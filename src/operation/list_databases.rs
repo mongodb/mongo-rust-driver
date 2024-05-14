@@ -1,14 +1,15 @@
-use bson::RawDocumentBuf;
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Document},
+    bson::{doc, Document, RawDocumentBuf},
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::ListDatabasesOptions,
     error::Result,
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
+
+use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
@@ -43,12 +44,12 @@ impl OperationWithDefaults for ListDatabases {
         ))
     }
 
-    fn handle_response(
-        &self,
-        raw_response: RawCommandResponse,
-        _description: &StreamDescription,
+    fn handle_response<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: Response = raw_response.body()?;
+        let response: Response = response.body()?;
         Ok(response.databases)
     }
 

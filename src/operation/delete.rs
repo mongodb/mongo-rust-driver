@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -18,6 +15,8 @@ use crate::{
     results::DeleteResult,
 };
 
+use super::ExecutionContext;
+
 #[derive(Debug)]
 pub(crate) struct Delete {
     ns: Namespace,
@@ -29,19 +28,6 @@ pub(crate) struct Delete {
 }
 
 impl Delete {
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::new(
-            Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            Document::new(),
-            None,
-            None,
-        )
-    }
-
     pub(crate) fn new(
         ns: Namespace,
         filter: Document,
@@ -95,10 +81,10 @@ impl OperationWithDefaults for Delete {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: WriteResponseBody = response.body()?;
         response.validate().map_err(convert_bulk_errors)?;

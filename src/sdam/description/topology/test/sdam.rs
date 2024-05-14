@@ -28,11 +28,11 @@ use crate::{
         get_client_options,
         log_uncaptured,
         run_spec_test,
-        util::event_buffer::EventBuffer,
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
         Event,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
         TestClient,
     },
 };
@@ -674,19 +674,13 @@ async fn heartbeat_events() {
     options.heartbeat_freq = None;
     let fp_client = TestClient::with_options(Some(options)).await;
 
-    let fp_options = FailCommandOptions::builder()
-        .error_code(1234)
-        .app_name("heartbeat_events".to_string())
-        .build();
-    let failpoint = FailPoint::fail_command(
+    let fail_point = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
         FailPointMode::AlwaysOn,
-        fp_options,
-    );
-    let _fp_guard = fp_client
-        .enable_failpoint(failpoint, None)
-        .await
-        .expect("enabling failpoint should succeed");
+    )
+    .app_name("heartbeat_events")
+    .error_code(1234);
+    let _guard = fp_client.enable_fail_point(fail_point).await.unwrap();
 
     subscriber
         .wait_for_event(Duration::from_millis(500), |event| {

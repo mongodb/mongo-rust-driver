@@ -1,18 +1,14 @@
-#[cfg(test)]
-mod test;
-
 use std::convert::TryInto;
 
-use bson::{RawBsonRef, RawDocumentBuf};
-
-use super::{CursorBody, OperationWithDefaults};
 use crate::{
-    bson::Document,
+    bson::{Document, RawBsonRef, RawDocumentBuf},
     client::SESSIONS_UNSUPPORTED_COMMANDS,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     selection_criteria::SelectionCriteria,
 };
+
+use super::{CursorBody, ExecutionContext, OperationWithDefaults};
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCommand<'conn> {
@@ -94,10 +90,10 @@ impl<'conn> OperationWithDefaults for RunCommand<'conn> {
         }
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         Ok(response.into_raw_document_buf().try_into()?)
     }

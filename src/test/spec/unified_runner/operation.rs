@@ -1,8 +1,6 @@
+mod bulk_write;
 #[cfg(feature = "in-use-encryption-unstable")]
 mod csfle;
-#[cfg(feature = "in-use-encryption-unstable")]
-use self::csfle::*;
-
 mod search_index;
 
 use std::{
@@ -10,6 +8,7 @@ use std::{
     convert::TryInto,
     fmt::Debug,
     ops::Deref,
+    panic::{catch_unwind, AssertUnwindSafe},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -45,15 +44,12 @@ use super::{
 use crate::{
     action::Action,
     bson::{doc, to_bson, Bson, Document},
-    client::{options::TransactionOptions, session::TransactionState},
-    coll::options::Hint,
-    collation::Collation,
-    db::options::{ListCollectionsOptions, RunCursorCommandOptions},
+    client::session::TransactionState,
     error::{ErrorKind, Result},
-    gridfs::options::{GridFsDownloadByNameOptions, GridFsUploadOptions},
     options::{
         AggregateOptions,
         ChangeStreamOptions,
+        Collation,
         CountOptions,
         CreateCollectionOptions,
         DeleteOptions,
@@ -65,20 +61,25 @@ use crate::{
         FindOneAndUpdateOptions,
         FindOneOptions,
         FindOptions,
+        GridFsDownloadByNameOptions,
+        GridFsUploadOptions,
+        Hint,
         IndexOptions,
         InsertManyOptions,
         InsertOneOptions,
+        ListCollectionsOptions,
         ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
+        RunCursorCommandOptions,
         SelectionCriteria,
+        TransactionOptions,
         UpdateModifications,
         UpdateOptions,
     },
     runtime,
-    selection_criteria::ReadPreference,
     serde_util,
-    test::FailPoint,
+    test::util::fail_point::FailPoint,
     ClientSession,
     Collection,
     Database,
@@ -86,6 +87,11 @@ use crate::{
     ServerType,
     TopologyType,
 };
+
+use bulk_write::*;
+#[cfg(feature = "in-use-encryption-unstable")]
+use csfle::*;
+use search_index::*;
 
 pub(crate) trait TestOperation: Debug + Send + Sync {
     fn execute_test_runner_operation<'a>(
@@ -182,6 +188,7 @@ macro_rules! with_opt_session {
         }
     };
 }
+use with_mut_session;
 
 #[derive(Debug)]
 pub(crate) struct Operation {
@@ -254,7 +261,7 @@ impl Operation {
                             "{}: {} should return an error",
                             description, self.name
                         ));
-                        expect_error.verify_result(&error, description).unwrap();
+                        expect_error.verify_result(&error, description);
                     }
                     Expectation::Ignore => (),
                 }
@@ -304,16 +311,12 @@ impl<'de> Deserialize<'de> for Operation {
         struct OperationDefinition {
             pub(crate) name: String,
             pub(crate) object: OperationObject,
-            #[serde(default = "default_arguments")]
+            #[serde(default = "Document::new")]
             pub(crate) arguments: Document,
             pub(crate) expect_error: Option<ExpectError>,
             pub(crate) expect_result: Option<Bson>,
             pub(crate) save_result_as_entity: Option<String>,
             pub(crate) ignore_result_and_error: Option<bool>,
-        }
-
-        fn default_arguments() -> Document {
-            doc! {}
         }
 
         let definition = OperationDefinition::deserialize(deserializer)?;
@@ -421,21 +424,12 @@ impl<'de> Deserialize<'de> for Operation {
             #[cfg(feature = "in-use-encryption-unstable")]
             "removeKeyAltName" => deserialize_op::<RemoveKeyAltName>(definition.arguments),
             "iterateOnce" => deserialize_op::<IterateOnce>(definition.arguments),
-            "createSearchIndex" => {
-                deserialize_op::<search_index::CreateSearchIndex>(definition.arguments)
-            }
-            "createSearchIndexes" => {
-                deserialize_op::<search_index::CreateSearchIndexes>(definition.arguments)
-            }
-            "dropSearchIndex" => {
-                deserialize_op::<search_index::DropSearchIndex>(definition.arguments)
-            }
-            "listSearchIndexes" => {
-                deserialize_op::<search_index::ListSearchIndexes>(definition.arguments)
-            }
-            "updateSearchIndex" => {
-                deserialize_op::<search_index::UpdateSearchIndex>(definition.arguments)
-            }
+            "createSearchIndex" => deserialize_op::<CreateSearchIndex>(definition.arguments),
+            "createSearchIndexes" => deserialize_op::<CreateSearchIndexes>(definition.arguments),
+            "dropSearchIndex" => deserialize_op::<DropSearchIndex>(definition.arguments),
+            "listSearchIndexes" => deserialize_op::<ListSearchIndexes>(definition.arguments),
+            "updateSearchIndex" => deserialize_op::<UpdateSearchIndex>(definition.arguments),
+            "clientBulkWrite" => deserialize_op::<BulkWrite>(definition.arguments),
             s => Ok(Box::new(UnimplementedOperation {
                 _name: s.to_string(),
             }) as Box<dyn TestOperation>),
@@ -1360,9 +1354,8 @@ impl TestOperation for FailPointCommand {
     ) -> BoxFuture<'a, ()> {
         async move {
             let client = test_runner.get_client(&self.client).await;
-            let guard = self
-                .fail_point
-                .enable(&client, Some(ReadPreference::Primary.into()))
+            let guard = client
+                .enable_fail_point(self.fail_point.clone())
                 .await
                 .unwrap();
             test_runner.fail_point_guards.write().await.push(guard);
@@ -1393,16 +1386,16 @@ impl TestOperation for TargetedFailPoint {
                         .unwrap_or_else(|| panic!("ClientSession not pinned"))
                 })
                 .await;
-            let fail_point_guard = test_runner
+            let guard = test_runner
                 .internal_client
-                .enable_failpoint(self.fail_point.clone(), Some(selection_criteria))
+                .enable_fail_point(
+                    self.fail_point
+                        .clone()
+                        .selection_criteria(selection_criteria),
+                )
                 .await
                 .unwrap();
-            test_runner
-                .fail_point_guards
-                .write()
-                .await
-                .push(fail_point_guard);
+            test_runner.fail_point_guards.write().await.push(guard);
         }
         .boxed()
     }
@@ -1842,7 +1835,7 @@ impl TestOperation for AssertSessionNotDirty {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct StartTransaction {
     #[serde(flatten)]
     options: TransactionOptions,
@@ -2489,12 +2482,14 @@ impl TestOperation for Loop {
                             self.report_success(&mut entities);
                         }
                         (Err(error), Expectation::Error(ref expected_error)) => {
-                            match expected_error.verify_result(&error, operation.name.as_str()) {
+                            match catch_unwind(AssertUnwindSafe(|| {
+                                expected_error.verify_result(&error, operation.name.as_str())
+                            })) {
                                 Ok(_) => self.report_success(&mut entities),
-                                Err(e) => report_error_or_failure!(
+                                Err(_) => report_error_or_failure!(
                                     self.store_failures_as_entity,
                                     self.store_errors_as_entity,
-                                    e,
+                                    format!("expected {:?}, got {:?}", expected_error, error),
                                     &mut entities
                                 ),
                             }

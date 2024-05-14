@@ -212,7 +212,7 @@ where
 }
 
 /// A struct modeling the canonical name for a collection in MongoDB.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Namespace {
     /// The name of the database associated with this namespace.
     pub db: String,
@@ -227,14 +227,6 @@ impl Namespace {
         Self {
             db: db.into(),
             coll: coll.into(),
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn empty() -> Self {
-        Self {
-            db: String::new(),
-            coll: String::new(),
         }
     }
 

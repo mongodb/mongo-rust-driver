@@ -9,7 +9,7 @@ use crate::{
     options::{Acknowledgment, TransactionOptions, WriteConcern},
 };
 
-use super::WriteConcernOnlyBody;
+use super::{ExecutionContext, WriteConcernOnlyBody};
 
 pub(crate) struct CommitTransaction {
     options: Option<TransactionOptions>,
@@ -42,10 +42,10 @@ impl OperationWithDefaults for CommitTransaction {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: WriteConcernOnlyBody = response.body()?;
         response.validate()

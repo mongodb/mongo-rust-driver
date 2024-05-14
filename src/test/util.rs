@@ -1,6 +1,6 @@
 mod event;
 pub(crate) mod event_buffer;
-mod failpoint;
+pub(crate) mod fail_point;
 mod matchable;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
@@ -9,7 +9,6 @@ mod trace;
 pub(crate) use self::event::EventClient;
 pub(crate) use self::{
     event::Event,
-    failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
 };
 
@@ -27,7 +26,6 @@ use crate::{
     bson::{doc, Bson},
     client::options::ServerAddress,
     hello::{hello_command, HelloCommandResponse},
-    selection_criteria::SelectionCriteria,
 };
 use bson::Document;
 use semver::{Version, VersionReq};
@@ -323,14 +321,6 @@ impl TestClient {
 
     pub(crate) fn supports_streaming_monitoring_protocol(&self) -> bool {
         self.server_info.topology_version.is_some()
-    }
-
-    pub(crate) async fn enable_failpoint(
-        &self,
-        fp: FailPoint,
-        criteria: impl Into<Option<SelectionCriteria>>,
-    ) -> Result<FailPointGuard> {
-        fp.enable(self, criteria).await
     }
 
     pub(crate) fn auth_enabled(&self) -> bool {

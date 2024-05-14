@@ -1,6 +1,7 @@
 //! Action builder types.
 
 mod aggregate;
+mod bulk_write;
 mod client_options;
 mod count;
 mod create_collection;
@@ -31,8 +32,10 @@ mod watch;
 
 use std::{future::IntoFuture, marker::PhantomData, ops::Deref};
 
+use crate::bson::Document;
+
 pub use aggregate::Aggregate;
-use bson::Document;
+pub use bulk_write::BulkWrite;
 pub use client_options::ParseConnectionString;
 pub use count::{CountDocuments, EstimatedDocumentCount};
 pub use create_collection::CreateCollection;

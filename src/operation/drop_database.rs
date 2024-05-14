@@ -1,7 +1,5 @@
-use bson::Document;
-
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::DropDatabaseOptions,
     error::Result,
@@ -13,6 +11,8 @@ use crate::{
     },
     options::WriteConcern,
 };
+
+use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct DropDatabase {
@@ -47,10 +47,10 @@ impl OperationWithDefaults for DropDatabase {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: WriteConcernOnlyBody = response.body()?;
         response.validate()

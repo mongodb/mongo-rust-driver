@@ -2,8 +2,8 @@ use std::convert::TryInto;
 
 use serde::Deserialize;
 
-use super::{OperationWithDefaults, Retryability, SingleCursorResult};
 use crate::{
+    bson::{doc, Document, RawDocument},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, Result},
     operation::aggregate::Aggregate,
@@ -11,7 +11,8 @@ use crate::{
     selection_criteria::SelectionCriteria,
     Namespace,
 };
-use bson::{doc, Document, RawDocument};
+
+use super::{ExecutionContext, OperationWithDefaults, Retryability, SingleCursorResult};
 
 pub(crate) struct CountDocuments {
     aggregate: Aggregate,
@@ -87,10 +88,10 @@ impl OperationWithDefaults for CountDocuments {
         self.aggregate.extract_at_cluster_time(response)
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: SingleCursorResult<Body> = response.body()?;
         Ok(response.0.map(|r| r.n).unwrap_or(0))

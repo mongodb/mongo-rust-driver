@@ -14,6 +14,8 @@ use crate::{
     Namespace,
 };
 
+use super::ExecutionContext;
+
 #[derive(Debug)]
 pub(crate) struct Find {
     ns: Namespace,
@@ -89,12 +91,14 @@ impl OperationWithDefaults for Find {
         CursorBody::extract_at_cluster_time(response)
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        description: &StreamDescription,
+        context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: CursorBody = response.body()?;
+
+        let description = context.connection.stream_description()?;
 
         // The comment should only be propagated to getMore calls on 4.4+.
         let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {

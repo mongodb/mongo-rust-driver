@@ -1,13 +1,9 @@
-#[cfg(test)]
-mod test;
-
 use std::{collections::VecDeque, time::Duration};
 
-use bson::{Document, RawDocumentBuf};
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Bson},
+    bson::{doc, Bson, Document, RawDocumentBuf},
     change_stream::event::ResumeToken,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     cursor::CursorInformation,
@@ -17,6 +13,8 @@ use crate::{
     results::GetMoreResult,
     Namespace,
 };
+
+use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct GetMore<'conn> {
@@ -87,10 +85,10 @@ impl<'conn> OperationWithDefaults for GetMore<'conn> {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: GetMoreResponseBody = response.body()?;
 

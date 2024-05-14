@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use serde::Deserialize;
 
 use crate::{
@@ -13,6 +10,8 @@ use crate::{
     results::UpdateResult,
     Namespace,
 };
+
+use super::ExecutionContext;
 
 #[derive(Clone, Debug)]
 pub(crate) enum UpdateOrReplace {
@@ -59,17 +58,6 @@ pub(crate) struct Update {
 }
 
 impl Update {
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::with_update(
-            Namespace::new("db", "coll"),
-            doc! {},
-            UpdateModifications::Document(doc! {}),
-            false,
-            None,
-        )
-    }
-
     pub(crate) fn with_update(
         ns: Namespace,
         filter: Document,
@@ -171,12 +159,12 @@ impl OperationWithDefaults for Update {
         ))
     }
 
-    fn handle_response(
-        &self,
-        raw_response: RawCommandResponse,
-        _description: &StreamDescription,
+    fn handle_response<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteResponseBody<UpdateBody> = raw_response.body_utf8_lossy()?;
+        let response: WriteResponseBody<UpdateBody> = response.body_utf8_lossy()?;
         response.validate().map_err(convert_bulk_errors)?;
 
         let modified_count = response.n_modified;
@@ -187,7 +175,11 @@ impl OperationWithDefaults for Update {
             .and_then(|doc| doc.get("_id"))
             .cloned();
 
-        let matched_count = if upserted_id.is_some() { 0 } else { response.n };
+        let matched_count = if upserted_id.is_some() {
+            0
+        } else {
+            response.body.n
+        };
 
         Ok(UpdateResult {
             matched_count,
@@ -213,6 +205,7 @@ impl OperationWithDefaults for Update {
 
 #[derive(Deserialize)]
 pub(crate) struct UpdateBody {
+    n: u64,
     #[serde(rename = "nModified")]
     n_modified: u64,
     upserted: Option<Vec<Document>>,

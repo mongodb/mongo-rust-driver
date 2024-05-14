@@ -2,12 +2,11 @@ pub(crate) mod options;
 
 use std::{fmt::Debug, marker::PhantomData};
 
-use bson::{from_slice, RawBson};
 use serde::{de::DeserializeOwned, Deserialize};
 
 use self::options::FindAndModifyOptions;
 use crate::{
-    bson::{doc, rawdoc, Document, RawDocumentBuf},
+    bson::{doc, from_slice, rawdoc, Document, RawBson, RawDocumentBuf},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::UpdateModifications, Namespace},
@@ -22,7 +21,7 @@ use crate::{
     options::WriteConcern,
 };
 
-use super::UpdateOrReplace;
+use super::{ExecutionContext, UpdateOrReplace};
 
 pub(crate) struct FindAndModify<T: DeserializeOwned> {
     ns: Namespace,
@@ -96,10 +95,10 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         #[derive(Debug, Deserialize)]
         pub(crate) struct Response {

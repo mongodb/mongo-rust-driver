@@ -1,9 +1,12 @@
+use futures_util::FutureExt;
+
 use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
+    BoxFuture,
 };
 
-use super::Operation;
+use super::{ExecutionContext, Operation};
 
 /// Forwards all implementation to the wrapped `Operation`, but returns the response unparsed and
 /// unvalidated as a `RawCommandResponse`.
@@ -26,12 +29,12 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.extract_at_cluster_time(response)
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
-    ) -> Result<Self::O> {
-        Ok(response)
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
+        async move { Ok(response) }.boxed()
     }
 
     fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {

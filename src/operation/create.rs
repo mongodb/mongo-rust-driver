@@ -1,7 +1,5 @@
-use bson::Document;
-
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{
@@ -13,6 +11,8 @@ use crate::{
     options::{CreateCollectionOptions, WriteConcern},
     Namespace,
 };
+
+use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct Create {
@@ -47,10 +47,10 @@ impl OperationWithDefaults for Create {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: WriteConcernOnlyBody = response.body()?;
         response.validate()

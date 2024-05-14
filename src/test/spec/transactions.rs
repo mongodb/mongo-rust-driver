@@ -10,9 +10,7 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
+        util::fail_point::{FailPoint, FailPointMode},
         TestClient,
     },
     Client,
@@ -205,17 +203,10 @@ async fn convenient_api_retry_timeout_commit_unknown() {
         .database("test_convenient")
         .collection::<Document>("test_convenient");
 
-    let _fp = FailPoint::fail_command(
-        &["commitTransaction"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder()
-            .error_code(251)
-            .error_labels(vec![UNKNOWN_TRANSACTION_COMMIT_RESULT.to_string()])
-            .build(),
-    )
-    .enable(&client, None)
-    .await
-    .unwrap();
+    let fail_point = FailPoint::fail_command(&["commitTransaction"], FailPointMode::Times(1))
+        .error_code(251)
+        .error_labels(vec![UNKNOWN_TRANSACTION_COMMIT_RESULT]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let result = session
         .start_transaction()
@@ -257,17 +248,10 @@ async fn convenient_api_retry_timeout_commit_transient() {
         .database("test_convenient")
         .collection::<Document>("test_convenient");
 
-    let _fp = FailPoint::fail_command(
-        &["commitTransaction"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder()
-            .error_code(251)
-            .error_labels(vec![TRANSIENT_TRANSACTION_ERROR.to_string()])
-            .build(),
-    )
-    .enable(&client, None)
-    .await
-    .unwrap();
+    let fail_point = FailPoint::fail_command(&["commitTransaction"], FailPointMode::Times(1))
+        .error_code(251)
+        .error_labels(vec![TRANSIENT_TRANSACTION_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let result = session
         .start_transaction()

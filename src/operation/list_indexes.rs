@@ -9,10 +9,7 @@ use crate::{
     Namespace,
 };
 
-use super::{CursorBody, Retryability};
-
-#[cfg(test)]
-mod test;
+use super::{CursorBody, ExecutionContext, Retryability};
 
 pub(crate) struct ListIndexes {
     ns: Namespace,
@@ -22,17 +19,6 @@ pub(crate) struct ListIndexes {
 impl ListIndexes {
     pub(crate) fn new(ns: Namespace, options: Option<ListIndexesOptions>) -> Self {
         ListIndexes { ns, options }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn empty() -> Self {
-        Self {
-            ns: Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            options: None,
-        }
     }
 }
 
@@ -58,15 +44,19 @@ impl OperationWithDefaults for ListIndexes {
         ))
     }
 
-    fn handle_response(
-        &self,
-        raw_response: RawCommandResponse,
-        description: &StreamDescription,
+    fn handle_response<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: CursorBody = raw_response.body()?;
+        let response: CursorBody = response.body()?;
         Ok(CursorSpecification::new(
             response.cursor,
-            description.server_address.clone(),
+            context
+                .connection
+                .stream_description()?
+                .server_address
+                .clone(),
             self.options.as_ref().and_then(|o| o.batch_size),
             self.options.as_ref().and_then(|o| o.max_time),
             None,

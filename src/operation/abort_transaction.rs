@@ -1,7 +1,5 @@
-use bson::Document;
-
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     client::session::TransactionPin,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::Result,
@@ -10,7 +8,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-use super::{OperationWithDefaults, WriteConcernOnlyBody};
+use super::{ExecutionContext, OperationWithDefaults, WriteConcernOnlyBody};
 
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
@@ -49,10 +47,10 @@ impl OperationWithDefaults for AbortTransaction {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: WriteConcernOnlyBody = response.body()?;
         response.validate()

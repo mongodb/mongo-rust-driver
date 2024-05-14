@@ -1,10 +1,13 @@
-use std::{collections::HashMap, convert::TryInto};
-
-use bson::{oid::ObjectId, Bson, RawArrayBuf, RawDocument, RawDocumentBuf};
+use std::collections::HashMap;
 
 use crate::{
-    bson::rawdoc,
-    bson_util,
+    bson::{rawdoc, Bson, RawDocument, RawDocumentBuf},
+    bson_util::{
+        array_entry_size_bytes,
+        extend_raw_document_buf,
+        get_or_prepend_id_field,
+        vec_to_raw_array_buf,
+    },
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{BulkWriteFailure, Error, ErrorKind, Result},
@@ -14,7 +17,7 @@ use crate::{
     Namespace,
 };
 
-use super::{COMMAND_OVERHEAD_SIZE, MAX_ENCRYPTED_WRITE_SIZE};
+use super::{ExecutionContext, MAX_ENCRYPTED_WRITE_SIZE, OP_MSG_OVERHEAD_BYTES};
 
 #[derive(Debug)]
 pub(crate) struct Insert<'a> {
@@ -54,46 +57,28 @@ impl<'a> OperationWithDefaults for Insert<'a> {
     const NAME: &'static str = "insert";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+        let max_doc_size: usize = Checked::new(description.max_bson_object_size).try_into()?;
+        let max_message_size: usize =
+            Checked::new(description.max_message_size_bytes).try_into()?;
+        let max_operations: usize = Checked::new(description.max_write_batch_size).try_into()?;
+
+        let mut command_body = rawdoc! { Self::NAME: self.ns.coll.clone() };
+        let options = bson::to_raw_document_buf(&self.options)?;
+        extend_raw_document_buf(&mut command_body, options)?;
+
+        let max_document_sequence_size: usize = (Checked::new(max_message_size)
+            - OP_MSG_OVERHEAD_BYTES
+            - command_body.as_bytes().len())
+        .try_into()?;
+
         let mut docs = Vec::new();
-        let mut size = 0;
+        let mut current_size = Checked::new(0);
+        for (i, document) in self.documents.iter().take(max_operations).enumerate() {
+            let mut document = bson::to_raw_document_buf(document)?;
+            let id = get_or_prepend_id_field(&mut document)?;
 
-        let max_doc_size = Checked::<usize>::try_from(description.max_bson_object_size)?;
-        let max_doc_sequence_size =
-            Checked::<usize>::try_from(description.max_message_size_bytes)? - COMMAND_OVERHEAD_SIZE;
-
-        for (i, &d) in self
-            .documents
-            .iter()
-            .take(Checked::new(description.max_write_batch_size).try_into()?)
-            .enumerate()
-        {
-            let mut doc = d.to_owned();
-            let id = match doc.get("_id")? {
-                Some(b) => b.try_into()?,
-                None => {
-                    let mut new_doc = RawDocumentBuf::new();
-                    let oid = ObjectId::new();
-                    new_doc.append("_id", oid);
-
-                    let mut new_bytes = new_doc.into_bytes();
-                    new_bytes.pop(); // remove trailing null byte
-
-                    let mut bytes = doc.into_bytes();
-                    let oid_slice = &new_bytes[4..];
-                    // insert oid at beginning of document
-                    bytes.splice(4..4, oid_slice.iter().cloned());
-
-                    // overwrite old length
-                    let new_length = Checked::new(bytes.len()).try_into::<i32>()?.to_le_bytes();
-                    bytes[0..4].copy_from_slice(&new_length);
-                    doc = RawDocumentBuf::from_bytes(bytes)?;
-
-                    Bson::ObjectId(oid)
-                }
-            };
-
-            let doc_size = doc.as_bytes().len();
-            if doc_size > max_doc_size.get()? {
+            let doc_size = document.as_bytes().len();
+            if doc_size > max_doc_size {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
                         "insert document must be within {} bytes, but document provided is {} \
@@ -107,18 +92,21 @@ impl<'a> OperationWithDefaults for Insert<'a> {
             // From the spec: Drivers MUST not reduce the size limits for a single write before
             // automatic encryption. I.e. if a single document has size larger than 2MiB (but less
             // than `maxBsonObjectSize`) proceed with automatic encryption.
-            if self.encrypted && i != 0 {
-                let doc_entry_size = bson_util::array_entry_size_bytes(i, doc.as_bytes().len())?;
-                if (Checked::new(size) + doc_entry_size).get()? >= MAX_ENCRYPTED_WRITE_SIZE {
+            if self.encrypted {
+                let doc_entry_size = array_entry_size_bytes(i, document.as_bytes().len())?;
+                current_size += doc_entry_size;
+                if i != 0 && current_size.get()? >= MAX_ENCRYPTED_WRITE_SIZE {
                     break;
                 }
-            } else if (Checked::new(size) + doc_size).get()? > max_doc_sequence_size.get()? {
-                break;
+            } else {
+                current_size += doc_size;
+                if current_size.get()? > max_document_sequence_size {
+                    break;
+                }
             }
 
             self.inserted_ids.push(id);
-            docs.push(doc);
-            size += doc_size;
+            docs.push(document);
         }
 
         let mut body = rawdoc! {
@@ -126,15 +114,11 @@ impl<'a> OperationWithDefaults for Insert<'a> {
         };
 
         let options_doc = bson::to_raw_document_buf(&self.options)?;
-        bson_util::extend_raw_document_buf(&mut body, options_doc)?;
+        extend_raw_document_buf(&mut body, options_doc)?;
 
         if self.encrypted {
             // Auto-encryption does not support document sequences
-            let mut raw_array = RawArrayBuf::new();
-            for doc in docs {
-                raw_array.push(doc);
-            }
-            body.append("documents", raw_array);
+            body.append("documents", vec_to_raw_array_buf(docs));
             Ok(Command::new(Self::NAME, &self.ns.db, body))
         } else {
             let mut command = Command::new(Self::NAME, &self.ns.db, body);
@@ -143,12 +127,12 @@ impl<'a> OperationWithDefaults for Insert<'a> {
         }
     }
 
-    fn handle_response(
-        &self,
-        raw_response: RawCommandResponse,
-        _description: &StreamDescription,
+    fn handle_response<'b>(
+        &'b self,
+        response: RawCommandResponse,
+        _context: ExecutionContext<'b>,
     ) -> Result<Self::O> {
-        let response: WriteResponseBody = raw_response.body_utf8_lossy()?;
+        let response: WriteResponseBody = response.body_utf8_lossy()?;
         let response_n = Checked::<usize>::try_from(response.n)?;
 
         let mut map = HashMap::new();

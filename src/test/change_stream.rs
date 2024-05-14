@@ -12,7 +12,7 @@ use crate::{
     db::options::ChangeStreamPreAndPostImages,
     event::command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
     options::{Acknowledgment, WriteConcern},
-    test::{FailCommandOptions, FailPoint, FailPointMode},
+    test::util::fail_point::{FailPoint, FailPointMode},
     Client,
     Collection,
 };
@@ -172,13 +172,8 @@ async fn resumes_on_error() -> Result<()> {
         }) if key == doc! { "_id": 1 }
     ));
 
-    let _guard = FailPoint::fail_command(
-        &["getMore"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder().error_code(43).build(),
-    )
-    .enable(&client, None)
-    .await?;
+    let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(43);
+    let _guard = client.enable_fail_point(fail_point).await?;
 
     coll.insert_one(doc! { "_id": 2 }).await?;
     assert!(matches!(stream.next().await.transpose()?,
@@ -205,13 +200,9 @@ async fn does_not_resume_aggregate() -> Result<()> {
         None => return Ok(()),
     };
 
-    let _guard = FailPoint::fail_command(
-        &["aggregate"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder().error_code(43).build(),
-    )
-    .enable(&client, None)
-    .await?;
+    let fail_point =
+        FailPoint::fail_command(&["aggregate"], FailPointMode::Times(1)).error_code(43);
+    let _guard = client.enable_fail_point(fail_point).await?;
 
     assert!(coll.watch().await.is_err());
 
@@ -277,13 +268,9 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
         }) if key == doc! { "_id": 1 }
     ));
 
-    let _guard = FailPoint::fail_command(
-        &["getMore", "killCursors"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder().error_code(43).build(),
-    )
-    .enable(&client, None)
-    .await?;
+    let fail_point = FailPoint::fail_command(&["getMore", "killCursors"], FailPointMode::Times(1))
+        .error_code(43);
+    let _guard = client.enable_fail_point(fail_point).await?;
 
     coll.insert_one(doc! { "_id": 2 }).await?;
     assert!(matches!(stream.next().await.transpose()?,
@@ -322,13 +309,8 @@ async fn resume_start_at_operation_time() -> Result<()> {
         return Ok(());
     }
 
-    let _guard = FailPoint::fail_command(
-        &["getMore"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder().error_code(43).build(),
-    )
-    .enable(&client, None)
-    .await?;
+    let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(43);
+    let _guard = client.enable_fail_point(fail_point).await?;
 
     coll.insert_one(doc! { "_id": 2 }).await?;
     stream.next().await.transpose()?;
@@ -538,13 +520,8 @@ async fn resume_uses_start_after() -> Result<()> {
 
     // Create an event, and synthesize a resumable error when calling `getMore` for that event.
     coll.insert_one(doc! {}).await?;
-    let _guard = FailPoint::fail_command(
-        &["getMore"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder().error_code(43).build(),
-    )
-    .enable(&client, None)
-    .await?;
+    let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(43);
+    let _guard = client.enable_fail_point(fail_point).await?;
     stream.next().await.transpose()?;
 
     let commands = client.events.get_command_started_events(&["aggregate"]);
@@ -598,13 +575,8 @@ async fn resume_uses_resume_after() -> Result<()> {
 
     // Create an event, and synthesize a resumable error when calling `getMore` for that event.
     coll.insert_one(doc! {}).await?;
-    let _guard = FailPoint::fail_command(
-        &["getMore"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder().error_code(43).build(),
-    )
-    .enable(&client, None)
-    .await?;
+    let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(43);
+    let _guard = client.enable_fail_point(fail_point).await?;
     stream.next().await.transpose()?;
 
     let commands = client.events.get_command_started_events(&["aggregate"]);

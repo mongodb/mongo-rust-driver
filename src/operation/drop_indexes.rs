@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -9,6 +6,8 @@ use crate::{
     options::{DropIndexOptions, WriteConcern},
     Namespace,
 };
+
+use super::ExecutionContext;
 
 pub(crate) struct DropIndexes {
     ns: Namespace,
@@ -19,18 +18,6 @@ pub(crate) struct DropIndexes {
 impl DropIndexes {
     pub(crate) fn new(ns: Namespace, name: String, options: Option<DropIndexOptions>) -> Self {
         Self { ns, name, options }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn empty() -> Self {
-        Self {
-            ns: Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            name: String::new(),
-            options: None,
-        }
     }
 }
 
@@ -55,10 +42,10 @@ impl OperationWithDefaults for DropIndexes {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         _response: RawCommandResponse,
-        _description: &StreamDescription,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         Ok(())
     }

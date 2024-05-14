@@ -7,6 +7,8 @@ use crate::{
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
 };
 
+use super::ExecutionContext;
+
 #[derive(Debug)]
 pub(crate) struct ListCollections {
     db: String,
@@ -52,15 +54,19 @@ impl OperationWithDefaults for ListCollections {
         Ok(Command::new(Self::NAME.to_string(), self.db.clone(), body))
     }
 
-    fn handle_response(
-        &self,
-        raw_response: RawCommandResponse,
-        description: &StreamDescription,
+    fn handle_response<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: CursorBody = raw_response.body()?;
+        let response: CursorBody = response.body()?;
         Ok(CursorSpecification::new(
             response.cursor,
-            description.server_address.clone(),
+            context
+                .connection
+                .stream_description()?
+                .server_address
+                .clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             None,
             None,

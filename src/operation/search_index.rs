@@ -1,9 +1,14 @@
-use bson::{doc, Document};
 use serde::Deserialize;
 
-use crate::{cmap::Command, error::Result, Namespace, SearchIndexModel};
+use crate::{
+    bson::{doc, Document},
+    cmap::{Command, RawCommandResponse},
+    error::Result,
+    Namespace,
+    SearchIndexModel,
+};
 
-use super::OperationWithDefaults;
+use super::{ExecutionContext, OperationWithDefaults};
 
 #[derive(Debug)]
 pub(crate) struct CreateSearchIndexes {
@@ -33,10 +38,10 @@ impl OperationWithDefaults for CreateSearchIndexes {
         ))
     }
 
-    fn handle_response(
-        &self,
-        response: crate::cmap::RawCommandResponse,
-        _description: &crate::cmap::StreamDescription,
+    fn handle_response<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         #[derive(Debug, Deserialize)]
         #[serde(rename_all = "camelCase")]
@@ -105,11 +110,11 @@ impl OperationWithDefaults for UpdateSearchIndex {
         ))
     }
 
-    fn handle_response(
-        &self,
-        _response: crate::cmap::RawCommandResponse,
-        _description: &crate::cmap::StreamDescription,
-    ) -> crate::error::Result<Self::O> {
+    fn handle_response<'a>(
+        &'a self,
+        _response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
+    ) -> Result<Self::O> {
         Ok(())
     }
 
@@ -153,10 +158,10 @@ impl OperationWithDefaults for DropSearchIndex {
         ))
     }
 
-    fn handle_response(
-        &self,
-        _response: crate::cmap::RawCommandResponse,
-        _description: &crate::cmap::StreamDescription,
+    fn handle_response<'a>(
+        &'a self,
+        _response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         Ok(())
     }

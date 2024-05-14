@@ -78,29 +78,4 @@ impl StreamDescription {
             && self.logical_session_timeout.is_some()
             && self.max_wire_version.map_or(false, |version| version >= 6)
     }
-
-    /// Gets a description of a stream for a 4.2 connection.
-    #[cfg(test)]
-    pub(crate) fn new_testing() -> Self {
-        Self::with_wire_version(8)
-    }
-
-    /// Gets a description of a stream for a connection to a server with the provided
-    /// maxWireVersion.
-    #[cfg(test)]
-    pub(crate) fn with_wire_version(max_wire_version: i32) -> Self {
-        Self {
-            server_address: Default::default(),
-            initial_server_type: Default::default(),
-            max_wire_version: Some(max_wire_version),
-            min_wire_version: Some(max_wire_version),
-            sasl_supported_mechs: Default::default(),
-            logical_session_timeout: Some(Duration::from_secs(30 * 60)),
-            max_bson_object_size: 16 * 1024 * 1024,
-            max_write_batch_size: 100_000,
-            hello_ok: false,
-            max_message_size_bytes: 48_000_000,
-            service_id: None,
-        }
-    }
 }

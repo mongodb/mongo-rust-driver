@@ -14,11 +14,12 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        util::{event_buffer::EventBuffer, TestClient},
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+            TestClient,
+        },
         Event,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
         SERVER_API,
     },
     Client,
@@ -707,14 +708,10 @@ async fn retry_commit_txn_check_out() {
         .await
         .unwrap();
 
-    // enable a fail point that clears the connection pools so that
-    // commitTransaction will create a new connection during check out.
-    let fp = FailPoint::fail_command(
-        &["ping"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder().error_code(11600).build(),
-    );
-    let _guard = setup_client.enable_failpoint(fp, None).await.unwrap();
+    // Enable a fail point that clears the connection pools so that commitTransaction will create a
+    // new connection during checkout.
+    let fail_point = FailPoint::fail_command(&["ping"], FailPointMode::Times(1)).error_code(11600);
+    let _guard = setup_client.enable_fail_point(fail_point).await.unwrap();
 
     #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
@@ -758,17 +755,13 @@ async fn retry_commit_txn_check_out() {
         .await
         .expect("should see mark available event");
 
-    // enable a failpoint on the handshake to cause check_out
-    // to fail with a retryable error
-    let fp = FailPoint::fail_command(
+    let fail_point = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
         FailPointMode::Times(1),
-        FailCommandOptions::builder()
-            .error_code(11600)
-            .app_name("retry_commit_txn_check_out".to_string())
-            .build(),
-    );
-    let _guard2 = setup_client.enable_failpoint(fp, None).await.unwrap();
+    )
+    .error_code(11600)
+    .app_name("retry_commit_txn_check_out");
+    let _guard2 = setup_client.enable_fail_point(fail_point).await.unwrap();
 
     // finally, attempt the commit.
     // this should succeed due to retry

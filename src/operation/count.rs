@@ -1,14 +1,15 @@
-use bson::Document;
 use serde::Deserialize;
 
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     error::{Error, Result},
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
 };
+
+use super::ExecutionContext;
 
 pub(crate) struct Count {
     ns: Namespace,
@@ -42,10 +43,10 @@ impl OperationWithDefaults for Count {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response_body: ResponseBody = response.body()?;
         Ok(response_body.n)

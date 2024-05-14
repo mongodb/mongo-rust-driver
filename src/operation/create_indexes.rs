@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -12,7 +9,7 @@ use crate::{
     Namespace,
 };
 
-use super::WriteConcernOnlyBody;
+use super::{ExecutionContext, WriteConcernOnlyBody};
 
 #[derive(Debug)]
 pub(crate) struct CreateIndexes {
@@ -31,18 +28,6 @@ impl CreateIndexes {
             ns,
             indexes,
             options,
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn with_indexes(indexes: Vec<IndexModel>) -> Self {
-        Self {
-            ns: Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            indexes,
-            options: None,
         }
     }
 }
@@ -85,10 +70,10 @@ impl OperationWithDefaults for CreateIndexes {
         ))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: WriteConcernOnlyBody = response.body()?;
         response.validate()?;

@@ -211,6 +211,26 @@ impl Client {
         ))
     }
 
+    /// Whether commands sent via this client should be auto-encrypted.
+    pub(crate) async fn should_auto_encrypt(&self) -> bool {
+        #[cfg(feature = "in-use-encryption-unstable")]
+        {
+            let csfle = self.inner.csfle.read().await;
+            match *csfle {
+                Some(ref csfle) => csfle
+                    .opts()
+                    .bypass_auto_encryption
+                    .map(|b| !b)
+                    .unwrap_or(true),
+                None => false,
+            }
+        }
+        #[cfg(not(feature = "in-use-encryption-unstable"))]
+        {
+            false
+        }
+    }
+
     #[cfg(all(test, feature = "in-use-encryption-unstable"))]
     pub(crate) async fn mongocryptd_spawned(&self) -> bool {
         self.inner

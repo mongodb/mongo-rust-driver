@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test;
 
+mod bulk_write;
 mod parse;
 mod resolver_config;
 
@@ -44,6 +45,7 @@ use crate::{
     srv::{OriginalSrvInfo, SrvResolver},
 };
 
+pub use bulk_write::*;
 #[cfg(feature = "dns-resolver")]
 pub use resolver_config::ResolverConfig;
 #[cfg(not(feature = "dns-resolver"))]

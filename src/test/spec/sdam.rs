@@ -10,11 +10,11 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
-        util::event_buffer::EventBuffer,
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
         Event,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
         TestClient,
     },
     Client,
@@ -204,15 +204,13 @@ async fn rtt_is_updated() {
     assert!(events.len() > 2);
 
     // configure a failpoint that blocks hello commands
-    let fp = FailPoint::fail_command(
+    let fail_point = FailPoint::fail_command(
         &["hello", LEGACY_HELLO_COMMAND_NAME],
         FailPointMode::Times(1000),
-        FailCommandOptions::builder()
-            .block_connection(Duration::from_millis(500))
-            .app_name(app_name.to_string())
-            .build(),
-    );
-    let _gp_guard = fp.enable(&client, None).await.unwrap();
+    )
+    .block_connection(Duration::from_millis(500))
+    .app_name(app_name);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let mut watcher = client.topology().watch();
     runtime::timeout(Duration::from_secs(10), async move {

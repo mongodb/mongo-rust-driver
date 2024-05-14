@@ -4,7 +4,16 @@ use std::{
 };
 
 use crate::{
-    bson::{Bson, Document, RawArrayBuf, RawBson, RawBsonRef, RawDocumentBuf},
+    bson::{
+        oid::ObjectId,
+        rawdoc,
+        Bson,
+        Document,
+        RawArrayBuf,
+        RawBson,
+        RawBsonRef,
+        RawDocumentBuf,
+    },
     checked::Checked,
     error::{ErrorKind, Result},
     runtime::SyncLittleEndianRead,
@@ -57,38 +66,51 @@ pub(crate) fn to_raw_bson_array(docs: &[Document]) -> Result<RawBson> {
     Ok(RawBson::Array(array))
 }
 
-#[cfg(test)]
-pub(crate) fn sort_document(document: &mut Document) {
-    let temp = std::mem::take(document);
-
-    let mut elements: Vec<_> = temp.into_iter().collect();
-    elements.sort_by(|e1, e2| e1.0.cmp(&e2.0));
-
-    document.extend(elements);
-}
-
 pub(crate) fn first_key(document: &Document) -> Option<&str> {
     document.keys().next().map(String::as_str)
 }
 
-pub(crate) fn replacement_raw_document_check(replacement: &RawDocumentBuf) -> Result<()> {
-    match replacement.iter().next().transpose()? {
-        Some((key, _)) if !key.starts_with('$') => Ok(()),
-        _ => Err(ErrorKind::InvalidArgument {
-            message: "replace document must have first key not starting with '$'".to_string(),
+pub(crate) fn update_document_check(update: &Document) -> Result<()> {
+    match first_key(update) {
+        Some(key) => {
+            if !key.starts_with('$') {
+                Err(ErrorKind::InvalidArgument {
+                    message: "update document must only contain update modifiers".to_string(),
+                }
+                .into())
+            } else {
+                Ok(())
+            }
+        }
+        None => Err(ErrorKind::InvalidArgument {
+            message: "update document must not be empty".to_string(),
         }
         .into()),
     }
 }
 
-pub(crate) fn update_document_check(update: &Document) -> Result<()> {
-    match first_key(update) {
-        Some(s) if s.starts_with('$') => Ok(()),
-        _ => Err(ErrorKind::InvalidArgument {
-            message: "update document must have first key starting with '$".to_string(),
+pub(crate) fn replacement_document_check(replacement: &Document) -> Result<()> {
+    if let Some(key) = first_key(replacement) {
+        if key.starts_with('$') {
+            return Err(ErrorKind::InvalidArgument {
+                message: "replacement document must not contain update modifiers".to_string(),
+            }
+            .into());
         }
-        .into()),
     }
+    Ok(())
+}
+
+pub(crate) fn replacement_raw_document_check(replacement: &RawDocumentBuf) -> Result<()> {
+    if let Some((key, _)) = replacement.iter().next().transpose()? {
+        if key.starts_with('$') {
+            return Err(ErrorKind::InvalidArgument {
+                message: "replacement document must not contain update modifiers".to_string(),
+            }
+            .into());
+        };
+    }
+    Ok(())
 }
 
 /// The size in bytes of the provided document's entry in a BSON array at the given index.
@@ -99,6 +121,14 @@ pub(crate) fn array_entry_size_bytes(index: usize, doc_len: usize) -> Result<usi
     //   * size of value
 
     (Checked::new(1) + num_decimal_digits(index) + 1 + doc_len).get()
+}
+
+pub(crate) fn vec_to_raw_array_buf(docs: Vec<RawDocumentBuf>) -> RawArrayBuf {
+    let mut array = RawArrayBuf::new();
+    for doc in docs {
+        array.push(doc);
+    }
+    array
 }
 
 /// The number of digits in `n` in base 10.
@@ -137,6 +167,30 @@ pub(crate) fn extend_raw_document_buf(
         this.append(k, v.to_raw_bson());
     }
     Ok(())
+}
+
+/// Returns the _id field of this document, prepending the field to the document if one is not
+/// already present.
+pub(crate) fn get_or_prepend_id_field(doc: &mut RawDocumentBuf) -> Result<Bson> {
+    match doc.get("_id")? {
+        Some(id) => Ok(id.try_into()?),
+        None => {
+            let id = ObjectId::new();
+            let mut new_bytes = rawdoc! { "_id": id }.into_bytes();
+
+            // Remove the trailing null byte (which will be replaced by the null byte in the given
+            // document) and append the document's elements
+            new_bytes.pop();
+            new_bytes.extend(&doc.as_bytes()[4..]);
+
+            let new_length: i32 = Checked::new(new_bytes.len()).try_into()?;
+            new_bytes[0..4].copy_from_slice(&new_length.to_le_bytes());
+
+            *doc = RawDocumentBuf::from_bytes(new_bytes)?;
+
+            Ok(id.into())
+        }
+    }
 }
 
 #[cfg(test)]

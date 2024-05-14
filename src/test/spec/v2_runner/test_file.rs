@@ -11,8 +11,7 @@ use crate::{
     test::{
         log_uncaptured,
         spec::merge_uri_options,
-        util::is_expected_type,
-        FailPoint,
+        util::{fail_point::FailPoint, is_expected_type},
         Serverless,
         TestClient,
         DEFAULT_URI,

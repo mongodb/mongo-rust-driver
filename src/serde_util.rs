@@ -1,4 +1,7 @@
-use std::time::Duration;
+use std::{
+    collections::{BTreeMap, HashMap},
+    time::Duration,
+};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -183,4 +186,40 @@ where
         )));
     }
     Ok(Some(vec))
+}
+
+pub(crate) fn serialize_indexed_map<S: Serializer, T: Serialize>(
+    map: &Option<HashMap<usize, T>>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    if let Some(map) = map {
+        let string_map: BTreeMap<_, _> = map
+            .iter()
+            .map(|(index, result)| (index.to_string(), result))
+            .collect();
+        string_map.serialize(serializer)
+    } else {
+        serializer.serialize_none()
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn deserialize_indexed_map<'de, D, T>(
+    deserializer: D,
+) -> std::result::Result<Option<HashMap<usize, T>>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: serde::de::DeserializeOwned,
+{
+    use std::str::FromStr;
+
+    let string_map: HashMap<String, T> = HashMap::deserialize(deserializer)?;
+    Ok(Some(string_map.into_iter().try_fold(
+        HashMap::new(),
+        |mut map, (index, t)| {
+            let index = usize::from_str(&index).map_err(serde::de::Error::custom)?;
+            map.insert(index, t);
+            Ok(map)
+        },
+    )?))
 }

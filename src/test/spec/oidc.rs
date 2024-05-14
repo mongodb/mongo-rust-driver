@@ -66,7 +66,7 @@ mod basic {
     use crate::{
         client::auth::{oidc, AuthMechanism, Credential},
         options::ClientOptions,
-        test::{FailCommandOptions, FailPoint},
+        test::util::fail_point::{FailPoint, FailPointMode},
         Client,
     };
     use bson::{doc, Document};
@@ -368,13 +368,9 @@ mod basic {
         let admin_client = admin_client!();
 
         // Now set a failpoint for find with 391 error code
-        let options = FailCommandOptions::builder().error_code(391).build();
-        let failpoint = FailPoint::fail_command(
-            &["find"],
-            crate::test::FailPointMode::Times(1),
-            Some(options),
-        );
-        let _fp_guard = failpoint.enable(&admin_client, None).await.unwrap();
+        let fail_point =
+            FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(391);
+        let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
 
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
@@ -799,16 +795,12 @@ mod basic {
         let client = Client::with_options(opts)?;
 
         // Now set a failpoint for saslStart
-        let options = FailCommandOptions::builder().error_code(20).build();
-        let failpoint = FailPoint::fail_command(
-            &["saslStart"],
-            // we use 5 times just because AlwaysOn is dangerous if for some reason we don't run
-            // the cleanup, since we will not be able to auth a new connection to turn
-            // off the failpoint.
-            crate::test::FailPointMode::Times(5),
-            Some(options),
-        );
-        let _fp_guard = failpoint.enable(&admin_client, None).await.unwrap();
+        // we use 5 times just because AlwaysOn is dangerous if for some reason we don't run
+        // the cleanup, since we will not be able to auth a new connection to turn
+        // off the failpoint.
+        let fail_point =
+            FailPoint::fail_command(&["saslStart"], FailPointMode::Times(5)).error_code(20);
+        let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
 
         // Now find should succeed even though we have a fail point on saslStart because the spec
         // auth should succeed.
@@ -831,13 +823,9 @@ mod basic {
         let admin_client = admin_client!();
 
         // Now set a failpoint for find
-        let options = FailCommandOptions::builder().error_code(20).build();
-        let failpoint = FailPoint::fail_command(
-            &["saslStart"],
-            crate::test::FailPointMode::Times(5),
-            Some(options),
-        );
-        let _fp_guard = failpoint.enable(&admin_client, None).await.unwrap();
+        let fail_point =
+            FailPoint::fail_command(&["saslStart"], FailPointMode::Times(5)).error_code(20);
+        let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
@@ -920,13 +908,9 @@ mod basic {
             .await?;
 
         // Now set a failpoint for find with 391 error code
-        let options = FailCommandOptions::builder().error_code(391).build();
-        let failpoint = FailPoint::fail_command(
-            &["find"],
-            crate::test::FailPointMode::Times(1),
-            Some(options),
-        );
-        let _fp_guard = failpoint.enable(&admin_client, None).await.unwrap();
+        let fail_point =
+            FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(391);
+        let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
 
         client
             .database("test")
@@ -1010,13 +994,9 @@ mod basic {
             .await?;
 
         // Now set a failpoint for find with 391 error code
-        let options = FailCommandOptions::builder().error_code(391).build();
-        let failpoint = FailPoint::fail_command(
-            &["find"],
-            crate::test::FailPointMode::Times(1),
-            Some(options),
-        );
-        let _fp_guard = failpoint.enable(&admin_client, None).await.unwrap();
+        let fail_point =
+            FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(391);
+        let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
 
         client
             .database("test")
@@ -1065,13 +1045,9 @@ mod basic {
         assert_eq!(1, *(*call_count).lock().await);
 
         // Now set a failpoint for find with 391 error code
-        let options = FailCommandOptions::builder().error_code(391).build();
-        let failpoint = FailPoint::fail_command(
-            &["find", "saslStart"],
-            crate::test::FailPointMode::Times(2),
-            Some(options),
-        );
-        let _fp_guard = failpoint.enable(&admin_client, None).await.unwrap();
+        let fail_point = FailPoint::fail_command(&["find", "saslStart"], FailPointMode::Times(2))
+            .error_code(391);
+        let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
 
         client
             .database("test")
@@ -1120,13 +1096,9 @@ mod basic {
         assert_eq!(1, *(*call_count).lock().await);
 
         // Now set a failpoint for find with 391 error code
-        let options = FailCommandOptions::builder().error_code(391).build();
-        let failpoint = FailPoint::fail_command(
-            &["find", "saslStart"],
-            crate::test::FailPointMode::Times(3),
-            Some(options),
-        );
-        let _fp_guard = failpoint.enable(&admin_client, None).await.unwrap();
+        let fail_point = FailPoint::fail_command(&["find", "saslStart"], FailPointMode::Times(3))
+            .error_code(391);
+        let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
 
         let res = client
             .database("test")

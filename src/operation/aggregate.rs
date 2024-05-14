@@ -1,8 +1,5 @@
 pub(crate) mod change_stream;
 
-#[cfg(test)]
-mod test;
-
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
@@ -16,6 +13,7 @@ use crate::{
 
 use super::{
     CursorBody,
+    ExecutionContext,
     OperationWithDefaults,
     WriteConcernOnlyBody,
     SERVER_4_2_0_WIRE_VERSION,
@@ -30,11 +28,6 @@ pub(crate) struct Aggregate {
 }
 
 impl Aggregate {
-    #[cfg(test)]
-    fn empty() -> Self {
-        Self::new(Namespace::empty(), Vec::new(), None)
-    }
-
     pub(crate) fn new(
         target: impl Into<AggregateTarget>,
         pipeline: impl IntoIterator<Item = Document>,
@@ -87,10 +80,10 @@ impl OperationWithDefaults for Aggregate {
         CursorBody::extract_at_cluster_time(response)
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        description: &StreamDescription,
+        context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let cursor_response: CursorBody = response.body()?;
 
@@ -98,6 +91,8 @@ impl OperationWithDefaults for Aggregate {
             let wc_error_info = response.body::<WriteConcernOnlyBody>()?;
             wc_error_info.validate()?;
         };
+
+        let description = context.connection.stream_description()?;
 
         // The comment should only be propagated to getMore calls on 4.4+.
         let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {

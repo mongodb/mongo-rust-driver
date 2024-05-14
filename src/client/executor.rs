@@ -7,6 +7,7 @@ use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
 
 use std::{
+    borrow::BorrowMut,
     collections::HashSet,
     sync::{atomic::Ordering, Arc},
     time::Instant,
@@ -52,6 +53,7 @@ use crate::{
         AbortTransaction,
         CommandErrorBody,
         CommitTransaction,
+        ExecutionContext,
         Operation,
         Retryability,
     },
@@ -90,17 +92,17 @@ impl Client {
     /// sessions and an explicit session is not provided.
     pub(crate) async fn execute_operation<T: Operation>(
         &self,
-        op: T,
+        mut op: impl BorrowMut<T>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<T::O> {
-        self.execute_operation_with_details(op, session)
+        self.execute_operation_with_details(op.borrow_mut(), session)
             .await
             .map(|details| details.output)
     }
 
     async fn execute_operation_with_details<T: Operation>(
         &self,
-        op: T,
+        op: &mut T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<ExecutionDetails<T>> {
         if self.inner.shutdown.executed.load(Ordering::SeqCst) {
@@ -144,12 +146,17 @@ impl Client {
     /// Execute the given operation, returning the cursor created by the operation.
     ///
     /// Server selection be will performed using the criteria specified on the operation, if any.
-    pub(crate) async fn execute_cursor_operation<Op, T>(&self, op: Op) -> Result<Cursor<T>>
+    pub(crate) async fn execute_cursor_operation<Op, T>(
+        &self,
+        mut op: impl BorrowMut<Op>,
+    ) -> Result<Cursor<T>>
     where
         Op: Operation<O = CursorSpecification>,
     {
         Box::pin(async {
-            let mut details = self.execute_operation_with_details(op, None).await?;
+            let mut details = self
+                .execute_operation_with_details(op.borrow_mut(), None)
+                .await?;
             let pinned =
                 self.pin_connection_for_cursor(&details.output, &mut details.connection)?;
             Ok(Cursor::new(
@@ -164,14 +171,14 @@ impl Client {
 
     pub(crate) async fn execute_session_cursor_operation<Op, T>(
         &self,
-        op: Op,
+        mut op: impl BorrowMut<Op>,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<T>>
     where
         Op: Operation<O = CursorSpecification>,
     {
         let mut details = self
-            .execute_operation_with_details(op, &mut *session)
+            .execute_operation_with_details(op.borrow_mut(), &mut *session)
             .await?;
 
         let pinned =
@@ -183,7 +190,7 @@ impl Client {
         self.inner.options.load_balanced.unwrap_or(false)
     }
 
-    fn pin_connection_for_cursor(
+    pub(crate) fn pin_connection_for_cursor(
         &self,
         spec: &CursorSpecification,
         conn: &mut Connection,
@@ -229,10 +236,10 @@ impl Client {
             let mut implicit_session = resume_data
                 .as_mut()
                 .and_then(|rd| rd.implicit_session.take());
-            let op = ChangeStreamAggregate::new(&args, resume_data)?;
+            let mut op = ChangeStreamAggregate::new(&args, resume_data)?;
 
             let mut details = self
-                .execute_operation_with_details(op, implicit_session.as_mut())
+                .execute_operation_with_details(&mut op, implicit_session.as_mut())
                 .await?;
             if let Some(session) = implicit_session {
                 details.implicit_session = Some(session);
@@ -264,10 +271,10 @@ impl Client {
                 target,
                 options,
             };
-            let op = ChangeStreamAggregate::new(&args, resume_data)?;
+            let mut op = ChangeStreamAggregate::new(&args, resume_data)?;
 
             let mut details = self
-                .execute_operation_with_details(op, &mut *session)
+                .execute_operation_with_details(&mut op, &mut *session)
                 .await?;
             let (cursor_spec, cs_data) = details.output;
             let pinned =
@@ -284,7 +291,7 @@ impl Client {
     /// reauthenticating if reauthentication is required.
     async fn execute_operation_with_retry<T: Operation>(
         &self,
-        mut op: T,
+        op: &mut T,
         mut session: Option<&mut ClientSession>,
     ) -> Result<ExecutionDetails<T>> {
         // If the current transaction has been committed/aborted and it is not being
@@ -331,7 +338,7 @@ impl Client {
             };
             let server_addr = server.address.clone();
 
-            let mut conn = match get_connection(&session, &op, &server.pool).await {
+            let mut conn = match get_connection(&session, op, &server.pool).await {
                 Ok(c) => c,
                 Err(mut err) => {
                     retry.first_error()?;
@@ -341,7 +348,7 @@ impl Client {
                         err.add_label(RETRYABLE_WRITE_ERROR);
                     }
 
-                    let op_retry = match self.get_op_retryability(&op, &session) {
+                    let op_retry = match self.get_op_retryability(op, &session) {
                         Retryability::Read => err.is_read_retryable(),
                         Retryability::Write => err.is_write_retryable(),
                         _ => false,
@@ -372,7 +379,7 @@ impl Client {
                 session = implicit_session.as_mut();
             }
 
-            let retryability = self.get_retryability(&conn, &op, &session)?;
+            let retryability = self.get_retryability(&conn, op, &session)?;
             if retryability == Retryability::None {
                 retry.first_error()?;
             }
@@ -384,7 +391,7 @@ impl Client {
 
             let details = match self
                 .execute_operation_on_connection(
-                    &mut op,
+                    op,
                     &mut conn,
                     &mut session,
                     txn_number,
@@ -785,7 +792,12 @@ impl Client {
                     }
                 };
 
-                match op.handle_response(response, connection.stream_description()?) {
+                let context = ExecutionContext {
+                    connection,
+                    session: session.as_deref_mut(),
+                };
+
+                match op.handle_response(response, context).await {
                     Ok(response) => Ok(response),
                     Err(mut err) => {
                         err.add_labels_and_update_pin(

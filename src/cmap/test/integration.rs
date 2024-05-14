@@ -18,10 +18,10 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        util::event_buffer::EventBuffer,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
         TestClient,
     },
 };
@@ -189,13 +189,12 @@ async fn connection_error_during_establishment() {
         return;
     }
 
-    let options = FailCommandOptions::builder().error_code(1234).build();
-    let failpoint = FailPoint::fail_command(
+    let fail_point = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
         FailPointMode::Times(10),
-        Some(options),
-    );
-    let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
+    )
+    .error_code(1234);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let buffer = EventBuffer::<CmapEvent>::new();
     #[allow(deprecated)]
@@ -245,9 +244,9 @@ async fn connection_error_during_operation() {
         return;
     }
 
-    let options = FailCommandOptions::builder().close_connection(true).build();
-    let failpoint = FailPoint::fail_command(&["ping"], FailPointMode::Times(10), Some(options));
-    let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
+    let fail_point =
+        FailPoint::fail_command(&["ping"], FailPointMode::Times(10)).close_connection(true);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();

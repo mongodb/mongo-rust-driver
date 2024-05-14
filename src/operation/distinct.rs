@@ -1,14 +1,15 @@
-use bson::RawBsonRef;
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, Bson, Document, RawBsonRef},
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::DistinctOptions, Namespace},
     error::Result,
     operation::{append_options, OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
 };
+
+use super::ExecutionContext;
 
 pub(crate) struct Distinct {
     ns: Namespace,
@@ -68,10 +69,10 @@ impl OperationWithDefaults for Distinct {
             .and_then(RawBsonRef::as_timestamp))
     }
 
-    fn handle_response(
-        &self,
+    fn handle_response<'a>(
+        &'a self,
         response: RawCommandResponse,
-        _description: &StreamDescription,
+        _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: Response = response.body()?;
         Ok(response.values)

@@ -136,8 +136,8 @@ pub(crate) struct HelloCommandResponse {
 
     /// Whether the server is an arbiter.
     pub arbiter_only: Option<bool>,
-    #[serde(rename = "isreplicaset")]
 
+    #[serde(rename = "isreplicaset")]
     /// Whether the server is a replica set.
     pub is_replica_set: Option<bool>,
 

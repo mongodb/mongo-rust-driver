@@ -44,22 +44,20 @@ use crate::{
         WriteConcern,
     },
     runtime,
-    test::{util::event_buffer::EventBuffer, Event},
+    test::{
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
+        Event,
+    },
     Client,
     Collection,
     IndexModel,
     Namespace,
 };
 
-use super::{
-    get_client_options,
-    log_uncaptured,
-    EventClient,
-    FailCommandOptions,
-    FailPoint,
-    FailPointMode,
-    TestClient,
-};
+use super::{get_client_options, log_uncaptured, EventClient, TestClient};
 
 type Result<T> = anyhow::Result<T>;
 
@@ -2414,12 +2412,9 @@ async fn decryption_events_command_error() -> Result<()> {
         None => return Ok(()),
     };
 
-    let fp = FailPoint::fail_command(
-        &["aggregate"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder().error_code(123).build(),
-    );
-    let _guard = fp.enable(&td.setup_client, None).await?;
+    let fail_point =
+        FailPoint::fail_command(&["aggregate"], FailPointMode::Times(1)).error_code(123);
+    let _guard = td.setup_client.enable_fail_point(fail_point).await.unwrap();
     let err = td
         .decryption_events
         .aggregate(vec![doc! { "$count": "total" }])
@@ -2443,15 +2438,10 @@ async fn decryption_events_network_error() -> Result<()> {
         None => return Ok(()),
     };
 
-    let fp = FailPoint::fail_command(
-        &["aggregate"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder()
-            .error_code(123)
-            .close_connection(true)
-            .build(),
-    );
-    let _guard = fp.enable(&td.setup_client, None).await?;
+    let fail_point = FailPoint::fail_command(&["aggregate"], FailPointMode::Times(1))
+        .error_code(123)
+        .close_connection(true);
+    let _guard = td.setup_client.enable_fail_point(fail_point).await.unwrap();
     let err = td
         .decryption_events
         .aggregate(vec![doc! { "$count": "total" }])
