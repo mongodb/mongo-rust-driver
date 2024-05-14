@@ -1,5 +1,7 @@
+use bson::{rawdoc, RawBson};
+
 use crate::{
-    bson::{doc, spec::BinarySubtype, Binary, Bson, Document},
+    bson::{spec::BinarySubtype, Binary, Bson, Document},
     bson_util,
     client::{auth::AuthMechanism, options::ServerApi},
     cmap::Command,
@@ -31,7 +33,7 @@ impl SaslStart {
     }
 
     pub(super) fn into_command(self) -> Command {
-        let mut body = doc! {
+        let mut body = rawdoc! {
             "saslStart": 1,
             "mechanism": self.mechanism.as_str(),
             "payload": Binary { subtype: BinarySubtype::Generic, bytes: self.payload },
@@ -39,7 +41,7 @@ impl SaslStart {
         if self.mechanism == AuthMechanism::ScramSha1
             || self.mechanism == AuthMechanism::ScramSha256
         {
-            body.insert("options", doc! { "skipEmptyExchange": true });
+            body.append("options", rawdoc! { "skipEmptyExchange": true });
         }
 
         let mut command = Command::new("saslStart", self.source, body);
@@ -75,9 +77,11 @@ impl SaslContinue {
     }
 
     pub(super) fn into_command(self) -> Command {
-        let body = doc! {
+        // Unwrap safety: the Bson -> RawBson conversion is actually infallible
+        let raw_id: RawBson = self.conversation_id.try_into().unwrap();
+        let body = rawdoc! {
             "saslContinue": 1,
-            "conversationId": self.conversation_id,
+            "conversationId": raw_id,
             "payload": Binary { subtype: BinarySubtype::Generic, bytes: self.payload },
         };
 

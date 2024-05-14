@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::{bson, Bson};
+use bson::{bson, rawdoc, Bson, RawBson};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -96,6 +96,15 @@ impl TopologyVersion {
 impl From<TopologyVersion> for Bson {
     fn from(tv: TopologyVersion) -> Self {
         bson!({
+            "processId": tv.process_id,
+            "counter": tv.counter
+        })
+    }
+}
+
+impl From<TopologyVersion> for RawBson {
+    fn from(tv: TopologyVersion) -> Self {
+        RawBson::Document(rawdoc! {
             "processId": tv.process_id,
             "counter": tv.counter
         })

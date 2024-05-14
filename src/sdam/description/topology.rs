@@ -201,10 +201,10 @@ impl TopologyDescription {
         self.servers.get(address)
     }
 
-    pub(crate) fn update_command_with_read_pref<T: Serialize>(
+    pub(crate) fn update_command_with_read_pref(
         &self,
         address: &ServerAddress,
-        command: &mut Command<T>,
+        command: &mut Command,
         criteria: Option<&SelectionCriteria>,
     ) {
         let server_type = self
@@ -248,9 +248,9 @@ impl TopologyDescription {
         }
     }
 
-    fn update_command_read_pref_for_mongos<T: Serialize>(
+    fn update_command_read_pref_for_mongos(
         &self,
-        command: &mut Command<T>,
+        command: &mut Command,
         criteria: Option<&SelectionCriteria>,
     ) {
         let read_preference = match criteria {

@@ -460,7 +460,7 @@ impl ClientFirst {
         let mut cmd = sasl_start.into_command();
 
         if self.include_db {
-            cmd.body.insert("db", self.source.clone());
+            cmd.body.append("db", self.source.clone());
         }
 
         cmd

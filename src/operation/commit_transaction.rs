@@ -1,11 +1,16 @@
 use std::time::Duration;
 
-use bson::{doc, Document};
+use bson::rawdoc;
 
 use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options, remove_empty_write_concern, OperationWithDefaults, Retryability},
+    operation::{
+        append_options_to_raw_document,
+        remove_empty_write_concern,
+        OperationWithDefaults,
+        Retryability,
+    },
     options::{Acknowledgment, TransactionOptions, WriteConcern},
 };
 
@@ -23,17 +28,16 @@ impl CommitTransaction {
 
 impl OperationWithDefaults for CommitTransaction {
     type O = ();
-    type Command = Document;
 
     const NAME: &'static str = "commitTransaction";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
-        let mut body = doc! {
+        let mut body = rawdoc! {
             Self::NAME: 1,
         };
 
         remove_empty_write_concern!(self.options);
-        append_options(&mut body, self.options.as_ref())?;
+        append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),

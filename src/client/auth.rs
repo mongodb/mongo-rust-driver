@@ -14,6 +14,7 @@ mod x509;
 
 use std::{borrow::Cow, fmt::Debug, str::FromStr};
 
+use bson::RawDocumentBuf;
 use derivative::Derivative;
 use hmac::{digest::KeyInit, Mac};
 use rand::Rng;
@@ -509,9 +510,9 @@ impl Credential {
 
     /// If the mechanism is missing, append the appropriate mechanism negotiation key-value-pair to
     /// the provided hello or legacy hello command document.
-    pub(crate) fn append_needed_mechanism_negotiation(&self, command: &mut Document) {
+    pub(crate) fn append_needed_mechanism_negotiation(&self, command: &mut RawDocumentBuf) {
         if let (Some(username), None) = (self.username.as_ref(), self.mechanism.as_ref()) {
-            command.insert(
+            command.append(
                 "saslSupportedMechs",
                 format!("{}.{}", self.resolved_source(), username),
             );
@@ -613,7 +614,7 @@ pub(crate) enum ClientFirst {
 }
 
 impl ClientFirst {
-    pub(crate) fn to_document(&self) -> Document {
+    pub(crate) fn to_document(&self) -> RawDocumentBuf {
         match self {
             Self::Scram(version, client_first) => client_first.to_command(version).body,
             Self::X509(command) => command.body.clone(),

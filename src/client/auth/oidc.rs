@@ -401,7 +401,7 @@ fn make_spec_auth_command(
     payload: Vec<u8>,
     server_api: Option<&ServerApi>,
 ) -> Command {
-    let body = doc! {
+    let body = rawdoc! {
         "saslStart": 1,
         "mechanism": MONGODB_OIDC_STR,
         "payload": Binary { subtype: BinarySubtype::Generic, bytes: payload },

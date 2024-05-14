@@ -76,7 +76,6 @@ impl CountDocuments {
 
 impl OperationWithDefaults for CountDocuments {
     type O = u64;
-    type Command = Document;
 
     const NAME: &'static str = Aggregate::NAME;
 

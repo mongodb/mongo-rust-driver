@@ -1,3 +1,4 @@
+use bson::rawdoc;
 use serde::Deserialize;
 
 use super::EVENT_TIMEOUT;
@@ -54,7 +55,7 @@ async fn acquire_connection_and_send_command() {
     );
     let mut connection = pool.check_out().await.unwrap();
 
-    let body = doc! { "listDatabases": 1 };
+    let body = rawdoc! { "listDatabases": 1 };
     let read_pref = ReadPreference::PrimaryPreferred {
         options: Default::default(),
     };

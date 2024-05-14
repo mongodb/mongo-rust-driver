@@ -1,7 +1,10 @@
 use std::{
+    collections::HashSet,
     convert::TryFrom,
     io::{Read, Write},
 };
+
+use serde::Serialize;
 
 use crate::{
     bson::{
@@ -15,7 +18,7 @@ use crate::{
         RawDocumentBuf,
     },
     checked::Checked,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     runtime::SyncLittleEndianRead,
 };
 
@@ -64,6 +67,23 @@ pub(crate) fn to_raw_bson_array(docs: &[Document]) -> Result<RawBson> {
         array.push(RawDocumentBuf::from_document(doc)?);
     }
     Ok(RawBson::Array(array))
+}
+pub(crate) fn to_raw_bson_array_ser<T: Serialize>(values: &[T]) -> Result<RawBson> {
+    let mut array = RawArrayBuf::new();
+    for value in values {
+        array.push(bson::to_raw_document_buf(value)?);
+    }
+    Ok(RawBson::Array(array))
+}
+
+#[cfg(test)]
+pub(crate) fn sort_document(document: &mut Document) {
+    let temp = std::mem::take(document);
+
+    let mut elements: Vec<_> = temp.into_iter().collect();
+    elements.sort_by(|e1, e2| e1.0.cmp(&e2.0));
+
+    document.extend(elements);
 }
 
 pub(crate) fn first_key(document: &Document) -> Option<&str> {
@@ -162,10 +182,39 @@ pub(crate) fn extend_raw_document_buf(
     this: &mut RawDocumentBuf,
     other: RawDocumentBuf,
 ) -> Result<()> {
+    let mut keys: HashSet<&str> = HashSet::new();
+    for elem in this.iter_elements() {
+        keys.insert(elem?.key());
+    }
     for result in other.iter() {
         let (k, v) = result?;
+        if keys.contains(k) {
+            return Err(Error::internal(format!(
+                "duplicate raw document key {:?}",
+                k
+            )));
+        }
         this.append(k, v.to_raw_bson());
     }
+    Ok(())
+}
+
+pub(crate) fn append_ser(
+    this: &mut RawDocumentBuf,
+    key: impl AsRef<str>,
+    value: impl Serialize,
+) -> Result<()> {
+    #[derive(Serialize)]
+    struct Helper<T> {
+        value: T,
+    }
+    let raw_doc = bson::to_raw_document_buf(&Helper { value })?;
+    this.append_ref(
+        key,
+        raw_doc
+            .get("value")?
+            .ok_or_else(|| Error::internal("no value"))?,
+    );
     Ok(())
 }
 

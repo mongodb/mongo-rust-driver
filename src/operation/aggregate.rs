@@ -45,7 +45,6 @@ impl Aggregate {
 // the equivalent delegations.
 impl OperationWithDefaults for Aggregate {
     type O = CursorSpecification;
-    type Command = Document;
 
     const NAME: &'static str = "aggregate";
 
@@ -69,7 +68,7 @@ impl OperationWithDefaults for Aggregate {
             Self::NAME.to_string(),
             self.target.db_name().to_string(),
             self.options.as_ref().and_then(|o| o.read_concern.clone()),
-            body,
+            (&body).try_into()?,
         ))
     }
 

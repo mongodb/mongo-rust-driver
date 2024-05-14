@@ -1,9 +1,15 @@
+use bson::rawdoc;
+
 use crate::{
-    bson::{doc, Document},
+    bson_util::to_raw_bson_array_ser,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     index::IndexModel,
-    operation::{append_options, remove_empty_write_concern, OperationWithDefaults},
+    operation::{
+        append_options_to_raw_document,
+        remove_empty_write_concern,
+        OperationWithDefaults,
+    },
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
     Namespace,
@@ -34,7 +40,6 @@ impl CreateIndexes {
 
 impl OperationWithDefaults for CreateIndexes {
     type O = CreateIndexesResult;
-    type Command = Document;
     const NAME: &'static str = "createIndexes";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
@@ -54,14 +59,14 @@ impl OperationWithDefaults for CreateIndexes {
         }
 
         self.indexes.iter_mut().for_each(|i| i.update_name()); // Generate names for unnamed indexes.
-        let indexes = bson::to_bson(&self.indexes)?;
-        let mut body = doc! {
+        let indexes = to_raw_bson_array_ser(&self.indexes)?;
+        let mut body = rawdoc! {
             Self::NAME: self.ns.coll.clone(),
             "indexes": indexes,
         };
 
         remove_empty_write_concern!(self.options);
-        append_options(&mut body, self.options.as_ref())?;
+        append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),
