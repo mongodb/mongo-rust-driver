@@ -130,6 +130,7 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
 
     /// If this operation specifies entities to create, returns those entities. Otherwise,
     /// returns None.
+    #[cfg(feature = "tracing-unstable")]
     fn test_file_entities(&self) -> Option<&Vec<TestFileEntity>> {
         None
     }
@@ -2300,7 +2301,7 @@ impl TestOperation for RenameCollection {
             let target = test_runner.get_collection(id).await;
             let ns = target.namespace();
             let mut to_ns = ns.clone();
-            to_ns.coll = self.to.clone();
+            to_ns.coll.clone_from(&self.to);
             let cmd = doc! {
                 "renameCollection": crate::bson::to_bson(&ns)?,
                 "to": crate::bson::to_bson(&to_ns)?,
@@ -2736,6 +2737,7 @@ impl TestOperation for CreateEntities {
             .boxed()
     }
 
+    #[cfg(feature = "tracing-unstable")]
     fn test_file_entities(&self) -> Option<&Vec<TestFileEntity>> {
         Some(&self.entities)
     }

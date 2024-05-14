@@ -23,7 +23,10 @@
 pub use crate::compression::compressors::Compressor;
 pub use crate::{
     change_stream::options::*,
-    client::{auth::*, options::*},
+    client::{
+        auth::{oidc, *},
+        options::*,
+    },
     coll::options::*,
     collation::*,
     concern::*,

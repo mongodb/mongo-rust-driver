@@ -4,7 +4,7 @@
 #![warn(clippy::cast_possible_truncation)]
 #![warn(clippy::cast_possible_wrap)]
 #![cfg_attr(
-    feature = "cargo-clippy",
+    feature = "clippy",
     allow(
         clippy::unreadable_literal,
         clippy::cognitive_complexity,

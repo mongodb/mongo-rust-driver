@@ -1,6 +1,7 @@
 use std::cmp::Ord;
 
 use futures::stream::TryStreamExt;
+use serde::Deserialize;
 
 use crate::{
     action::Action,
@@ -17,6 +18,7 @@ use crate::{
     results::{CollectionSpecification, CollectionType},
     test::util::TestClient,
     Client,
+    Cursor,
     Database,
 };
 
@@ -377,4 +379,33 @@ async fn clustered_index_list_collections() {
         .find(|specification| specification.name == "clustered_index_collection")
         .unwrap();
     assert!(clustered_index_collection.options.clustered_index.is_some());
+}
+
+#[tokio::test]
+async fn aggregate_with_generics() {
+    #[derive(Deserialize)]
+    struct A {
+        str: String,
+    }
+
+    let client = TestClient::new().await;
+    let database = client.database("aggregate_with_generics");
+
+    if client.server_version_lt(5, 1) {
+        log_uncaptured(
+            "skipping aggregate_with_generics: $documents agg stage only available on 5.1+",
+        );
+        return;
+    }
+
+    // The cursor returned will contain these documents
+    let pipeline = vec![doc! { "$documents": [ { "str": "hi" } ] }];
+
+    // Assert at compile-time that the default cursor returned is a Cursor<Document>
+    let _: Cursor<Document> = database.aggregate(pipeline.clone()).await.unwrap();
+
+    // Assert that data is properly deserialized when using with_type
+    let mut cursor = database.aggregate(pipeline).with_type::<A>().await.unwrap();
+    assert!(cursor.advance().await.unwrap());
+    assert_eq!(&cursor.deserialize_current().unwrap().str, "hi");
 }

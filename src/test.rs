@@ -112,7 +112,7 @@ pub(crate) static DEFAULT_GLOBAL_TRACING_HANDLER: Lazy<TracingHandler> = Lazy::n
 
 pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
     if options.server_api.is_none() {
-        options.server_api = SERVER_API.clone();
+        options.server_api.clone_from(&SERVER_API);
     }
 
     #[cfg(any(

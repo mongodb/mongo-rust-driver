@@ -1,3 +1,4 @@
+//! Contains the functionality for [`OIDC`](https://openid.net/developers/how-connect-works/) authorization and authentication.
 use serde::Deserialize;
 use std::{
     sync::Arc,
@@ -44,22 +45,21 @@ const DEFAULT_ALLOWED_HOSTS: &[&str] = &[
     "::1",
 ];
 
+/// The callback to use for OIDC authentication.
 #[derive(Clone)]
-pub struct State {
-    inner: Arc<Mutex<Option<StateInner>>>,
+#[non_exhaustive]
+pub struct Callback {
+    inner: Arc<Mutex<Option<CallbackInner>>>,
     is_user_provided: bool,
 }
 
-impl Default for State {
+impl Default for Callback {
     fn default() -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(None)),
-            is_user_provided: false,
-        }
+        Self::new()
     }
 }
 
-impl State {
+impl Callback {
     pub(crate) fn is_user_provided(&self) -> bool {
         self.is_user_provided
     }
@@ -79,33 +79,54 @@ impl State {
             .cache
             .refresh_token = refresh_token;
     }
-}
 
-/// The OIDC state containing the cache of necessary OIDC info as well as the callback
-#[derive(Clone, Debug)]
-pub struct StateInner {
-    callback: Callback,
-    cache: Cache,
-}
+    pub(crate) fn new() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(None)),
+            is_user_provided: false,
+        }
+    }
 
-#[derive(Clone)]
-#[non_exhaustive]
-pub struct Callback {
-    inner: Arc<CallbackInner>,
-    kind: CallbackKind,
-}
+    fn new_function<F>(func: F, kind: CallbackKind) -> Function
+    where
+        F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
+            + Send
+            + Sync
+            + 'static,
+    {
+        Function {
+            inner: Box::new(FunctionInner { f: Box::new(func) }),
+            kind,
+        }
+    }
 
-#[non_exhaustive]
-#[derive(Clone, Copy, Debug)]
-enum CallbackKind {
-    Human,
-    Machine,
-}
+    /// Create a new human token request function for OIDC.
+    /// The return type is purposefully opaque to users and should only be created using this
+    /// function or Callback::machine.
+    pub fn human<F>(function: F) -> Callback
+    where
+        F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
+            + Send
+            + Sync
+            + 'static,
+    {
+        Self::create_callback(function, CallbackKind::Human)
+    }
 
-// TODO RUST-1497: These will no longer be dead_code
-#[allow(dead_code)]
-impl Callback {
-    fn new<F>(callback: F, kind: CallbackKind) -> Callback
+    /// Create a new machine token request function for OIDC.
+    /// The return type is purposefully opaque to users and should only be created using this
+    /// function or Callback::human.
+    pub fn machine<F>(function: F) -> Callback
+    where
+        F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
+            + Send
+            + Sync
+            + 'static,
+    {
+        Self::create_callback(function, CallbackKind::Machine)
+    }
+
+    fn create_callback<F>(function: F, kind: CallbackKind) -> Callback
     where
         F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
             + Send
@@ -113,45 +134,8 @@ impl Callback {
             + 'static,
     {
         Callback {
-            inner: Arc::new(CallbackInner {
-                f: Box::new(callback),
-            }),
-            kind,
-        }
-    }
-
-    /// Create a new human token request callback.
-    pub fn human<F>(callback: F) -> State
-    where
-        F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
-            + Send
-            + Sync
-            + 'static,
-    {
-        Self::create_state(callback, CallbackKind::Human)
-    }
-
-    /// Create a new machine token request callback.
-    pub fn machine<F>(callback: F) -> State
-    where
-        F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
-            + Send
-            + Sync
-            + 'static,
-    {
-        Self::create_state(callback, CallbackKind::Machine)
-    }
-
-    fn create_state<F>(callback: F, kind: CallbackKind) -> State
-    where
-        F: Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>>
-            + Send
-            + Sync
-            + 'static,
-    {
-        State {
-            inner: Arc::new(Mutex::new(Some(StateInner {
-                callback: Self::new(callback, kind),
+            inner: Arc::new(Mutex::new(Some(CallbackInner {
+                function: Self::new_function(function, kind),
                 cache: Cache::new(),
             }))),
             is_user_provided: true,
@@ -160,7 +144,7 @@ impl Callback {
 
     /// Create azure callback.
     #[cfg(feature = "azure-oidc")]
-    fn azure_callback(client_id: Option<&str>, resource: &str) -> StateInner {
+    fn azure_callback(client_id: Option<&str>, resource: &str) -> CallbackInner {
         use futures_util::FutureExt;
         let resource = resource.to_string();
         let client_id = client_id.map(|s| s.to_string());
@@ -171,8 +155,8 @@ impl Callback {
         if let Some(ref client_id) = client_id {
             url.push_str(&format!("&client_id={}", client_id));
         }
-        StateInner {
-            callback: Self::new(
+        CallbackInner {
+            function: Self::new_function(
                 move |_| {
                     let url = url.clone();
                     async move {
@@ -232,20 +216,42 @@ impl Callback {
     }
 }
 
+/// The OIDC state containing the cache of necessary OIDC info as well as the function
+#[derive(Debug)]
+struct CallbackInner {
+    function: Function,
+    cache: Cache,
+}
+
+/// Callback provides an interface for creating human and machine functions that return
+/// access tokens for use in human and machine OIDC flows.
+#[non_exhaustive]
+struct Function {
+    inner: Box<FunctionInner>,
+    kind: CallbackKind,
+}
+
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug)]
+enum CallbackKind {
+    Human,
+    Machine,
+}
+
 use std::fmt::Debug;
-impl std::fmt::Debug for Callback {
+impl std::fmt::Debug for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(format!("Callback: {:?}", self.kind).as_str())
             .finish()
     }
 }
 
-pub struct CallbackInner {
+struct FunctionInner {
     f: Box<dyn Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Cache {
+pub(crate) struct Cache {
     idp_server_info: Option<IdpServerInfo>,
     refresh_token: Option<String>,
     access_token: Option<String>,
@@ -273,7 +279,7 @@ impl Cache {
             self.idp_server_info = idp_server_info;
         }
         self.access_token = Some(response.access_token.clone());
-        self.refresh_token = response.refresh_token.clone();
+        self.refresh_token.clone_from(&response.refresh_token);
         self.last_call_time = Instant::now();
         self.token_gen_id += 1;
     }
@@ -296,31 +302,97 @@ impl Cache {
     }
 }
 
+/// IdpServerInfo contains the information necessary to locate and authorize with an OIDC server.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct IdpServerInfo {
+    /// issuer is the address of the IdP server.
     pub issuer: String,
+    /// client_id is the client id for the application, which must be passed to the IdP in order to
+    /// perform authorization.
     pub client_id: Option<String>,
+    /// request_scopes are the scopes requested by the application, see [`Oauth Scope`](https://oauth.net/2/scope/)
     pub request_scopes: Option<Vec<String>>,
 }
 
-#[derive(Debug)]
+/// CallbackContext contains the information necessary to perform the human or machine flow
+/// in a function. The driver passes ownership of this struct to the Callback function.
+/// ```
+/// use mongodb::{error::Error, Client, options::{ClientOptions, oidc::{Callback, CallbackContext, IdpServerResponse}}};
+/// use std::time::{Duration, Instant};
+/// use futures::future::FutureExt;
+/// async fn do_human_flow(c: CallbackContext) -> Result<(String, Option<Instant>, Option<String>), Error> {
+///   // Do the human flow here see: https://auth0.com/docs/authenticate/login/oidc-conformant-authentication/oidc-adoption-auth-code-flow
+///   Ok(("some_access_token".to_string(), Some(Instant::now() + Duration::from_secs(60 * 60 * 12)), Some("some_refresh_token".to_string())))
+/// }
+///
+/// async fn setup_client() -> Result<Client, Error> {
+///     let mut opts =
+///     ClientOptions::parse("mongodb://localhost:27017,localhost:27018/admin?authSource=admin&authMechanism=MONGODB-OIDC").await?;
+///     opts.credential.as_mut().unwrap().oidc_callback =
+///         Callback::human(move |c: CallbackContext| {
+///         async move {
+///             let (access_token, expires, refresh_token) = do_human_flow(c).await?;
+///             Ok(IdpServerResponse::builder().access_token(access_token).expires(expires).refresh_token(refresh_token).build())
+///         }.boxed()
+///     });
+///     Client::with_options(opts)
+/// }
+/// ```
+#[derive(Clone, Debug, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct CallbackContext {
-    pub timeout_seconds: Option<Instant>,
+    /// The time in the future when the function should return an error if it
+    /// it has not completed.
+    pub timeout: Option<Instant>,
+    /// The version of the function API that the driver is using.
     pub version: u32,
+    /// The refresh token that the driver has stored in the cache, which may not
+    /// exist.
     pub refresh_token: Option<String>,
+    /// The information necessary to locate and authorize with an OIDC server.
     pub idp_info: Option<IdpServerInfo>,
 }
 
-#[derive(TypedBuilder)]
+/// The return type of the OIDC authentication function. It contains the access token
+/// with optional expiration time and refresh token.
+/// ```
+/// use mongodb::{error::Error, Client, options::{ClientOptions, oidc::{Callback, CallbackContext, IdpServerResponse}}};
+/// use std::time::{Duration, Instant};
+/// use futures::future::FutureExt;
+/// async fn do_human_flow(c: CallbackContext) -> Result<(String, Option<Instant>, Option<String>), Error> {
+///   // Do the human flow here see: https://auth0.com/docs/authenticate/login/oidc-conformant-authentication/oidc-adoption-auth-code-flow
+///   Ok(("some_access_token".to_string(), Some(Instant::now() + Duration::from_secs(60 * 60 * 12)), Some("some_refresh_token".to_string())))
+/// }
+///
+/// async fn setup_client() -> Result<Client, Error> {
+///     let mut opts =
+///     ClientOptions::parse("mongodb://localhost:27017,localhost:27018/admin?authSource=admin&authMechanism=MONGODB-OIDC").await?;
+///     opts.credential.as_mut().unwrap().oidc_callback =
+///         Callback::human(move |c: CallbackContext| {
+///         async move {
+///             let (access_token, expires, refresh_token) = do_human_flow(c).await?;
+///             Ok(IdpServerResponse::builder().access_token(access_token).expires(expires).refresh_token(refresh_token).build())
+///         }.boxed()
+///     });
+///     Client::with_options(opts)
+/// }
+/// ```
+#[derive(Clone, Debug, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct IdpServerResponse {
     #[builder(!default)]
+    /// The token that the driver will use to authenticate with the server.
     pub access_token: String,
+    /// The time when the access token expires.
     pub expires: Option<Instant>,
+    /// The token that the driver will use to refresh the access token when the
+    /// access_token expires.
     pub refresh_token: Option<String>,
 }
 
@@ -396,10 +468,10 @@ pub(crate) async fn reauthenticate_stream(
 }
 
 #[cfg(feature = "azure-oidc")]
-async fn setup_automatic_providers(credential: &Credential, state: &mut Option<StateInner>) {
-    // If there is already a callback, there is no need to set up an automatic provider
+async fn setup_automatic_providers(credential: &Credential, state: &mut Option<CallbackInner>) {
+    // If there is already a function, there is no need to set up an automatic provider
     // this could happen in the case of a reauthentication, or if the user has already set up
-    // a callback. A situation where the user has set up a callback and an automatic provider
+    // a function. A situation where the user has set up a function and an automatic provider
     // would already have caused an InvalidArgument error in `validate_credential`.
     if state.is_some() {
         return;
@@ -426,19 +498,19 @@ pub(crate) async fn authenticate_stream(
     server_api: Option<&ServerApi>,
     server_first: impl Into<Option<Document>>,
 ) -> Result<()> {
-    // We need to hold the lock for the entire function so that multiple callbacks
+    // We need to hold the lock for the entire function so that multiple functions
     // are not called during an authentication race, and so that token_gen_id on the Connection
     // always matches that in the Credential Cache.
     let mut guard = credential.oidc_callback.inner.lock().await;
 
     #[cfg(feature = "azure-oidc")]
     setup_automatic_providers(credential, &mut guard).await;
-    let StateInner {
+    let CallbackInner {
         cache,
-        callback: Callback { inner, kind },
+        function: Function { inner, kind },
     } = &mut guard
         .as_mut()
-        .ok_or_else(|| auth_error("no callbacks supplied"))?;
+        .ok_or_else(|| auth_error("no functions supplied"))?;
 
     cache.propagate_token_gen_id(conn).await;
 
@@ -452,10 +524,10 @@ pub(crate) async fn authenticate_stream(
 
     match kind {
         CallbackKind::Machine => {
-            authenticate_machine(source, conn, credential, cache, server_api, inner.clone()).await
+            authenticate_machine(source, conn, credential, cache, server_api, inner.as_ref()).await
         }
         CallbackKind::Human => {
-            authenticate_human(source, conn, credential, cache, server_api, inner.clone()).await
+            authenticate_human(source, conn, credential, cache, server_api, inner.as_ref()).await
         }
     }
 }
@@ -487,23 +559,23 @@ async fn send_sasl_start_command(
 
 // this is shared functionality between the human and machine flow. In the machine flow, the idp
 // info will always be None, but the code is the same so we reuse it.
-async fn do_single_step_callback(
+async fn do_single_step_function(
     source: &str,
     conn: &mut Connection,
     cred_cache: &mut Cache,
     credential: &Credential,
     server_api: Option<&ServerApi>,
-    callback: Arc<CallbackInner>,
+    function: &FunctionInner,
     timeout: Duration,
 ) -> Result<()> {
     let idp_response = {
         let cb_context = CallbackContext {
-            timeout_seconds: Some(Instant::now() + timeout),
+            timeout: Some(Instant::now() + timeout),
             version: API_VERSION,
             refresh_token: None,
             idp_info: cred_cache.idp_server_info.clone(),
         };
-        (callback.f)(cb_context).await?
+        (function.f)(cb_context).await?
     };
     let response = send_sasl_start_command(
         source,
@@ -524,13 +596,13 @@ async fn do_single_step_callback(
 // This is currently only used in the human flow, but is abstracted to make the algorithm more
 // clear. The timeout is still passed in, so that the human flow can control the timeout in one
 // place.
-async fn do_two_step_callback(
+async fn do_two_step_function(
     source: &str,
     conn: &mut Connection,
     cred_cache: &mut Cache,
     credential: &Credential,
     server_api: Option<&ServerApi>,
-    callback: Arc<CallbackInner>,
+    function: &FunctionInner,
     timeout: Duration,
 ) -> Result<()> {
     // Here we do not have the idpinfo, so we need to do the two step sasl conversation.
@@ -543,12 +615,12 @@ async fn do_two_step_callback(
         bson::from_slice(&response.payload).map_err(|_| invalid_auth_response())?;
     let idp_response = {
         let cb_context = CallbackContext {
-            timeout_seconds: Some(Instant::now() + timeout),
+            timeout: Some(Instant::now() + timeout),
             version: API_VERSION,
             refresh_token: None,
             idp_info: Some(server_info.clone()),
         };
-        (callback.f)(cb_context).await?
+        (function.f)(cb_context).await?
     };
 
     // Update the credential and connection caches with the access token and the credential cache
@@ -620,15 +692,15 @@ async fn authenticate_human(
     credential: &Credential,
     cred_cache: &mut Cache,
     server_api: Option<&ServerApi>,
-    callback: Arc<CallbackInner>,
+    function: &FunctionInner,
 ) -> Result<()> {
     validate_address_with_allowed_hosts(credential.mechanism_properties.as_ref(), &conn.address)?;
 
-    // We need to hold the lock for the entire function so that multiple callbacks
+    // We need to hold the lock for the entire function so that multiple functions
     // are not called during an authentication race.
 
     // If the access token is in the cache, we can use it to send the sasl start command and avoid
-    // the callback and sasl_continue
+    // the function and sasl_continue
     if let Some(ref access_token) = cred_cache.access_token {
         let response = send_sasl_start_command(
             source,
@@ -653,12 +725,12 @@ async fn authenticate_human(
     ) {
         let idp_response = {
             let cb_context = CallbackContext {
-                timeout_seconds: Some(Instant::now() + HUMAN_CALLBACK_TIMEOUT),
+                timeout: Some(Instant::now() + HUMAN_CALLBACK_TIMEOUT),
                 version: API_VERSION,
                 refresh_token,
                 idp_info,
             };
-            (callback.f)(cb_context).await?
+            (function.f)(cb_context).await?
         };
 
         let access_token = idp_response.access_token.clone();
@@ -682,28 +754,28 @@ async fn authenticate_human(
         }
     }
 
-    // If the idpinfo is cached, we run the callback and then do a single step sasl conversation.
+    // If the idpinfo is cached, we run the function and then do a single step sasl conversation.
     // It seems the spec does not allow idpinfo to change on invalidations.
     if cred_cache.idp_server_info.is_some() {
-        return do_single_step_callback(
+        return do_single_step_function(
             source,
             conn,
             cred_cache,
             credential,
             server_api,
-            callback,
+            function,
             HUMAN_CALLBACK_TIMEOUT,
         )
         .await;
     }
 
-    do_two_step_callback(
+    do_two_step_function(
         source,
         conn,
         cred_cache,
         credential,
         server_api,
-        callback,
+        function,
         HUMAN_CALLBACK_TIMEOUT,
     )
     .await
@@ -715,10 +787,10 @@ async fn authenticate_machine(
     credential: &Credential,
     cred_cache: &mut Cache,
     server_api: Option<&ServerApi>,
-    callback: Arc<CallbackInner>,
+    function: &FunctionInner,
 ) -> Result<()> {
     // If the access token is in the cache, we can use it to send the sasl start command and avoid
-    // the callback and sasl_continue
+    // the function and sasl_continue
     if let Some(ref access_token) = cred_cache.access_token {
         let response = send_sasl_start_command(
             source,
@@ -737,13 +809,13 @@ async fn authenticate_machine(
         tokio::time::sleep(MACHINE_INVALIDATE_SLEEP_TIMEOUT).await;
     }
 
-    do_single_step_callback(
+    do_single_step_function(
         source,
         conn,
         cred_cache,
         credential,
         server_api,
-        callback,
+        function,
         MACHINE_CALLBACK_TIMEOUT,
     )
     .await

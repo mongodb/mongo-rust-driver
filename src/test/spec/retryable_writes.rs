@@ -50,7 +50,7 @@ async fn run_legacy() {
                 continue;
             }
             let mut options = test_case.client_options.unwrap_or_default();
-            options.hosts = get_client_options().await.hosts.clone();
+            options.hosts.clone_from(&get_client_options().await.hosts);
             if options.heartbeat_freq.is_none() {
                 options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
             }
@@ -454,9 +454,8 @@ async fn retry_write_pool_cleared() {
         .expect("pool clear should occur");
 
     let next_cmap_events = subscriber
-        .collect_events(Duration::from_millis(1000), |event| match event {
-            Event::Cmap(_) => true,
-            _ => false,
+        .collect_events(Duration::from_millis(1000), |event| {
+            matches!(event, Event::Cmap(_))
         })
         .await;
 
