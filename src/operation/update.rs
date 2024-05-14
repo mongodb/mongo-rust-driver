@@ -4,7 +4,7 @@ use crate::{
     bson::{doc, rawdoc, Document, RawArrayBuf, RawBson, RawDocumentBuf},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    error::{convert_bulk_errors, Result},
+    error::{convert_insert_many_error, Result},
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
     options::{UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
@@ -165,7 +165,7 @@ impl OperationWithDefaults for Update {
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: WriteResponseBody<UpdateBody> = response.body_utf8_lossy()?;
-        response.validate().map_err(convert_bulk_errors)?;
+        response.validate().map_err(convert_insert_many_error)?;
 
         let modified_count = response.n_modified;
         let upserted_id = response

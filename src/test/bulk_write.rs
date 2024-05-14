@@ -1,6 +1,6 @@
 use crate::{
     bson::{doc, Document},
-    error::{ClientBulkWriteError, ErrorKind},
+    error::{BulkWriteError, ErrorKind},
     options::WriteModel,
     test::{
         get_client_options,
@@ -137,7 +137,7 @@ async fn write_concern_error_batches() {
     ];
     let error = client.bulk_write(models).ordered(false).await.unwrap_err();
 
-    let ErrorKind::ClientBulkWrite(bulk_write_error) = *error.kind else {
+    let ErrorKind::BulkWrite(bulk_write_error) = *error.kind else {
         panic!("Expected bulk write error, got {:?}", error);
     };
 
@@ -184,7 +184,7 @@ async fn write_error_batches() {
         .await
         .unwrap_err();
 
-    let ErrorKind::ClientBulkWrite(bulk_write_error) = *error.kind else {
+    let ErrorKind::BulkWrite(bulk_write_error) = *error.kind else {
         panic!("Expected bulk write error, got {:?}", error);
     };
 
@@ -200,7 +200,7 @@ async fn write_error_batches() {
 
     let error = client.bulk_write(models).ordered(true).await.unwrap_err();
 
-    let ErrorKind::ClientBulkWrite(bulk_write_error) = *error.kind else {
+    let ErrorKind::BulkWrite(bulk_write_error) = *error.kind else {
         panic!("Expected bulk write error, got {:?}", error);
     };
 
@@ -371,7 +371,7 @@ async fn failed_cursor_iteration() {
     };
     assert_eq!(source.code(), Some(8));
 
-    let ErrorKind::ClientBulkWrite(ClientBulkWriteError {
+    let ErrorKind::BulkWrite(BulkWriteError {
         partial_result: Some(partial_result),
         ..
     }) = *error.kind

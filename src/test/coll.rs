@@ -431,7 +431,7 @@ async fn large_insert_unordered_with_errors() {
         .expect_err("should get error")
         .kind
     {
-        ErrorKind::BulkWrite(ref failure) => {
+        ErrorKind::InsertMany(ref failure) => {
             let mut write_errors = failure
                 .write_errors
                 .clone()
@@ -469,7 +469,7 @@ async fn large_insert_ordered_with_errors() {
         .expect_err("should get error")
         .kind
     {
-        ErrorKind::BulkWrite(ref failure) => {
+        ErrorKind::InsertMany(ref failure) => {
             let write_errors = failure
                 .write_errors
                 .clone()
@@ -1095,7 +1095,7 @@ fn assert_duplicate_key_error_with_utf8_replacement(error: &ErrorKind) {
             }
             e => panic!("expected WriteFailure::WriteError, got {:?} instead", e),
         },
-        ErrorKind::BulkWrite(ref failure) => match &failure.write_errors {
+        ErrorKind::InsertMany(ref failure) => match &failure.write_errors {
             Some(write_errors) => {
                 assert_eq!(write_errors.len(), 1);
                 assert_eq!(write_errors[0].code, 11000);

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::{
     bson::{Bson, Document},
-    error::{ClientBulkWriteError, Error, ErrorKind, Result},
+    error::{BulkWriteError, Error, ErrorKind, Result},
     operation::bulk_write::BulkWrite as BulkWriteOperation,
     options::{BulkWriteOptions, WriteConcern, WriteModel},
     results::BulkWriteResult,
@@ -162,25 +162,24 @@ impl ExecutionStatus {
             // partial result. Otherwise, create a new BulkWriteError with the existing results and
             // set its source as the error that just occurred.
             Self::Success(current_result) => match *error.kind {
-                ErrorKind::ClientBulkWrite(ref mut bulk_write_error) => {
+                ErrorKind::BulkWrite(ref mut bulk_write_error) => {
                     bulk_write_error.merge_partial_results(current_result);
                     Self::Error(error)
                 }
                 _ => {
-                    let bulk_write_error: Error =
-                        ErrorKind::ClientBulkWrite(ClientBulkWriteError {
-                            write_errors: HashMap::new(),
-                            write_concern_errors: Vec::new(),
-                            partial_result: Some(current_result),
-                        })
-                        .into();
+                    let bulk_write_error: Error = ErrorKind::BulkWrite(BulkWriteError {
+                        write_errors: HashMap::new(),
+                        write_concern_errors: Vec::new(),
+                        partial_result: Some(current_result),
+                    })
+                    .into();
                     Self::Error(bulk_write_error.with_source(error))
                 }
             },
             // If the new error is a BulkWriteError, merge its contents with the existing error.
             // Otherwise, set the new error as the existing error's source.
             Self::Error(mut current_error) => match *error.kind {
-                ErrorKind::ClientBulkWrite(bulk_write_error) => {
+                ErrorKind::BulkWrite(bulk_write_error) => {
                     let current_bulk_write_error =
                         Self::get_current_bulk_write_error(&mut current_error);
                     current_bulk_write_error.merge(bulk_write_error);
@@ -195,9 +194,9 @@ impl ExecutionStatus {
     /// Gets a BulkWriteError from a given Error. This method should only be called when adding a
     /// new result or error to the existing state, as it requires that the given Error's kind is
     /// ClientBulkWrite.
-    fn get_current_bulk_write_error(error: &mut Error) -> &mut ClientBulkWriteError {
+    fn get_current_bulk_write_error(error: &mut Error) -> &mut BulkWriteError {
         match *error.kind {
-            ErrorKind::ClientBulkWrite(ref mut bulk_write_error) => bulk_write_error,
+            ErrorKind::BulkWrite(ref mut bulk_write_error) => bulk_write_error,
             _ => unreachable!(),
         }
     }
@@ -208,7 +207,7 @@ impl ExecutionStatus {
         match self {
             Self::Error(ref error) => {
                 match *error.kind {
-                    ErrorKind::ClientBulkWrite(ref bulk_write_error) => {
+                    ErrorKind::BulkWrite(ref bulk_write_error) => {
                         // A top-level error is always fatal.
                         let top_level_error_occurred = error.source.is_some();
                         // A write error occurring during an ordered bulk write is fatal.
