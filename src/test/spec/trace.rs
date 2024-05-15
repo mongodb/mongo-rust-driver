@@ -4,11 +4,11 @@ use crate::{
     bson::{doc, Document},
     client::options::ServerAddress,
     error::{
-        BulkWriteError,
-        BulkWriteFailure,
         CommandError,
         Error,
         ErrorKind,
+        IndexedWriteError,
+        InsertManyError,
         WriteConcernError,
         WriteError,
         WriteFailure,
@@ -259,13 +259,13 @@ fn error_redaction() {
                     assert_on_properties(code, code_name.unwrap(), message, details);
                 }
             },
-            ErrorKind::BulkWrite(BulkWriteFailure {
+            ErrorKind::InsertMany(InsertManyError {
                 write_errors,
                 write_concern_error,
                 ..
             }) => {
                 if let Some(write_errors) = write_errors {
-                    for BulkWriteError {
+                    for IndexedWriteError {
                         code,
                         code_name,
                         message,
@@ -334,8 +334,8 @@ fn error_redaction() {
     assert_is_redacted(write_error);
 
     let mut bulk_write_error = Error::new(
-        ErrorKind::BulkWrite(BulkWriteFailure {
-            write_errors: Some(vec![BulkWriteError {
+        ErrorKind::InsertMany(InsertManyError {
+            write_errors: Some(vec![IndexedWriteError {
                 index: 0,
                 code: 123,
                 code_name: Some("CodeName".to_string()),

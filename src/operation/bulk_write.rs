@@ -11,7 +11,7 @@ use crate::{
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
-    error::{ClientBulkWriteError, Error, ErrorKind, Result},
+    error::{BulkWriteError, Error, ErrorKind, Result},
     operation::OperationWithDefaults,
     options::{BulkWriteOptions, OperationType, WriteModel},
     results::{BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult},
@@ -64,7 +64,7 @@ impl<'a> BulkWrite<'a> {
     async fn iterate_results_cursor(
         &self,
         mut stream: impl TryStream<Ok = SingleOperationResponse, Error = Error> + Unpin,
-        error: &mut ClientBulkWriteError,
+        error: &mut BulkWriteError,
     ) -> Result<()> {
         let result = &mut error.partial_result;
 
@@ -250,7 +250,7 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
         async move {
             let response: WriteResponseBody<Response> = response.body()?;
 
-            let mut bulk_write_error = ClientBulkWriteError::default();
+            let mut bulk_write_error = BulkWriteError::default();
 
             // A partial result with summary info should only be created if one or more
             // operations were successful.
@@ -309,19 +309,14 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
                             .partial_result
                             .unwrap_or_else(|| BulkWriteResult::new(self.is_verbose())))
                     } else {
-                        let error = Error::new(
-                            ErrorKind::ClientBulkWrite(bulk_write_error),
-                            response.labels,
-                        );
+                        let error =
+                            Error::new(ErrorKind::BulkWrite(bulk_write_error), response.labels);
                         Err(error)
                     }
                 }
                 Err(error) => {
-                    let error = Error::new(
-                        ErrorKind::ClientBulkWrite(bulk_write_error),
-                        response.labels,
-                    )
-                    .with_source(error);
+                    let error = Error::new(ErrorKind::BulkWrite(bulk_write_error), response.labels)
+                        .with_source(error);
                     Err(error)
                 }
             }

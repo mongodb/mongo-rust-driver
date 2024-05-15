@@ -9,7 +9,7 @@ use crate::{
     bson::{doc, oid::ObjectId},
     client::Client,
     cmap::{conn::ConnectionGeneration, PoolGeneration},
-    error::{BulkWriteFailure, CommandError, Error, ErrorKind},
+    error::{CommandError, Error, ErrorKind, InsertManyError},
     event::sdam::SdamEvent,
     hello::{HelloCommandResponse, HelloReply, LastWrite, LEGACY_HELLO_COMMAND_NAME},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
@@ -175,14 +175,14 @@ pub enum ErrorType {
 #[serde(untagged)]
 pub enum ServerError {
     CommandError(CommandError),
-    WriteError(BulkWriteFailure),
+    WriteError(InsertManyError),
 }
 
 impl From<ServerError> for Error {
     fn from(server_error: ServerError) -> Self {
         match server_error {
             ServerError::CommandError(command_error) => ErrorKind::Command(command_error).into(),
-            ServerError::WriteError(bwf) => ErrorKind::BulkWrite(bwf).into(),
+            ServerError::WriteError(bwf) => ErrorKind::InsertMany(bwf).into(),
         }
     }
 }

@@ -10,7 +10,7 @@ use crate::{
     },
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    error::{BulkWriteFailure, Error, ErrorKind, Result},
+    error::{Error, ErrorKind, InsertManyError, Result},
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
@@ -157,7 +157,7 @@ impl<'a> OperationWithDefaults for Insert<'a> {
 
         if response.write_errors.is_some() || response.write_concern_error.is_some() {
             return Err(Error::new(
-                ErrorKind::BulkWrite(BulkWriteFailure {
+                ErrorKind::InsertMany(InsertManyError {
                     write_errors: response.write_errors,
                     write_concern_error: response.write_concern_error,
                     inserted_ids: map,

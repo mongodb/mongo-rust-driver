@@ -15,7 +15,7 @@ use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
     client::options::{ServerApi, ServerApiVersion},
     concern::{Acknowledgment, ReadConcernLevel},
-    error::{ClientBulkWriteError, Error, ErrorKind},
+    error::{BulkWriteError, Error, ErrorKind},
     gridfs::options::GridFsBucketOptions,
     options::{
         ClientOptions,
@@ -540,7 +540,7 @@ impl ExpectError {
 
         if let Some(ref expected_result) = self.expect_result {
             let actual_result = match *error.kind {
-                ErrorKind::ClientBulkWrite(ClientBulkWriteError {
+                ErrorKind::BulkWrite(BulkWriteError {
                     partial_result: Some(ref partial_result),
                     ..
                 }) => Some(
@@ -554,7 +554,7 @@ impl ExpectError {
         }
 
         if let Some(ref write_errors) = self.write_errors {
-            let ErrorKind::ClientBulkWrite(ClientBulkWriteError {
+            let ErrorKind::BulkWrite(BulkWriteError {
                 write_errors: ref actual_write_errors,
                 ..
             }) = *error.kind
@@ -572,7 +572,7 @@ impl ExpectError {
         }
 
         if let Some(ref write_concern_errors) = self.write_concern_errors {
-            let ErrorKind::ClientBulkWrite(ClientBulkWriteError {
+            let ErrorKind::BulkWrite(BulkWriteError {
                 write_concern_errors: ref actual_write_concern_errors,
                 ..
             }) = *error.kind

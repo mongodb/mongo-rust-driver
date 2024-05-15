@@ -42,11 +42,11 @@ use crate::{
         StreamDescription,
     },
     error::{
-        BulkWriteError,
-        BulkWriteFailure,
         CommandError,
         Error,
         ErrorKind,
+        IndexedWriteError,
+        InsertManyError,
         Result,
         WriteConcernError,
         WriteFailure,
@@ -441,7 +441,7 @@ pub(crate) struct WriteResponseBody<T = SingleWriteBody> {
     body: T,
 
     #[serde(rename = "writeErrors")]
-    write_errors: Option<Vec<BulkWriteError>>,
+    write_errors: Option<Vec<IndexedWriteError>>,
 
     #[serde(rename = "writeConcernError")]
     write_concern_error: Option<WriteConcernError>,
@@ -456,14 +456,14 @@ impl<T> WriteResponseBody<T> {
             return Ok(());
         };
 
-        let failure = BulkWriteFailure {
+        let failure = InsertManyError {
             write_errors: self.write_errors.clone(),
             write_concern_error: self.write_concern_error.clone(),
             inserted_ids: Default::default(),
         };
 
         Err(Error::new(
-            ErrorKind::BulkWrite(failure),
+            ErrorKind::InsertMany(failure),
             self.labels.clone(),
         ))
     }

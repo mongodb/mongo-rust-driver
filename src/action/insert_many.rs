@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::{
     coll::options::InsertManyOptions,
-    error::{BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
+    error::{Error, ErrorKind, IndexedWriteError, InsertManyError, Result},
     operation::Insert as Op,
     options::WriteConcern,
     results::InsertManyResult,
@@ -105,7 +105,7 @@ impl<'a> Action for InsertMany<'a> {
             .unwrap_or(true);
         let encrypted = self.coll.client().should_auto_encrypt().await;
 
-        let mut cumulative_failure: Option<BulkWriteFailure> = None;
+        let mut cumulative_failure: Option<InsertManyError> = None;
         let mut error_labels: HashSet<String> = Default::default();
         let mut cumulative_result: Option<InsertManyResult> = None;
 
@@ -137,7 +137,7 @@ impl<'a> Action for InsertMany<'a> {
                 Err(e) => {
                     let labels = e.labels().clone();
                     match *e.kind {
-                        ErrorKind::BulkWrite(bw) => {
+                        ErrorKind::InsertMany(bw) => {
                             // for ordered inserts this size will be incorrect, but knowing the
                             // batch size isn't needed for ordered
                             // failures since we return immediately from
@@ -146,7 +146,7 @@ impl<'a> Action for InsertMany<'a> {
                                 + bw.write_errors.as_ref().map(|we| we.len()).unwrap_or(0);
 
                             let failure_ref =
-                                cumulative_failure.get_or_insert_with(BulkWriteFailure::new);
+                                cumulative_failure.get_or_insert_with(InsertManyError::new);
                             if let Some(write_errors) = bw.write_errors {
                                 for err in write_errors {
                                     let index = n_attempted + err.index;
@@ -154,7 +154,7 @@ impl<'a> Action for InsertMany<'a> {
                                     failure_ref
                                         .write_errors
                                         .get_or_insert_with(Default::default)
-                                        .push(BulkWriteError { index, ..err });
+                                        .push(IndexedWriteError { index, ..err });
                                 }
                             }
 
@@ -169,7 +169,7 @@ impl<'a> Action for InsertMany<'a> {
                                 // above.
                                 if let Some(failure) = cumulative_failure {
                                     return Err(Error::new(
-                                        ErrorKind::BulkWrite(failure),
+                                        ErrorKind::InsertMany(failure),
                                         Some(error_labels),
                                     ));
                                 }
@@ -184,7 +184,7 @@ impl<'a> Action for InsertMany<'a> {
 
         match cumulative_failure {
             Some(failure) => Err(Error::new(
-                ErrorKind::BulkWrite(failure),
+                ErrorKind::InsertMany(failure),
                 Some(error_labels),
             )),
             None => Ok(cumulative_result.unwrap_or_else(InsertManyResult::new)),

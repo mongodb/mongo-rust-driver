@@ -18,7 +18,7 @@ use crate::{
     sdam::{ServerType, TopologyVersion},
 };
 
-pub use bulk_write::BulkWriteError as ClientBulkWriteError;
+pub use bulk_write::BulkWriteError;
 
 const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
 const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
@@ -195,8 +195,8 @@ impl Error {
     fn is_write_concern_error(&self) -> bool {
         match *self.kind {
             ErrorKind::Write(WriteFailure::WriteConcernError(_)) => true,
-            ErrorKind::BulkWrite(ref bulk_write_error)
-                if bulk_write_error.write_concern_error.is_some() =>
+            ErrorKind::InsertMany(ref insert_many_error)
+                if insert_many_error.write_concern_error.is_some() =>
             {
                 true
             }
@@ -249,7 +249,7 @@ impl Error {
         matches!(
             self.kind.as_ref(),
             ErrorKind::Authentication { .. }
-                | ErrorKind::BulkWrite(_)
+                | ErrorKind::InsertMany(_)
                 | ErrorKind::Command(_)
                 | ErrorKind::Write(_)
         )
@@ -308,7 +308,7 @@ impl Error {
             ErrorKind::Command(command_error) => Some(command_error.code),
             // According to SDAM spec, write concern error codes MUST also be checked, and
             // writeError codes MUST NOT be checked.
-            ErrorKind::BulkWrite(BulkWriteFailure {
+            ErrorKind::InsertMany(InsertManyError {
                 write_concern_error: Some(wc_error),
                 ..
             }) => Some(wc_error.code),
@@ -323,7 +323,7 @@ impl Error {
     pub(crate) fn code(&self) -> Option<i32> {
         match self.kind.as_ref() {
             ErrorKind::Command(command_error) => Some(command_error.code),
-            ErrorKind::BulkWrite(BulkWriteFailure {
+            ErrorKind::InsertMany(InsertManyError {
                 write_concern_error: Some(wc_error),
                 ..
             }) => Some(wc_error.code),
@@ -334,15 +334,15 @@ impl Error {
     }
 
     /// Gets the message for this error, if applicable, for use in testing.
-    /// If this error is a BulkWriteError, the messages are concatenated.
+    /// If this error is an InsertManyError, the messages are concatenated.
     #[cfg(test)]
     pub(crate) fn message(&self) -> Option<String> {
         match self.kind.as_ref() {
             ErrorKind::Command(command_error) => Some(command_error.message.clone()),
             // since this is used primarily for errorMessageContains assertions in the unified
             // runner, we just concatenate all the relevant server messages into one for
-            // bulk errors.
-            ErrorKind::BulkWrite(BulkWriteFailure {
+            // insert many errors.
+            ErrorKind::InsertMany(InsertManyError {
                 write_concern_error,
                 write_errors,
                 inserted_ids: _,
@@ -382,7 +382,7 @@ impl Error {
                 WriteFailure::WriteConcernError(ref wce) => Some(wce.code_name.as_str()),
                 WriteFailure::WriteError(ref we) => we.code_name.as_deref(),
             },
-            ErrorKind::BulkWrite(ref bwe) => bwe
+            ErrorKind::InsertMany(ref bwe) => bwe
                 .write_concern_error
                 .as_ref()
                 .map(|wce| wce.code_name.as_str()),
@@ -481,21 +481,21 @@ impl Error {
         // This is intentionally written without a catch-all branch so that if new error
         // kinds are added we remember to reason about whether they need to be redacted.
         match *self.kind {
-            ErrorKind::BulkWrite(ref mut bwe) => {
-                if let Some(ref mut wes) = bwe.write_errors {
+            ErrorKind::InsertMany(ref mut insert_many_error) => {
+                if let Some(ref mut wes) = insert_many_error.write_errors {
                     for we in wes {
                         we.redact();
                     }
                 }
-                if let Some(ref mut wce) = bwe.write_concern_error {
+                if let Some(ref mut wce) = insert_many_error.write_concern_error {
                     wce.redact();
                 }
             }
-            ErrorKind::ClientBulkWrite(ref mut client_bulk_write_error) => {
-                for write_concern_error in client_bulk_write_error.write_concern_errors.iter_mut() {
+            ErrorKind::BulkWrite(ref mut bulk_write_error) => {
+                for write_concern_error in bulk_write_error.write_concern_errors.iter_mut() {
                     write_concern_error.redact();
                 }
-                for (_, write_error) in client_bulk_write_error.write_errors.iter_mut() {
+                for (_, write_error) in bulk_write_error.write_errors.iter_mut() {
                     write_error.redact();
                 }
             }
@@ -612,12 +612,13 @@ pub enum ErrorKind {
     #[error("{0}")]
     BsonSerialization(crate::bson::ser::Error),
 
-    /// An error occurred when trying to execute a write operation consisting of multiple writes.
-    #[error("An error occurred when trying to execute a write operation: {0:?}")]
-    BulkWrite(BulkWriteFailure),
+    /// An error occurred when trying to execute an [`insert_many`](crate::Collection::insert_many)
+    /// operation.
+    #[error("An error occurred when trying to execute an insert_many operation: {0:?}")]
+    InsertMany(InsertManyError),
 
     #[error("An error occurred when executing Client::bulk_write: {0:?}")]
-    ClientBulkWrite(ClientBulkWriteError),
+    BulkWrite(BulkWriteError),
 
     /// The server returned an error to an attempted operation.
     #[error("Command failed: {0}")]
@@ -706,7 +707,7 @@ impl ErrorKind {
     // TODO CLOUDP-105256 Remove this when Atlas Proxy error label behavior is fixed.
     fn get_write_concern_error(&self) -> Option<&WriteConcernError> {
         match self {
-            ErrorKind::BulkWrite(BulkWriteFailure {
+            ErrorKind::InsertMany(InsertManyError {
                 write_concern_error,
                 ..
             }) => write_concern_error.as_ref(),
@@ -825,11 +826,11 @@ impl WriteError {
     }
 }
 
-/// An error that occurred during a write operation consisting of multiple writes that wasn't due to
-/// being unable to satisfy a write concern.
+/// An individual write error that occurred during an
+/// [`insert_many`](crate::Collection::insert_many) operation.
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
-pub struct BulkWriteError {
+pub struct IndexedWriteError {
     /// Index into the list of operations that this error corresponds to.
     #[serde(default)]
     pub index: usize,
@@ -854,8 +855,8 @@ pub struct BulkWriteError {
     pub details: Option<Document>,
 }
 
-impl BulkWriteError {
-    // If any new fields are added to BulkWriteError, this implementation must be updated to redact
+impl IndexedWriteError {
+    // If any new fields are added to InsertError, this implementation must be updated to redact
     // them per the CLAM spec.
     fn redact(&mut self) {
         self.message = "REDACTED".to_string();
@@ -863,13 +864,14 @@ impl BulkWriteError {
     }
 }
 
-/// The set of errors that occurred during a write operation.
+/// The set of errors that occurred during a call to
+/// [`insert_many`](crate::Collection::insert_many).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct BulkWriteFailure {
+pub struct InsertManyError {
     /// The error(s) that occurred on account of a non write concern failure.
-    pub write_errors: Option<Vec<BulkWriteError>>,
+    pub write_errors: Option<Vec<IndexedWriteError>>,
 
     /// The error that occurred on account of write concern failure.
     pub write_concern_error: Option<WriteConcernError>,
@@ -878,9 +880,9 @@ pub struct BulkWriteFailure {
     pub(crate) inserted_ids: HashMap<usize, Bson>,
 }
 
-impl BulkWriteFailure {
+impl InsertManyError {
     pub(crate) fn new() -> Self {
-        BulkWriteFailure {
+        InsertManyError {
             write_errors: None,
             write_concern_error: None,
             inserted_ids: Default::default(),
@@ -901,13 +903,13 @@ pub enum WriteFailure {
 }
 
 impl WriteFailure {
-    fn from_bulk_failure(bulk: BulkWriteFailure) -> Result<Self> {
-        if let Some(bulk_write_error) = bulk.write_errors.and_then(|es| es.into_iter().next()) {
+    fn from_insert_many_error(bulk: InsertManyError) -> Result<Self> {
+        if let Some(insert_error) = bulk.write_errors.and_then(|es| es.into_iter().next()) {
             let write_error = WriteError {
-                code: bulk_write_error.code,
-                code_name: bulk_write_error.code_name,
-                message: bulk_write_error.message,
-                details: bulk_write_error.details,
+                code: insert_error.code,
+                code_name: insert_error.code_name,
+                message: insert_error.message,
+                details: insert_error.details,
             };
             Ok(WriteFailure::WriteError(write_error))
         } else if let Some(wc_error) = bulk.write_concern_error {
@@ -993,14 +995,15 @@ pub enum GridFsFileIdentifier {
     Id(Bson),
 }
 
-/// Translates ErrorKind::BulkWriteError cases to ErrorKind::WriteErrors, leaving all other errors
-/// untouched.
-pub(crate) fn convert_bulk_errors(error: Error) -> Error {
+/// Translates ErrorKind::InsertMany to ErrorKind::Write, leaving all other errors untouched.
+pub(crate) fn convert_insert_many_error(error: Error) -> Error {
     match *error.kind {
-        ErrorKind::BulkWrite(bulk_failure) => match WriteFailure::from_bulk_failure(bulk_failure) {
-            Ok(failure) => Error::new(ErrorKind::Write(failure), Some(error.labels)),
-            Err(e) => e,
-        },
+        ErrorKind::InsertMany(insert_many_error) => {
+            match WriteFailure::from_insert_many_error(insert_many_error) {
+                Ok(failure) => Error::new(ErrorKind::Write(failure), Some(error.labels)),
+                Err(e) => e,
+            }
+        }
         _ => error,
     }
 }

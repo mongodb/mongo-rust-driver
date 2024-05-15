@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::{
     coll::options::{InsertManyOptions, InsertOneOptions},
-    error::{convert_bulk_errors, Result},
+    error::{convert_insert_many_error, Result},
     operation::Insert as Op,
     options::WriteConcern,
     results::InsertOneResult,
@@ -100,6 +100,6 @@ impl<'a> Action for InsertOne<'a> {
             .execute_operation(insert, self.session)
             .await
             .map(InsertOneResult::from_insert_many_result)
-            .map_err(convert_bulk_errors)
+            .map_err(convert_insert_many_error)
     }
 }

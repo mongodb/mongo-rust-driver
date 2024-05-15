@@ -3,7 +3,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::Namespace,
     collation::Collation,
-    error::{convert_bulk_errors, Result},
+    error::{convert_insert_many_error, Result},
     operation::{
         append_options,
         remove_empty_write_concern,
@@ -87,7 +87,7 @@ impl OperationWithDefaults for Delete {
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: WriteResponseBody = response.body()?;
-        response.validate().map_err(convert_bulk_errors)?;
+        response.validate().map_err(convert_insert_many_error)?;
 
         Ok(DeleteResult {
             deleted_count: response.n,
