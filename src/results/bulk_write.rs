@@ -14,9 +14,9 @@ use crate::{
 #[non_exhaustive]
 pub struct SummaryBulkWriteResult {
     pub inserted_count: i64,
-    pub upserted_count: i64,
     pub matched_count: i64,
     pub modified_count: i64,
+    pub upserted_count: i64,
     pub deleted_count: i64,
 }
 
@@ -27,9 +27,9 @@ pub struct SummaryBulkWriteResult {
 #[non_exhaustive]
 pub struct VerboseBulkWriteResult {
     pub inserted_count: i64,
-    pub upserted_count: i64,
     pub matched_count: i64,
     pub modified_count: i64,
+    pub upserted_count: i64,
     pub deleted_count: i64,
     #[cfg_attr(
         test,
@@ -58,8 +58,6 @@ mod result_trait {
         fn errors_only() -> bool;
 
         fn merge(&mut self, other: Self);
-
-        fn empty_partial_result() -> PartialBulkWriteResult;
 
         fn into_partial_result(self) -> PartialBulkWriteResult;
 
@@ -90,21 +88,17 @@ impl BulkWriteResult for SummaryBulkWriteResult {
     fn merge(&mut self, other: Self) {
         let SummaryBulkWriteResult {
             inserted_count: other_inserted_count,
-            upserted_count: other_upserted_count,
             matched_count: other_matched_count,
             modified_count: other_modified_count,
+            upserted_count: other_upserted_count,
             deleted_count: other_deleted_count,
         } = other;
 
         self.inserted_count += other_inserted_count;
-        self.upserted_count += other_upserted_count;
         self.matched_count += other_matched_count;
         self.modified_count += other_modified_count;
+        self.upserted_count += other_upserted_count;
         self.deleted_count += other_deleted_count;
-    }
-
-    fn empty_partial_result() -> PartialBulkWriteResult {
-        PartialBulkWriteResult::Summary(Default::default())
     }
 
     fn into_partial_result(self) -> PartialBulkWriteResult {
@@ -152,10 +146,6 @@ impl BulkWriteResult for VerboseBulkWriteResult {
         self.insert_results.extend(other_insert_results);
         self.update_results.extend(other_update_results);
         self.delete_results.extend(other_delete_results);
-    }
-
-    fn empty_partial_result() -> PartialBulkWriteResult {
-        PartialBulkWriteResult::Verbose(Default::default())
     }
 
     fn into_partial_result(self) -> PartialBulkWriteResult {
