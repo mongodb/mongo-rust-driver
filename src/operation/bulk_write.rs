@@ -50,7 +50,7 @@ where
         models: &'a [WriteModel],
         offset: usize,
         options: Option<&'a BulkWriteOptions>,
-    ) -> Self {
+    ) -> BulkWrite<'a, R> {
         Self {
             client,
             models,
