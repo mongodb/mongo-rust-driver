@@ -1,6 +1,6 @@
 mod server_responses;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, marker::PhantomData};
 
 use futures_core::TryStream;
 use futures_util::{FutureExt, TryStreamExt};
@@ -26,7 +26,10 @@ use super::{ExecutionContext, Retryability, WriteResponseBody, OP_MSG_OVERHEAD_B
 
 use server_responses::*;
 
-pub(crate) struct BulkWrite<'a> {
+pub(crate) struct BulkWrite<'a, R>
+where
+    R: BulkWriteResult,
+{
     client: Client,
     models: &'a [WriteModel],
     offset: usize,
@@ -35,15 +38,19 @@ pub(crate) struct BulkWrite<'a> {
     inserted_ids: HashMap<usize, Bson>,
     /// The number of writes that were sent to the server. This value is populated in `build`.
     pub(crate) n_attempted: usize,
+    _phantom: PhantomData<R>,
 }
 
-impl<'a> BulkWrite<'a> {
+impl<'a, R> BulkWrite<'a, R>
+where
+    R: BulkWriteResult,
+{
     pub(crate) async fn new(
         client: Client,
         models: &'a [WriteModel],
         offset: usize,
         options: Option<&'a BulkWriteOptions>,
-    ) -> BulkWrite<'a> {
+    ) -> Self {
         Self {
             client,
             models,
@@ -51,23 +58,16 @@ impl<'a> BulkWrite<'a> {
             options,
             n_attempted: 0,
             inserted_ids: HashMap::new(),
+            _phantom: PhantomData,
         }
-    }
-
-    fn is_verbose(&self) -> bool {
-        self.options
-            .as_ref()
-            .and_then(|o| o.verbose_results)
-            .unwrap_or(false)
     }
 
     async fn iterate_results_cursor(
         &self,
         mut stream: impl TryStream<Ok = SingleOperationResponse, Error = Error> + Unpin,
+        result: &mut impl BulkWriteResult,
         error: &mut BulkWriteError,
     ) -> Result<()> {
-        let result = &mut error.partial_result;
-
         while let Some(response) = stream.try_next().await? {
             let index = response.index + self.offset;
             match response.result {
@@ -81,9 +81,7 @@ impl<'a> BulkWrite<'a> {
                         OperationType::Insert => {
                             let inserted_id = self.get_inserted_id(index)?;
                             let insert_result = InsertOneResult { inserted_id };
-                            result
-                                .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))
-                                .add_insert_result(index, insert_result);
+                            result.add_insert_result(index, insert_result);
                         }
                         OperationType::Update => {
                             let modified_count =
@@ -97,15 +95,11 @@ impl<'a> BulkWrite<'a> {
                                 modified_count,
                                 upserted_id: upserted.map(|upserted| upserted.id),
                             };
-                            result
-                                .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))
-                                .add_update_result(index, update_result);
+                            result.add_update_result(index, update_result);
                         }
                         OperationType::Delete => {
                             let delete_result = DeleteResult { deleted_count: n };
-                            result
-                                .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))
-                                .add_delete_result(index, delete_result);
+                            result.add_delete_result(index, delete_result);
                         }
                     }
                 }
@@ -171,8 +165,11 @@ impl<'a> NamespaceInfo<'a> {
     }
 }
 
-impl<'a> OperationWithDefaults for BulkWrite<'a> {
-    type O = BulkWriteResult;
+impl<'a, R> OperationWithDefaults for BulkWrite<'a, R>
+where
+    R: BulkWriteResult,
+{
+    type O = R;
 
     type Command = RawDocumentBuf;
 
@@ -184,10 +181,11 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
         let max_operations: usize = Checked::new(description.max_write_batch_size).try_into()?;
 
         let mut command_body = rawdoc! { Self::NAME: 1 };
-        let options = match self.options {
+        let mut options = match self.options {
             Some(options) => bson::to_raw_document_buf(options),
             None => bson::to_raw_document_buf(&BulkWriteOptions::default()),
         }?;
+        options.append("errorsOnly", R::errors_only());
         bson_util::extend_raw_document_buf(&mut command_body, options)?;
 
         let max_document_sequences_size: usize = (Checked::new(max_message_size)
@@ -249,23 +247,21 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
     ) -> BoxFuture<'b, Result<Self::O>> {
         async move {
             let response: WriteResponseBody<Response> = response.body()?;
-
-            let mut bulk_write_error = BulkWriteError::default();
-
-            // A partial result with summary info should only be created if one or more
-            // operations were successful.
             let n_errors: usize = Checked::new(response.summary.n_errors).try_into()?;
-            if n_errors < self.n_attempted {
-                bulk_write_error
-                    .partial_result
-                    .get_or_insert_with(|| BulkWriteResult::new(self.is_verbose()))
-                    .populate_summary_info(&response.summary);
-            }
+
+            let mut error: BulkWriteError = Default::default();
+            let mut result: R = Default::default();
+
+            result.populate_summary_info(
+                response.summary.n_inserted,
+                response.summary.n_matched,
+                response.summary.n_modified,
+                response.summary.n_upserted,
+                response.summary.n_deleted,
+            );
 
             if let Some(write_concern_error) = response.write_concern_error {
-                bulk_write_error
-                    .write_concern_errors
-                    .push(write_concern_error);
+                error.write_concern_errors.push(write_concern_error);
             }
 
             let specification = CursorSpecification::new(
@@ -288,37 +284,33 @@ impl<'a> OperationWithDefaults for BulkWrite<'a> {
                         SessionCursor::new(self.client.clone(), specification, pinned_connection);
                     self.iterate_results_cursor(
                         session_cursor.stream(session),
-                        &mut bulk_write_error,
+                        &mut result,
+                        &mut error,
                     )
                     .await
                 }
                 None => {
                     let cursor =
                         Cursor::new(self.client.clone(), specification, None, pinned_connection);
-                    self.iterate_results_cursor(cursor, &mut bulk_write_error)
+                    self.iterate_results_cursor(cursor, &mut result, &mut error)
                         .await
                 }
             };
 
-            match iteration_result {
-                Ok(()) => {
-                    if bulk_write_error.write_errors.is_empty()
-                        && bulk_write_error.write_concern_errors.is_empty()
-                    {
-                        Ok(bulk_write_error
-                            .partial_result
-                            .unwrap_or_else(|| BulkWriteResult::new(self.is_verbose())))
-                    } else {
-                        let error =
-                            Error::new(ErrorKind::BulkWrite(bulk_write_error), response.labels);
-                        Err(error)
-                    }
+            if iteration_result.is_ok()
+                && error.write_errors.is_empty()
+                && error.write_concern_errors.is_empty()
+            {
+                Ok(result)
+            } else {
+                // The partial result should only be populated if one or more operations succeeded.
+                if n_errors < self.n_attempted {
+                    error.partial_result = Some(result.into_partial_result());
                 }
-                Err(error) => {
-                    let error = Error::new(ErrorKind::BulkWrite(bulk_write_error), response.labels)
-                        .with_source(error);
-                    Err(error)
-                }
+
+                let error = Error::new(ErrorKind::BulkWrite(error), response.labels)
+                    .with_source(iteration_result.err());
+                Err(error)
             }
         }
         .boxed()

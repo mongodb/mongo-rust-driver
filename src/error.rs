@@ -1,6 +1,6 @@
 //! Contains the `Error` and `Result` types that `mongodb` uses.
 
-mod bulk_write;
+pub(crate) mod bulk_write;
 
 use std::{
     any::Any,

@@ -2,84 +2,190 @@
 
 use std::{collections::HashMap, fmt::Debug};
 
-use serde::Serialize;
-use serde_with::skip_serializing_none;
-
 use crate::{
+    error::bulk_write::PartialBulkWriteResult,
     results::{DeleteResult, InsertOneResult, UpdateResult},
-    serde_util::serialize_indexed_map,
 };
 
-#[skip_serializing_none]
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(test, serde_with::skip_serializing_none)]
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
+#[cfg_attr(test, serde(rename_all = "camelCase"))]
 #[non_exhaustive]
-pub struct BulkWriteResult {
+pub struct SummaryBulkWriteResult {
     pub inserted_count: i64,
     pub upserted_count: i64,
     pub matched_count: i64,
     pub modified_count: i64,
     pub deleted_count: i64,
-    #[serde(serialize_with = "serialize_indexed_map")]
-    pub insert_results: Option<HashMap<usize, InsertOneResult>>,
-    #[serde(serialize_with = "serialize_indexed_map")]
-    pub update_results: Option<HashMap<usize, UpdateResult>>,
-    #[serde(serialize_with = "serialize_indexed_map")]
-    pub delete_results: Option<HashMap<usize, DeleteResult>>,
 }
 
-impl BulkWriteResult {
-    pub(crate) fn new(verbose: bool) -> Self {
-        Self {
-            inserted_count: 0,
-            upserted_count: 0,
-            matched_count: 0,
-            modified_count: 0,
-            deleted_count: 0,
-            insert_results: verbose.then(HashMap::new),
-            update_results: verbose.then(HashMap::new),
-            delete_results: verbose.then(HashMap::new),
-        }
+#[cfg_attr(test, serde_with::skip_serializing_none)]
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
+#[cfg_attr(test, serde(rename_all = "camelCase"))]
+#[non_exhaustive]
+pub struct VerboseBulkWriteResult {
+    pub inserted_count: i64,
+    pub upserted_count: i64,
+    pub matched_count: i64,
+    pub modified_count: i64,
+    pub deleted_count: i64,
+    #[cfg_attr(
+        test,
+        serde(serialize_with = "crate::serde_util::serialize_indexed_map")
+    )]
+    pub insert_results: HashMap<usize, InsertOneResult>,
+    #[cfg_attr(
+        test,
+        serde(serialize_with = "crate::serde_util::serialize_indexed_map")
+    )]
+    pub update_results: HashMap<usize, UpdateResult>,
+    #[cfg_attr(
+        test,
+        serde(serialize_with = "crate::serde_util::serialize_indexed_map")
+    )]
+    pub delete_results: HashMap<usize, DeleteResult>,
+}
+
+mod result_trait {
+    use crate::{
+        error::bulk_write::PartialBulkWriteResult,
+        results::{DeleteResult, InsertOneResult, UpdateResult},
+    };
+
+    pub trait BulkWriteResult: Default + Send + Sync {
+        fn errors_only() -> bool;
+
+        fn merge(&mut self, other: Self);
+
+        fn empty_partial_result() -> PartialBulkWriteResult;
+
+        fn into_partial_result(self) -> PartialBulkWriteResult;
+
+        fn populate_summary_info(
+            &mut self,
+            n_inserted: i64,
+            n_matched: i64,
+            n_modified: i64,
+            n_upserted: i64,
+            n_deleted: i64,
+        );
+
+        fn add_insert_result(&mut self, _index: usize, _insert_result: InsertOneResult) {}
+
+        fn add_update_result(&mut self, _index: usize, _update_result: UpdateResult) {}
+
+        fn add_delete_result(&mut self, _index: usize, _delete_result: DeleteResult) {}
+    }
+}
+
+pub(crate) use result_trait::BulkWriteResult;
+
+impl BulkWriteResult for SummaryBulkWriteResult {
+    fn errors_only() -> bool {
+        true
     }
 
-    pub(crate) fn add_insert_result(&mut self, index: usize, insert_result: InsertOneResult) {
-        self.insert_results
-            .get_or_insert_with(Default::default)
-            .insert(index, insert_result);
+    fn merge(&mut self, other: Self) {
+        let SummaryBulkWriteResult {
+            inserted_count: other_inserted_count,
+            upserted_count: other_upserted_count,
+            matched_count: other_matched_count,
+            modified_count: other_modified_count,
+            deleted_count: other_deleted_count,
+        } = other;
+
+        self.inserted_count += other_inserted_count;
+        self.upserted_count += other_upserted_count;
+        self.matched_count += other_matched_count;
+        self.modified_count += other_modified_count;
+        self.deleted_count += other_deleted_count;
     }
 
-    pub(crate) fn add_update_result(&mut self, index: usize, update_result: UpdateResult) {
-        self.update_results
-            .get_or_insert_with(Default::default)
-            .insert(index, update_result);
+    fn empty_partial_result() -> PartialBulkWriteResult {
+        PartialBulkWriteResult::Summary(Default::default())
     }
 
-    pub(crate) fn add_delete_result(&mut self, index: usize, delete_result: DeleteResult) {
-        self.delete_results
-            .get_or_insert_with(Default::default)
-            .insert(index, delete_result);
+    fn into_partial_result(self) -> PartialBulkWriteResult {
+        PartialBulkWriteResult::Summary(self)
     }
 
-    pub(crate) fn merge(&mut self, other: Self) {
-        self.inserted_count += other.inserted_count;
-        self.upserted_count += other.upserted_count;
-        self.matched_count += other.matched_count;
-        self.modified_count += other.modified_count;
-        self.deleted_count += other.deleted_count;
-        if let Some(insert_results) = other.insert_results {
-            self.insert_results
-                .get_or_insert_with(Default::default)
-                .extend(insert_results);
-        }
-        if let Some(update_results) = other.update_results {
-            self.update_results
-                .get_or_insert_with(Default::default)
-                .extend(update_results);
-        }
-        if let Some(delete_results) = other.delete_results {
-            self.delete_results
-                .get_or_insert_with(Default::default)
-                .extend(delete_results);
-        }
+    fn populate_summary_info(
+        &mut self,
+        n_inserted: i64,
+        n_matched: i64,
+        n_modified: i64,
+        n_upserted: i64,
+        n_deleted: i64,
+    ) {
+        self.inserted_count += n_inserted;
+        self.matched_count += n_matched;
+        self.modified_count += n_modified;
+        self.upserted_count += n_upserted;
+        self.deleted_count += n_deleted;
+    }
+}
+
+impl BulkWriteResult for VerboseBulkWriteResult {
+    fn errors_only() -> bool {
+        false
+    }
+
+    fn merge(&mut self, other: Self) {
+        let VerboseBulkWriteResult {
+            inserted_count: other_inserted_count,
+            matched_count: other_matched_count,
+            modified_count: other_modified_count,
+            upserted_count: other_upserted_count,
+            deleted_count: other_deleted_count,
+            insert_results: other_insert_results,
+            update_results: other_update_results,
+            delete_results: other_delete_results,
+        } = other;
+
+        self.inserted_count += other_inserted_count;
+        self.matched_count += other_matched_count;
+        self.modified_count += other_modified_count;
+        self.upserted_count += other_upserted_count;
+        self.deleted_count += other_deleted_count;
+        self.insert_results.extend(other_insert_results);
+        self.update_results.extend(other_update_results);
+        self.delete_results.extend(other_delete_results);
+    }
+
+    fn empty_partial_result() -> PartialBulkWriteResult {
+        PartialBulkWriteResult::Verbose(Default::default())
+    }
+
+    fn into_partial_result(self) -> PartialBulkWriteResult {
+        PartialBulkWriteResult::Verbose(self)
+    }
+
+    fn populate_summary_info(
+        &mut self,
+        n_inserted: i64,
+        n_matched: i64,
+        n_modified: i64,
+        n_upserted: i64,
+        n_deleted: i64,
+    ) {
+        self.inserted_count += n_inserted;
+        self.matched_count += n_matched;
+        self.modified_count += n_modified;
+        self.upserted_count += n_upserted;
+        self.deleted_count += n_deleted;
+    }
+
+    fn add_insert_result(&mut self, index: usize, insert_result: InsertOneResult) {
+        self.insert_results.insert(index, insert_result);
+    }
+
+    fn add_update_result(&mut self, index: usize, update_result: UpdateResult) {
+        self.update_results.insert(index, update_result);
+    }
+
+    fn add_delete_result(&mut self, index: usize, delete_result: DeleteResult) {
+        self.delete_results.insert(index, delete_result);
     }
 }

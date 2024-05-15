@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::{bson::Bson, error::WriteError, operation::CursorInfo, results::BulkWriteResult};
+use crate::{bson::Bson, error::WriteError, operation::CursorInfo};
 
 /// The top-level response to the bulkWrite command.
 #[derive(Debug, Deserialize)]
@@ -21,16 +21,6 @@ pub(super) struct SummaryInfo {
     pub(super) n_modified: i64,
     pub(super) n_upserted: i64,
     pub(super) n_deleted: i64,
-}
-
-impl BulkWriteResult {
-    pub(super) fn populate_summary_info(&mut self, summary_info: &SummaryInfo) {
-        self.inserted_count += summary_info.n_inserted;
-        self.upserted_count += summary_info.n_upserted;
-        self.matched_count += summary_info.n_matched;
-        self.modified_count += summary_info.n_modified;
-        self.deleted_count += summary_info.n_deleted;
-    }
 }
 
 /// The structure of the response for a single operation within the results cursor.

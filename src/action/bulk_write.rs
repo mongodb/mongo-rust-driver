@@ -1,13 +1,13 @@
 #![allow(missing_docs)]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{
     bson::{Bson, Document},
     error::{BulkWriteError, Error, ErrorKind, Result},
     operation::bulk_write::BulkWrite as BulkWriteOperation,
     options::{BulkWriteOptions, WriteConcern, WriteModel},
-    results::BulkWriteResult,
+    results::{BulkWriteResult, SummaryBulkWriteResult, VerboseBulkWriteResult},
     Client,
     ClientSession,
 };
@@ -15,30 +15,48 @@ use crate::{
 use super::{action_impl, option_setters};
 
 impl Client {
-    pub fn bulk_write(&self, models: impl IntoIterator<Item = WriteModel>) -> BulkWrite {
+    pub fn bulk_write(
+        &self,
+        models: impl IntoIterator<Item = WriteModel>,
+    ) -> BulkWrite<SummaryBulkWriteResult> {
         BulkWrite::new(self, models.into_iter().collect())
     }
 }
 
 #[must_use]
-pub struct BulkWrite<'a> {
+pub struct BulkWrite<'a, R> {
     client: &'a Client,
     models: Vec<WriteModel>,
     options: Option<BulkWriteOptions>,
     session: Option<&'a mut ClientSession>,
+    _phantom: PhantomData<R>,
 }
 
-impl<'a> BulkWrite<'a> {
+impl<'a> BulkWrite<'a, SummaryBulkWriteResult> {
+    pub fn verbose_results(self) -> BulkWrite<'a, VerboseBulkWriteResult> {
+        BulkWrite {
+            client: self.client,
+            models: self.models,
+            options: self.options,
+            session: self.session,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a, R> BulkWrite<'a, R>
+where
+    R: BulkWriteResult,
+{
     option_setters!(options: BulkWriteOptions;
         ordered: bool,
         bypass_document_validation: bool,
         comment: Bson,
         let_vars: Document,
-        verbose_results: bool,
         write_concern: WriteConcern,
     );
 
-    pub fn session(mut self, session: &'a mut ClientSession) -> BulkWrite<'a> {
+    pub fn session(mut self, session: &'a mut ClientSession) -> Self {
         self.session = Some(session);
         self
     }
@@ -49,6 +67,7 @@ impl<'a> BulkWrite<'a> {
             models,
             options: None,
             session: None,
+            _phantom: PhantomData,
         }
     }
 
@@ -58,13 +77,8 @@ impl<'a> BulkWrite<'a> {
             .and_then(|options| options.ordered)
             .unwrap_or(true)
     }
-}
 
-#[action_impl]
-impl<'a> Action for BulkWrite<'a> {
-    type Future = BulkWriteFuture;
-
-    async fn execute(mut self) -> Result<BulkWriteResult> {
+    async fn execute_inner(mut self) -> Result<R> {
         #[cfg(feature = "in-use-encryption-unstable")]
         if self.client.should_auto_encrypt().await {
             use mongocrypt::error::{Error as EncryptionError, ErrorKind as EncryptionErrorKind};
@@ -100,7 +114,7 @@ impl<'a> Action for BulkWrite<'a> {
             .await;
             let result = self
                 .client
-                .execute_operation::<BulkWriteOperation>(
+                .execute_operation::<BulkWriteOperation<R>>(
                     &mut operation,
                     self.session.as_deref_mut(),
                 )
@@ -128,18 +142,42 @@ impl<'a> Action for BulkWrite<'a> {
     }
 }
 
+#[action_impl]
+impl<'a> Action for BulkWrite<'a, SummaryBulkWriteResult> {
+    type Future = SummaryBulkWriteFuture;
+
+    async fn execute(mut self) -> Result<SummaryBulkWriteResult> {
+        self.execute_inner().await
+    }
+}
+
+#[action_impl]
+impl<'a> Action for BulkWrite<'a, VerboseBulkWriteResult> {
+    type Future = VerboseBulkWriteFuture;
+
+    async fn execute(mut self) -> Result<VerboseBulkWriteResult> {
+        self.execute_inner().await
+    }
+}
+
 /// Represents the execution status of a bulk write. The status starts at `None`, indicating that no
 /// writes have been attempted yet, and transitions to either `Success` or `Error` as batches are
 /// executed. The contents of `Error` can be inspected to determine whether a bulk write can
 /// continue with further batches or should be terminated.
-enum ExecutionStatus {
-    Success(BulkWriteResult),
+enum ExecutionStatus<R>
+where
+    R: BulkWriteResult,
+{
+    Success(R),
     Error(Error),
     None,
 }
 
-impl ExecutionStatus {
-    fn with_success(mut self, result: BulkWriteResult) -> Self {
+impl<R> ExecutionStatus<R>
+where
+    R: BulkWriteResult,
+{
+    fn with_success(mut self, result: R) -> Self {
         match self {
             // Merge two successful sets of results together.
             Self::Success(ref mut current_result) => {
@@ -149,7 +187,7 @@ impl ExecutionStatus {
             // Merge the results of the new batch into the existing bulk write error.
             Self::Error(ref mut current_error) => {
                 let bulk_write_error = Self::get_current_bulk_write_error(current_error);
-                bulk_write_error.merge_partial_results(result);
+                bulk_write_error.merge_partial_results(result.into_partial_result());
                 self
             }
             Self::None => Self::Success(result),
@@ -163,14 +201,14 @@ impl ExecutionStatus {
             // set its source as the error that just occurred.
             Self::Success(current_result) => match *error.kind {
                 ErrorKind::BulkWrite(ref mut bulk_write_error) => {
-                    bulk_write_error.merge_partial_results(current_result);
+                    bulk_write_error.merge_partial_results(current_result.into_partial_result());
                     Self::Error(error)
                 }
                 _ => {
                     let bulk_write_error: Error = ErrorKind::BulkWrite(BulkWriteError {
                         write_errors: HashMap::new(),
                         write_concern_errors: Vec::new(),
-                        partial_result: Some(current_result),
+                        partial_result: Some(current_result.into_partial_result()),
                     })
                     .into();
                     Self::Error(bulk_write_error.with_source(error))

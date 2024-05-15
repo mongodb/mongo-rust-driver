@@ -80,7 +80,6 @@ use crate::{
     runtime,
     serde_util,
     test::util::fail_point::FailPoint,
-    ClientSession,
     Collection,
     Database,
     IndexModel,
@@ -147,7 +146,7 @@ macro_rules! with_mut_session {
             let entity = $test_runner.entities.write().await.remove(id).unwrap();
             match entity {
                 Entity::Session(mut session_owned) => {
-                    let $session: &mut ClientSession = &mut session_owned;
+                    let $session: &mut crate::ClientSession = &mut session_owned;
                     let out = $body.await;
                     $test_runner
                         .entities
@@ -174,6 +173,7 @@ macro_rules! with_mut_session {
         }
     };
 }
+use with_mut_session;
 
 macro_rules! with_opt_session {
     ($test_runner:ident, $id:expr, $act:expr $(,)?) => {
@@ -188,7 +188,7 @@ macro_rules! with_opt_session {
         }
     };
 }
-use with_mut_session;
+use with_opt_session;
 
 #[derive(Debug)]
 pub(crate) struct Operation {
