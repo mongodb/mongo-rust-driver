@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     bson::{doc, Document},
     error::{bulk_write::PartialBulkWriteResult, BulkWriteError, ErrorKind},
-    options::WriteModel,
+    options::{InsertOneModel, UpdateOneModel},
     results::UpdateResult,
     test::{
         get_client_options,
@@ -60,10 +60,10 @@ async fn max_write_batch_size_batching() {
 
     let max_write_batch_size = client.server_info.max_write_batch_size.unwrap() as usize;
 
-    let model = WriteModel::InsertOne {
-        namespace: Namespace::new("db", "coll"),
-        document: doc! { "a": "b" },
-    };
+    let model = InsertOneModel::builder()
+        .namespace(Namespace::new("db", "coll"))
+        .document(doc! { "a": "b" })
+        .build();
     let models = vec![model; max_write_batch_size + 1];
 
     let result = client.bulk_write(models).await.unwrap();
@@ -101,10 +101,10 @@ async fn max_message_size_bytes_batching() {
     let max_message_size_bytes = client.server_info.max_message_size_bytes as usize;
 
     let document = doc! { "a": "b".repeat(max_bson_object_size - 500) };
-    let model = WriteModel::InsertOne {
-        namespace: Namespace::new("db", "coll"),
-        document,
-    };
+    let model = InsertOneModel::builder()
+        .namespace(Namespace::new("db", "coll"))
+        .document(document)
+        .build();
     let num_models = max_message_size_bytes / max_bson_object_size + 1;
     let models = vec![model; num_models];
 
@@ -155,10 +155,10 @@ async fn write_concern_error_batches() {
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let models = vec![
-        WriteModel::InsertOne {
-            namespace: Namespace::new("db", "coll"),
-            document: doc! { "a": "b" }
-        };
+        InsertOneModel::builder()
+            .namespace(Namespace::new("db", "coll"))
+            .document(doc! { "a": "b" })
+            .build();
         max_write_batch_size + 1
     ];
     let error = client.bulk_write(models).ordered(false).await.unwrap_err();
@@ -197,10 +197,10 @@ async fn write_error_batches() {
     collection.insert_one(document.clone()).await.unwrap();
 
     let models = vec![
-        WriteModel::InsertOne {
-            namespace: collection.namespace(),
-            document,
-        };
+        InsertOneModel::builder()
+            .namespace(collection.namespace())
+            .document(document)
+            .build();
         max_write_batch_size + 1
     ];
 
@@ -252,24 +252,18 @@ async fn successful_cursor_iteration() {
     collection.drop().await.unwrap();
 
     let models = vec![
-        WriteModel::UpdateOne {
-            namespace: collection.namespace(),
-            filter: doc! { "_id": "a".repeat(max_bson_object_size / 2) },
-            update: doc! { "$set": { "x": 1 } }.into(),
-            array_filters: None,
-            collation: None,
-            hint: None,
-            upsert: Some(true),
-        },
-        WriteModel::UpdateOne {
-            namespace: collection.namespace(),
-            filter: doc! { "_id": "b".repeat(max_bson_object_size / 2) },
-            update: doc! { "$set": { "x": 1 } }.into(),
-            array_filters: None,
-            collation: None,
-            hint: None,
-            upsert: Some(true),
-        },
+        UpdateOneModel::builder()
+            .namespace(collection.namespace())
+            .filter(doc! { "_id": "a".repeat(max_bson_object_size / 2) })
+            .update(doc! { "$set": { "x": 1 } })
+            .upsert(true)
+            .build(),
+        UpdateOneModel::builder()
+            .namespace(collection.namespace())
+            .filter(doc! { "_id": "b".repeat(max_bson_object_size / 2) })
+            .update(doc! { "$set": { "x": 1 } })
+            .upsert(true)
+            .build(),
     ];
 
     let result = client.bulk_write(models).verbose_results().await.unwrap();
@@ -302,24 +296,18 @@ async fn cursor_iteration_in_a_transaction() {
     session.start_transaction().await.unwrap();
 
     let models = vec![
-        WriteModel::UpdateOne {
-            namespace: collection.namespace(),
-            filter: doc! { "_id": "a".repeat(max_bson_object_size / 2) },
-            update: doc! { "$set": { "x": 1 } }.into(),
-            array_filters: None,
-            collation: None,
-            hint: None,
-            upsert: Some(true),
-        },
-        WriteModel::UpdateOne {
-            namespace: collection.namespace(),
-            filter: doc! { "_id": "b".repeat(max_bson_object_size / 2) },
-            update: doc! { "$set": { "x": 1 } }.into(),
-            array_filters: None,
-            collation: None,
-            hint: None,
-            upsert: Some(true),
-        },
+        UpdateOneModel::builder()
+            .namespace(collection.namespace())
+            .filter(doc! { "_id": "a".repeat(max_bson_object_size / 2) })
+            .update(doc! { "$set": { "x": 1 } })
+            .upsert(true)
+            .build(),
+        UpdateOneModel::builder()
+            .namespace(collection.namespace())
+            .filter(doc! { "_id": "b".repeat(max_bson_object_size / 2) })
+            .update(doc! { "$set": { "x": 1 } })
+            .upsert(true)
+            .build(),
     ];
 
     let result = client
@@ -362,24 +350,18 @@ async fn failed_cursor_iteration() {
     collection.drop().await.unwrap();
 
     let models = vec![
-        WriteModel::UpdateOne {
-            namespace: collection.namespace(),
-            filter: doc! { "_id": "a".repeat(max_bson_object_size / 2) },
-            update: doc! { "$set": { "x": 1 } }.into(),
-            array_filters: None,
-            collation: None,
-            hint: None,
-            upsert: Some(true),
-        },
-        WriteModel::UpdateOne {
-            namespace: collection.namespace(),
-            filter: doc! { "_id": "b".repeat(max_bson_object_size / 2) },
-            update: doc! { "$set": { "x": 1 } }.into(),
-            array_filters: None,
-            collation: None,
-            hint: None,
-            upsert: Some(true),
-        },
+        UpdateOneModel::builder()
+            .namespace(collection.namespace())
+            .filter(doc! { "_id": "a".repeat(max_bson_object_size / 2) })
+            .update(doc! { "$set": { "x": 1 } })
+            .upsert(true)
+            .build(),
+        UpdateOneModel::builder()
+            .namespace(collection.namespace())
+            .filter(doc! { "_id": "b".repeat(max_bson_object_size / 2) })
+            .update(doc! { "$set": { "x": 1 } })
+            .upsert(true)
+            .build(),
     ];
 
     let error = client
@@ -432,27 +414,31 @@ async fn namespace_batch_splitting() {
     let ops_bytes = max_message_size_bytes - 1122;
     let num_models = ops_bytes / max_bson_object_size;
 
-    let model = WriteModel::InsertOne {
-        namespace: first_namespace.clone(),
-        document: doc! { "a": "b".repeat(max_bson_object_size - 57) },
-    };
+    let model = InsertOneModel::builder()
+        .namespace(first_namespace.clone())
+        .document(doc! { "a": "b".repeat(max_bson_object_size - 57) })
+        .build();
     let mut models = vec![model; num_models];
 
     let remainder_bytes = ops_bytes % max_bson_object_size;
     if remainder_bytes >= 217 {
-        models.push(WriteModel::InsertOne {
-            namespace: first_namespace.clone(),
-            document: doc! { "a": "b".repeat(remainder_bytes - 57) },
-        });
+        models.push(
+            InsertOneModel::builder()
+                .namespace(first_namespace.clone())
+                .document(doc! { "a": "b".repeat(remainder_bytes - 57) })
+                .build(),
+        );
     }
 
     // Case 1: no batch-splitting required
 
     let mut first_models = models.clone();
-    first_models.push(WriteModel::InsertOne {
-        namespace: first_namespace.clone(),
-        document: doc! { "a": "b" },
-    });
+    first_models.push(
+        InsertOneModel::builder()
+            .namespace(first_namespace.clone())
+            .document(doc! { "a": "b" })
+            .build(),
+    );
     let num_models = first_models.len();
 
     let result = client.bulk_write(first_models).await.unwrap();
@@ -478,10 +464,12 @@ async fn namespace_batch_splitting() {
     let second_namespace = Namespace::new("db", "c".repeat(200));
 
     let mut second_models = models.clone();
-    second_models.push(WriteModel::InsertOne {
-        namespace: second_namespace.clone(),
-        document: doc! { "a": "b" },
-    });
+    second_models.push(
+        InsertOneModel::builder()
+            .namespace(second_namespace.clone())
+            .document(doc! { "a": "b" })
+            .build(),
+    );
     let num_models = second_models.len();
 
     let result = client.bulk_write(second_models).await.unwrap();
@@ -531,19 +519,19 @@ async fn too_large_client_error() {
     }
 
     // Case 1: document too large
-    let model = WriteModel::InsertOne {
-        namespace: Namespace::new("db", "coll"),
-        document: doc! { "a": "b".repeat(max_message_size_bytes) },
-    };
+    let model = InsertOneModel::builder()
+        .namespace(Namespace::new("db", "coll"))
+        .document(doc! { "a": "b".repeat(max_message_size_bytes) })
+        .build();
 
     let error = client.bulk_write(vec![model]).await.unwrap_err();
     assert!(!error.is_server_error());
 
     // Case 2: namespace too large
-    let model = WriteModel::InsertOne {
-        namespace: Namespace::new("db", "c".repeat(max_message_size_bytes)),
-        document: doc! { "a": "b" },
-    };
+    let model = InsertOneModel::builder()
+        .namespace(Namespace::new("db", "c".repeat(max_message_size_bytes)))
+        .document(doc! { "a": "b" })
+        .build();
 
     let error = client.bulk_write(vec![model]).await.unwrap_err();
     assert!(!error.is_server_error());
@@ -570,10 +558,10 @@ async fn encryption_error() {
         .build()
         .await;
 
-    let model = WriteModel::InsertOne {
-        namespace: Namespace::new("db", "coll"),
-        document: doc! { "a": "b" },
-    };
+    let model = InsertOneModel::builder()
+        .namespace(Namespace::new("db", "coll"))
+        .document(doc! { "a": "b" })
+        .build();
     let error = encrypted_client.bulk_write(vec![model]).await.unwrap_err();
 
     let ErrorKind::Encryption(encryption_error) = *error.kind else {

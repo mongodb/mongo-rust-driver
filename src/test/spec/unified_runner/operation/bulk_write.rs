@@ -3,12 +3,19 @@ use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
-    bson::{to_bson, Array, Bson, Document},
-    coll::options::UpdateModifications,
+    bson::to_bson,
     error::Result,
-    options::{BulkWriteOptions, WriteModel},
+    options::{
+        BulkWriteOptions,
+        DeleteManyModel,
+        DeleteOneModel,
+        InsertOneModel,
+        ReplaceOneModel,
+        UpdateManyModel,
+        UpdateOneModel,
+        WriteModel,
+    },
     test::spec::unified_runner::{Entity, TestRunner},
-    Namespace,
 };
 
 use super::{with_mut_session, with_opt_session, TestOperation};
@@ -31,136 +38,22 @@ impl<'de> Deserialize<'de> for WriteModel {
         #[derive(Debug, Deserialize)]
         #[serde(rename_all = "camelCase")]
         enum WriteModelHelper {
-            InsertOne {
-                namespace: Namespace,
-                document: Document,
-            },
-            #[serde(rename_all = "camelCase")]
-            UpdateOne {
-                namespace: Namespace,
-                filter: Document,
-                update: UpdateModifications,
-                array_filters: Option<Array>,
-                collation: Option<Document>,
-                hint: Option<Bson>,
-                upsert: Option<bool>,
-            },
-            #[serde(rename_all = "camelCase")]
-            UpdateMany {
-                namespace: Namespace,
-                filter: Document,
-                update: UpdateModifications,
-                array_filters: Option<Array>,
-                collation: Option<Document>,
-                hint: Option<Bson>,
-                upsert: Option<bool>,
-            },
-            #[serde(rename_all = "camelCase")]
-            ReplaceOne {
-                namespace: Namespace,
-                filter: Document,
-                replacement: Document,
-                collation: Option<Document>,
-                hint: Option<Bson>,
-                upsert: Option<bool>,
-            },
-            DeleteOne {
-                namespace: Namespace,
-                filter: Document,
-                collation: Option<Document>,
-                hint: Option<Bson>,
-            },
-            DeleteMany {
-                namespace: Namespace,
-                filter: Document,
-                collation: Option<Document>,
-                hint: Option<Bson>,
-            },
+            InsertOne(InsertOneModel),
+            UpdateOne(UpdateOneModel),
+            UpdateMany(UpdateManyModel),
+            ReplaceOne(ReplaceOneModel),
+            DeleteOne(DeleteOneModel),
+            DeleteMany(DeleteManyModel),
         }
 
-        let helper = WriteModelHelper::deserialize(deserializer)?;
-        let model = match helper {
-            WriteModelHelper::InsertOne {
-                namespace,
-                document,
-            } => WriteModel::InsertOne {
-                namespace,
-                document,
-            },
-            WriteModelHelper::UpdateOne {
-                namespace,
-                filter,
-                update,
-                array_filters,
-                collation,
-                hint,
-                upsert,
-            } => WriteModel::UpdateOne {
-                namespace,
-                filter,
-                update,
-                array_filters,
-                collation,
-                hint,
-                upsert,
-            },
-            WriteModelHelper::UpdateMany {
-                namespace,
-                filter,
-                update,
-                array_filters,
-                collation,
-                hint,
-                upsert,
-            } => WriteModel::UpdateMany {
-                namespace,
-                filter,
-                update,
-                array_filters,
-                collation,
-                hint,
-                upsert,
-            },
-            WriteModelHelper::ReplaceOne {
-                namespace,
-                filter,
-                replacement,
-                collation,
-                hint,
-                upsert,
-            } => WriteModel::ReplaceOne {
-                namespace,
-                filter,
-                replacement,
-                collation,
-                hint,
-                upsert,
-            },
-            WriteModelHelper::DeleteOne {
-                namespace,
-                filter,
-                collation,
-                hint,
-            } => WriteModel::DeleteOne {
-                namespace,
-                filter,
-                collation,
-                hint,
-            },
-            WriteModelHelper::DeleteMany {
-                namespace,
-                filter,
-                collation,
-                hint,
-            } => WriteModel::DeleteMany {
-                namespace,
-                filter,
-                collation,
-                hint,
-            },
-        };
-
-        Ok(model)
+        match WriteModelHelper::deserialize(deserializer)? {
+            WriteModelHelper::InsertOne(model) => Ok(Self::InsertOne(model)),
+            WriteModelHelper::UpdateOne(model) => Ok(Self::UpdateOne(model)),
+            WriteModelHelper::UpdateMany(model) => Ok(Self::UpdateMany(model)),
+            WriteModelHelper::ReplaceOne(model) => Ok(Self::ReplaceOne(model)),
+            WriteModelHelper::DeleteOne(model) => Ok(Self::DeleteOne(model)),
+            WriteModelHelper::DeleteMany(model) => Ok(Self::DeleteMany(model)),
+        }
     }
 }
 
