@@ -402,12 +402,10 @@ impl Handshaker {
         }
     }
 
-    /// Handshakes a connection.
-    pub(crate) async fn handshake(
+    async fn build_command(
         &self,
-        conn: &mut Connection,
         credential: Option<&Credential>,
-    ) -> Result<HelloReply> {
+    ) -> Result<(Command, Option<ClientFirst>)> {
         let mut command = self.command.clone();
 
         if let Some(cred) = credential {
@@ -431,6 +429,16 @@ impl Handshaker {
         }
         body.append("client", meta_doc);
 
+        Ok((command, client_first))
+    }
+
+    /// Handshakes a connection.
+    pub(crate) async fn handshake(
+        &self,
+        conn: &mut Connection,
+        credential: Option<&Credential>,
+    ) -> Result<HelloReply> {
+        let (command, client_first) = self.build_command(credential).await?;
         let mut hello_reply = run_hello(conn, command).await?;
 
         conn.stream_description = Some(StreamDescription::from_hello_reply(&hello_reply));
