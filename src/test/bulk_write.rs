@@ -1,7 +1,10 @@
+use std::collections::HashMap;
+
 use crate::{
     bson::{doc, Document},
-    error::{BulkWriteError, ErrorKind},
+    error::{bulk_write::PartialBulkWriteResult, BulkWriteError, ErrorKind},
     options::WriteModel,
+    results::UpdateResult,
     test::{
         get_client_options,
         log_uncaptured,
@@ -13,6 +16,29 @@ use crate::{
 };
 
 use super::TestClient;
+
+impl PartialBulkWriteResult {
+    fn inserted_count(&self) -> i64 {
+        match self {
+            Self::Summary(summary_result) => summary_result.inserted_count,
+            Self::Verbose(verbose_result) => verbose_result.summary.inserted_count,
+        }
+    }
+
+    fn upserted_count(&self) -> i64 {
+        match self {
+            Self::Summary(summary_result) => summary_result.upserted_count,
+            Self::Verbose(verbose_result) => verbose_result.summary.upserted_count,
+        }
+    }
+
+    fn update_results(&self) -> Option<&HashMap<usize, UpdateResult>> {
+        match self {
+            Self::Summary(_) => None,
+            Self::Verbose(verbose_result) => Some(&verbose_result.update_results),
+        }
+    }
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
@@ -145,7 +171,7 @@ async fn write_concern_error_batches() {
 
     let partial_result = bulk_write_error.partial_result.unwrap();
     assert_eq!(
-        partial_result.inserted_count as usize,
+        partial_result.inserted_count() as usize,
         max_write_batch_size + 1
     );
 
@@ -246,13 +272,9 @@ async fn successful_cursor_iteration() {
         },
     ];
 
-    let result = client
-        .bulk_write(models)
-        .verbose_results(true)
-        .await
-        .unwrap();
-    assert_eq!(result.upserted_count, 2);
-    assert_eq!(result.update_results.unwrap().len(), 2);
+    let result = client.bulk_write(models).verbose_results().await.unwrap();
+    assert_eq!(result.summary.upserted_count, 2);
+    assert_eq!(result.update_results.len(), 2);
 
     let command_started_events = client.events.get_command_started_events(&["getMore"]);
     assert_eq!(command_started_events.len(), 1);
@@ -302,12 +324,12 @@ async fn cursor_iteration_in_a_transaction() {
 
     let result = client
         .bulk_write(models)
-        .verbose_results(true)
+        .verbose_results()
         .session(&mut session)
         .await
         .unwrap();
-    assert_eq!(result.upserted_count, 2);
-    assert_eq!(result.update_results.unwrap().len(), 2);
+    assert_eq!(result.summary.upserted_count, 2);
+    assert_eq!(result.update_results.len(), 2);
 
     let command_started_events = client.events.get_command_started_events(&["getMore"]);
     assert_eq!(command_started_events.len(), 1);
@@ -362,7 +384,7 @@ async fn failed_cursor_iteration() {
 
     let error = client
         .bulk_write(models)
-        .verbose_results(true)
+        .verbose_results()
         .await
         .unwrap_err();
 
@@ -381,8 +403,8 @@ async fn failed_cursor_iteration() {
             error
         );
     };
-    assert_eq!(partial_result.upserted_count, 2);
-    assert_eq!(partial_result.update_results.unwrap().len(), 1);
+    assert_eq!(partial_result.upserted_count(), 2);
+    assert_eq!(partial_result.update_results().unwrap().len(), 1);
 
     let get_more_events = client.events.get_command_started_events(&["getMore"]);
     assert_eq!(get_more_events.len(), 1);

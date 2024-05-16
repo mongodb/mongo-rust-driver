@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    time::Duration,
-};
+use std::time::Duration;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -188,30 +185,27 @@ where
     Ok(Some(vec))
 }
 
+#[cfg(test)]
 pub(crate) fn serialize_indexed_map<S: Serializer, T: Serialize>(
-    map: &Option<HashMap<usize, T>>,
+    map: &std::collections::HashMap<usize, T>,
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
-    if let Some(map) = map {
-        let string_map: BTreeMap<_, _> = map
-            .iter()
-            .map(|(index, result)| (index.to_string(), result))
-            .collect();
-        string_map.serialize(serializer)
-    } else {
-        serializer.serialize_none()
-    }
+    let string_map: std::collections::BTreeMap<_, _> = map
+        .iter()
+        .map(|(index, result)| (index.to_string(), result))
+        .collect();
+    string_map.serialize(serializer)
 }
 
 #[cfg(test)]
 pub(crate) fn deserialize_indexed_map<'de, D, T>(
     deserializer: D,
-) -> std::result::Result<Option<HashMap<usize, T>>, D::Error>
+) -> std::result::Result<Option<std::collections::HashMap<usize, T>>, D::Error>
 where
     D: Deserializer<'de>,
     T: serde::de::DeserializeOwned,
 {
-    use std::str::FromStr;
+    use std::{collections::HashMap, str::FromStr};
 
     let string_map: HashMap<String, T> = HashMap::deserialize(deserializer)?;
     Ok(Some(string_map.into_iter().try_fold(
@@ -222,4 +216,12 @@ where
             Ok(map)
         },
     )?))
+}
+
+pub(crate) fn serialize_bool_or_true<S: Serializer>(
+    val: &Option<bool>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    let val = val.unwrap_or(true);
+    serializer.serialize_bool(val)
 }

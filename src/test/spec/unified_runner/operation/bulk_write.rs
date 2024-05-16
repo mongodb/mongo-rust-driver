@@ -3,22 +3,22 @@ use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
-    bson::{Array, Bson, Document},
+    bson::{to_bson, Array, Bson, Document},
     coll::options::UpdateModifications,
     error::Result,
     options::{BulkWriteOptions, WriteModel},
     test::spec::unified_runner::{Entity, TestRunner},
-    ClientSession,
     Namespace,
 };
 
-use super::{with_mut_session, TestOperation};
+use super::{with_mut_session, with_opt_session, TestOperation};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct BulkWrite {
     session: Option<String>,
     models: Vec<WriteModel>,
+    verbose_results: Option<bool>,
     #[serde(flatten)]
     options: BulkWriteOptions,
 }
@@ -172,26 +172,19 @@ impl TestOperation for BulkWrite {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let client = test_runner.get_client(id).await;
-            let result = match self.session {
-                Some(ref session_id) => {
-                    with_mut_session!(test_runner, session_id, |session| async {
-                        client
-                            .bulk_write(self.models.clone())
-                            .with_options(self.options.clone())
-                            .session(session)
-                            .await
-                    })
+            let action = client
+                .bulk_write(self.models.clone())
+                .with_options(self.options.clone());
+            let result = if let Some(true) = self.verbose_results {
+                with_opt_session!(test_runner, &self.session, action.verbose_results())
                     .await
-                }
-                None => {
-                    client
-                        .bulk_write(self.models.clone())
-                        .with_options(self.options.clone())
-                        .await
-                }
+                    .and_then(|result| Ok(to_bson(&result)?))
+            } else {
+                with_opt_session!(test_runner, &self.session, action)
+                    .await
+                    .and_then(|result| Ok(to_bson(&result)?))
             }?;
-            let bson = bson::to_bson(&result)?;
-            Ok(Some(bson.into()))
+            Ok(Some(result.into()))
         }
         .boxed()
     }

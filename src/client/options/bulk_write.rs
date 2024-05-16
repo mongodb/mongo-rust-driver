@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use serde::{ser::SerializeMap, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::{
@@ -8,64 +8,23 @@ use crate::{
     bson_util::{get_or_prepend_id_field, replacement_document_check, update_document_check},
     error::Result,
     options::{UpdateModifications, WriteConcern},
+    serde_util::serialize_bool_or_true,
     Namespace,
 };
 
 #[skip_serializing_none]
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct BulkWriteOptions {
+    #[serialize_always]
+    #[serde(serialize_with = "serialize_bool_or_true")]
     pub ordered: Option<bool>,
     pub bypass_document_validation: Option<bool>,
     pub comment: Option<Bson>,
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
-    pub verbose_results: Option<bool>,
     pub write_concern: Option<WriteConcern>,
-}
-
-impl Serialize for BulkWriteOptions {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let BulkWriteOptions {
-            ordered,
-            bypass_document_validation,
-            comment,
-            let_vars,
-            verbose_results,
-            write_concern,
-        } = self;
-
-        let mut map_serializer = serializer.serialize_map(None)?;
-
-        let ordered = ordered.unwrap_or(true);
-        map_serializer.serialize_entry("ordered", &ordered)?;
-
-        if let Some(bypass_document_validation) = bypass_document_validation {
-            map_serializer
-                .serialize_entry("bypassDocumentValidation", bypass_document_validation)?;
-        }
-
-        if let Some(ref comment) = comment {
-            map_serializer.serialize_entry("comment", comment)?;
-        }
-
-        if let Some(ref let_vars) = let_vars {
-            map_serializer.serialize_entry("let", let_vars)?;
-        }
-
-        let errors_only = verbose_results.map(|b| !b).unwrap_or(true);
-        map_serializer.serialize_entry("errorsOnly", &errors_only)?;
-
-        if let Some(ref write_concern) = write_concern {
-            map_serializer.serialize_entry("writeConcern", write_concern)?;
-        }
-
-        map_serializer.end()
-    }
 }
 
 #[skip_serializing_none]

@@ -1,6 +1,6 @@
 //! Contains the `Error` and `Result` types that `mongodb` uses.
 
-mod bulk_write;
+pub(crate) mod bulk_write;
 
 use std::{
     any::Any,
@@ -18,7 +18,7 @@ use crate::{
     sdam::{ServerType, TopologyVersion},
 };
 
-pub use bulk_write::BulkWriteError;
+pub use bulk_write::{BulkWriteError, PartialBulkWriteResult};
 
 const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
 const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
