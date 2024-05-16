@@ -21,14 +21,14 @@ impl PartialBulkWriteResult {
     fn inserted_count(&self) -> i64 {
         match self {
             Self::Summary(summary_result) => summary_result.inserted_count,
-            Self::Verbose(verbose_result) => verbose_result.inserted_count,
+            Self::Verbose(verbose_result) => verbose_result.summary.inserted_count,
         }
     }
 
     fn upserted_count(&self) -> i64 {
         match self {
             Self::Summary(summary_result) => summary_result.upserted_count,
-            Self::Verbose(verbose_result) => verbose_result.upserted_count,
+            Self::Verbose(verbose_result) => verbose_result.summary.upserted_count,
         }
     }
 
@@ -273,7 +273,7 @@ async fn successful_cursor_iteration() {
     ];
 
     let result = client.bulk_write(models).verbose_results().await.unwrap();
-    assert_eq!(result.upserted_count, 2);
+    assert_eq!(result.summary.upserted_count, 2);
     assert_eq!(result.update_results.len(), 2);
 
     let command_started_events = client.events.get_command_started_events(&["getMore"]);
@@ -328,7 +328,7 @@ async fn cursor_iteration_in_a_transaction() {
         .session(&mut session)
         .await
         .unwrap();
-    assert_eq!(result.upserted_count, 2);
+    assert_eq!(result.summary.upserted_count, 2);
     assert_eq!(result.update_results.len(), 2);
 
     let command_started_events = client.events.get_command_started_events(&["getMore"]);

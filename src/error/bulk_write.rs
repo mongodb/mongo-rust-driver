@@ -29,7 +29,7 @@ impl PartialBulkWriteResult {
             (Self::Summary(this), Self::Summary(other)) => this.merge(other),
             (Self::Verbose(this), Self::Verbose(other)) => this.merge(other),
             // The operation execution path makes this an unreachable state
-            _ => {}
+            _ => unreachable!(),
         }
     }
 }

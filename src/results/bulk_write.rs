@@ -26,11 +26,7 @@ pub struct SummaryBulkWriteResult {
 #[cfg_attr(test, serde(rename_all = "camelCase"))]
 #[non_exhaustive]
 pub struct VerboseBulkWriteResult {
-    pub inserted_count: i64,
-    pub matched_count: i64,
-    pub modified_count: i64,
-    pub upserted_count: i64,
-    pub deleted_count: i64,
+    pub summary: SummaryBulkWriteResult,
     #[cfg_attr(
         test,
         serde(serialize_with = "crate::serde_util::serialize_indexed_map")
@@ -128,21 +124,13 @@ impl BulkWriteResult for VerboseBulkWriteResult {
 
     fn merge(&mut self, other: Self) {
         let VerboseBulkWriteResult {
-            inserted_count: other_inserted_count,
-            matched_count: other_matched_count,
-            modified_count: other_modified_count,
-            upserted_count: other_upserted_count,
-            deleted_count: other_deleted_count,
+            summary: other_summary,
             insert_results: other_insert_results,
             update_results: other_update_results,
             delete_results: other_delete_results,
         } = other;
 
-        self.inserted_count += other_inserted_count;
-        self.matched_count += other_matched_count;
-        self.modified_count += other_modified_count;
-        self.upserted_count += other_upserted_count;
-        self.deleted_count += other_deleted_count;
+        self.summary.merge(other_summary);
         self.insert_results.extend(other_insert_results);
         self.update_results.extend(other_update_results);
         self.delete_results.extend(other_delete_results);
@@ -160,11 +148,8 @@ impl BulkWriteResult for VerboseBulkWriteResult {
         n_upserted: i64,
         n_deleted: i64,
     ) {
-        self.inserted_count += n_inserted;
-        self.matched_count += n_matched;
-        self.modified_count += n_modified;
-        self.upserted_count += n_upserted;
-        self.deleted_count += n_deleted;
+        self.summary
+            .populate_summary_info(n_inserted, n_matched, n_modified, n_upserted, n_deleted);
     }
 
     fn add_insert_result(&mut self, index: usize, insert_result: InsertOneResult) {
