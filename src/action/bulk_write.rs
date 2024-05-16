@@ -17,9 +17,13 @@ use super::{action_impl, option_setters};
 impl Client {
     pub fn bulk_write(
         &self,
-        models: impl IntoIterator<Item = WriteModel>,
+        models: impl IntoIterator<Item = impl Into<WriteModel>>,
     ) -> BulkWrite<SummaryBulkWriteResult> {
-        BulkWrite::new(self, models.into_iter().collect())
+        let mut models_vec = Vec::new();
+        for model in models.into_iter() {
+            models_vec.push(model.into());
+        }
+        BulkWrite::new(self, models_vec)
     }
 }
 
