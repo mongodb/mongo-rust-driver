@@ -37,7 +37,7 @@ impl OperationWithDefaults for AbortTransaction {
         };
         if let Some(ref write_concern) = self.write_concern() {
             if !write_concern.is_empty() {
-                append_ser(&mut body, "writeConcern", write_concern);
+                append_ser(&mut body, "writeConcern", write_concern)?;
             }
         }
 
