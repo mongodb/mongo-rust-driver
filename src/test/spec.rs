@@ -6,7 +6,6 @@ mod collection_management;
 mod command_monitoring;
 mod connection_stepdown;
 mod crud;
-mod crud_v1;
 mod faas;
 mod gridfs;
 mod index_management;

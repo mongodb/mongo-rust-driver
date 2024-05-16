@@ -19,6 +19,14 @@ async fn run_unified() {
             "replaceOne-hint-unacknowledged.json",
             "updateMany-hint-unacknowledged.json",
             "updateOne-hint-unacknowledged.json",
+            // TODO RUST-1405: unskip the errorResponse tests
+            "client-bulkWrite-errorResponse.json",
+            "bulkWrite-errorResponse.json",
+            "updateOne-errorResponse.json",
+            "insertOne-errorResponse.json",
+            "deleteOne-errorResponse.json",
+            "aggregate-merge-errorResponse.json",
+            "findOneAndUpdate-errorResponse.json",
         ])
         .skip_tests(&[
             // Unacknowledged write; see above.
