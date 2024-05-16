@@ -1,6 +1,6 @@
 description: "server-selection-logging"
 
-schemaVersion: "1.14"
+schemaVersion: "1.13"
 
 runOnRequirements:
   - topologies:

@@ -521,11 +521,7 @@ async fn connection_logging_unified() {
 #[tokio::test(flavor = "multi_thread")]
 async fn server_selection_logging_unified() {
     run_unified_tests(&["server-selection", "logging"])
-        .skip_tests(&[
-            // TODO: RUST-583 Unskip these if/when we add operation IDs as part of bulkWrite
-            // support.
-            "Successful bulkWrite operation: log messages have operationIds",
-            "Failed bulkWrite operation: log messages have operationIds",
-        ])
+        // Operation IDs are not currently supported.
+        .skip_files(&["operation-id.json"])
         .await;
 }
