@@ -1,6 +1,6 @@
 {
   "description": "client bulkWrite retryable writes with client errors",
-  "schemaVersion": "1.20",
+  "schemaVersion": "1.21",
   "runOnRequirements": [
     {
       "minServerVersion": "8.0",

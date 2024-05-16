@@ -1,13 +1,8 @@
-mod test_file;
-
 use std::{sync::Arc, time::Duration};
 
 use bson::Bson;
-use futures::stream::TryStreamExt;
 use semver::VersionReq;
 use tokio::sync::Mutex;
-
-use test_file::{TestFile, TestResult};
 
 use crate::{
     bson::{doc, Document},
@@ -19,17 +14,13 @@ use crate::{
     options::ClientOptions,
     runtime,
     runtime::{spawn, AcknowledgedMessage, AsyncJoinHandle},
-    sdam::MIN_HEARTBEAT_FREQUENCY,
     test::{
-        assert_matches,
         get_client_options,
         log_uncaptured,
-        run_spec_test,
         spec::unified_runner::run_unified_tests,
         util::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
-            get_default_name,
         },
         Event,
         TestClient,
@@ -40,142 +31,6 @@ use crate::{
 #[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
     run_unified_tests(&["retryable-writes", "unified"]).await;
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn run_legacy() {
-    async fn run_test(test_file: TestFile) {
-        for test_case in test_file.tests {
-            if test_case.operation.name == "bulkWrite" {
-                continue;
-            }
-            let mut options = test_case.client_options.unwrap_or_default();
-            options.hosts.clone_from(&get_client_options().await.hosts);
-            if options.heartbeat_freq.is_none() {
-                options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
-            }
-
-            let client = Client::test_builder()
-                .additional_options(options, test_case.use_multiple_mongoses.unwrap_or(false))
-                .await
-                .min_heartbeat_freq(Duration::from_millis(50))
-                .build()
-                .await;
-
-            if let Some(ref run_on) = test_file.run_on {
-                let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
-                if !can_run_on {
-                    log_uncaptured(format!("Skipping {}", test_case.description));
-                    continue;
-                }
-            }
-
-            let db_name = get_default_name(&test_case.description);
-            let coll_name = "coll";
-
-            let coll = client.init_db_and_coll(&db_name, coll_name).await;
-
-            if !test_file.data.is_empty() {
-                coll.insert_many(test_file.data.clone())
-                    .await
-                    .expect(&test_case.description);
-            }
-
-            let guard = if let Some(fail_point) = test_case.fail_point {
-                Some(
-                    client
-                        .enable_fail_point(fail_point)
-                        .await
-                        .expect(&test_case.description),
-                )
-            } else {
-                None
-            };
-
-            let coll = client.database(&db_name).collection(coll_name);
-            let result = test_case.operation.execute_on_collection(&coll, None).await;
-
-            // Disable the failpoint, if any.
-            drop(guard);
-
-            if let Some(error) = test_case.outcome.error {
-                assert_eq!(
-                    error,
-                    result.is_err(),
-                    "{}: expected error: {}, got {:?}",
-                    &test_case.description,
-                    error,
-                    result
-                );
-            }
-
-            if let Some(expected_result) = test_case.outcome.result {
-                match expected_result {
-                    TestResult::Value(value) => {
-                        let description = &test_case.description;
-                        let result = result
-                            .unwrap_or_else(|e| {
-                                panic!(
-                                    "{:?}: operation should succeed, got error: {}",
-                                    description, e
-                                )
-                            })
-                            .unwrap();
-                        assert_matches(&result, &value, Some(description));
-                    }
-                    TestResult::Labels(expected_labels) => {
-                        let error = result.expect_err(&format!(
-                            "{:?}: operation should fail",
-                            &test_case.description
-                        ));
-
-                        let description = &test_case.description;
-                        if let Some(contain) = expected_labels.error_labels_contain {
-                            contain.iter().for_each(|label| {
-                                assert!(
-                                    error.contains_label(label),
-                                    "{}: error labels should include {}",
-                                    description,
-                                    label,
-                                );
-                            });
-                        }
-
-                        if let Some(omit) = expected_labels.error_labels_omit {
-                            omit.iter().for_each(|label| {
-                                assert!(
-                                    !error.contains_label(label),
-                                    "{}: error labels should not include {}",
-                                    description,
-                                    label,
-                                );
-                            });
-                        }
-                    }
-                };
-            }
-
-            let coll_name = match test_case.outcome.collection.name {
-                Some(name) => name,
-                None => coll_name.to_string(),
-            };
-
-            let coll = client.get_coll(&db_name, &coll_name);
-            let actual_data: Vec<Document> = coll
-                .find(doc! {})
-                .sort(doc! { "_id": 1 })
-                .await
-                .unwrap()
-                .try_collect()
-                .await
-                .unwrap();
-            assert_eq!(test_case.outcome.collection.data, actual_data);
-
-            client.database(&db_name).drop().await.unwrap();
-        }
-    }
-
-    run_spec_test(&["retryable-writes", "legacy"], run_test).await;
 }
 
 #[tokio::test]
