@@ -27,6 +27,16 @@ impl Client {
     }
 }
 
+#[cfg(feature = "sync")]
+impl crate::sync::Client {
+    pub fn bulk_write(
+        &self,
+        models: impl IntoIterator<Item = impl Into<WriteModel>>,
+    ) -> BulkWrite<SummaryBulkWriteResult> {
+        self.async_client.bulk_write(models)
+    }
+}
+
 #[must_use]
 pub struct BulkWrite<'a, R> {
     client: &'a Client,
