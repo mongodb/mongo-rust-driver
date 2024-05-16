@@ -26,6 +26,7 @@ pub struct SummaryBulkWriteResult {
 #[cfg_attr(test, serde(rename_all = "camelCase"))]
 #[non_exhaustive]
 pub struct VerboseBulkWriteResult {
+    #[cfg_attr(test, serde(flatten))]
     pub summary: SummaryBulkWriteResult,
     #[cfg_attr(
         test,
