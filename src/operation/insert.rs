@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    bson::{rawdoc, Bson, RawDocument, RawDocumentBuf},
+    bson::{rawdoc, Bson, RawDocument},
     bson_util::{
         array_entry_size_bytes,
         extend_raw_document_buf,
@@ -52,11 +52,10 @@ impl<'a> Insert<'a> {
 
 impl<'a> OperationWithDefaults for Insert<'a> {
     type O = InsertManyResult;
-    type Command = RawDocumentBuf;
 
     const NAME: &'static str = "insert";
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         let max_doc_size: usize = Checked::new(description.max_bson_object_size).try_into()?;
         let max_message_size: usize =
             Checked::new(description.max_message_size_bytes).try_into()?;

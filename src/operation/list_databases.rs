@@ -1,15 +1,16 @@
+use bson::rawdoc;
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Document, RawDocumentBuf},
+    bson::{doc, RawDocumentBuf},
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::ListDatabasesOptions,
     error::Result,
-    operation::{append_options, OperationWithDefaults, Retryability},
+    operation::{OperationWithDefaults, Retryability},
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
 
-use super::ExecutionContext;
+use super::{append_options_to_raw_document, ExecutionContext};
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
@@ -25,17 +26,16 @@ impl ListDatabases {
 
 impl OperationWithDefaults for ListDatabases {
     type O = Vec<RawDocumentBuf>;
-    type Command = Document;
 
     const NAME: &'static str = "listDatabases";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
-        let mut body: Document = doc! {
+        let mut body = rawdoc! {
             Self::NAME: 1,
             "nameOnly": self.name_only
         };
 
-        append_options(&mut body, self.options.as_ref())?;
+        append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),

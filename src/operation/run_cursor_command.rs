@@ -1,7 +1,6 @@
 use futures_util::FutureExt;
 
 use crate::{
-    bson::RawDocumentBuf,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     concern::WriteConcern,
     cursor::CursorSpecification,
@@ -34,11 +33,10 @@ impl<'conn> RunCursorCommand<'conn> {
 
 impl<'conn> Operation for RunCursorCommand<'conn> {
     type O = CursorSpecification;
-    type Command = RawDocumentBuf;
 
     const NAME: &'static str = "run_cursor_command";
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.run_command.build(description)
     }
 

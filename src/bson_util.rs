@@ -182,9 +182,9 @@ pub(crate) fn extend_raw_document_buf(
     this: &mut RawDocumentBuf,
     other: RawDocumentBuf,
 ) -> Result<()> {
-    let mut keys: HashSet<&str> = HashSet::new();
+    let mut keys: HashSet<String> = HashSet::new();
     for elem in this.iter_elements() {
-        keys.insert(elem?.key());
+        keys.insert(elem?.key().to_owned());
     }
     for result in other.iter() {
         let (k, v) = result?;

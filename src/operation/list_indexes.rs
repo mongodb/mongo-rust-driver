@@ -1,15 +1,17 @@
+use bson::rawdoc;
+
 use crate::{
-    bson::{doc, Document},
+    checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, OperationWithDefaults},
+    operation::OperationWithDefaults,
     options::ListIndexesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
     Namespace,
 };
 
-use super::{CursorBody, ExecutionContext, Retryability};
+use super::{append_options_to_raw_document, CursorBody, ExecutionContext, Retryability};
 
 pub(crate) struct ListIndexes {
     ns: Namespace,
@@ -24,18 +26,18 @@ impl ListIndexes {
 
 impl OperationWithDefaults for ListIndexes {
     type O = CursorSpecification;
-    type Command = Document;
 
     const NAME: &'static str = "listIndexes";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
-        let mut body = doc! {
+        let mut body = rawdoc! {
             "listIndexes": self.ns.coll.clone(),
         };
         if let Some(size) = self.options.as_ref().and_then(|o| o.batch_size) {
-            body.insert("cursor", doc! { "batchSize": size });
+            let size = Checked::from(size).try_into::<i32>()?;
+            body.append("cursor", rawdoc! { "batchSize": size });
         }
-        append_options(&mut body, self.options.as_ref())?;
+        append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),
