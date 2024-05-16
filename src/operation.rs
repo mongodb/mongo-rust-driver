@@ -294,12 +294,6 @@ where
     }
 }
 
-pub(crate) trait CommandBody: Serialize {
-    fn should_redact(&self) -> bool {
-        false
-    }
-}
-
 fn should_redact_body(body: &RawDocumentBuf) -> bool {
     if let Some(Ok((command_name, _))) = body.into_iter().next() {
         HELLO_COMMAND_NAMES.contains(command_name.to_lowercase().as_str())
