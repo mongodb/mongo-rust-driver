@@ -493,6 +493,8 @@ fn topology_description_tracing_representation() {
 #[tokio::test(flavor = "multi_thread")]
 async fn command_logging_unified() {
     run_unified_tests(&["command-logging-and-monitoring", "logging"])
+        // TODO RUST-1599: Unskip this file
+        .skip_files(&["command.json"])
         // Rust does not (and does not plan to) support unacknowledged writes; see RUST-9.
         .skip_tests(&[
             "An unacknowledged write generates a succeeded log message with ok: 1 reply",

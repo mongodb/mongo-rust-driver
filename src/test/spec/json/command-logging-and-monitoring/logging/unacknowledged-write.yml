@@ -1,6 +1,6 @@
 description: "unacknowledged-write"
 
-schemaVersion: "1.13"
+schemaVersion: "1.16"
 
 createEntities:
   - client:
@@ -31,8 +31,18 @@ tests:
         object: *collection
         arguments:
           document: { _id: 2 }
+      # Force completion of the w: 0 write by executing a find on the same connection
+      - name: find
+        object: *collection
+        arguments:
+          filter: { }
+        expectResult: [
+          { _id: 1 },
+          { _id: 2 }
+        ]
     expectLogMessages:
       - client: *client
+        ignoreExtraMessages: true
         messages:
           - level: debug
             component: command
