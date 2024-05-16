@@ -76,16 +76,6 @@ pub(crate) fn to_raw_bson_array_ser<T: Serialize>(values: &[T]) -> Result<RawBso
     Ok(RawBson::Array(array))
 }
 
-#[cfg(test)]
-pub(crate) fn sort_document(document: &mut Document) {
-    let temp = std::mem::take(document);
-
-    let mut elements: Vec<_> = temp.into_iter().collect();
-    elements.sort_by(|e1, e2| e1.0.cmp(&e2.0));
-
-    document.extend(elements);
-}
-
 pub(crate) fn first_key(document: &Document) -> Option<&str> {
     document.keys().next().map(String::as_str)
 }
