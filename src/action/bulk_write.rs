@@ -47,6 +47,7 @@ impl crate::sync::Client {
     /// [`run`](BulkWrite::run) will return d[`Result<SummaryBulkWriteResult`] or
     /// d[`Result<VerboseBulkWriteResult`] if [`verbose_results`](BulkWrite::verbose_results) is
     /// configured.
+    #[deeplink]
     pub fn bulk_write(
         &self,
         models: impl IntoIterator<Item = impl Into<WriteModel>>,
