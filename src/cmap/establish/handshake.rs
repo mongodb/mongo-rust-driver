@@ -3,6 +3,7 @@ mod test;
 
 use std::env;
 
+use bson::{rawdoc, RawBson, RawDocumentBuf};
 use once_cell::sync::Lazy;
 
 #[cfg(any(
@@ -12,7 +13,6 @@ use once_cell::sync::Lazy;
 ))]
 use crate::options::Compressor;
 use crate::{
-    bson::{doc, Bson, Document},
     client::auth::ClientFirst,
     cmap::{Command, Connection, StreamDescription},
     error::Result,
@@ -62,7 +62,7 @@ struct RuntimeEnvironment {
     memory_mb: Option<i32>,
     region: Option<String>,
     url: Option<String>,
-    container: Option<Document>,
+    container: Option<RawDocumentBuf>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -73,55 +73,55 @@ pub(crate) enum FaasEnvironmentName {
     Vercel,
 }
 
-impl From<ClientMetadata> for Bson {
-    fn from(metadata: ClientMetadata) -> Self {
-        let mut metadata_doc = Document::new();
+impl From<&ClientMetadata> for RawDocumentBuf {
+    fn from(metadata: &ClientMetadata) -> Self {
+        let mut metadata_doc = RawDocumentBuf::new();
 
-        if let Some(application) = metadata.application {
-            metadata_doc.insert("application", doc! { "name": application.name });
+        if let Some(application) = &metadata.application {
+            metadata_doc.append("application", rawdoc! { "name": application.name.as_str() });
         }
 
-        metadata_doc.insert(
+        metadata_doc.append(
             "driver",
-            doc! {
-                "name": metadata.driver.name,
-                "version": metadata.driver.version,
+            rawdoc! {
+                "name": metadata.driver.name.as_str(),
+                "version": metadata.driver.version.as_str(),
             },
         );
 
-        metadata_doc.insert("os", metadata.os);
-        metadata_doc.insert("platform", metadata.platform);
+        metadata_doc.append("os", &metadata.os);
+        metadata_doc.append("platform", metadata.platform.as_str());
 
-        if let Some(env) = metadata.env {
-            metadata_doc.insert("env", env);
+        if let Some(env) = &metadata.env {
+            metadata_doc.append("env", env);
         }
 
-        Bson::Document(metadata_doc)
+        metadata_doc
     }
 }
 
-impl From<OsMetadata> for Bson {
-    fn from(metadata: OsMetadata) -> Self {
-        let mut doc = doc! { "type": metadata.os_type };
+impl From<&OsMetadata> for RawBson {
+    fn from(metadata: &OsMetadata) -> Self {
+        let mut doc = rawdoc! { "type": metadata.os_type.as_str() };
 
-        if let Some(name) = metadata.name {
-            doc.insert("name", name);
+        if let Some(name) = &metadata.name {
+            doc.append("name", name.as_str());
         }
 
-        if let Some(arch) = metadata.architecture {
-            doc.insert("architecture", arch);
+        if let Some(arch) = &metadata.architecture {
+            doc.append("architecture", arch.as_str());
         }
 
-        if let Some(version) = metadata.version {
-            doc.insert("version", version);
+        if let Some(version) = &metadata.version {
+            doc.append("version", version.as_str());
         }
 
-        Bson::Document(doc)
+        RawBson::Document(doc)
     }
 }
 
-impl From<RuntimeEnvironment> for Bson {
-    fn from(env: RuntimeEnvironment) -> Self {
+impl From<&RuntimeEnvironment> for RawBson {
+    fn from(env: &RuntimeEnvironment) -> Self {
         let RuntimeEnvironment {
             name,
             runtime,
@@ -131,29 +131,29 @@ impl From<RuntimeEnvironment> for Bson {
             url,
             container,
         } = env;
-        let mut out = doc! {};
+        let mut out = rawdoc! {};
         if let Some(name) = name {
-            out.insert("name", name.name());
+            out.append("name", name.name());
         }
         if let Some(rt) = runtime {
-            out.insert("runtime", rt);
+            out.append("runtime", rt.as_str());
         }
         if let Some(t) = timeout_sec {
-            out.insert("timeout_sec", t);
+            out.append("timeout_sec", *t);
         }
         if let Some(m) = memory_mb {
-            out.insert("memory_mb", m);
+            out.append("memory_mb", *m);
         }
         if let Some(r) = region {
-            out.insert("region", r);
+            out.append("region", r.as_str());
         }
         if let Some(u) = url {
-            out.insert("url", u);
+            out.append("url", u.as_str());
         }
         if let Some(c) = container {
-            out.insert("container", c);
+            out.append("container", c.clone());
         }
-        Bson::Document(out)
+        RawBson::Document(out)
     }
 }
 
@@ -197,12 +197,12 @@ impl RuntimeEnvironment {
                 }
             }
         }
-        let mut container = doc! {};
+        let mut container = rawdoc! {};
         if std::path::Path::new("/.dockerenv").exists() {
-            container.insert("runtime", "docker");
+            container.append("runtime", "docker");
         }
         if var_set("KUBERNETES_SERVICE_HOST") {
-            container.insert("orchestrator", "kubernetes");
+            container.append("orchestrator", "kubernetes");
         }
         if !container.is_empty() {
             out.container = Some(container);
@@ -369,7 +369,7 @@ impl Handshaker {
         metadata.env = RuntimeEnvironment::new();
 
         if options.load_balanced {
-            command.body.insert("loadBalanced", true);
+            command.body.append("loadBalanced", true);
         }
 
         #[cfg(any(
@@ -378,16 +378,14 @@ impl Handshaker {
             feature = "snappy-compression"
         ))]
         if let Some(ref compressors) = options.compressors {
-            command.body.insert(
+            command.body.append(
                 "compression",
                 compressors
                     .iter()
                     .map(|compressor| compressor.name())
-                    .collect::<Vec<&'static str>>(),
+                    .collect::<bson::RawArrayBuf>(),
             );
         }
-
-        command.body.insert("client", metadata.clone());
 
         Self {
             command,
@@ -404,12 +402,10 @@ impl Handshaker {
         }
     }
 
-    /// Handshakes a connection.
-    pub(crate) async fn handshake(
+    async fn build_command(
         &self,
-        conn: &mut Connection,
         credential: Option<&Credential>,
-    ) -> Result<HelloReply> {
+    ) -> Result<(Command, Option<ClientFirst>)> {
         let mut command = self.command.clone();
 
         if let Some(cred) = credential {
@@ -420,15 +416,29 @@ impl Handshaker {
         let client_first = set_speculative_auth_info(&mut command.body, credential).await?;
 
         let body = &mut command.body;
-        let mut trunc_meta = self.metadata.clone();
+        let body_size = body.as_bytes().len();
+        let mut metadata = self.metadata.clone();
+        let mut meta_doc: RawDocumentBuf = (&metadata).into();
+        const OVERHEAD: usize = 1 /* tag */ + 6 /* name */ + 1 /* null */;
         for trunc_fn in METADATA_TRUNCATIONS {
-            if doc_size(body)? <= MAX_HELLO_SIZE {
+            if body_size + OVERHEAD + meta_doc.as_bytes().len() <= MAX_HELLO_SIZE {
                 break;
             }
-            trunc_fn(&mut trunc_meta);
-            body.insert("client", trunc_meta.clone());
+            trunc_fn(&mut metadata);
+            meta_doc = (&metadata).into();
         }
+        body.append("client", meta_doc);
 
+        Ok((command, client_first))
+    }
+
+    /// Handshakes a connection.
+    pub(crate) async fn handshake(
+        &self,
+        conn: &mut Connection,
+        credential: Option<&Credential>,
+    ) -> Result<HelloReply> {
+        let (command, client_first) = self.build_command(credential).await?;
         let mut hello_reply = run_hello(conn, command).await?;
 
         conn.stream_description = Some(StreamDescription::from_hello_reply(&hello_reply));
@@ -510,7 +520,7 @@ pub(crate) struct HandshakerOptions {
 
 /// Updates the handshake command document with the speculative authenitication info.
 async fn set_speculative_auth_info(
-    command: &mut Document,
+    command: &mut RawDocumentBuf,
     credential: Option<&Credential>,
 ) -> Result<Option<ClientFirst>> {
     let credential = match credential {
@@ -534,15 +544,9 @@ async fn set_speculative_auth_info(
         None => return Ok(None),
     };
 
-    command.insert("speculativeAuthenticate", client_first.to_document());
+    command.append("speculativeAuthenticate", client_first.to_document());
 
     Ok(Some(client_first))
-}
-
-fn doc_size(d: &Document) -> Result<usize> {
-    let mut tmp = vec![];
-    d.to_writer(&mut tmp)?;
-    Ok(tmp.len())
 }
 
 const MAX_HELLO_SIZE: usize = 512;

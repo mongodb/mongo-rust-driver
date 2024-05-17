@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::RawDocumentBuf;
+use bson::{rawdoc, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -39,22 +39,22 @@ pub(crate) fn hello_command(
     hello_ok: Option<bool>,
     awaitable_options: Option<AwaitableHelloOptions>,
 ) -> Command {
-    let (mut command, command_name) = if server_api.is_some()
+    let (mut body, command_name) = if server_api.is_some()
         || matches!(load_balanced, Some(true))
         || matches!(hello_ok, Some(true))
     {
-        (doc! { "hello": 1 }, "hello")
+        (rawdoc! { "hello": 1 }, "hello")
     } else {
-        let mut cmd = doc! { LEGACY_HELLO_COMMAND_NAME: 1 };
+        let mut body = rawdoc! { LEGACY_HELLO_COMMAND_NAME: 1 };
         if hello_ok.is_none() {
-            cmd.insert("helloOk", true);
+            body.append("helloOk", true);
         }
-        (cmd, LEGACY_HELLO_COMMAND_NAME)
+        (body, LEGACY_HELLO_COMMAND_NAME)
     };
 
     if let Some(opts) = awaitable_options {
-        command.insert("topologyVersion", opts.topology_version);
-        command.insert(
+        body.append("topologyVersion", opts.topology_version);
+        body.append(
             "maxAwaitTimeMS",
             opts.max_await_time
                 .as_millis()
@@ -63,7 +63,7 @@ pub(crate) fn hello_command(
         );
     }
 
-    let mut command = Command::new(command_name, "admin", command);
+    let mut command = Command::new(command_name, "admin", body);
     if let Some(server_api) = server_api {
         command.set_server_api(server_api);
     }

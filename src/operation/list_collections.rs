@@ -1,13 +1,14 @@
+use bson::rawdoc;
+
 use crate::{
-    bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, CursorBody, OperationWithDefaults, Retryability},
+    operation::{CursorBody, OperationWithDefaults, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
 };
 
-use super::ExecutionContext;
+use super::{append_options_to_raw_document, ExecutionContext};
 
 #[derive(Debug)]
 pub(crate) struct ListCollections {
@@ -32,12 +33,11 @@ impl ListCollections {
 
 impl OperationWithDefaults for ListCollections {
     type O = CursorSpecification;
-    type Command = Document;
 
     const NAME: &'static str = "listCollections";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
-        let mut body = doc! {
+        let mut body = rawdoc! {
             Self::NAME: 1,
         };
 
@@ -47,9 +47,9 @@ impl OperationWithDefaults for ListCollections {
                 name_only = false;
             }
         }
-        body.insert("nameOnly", name_only);
+        body.append("nameOnly", name_only);
 
-        append_options(&mut body, self.options.as_ref())?;
+        append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(Self::NAME.to_string(), self.db.clone(), body))
     }

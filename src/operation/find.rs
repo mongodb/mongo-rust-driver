@@ -1,20 +1,16 @@
+use bson::RawDocumentBuf;
+
 use crate::{
-    bson::{doc, Document},
+    bson::{rawdoc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{ErrorKind, Result},
-    operation::{
-        append_options,
-        CursorBody,
-        OperationWithDefaults,
-        Retryability,
-        SERVER_4_4_0_WIRE_VERSION,
-    },
+    operation::{CursorBody, OperationWithDefaults, Retryability, SERVER_4_4_0_WIRE_VERSION},
     options::{CursorType, FindOptions, SelectionCriteria},
     Namespace,
 };
 
-use super::ExecutionContext;
+use super::{append_options_to_raw_document, ExecutionContext};
 
 #[derive(Debug)]
 pub(crate) struct Find {
@@ -35,18 +31,17 @@ impl Find {
 
 impl OperationWithDefaults for Find {
     type O = CursorSpecification;
-    type Command = Document;
     const NAME: &'static str = "find";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
-        let mut body = doc! {
+        let mut body = rawdoc! {
             Self::NAME: self.ns.coll.clone(),
         };
 
         if let Some(ref options) = self.options {
             // negative limits should be interpreted as request for single batch as per crud spec.
             if options.limit.map(|limit| limit < 0) == Some(true) {
-                body.insert("singleBatch", true);
+                body.append("singleBatch", true);
             }
 
             if options
@@ -62,19 +57,20 @@ impl OperationWithDefaults for Find {
 
             match options.cursor_type {
                 Some(CursorType::Tailable) => {
-                    body.insert("tailable", true);
+                    body.append("tailable", true);
                 }
                 Some(CursorType::TailableAwait) => {
-                    body.insert("tailable", true);
-                    body.insert("awaitData", true);
+                    body.append("tailable", true);
+                    body.append("awaitData", true);
                 }
                 _ => {}
             };
         }
 
-        append_options(&mut body, self.options.as_ref())?;
+        append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        body.insert("filter", self.filter.clone());
+        let raw_filter: RawDocumentBuf = (&self.filter).try_into()?;
+        body.append("filter", raw_filter);
 
         Ok(Command::new_read(
             Self::NAME.to_string(),

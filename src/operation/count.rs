@@ -1,15 +1,16 @@
+use bson::rawdoc;
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Document},
+    bson::doc,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     error::{Error, Result},
-    operation::{append_options, OperationWithDefaults, Retryability},
+    operation::{OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
 };
 
-use super::ExecutionContext;
+use super::{append_options_to_raw_document, ExecutionContext};
 
 pub(crate) struct Count {
     ns: Namespace,
@@ -24,16 +25,15 @@ impl Count {
 
 impl OperationWithDefaults for Count {
     type O = u64;
-    type Command = Document;
 
     const NAME: &'static str = "count";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
-        let mut body = doc! {
+        let mut body = rawdoc! {
             Self::NAME: self.ns.coll.clone(),
         };
 
-        append_options(&mut body, self.options.as_ref())?;
+        append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new_read(
             Self::NAME.to_string(),

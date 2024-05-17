@@ -1,15 +1,15 @@
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Bson, Document, RawBsonRef},
+    bson::{doc, rawdoc, Bson, Document, RawBsonRef, RawDocumentBuf},
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::DistinctOptions, Namespace},
     error::Result,
-    operation::{append_options, OperationWithDefaults, Retryability},
+    operation::{OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
 };
 
-use super::ExecutionContext;
+use super::{append_options_to_raw_document, ExecutionContext};
 
 pub(crate) struct Distinct {
     ns: Namespace,
@@ -36,21 +36,21 @@ impl Distinct {
 
 impl OperationWithDefaults for Distinct {
     type O = Vec<Bson>;
-    type Command = Document;
 
     const NAME: &'static str = "distinct";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
-        let mut body: Document = doc! {
+        let mut body = rawdoc! {
             Self::NAME: self.ns.coll.clone(),
             "key": self.field_name.clone(),
         };
 
         if !self.query.is_empty() {
-            body.insert("query", self.query.clone());
+            let raw_query: RawDocumentBuf = (&self.query).try_into()?;
+            body.append("query", raw_query);
         }
 
-        append_options(&mut body, self.options.as_ref())?;
+        append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new_read(
             Self::NAME.to_string(),

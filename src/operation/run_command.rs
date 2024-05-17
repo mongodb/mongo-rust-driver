@@ -59,13 +59,12 @@ impl<'conn> RunCommand<'conn> {
 
 impl<'conn> OperationWithDefaults for RunCommand<'conn> {
     type O = Document;
-    type Command = RawDocumentBuf;
 
     // Since we can't actually specify a string statically here, we just put a descriptive string
     // that should fail loudly if accidentally passed to the server.
     const NAME: &'static str = "$genericRunCommand";
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let command_name = self
             .command_name()
             .ok_or_else(|| ErrorKind::InvalidArgument {

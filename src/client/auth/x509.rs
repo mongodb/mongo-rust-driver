@@ -1,5 +1,7 @@
+use bson::rawdoc;
+
 use crate::{
-    bson::{doc, Document},
+    bson::Document,
     client::options::ServerApi,
     cmap::{Command, Connection, RawCommandResponse},
     error::{Error, Result},
@@ -16,13 +18,13 @@ pub(crate) fn build_client_first(
     credential: &Credential,
     server_api: Option<&ServerApi>,
 ) -> Command {
-    let mut auth_command_doc = doc! {
+    let mut auth_command_doc = rawdoc! {
         "authenticate": 1,
         "mechanism": "MONGODB-X509",
     };
 
     if let Some(ref username) = credential.username {
-        auth_command_doc.insert("username", username);
+        auth_command_doc.append("username", username.as_str());
     }
 
     let mut command = Command::new("authenticate", "$external", auth_command_doc);

@@ -1,8 +1,13 @@
+use bson::rawdoc;
+
 use crate::{
-    bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options, remove_empty_write_concern, OperationWithDefaults},
+    operation::{
+        append_options_to_raw_document,
+        remove_empty_write_concern,
+        OperationWithDefaults,
+    },
     options::{DropIndexOptions, WriteConcern},
     Namespace,
 };
@@ -23,17 +28,16 @@ impl DropIndexes {
 
 impl OperationWithDefaults for DropIndexes {
     type O = ();
-    type Command = Document;
     const NAME: &'static str = "dropIndexes";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
-        let mut body = doc! {
+        let mut body = rawdoc! {
             Self::NAME: self.ns.coll.clone(),
             "index": self.name.clone(),
         };
 
         remove_empty_write_concern!(self.options);
-        append_options(&mut body, self.options.as_ref())?;
+        append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),

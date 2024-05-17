@@ -10,7 +10,6 @@ use futures_util::{
     stream::{FuturesUnordered, StreamExt},
     FutureExt,
 };
-use serde::Serialize;
 use tokio::sync::{
     mpsc::{self, UnboundedReceiver, UnboundedSender},
     watch::{self, Ref},
@@ -198,10 +197,10 @@ impl Topology {
     }
 
     /// Updates the given `command` as needed based on the `criteria`.
-    pub(crate) fn update_command_with_read_pref<T: Serialize>(
+    pub(crate) fn update_command_with_read_pref(
         &self,
         server_address: &ServerAddress,
-        command: &mut Command<T>,
+        command: &mut Command,
         criteria: Option<&SelectionCriteria>,
     ) {
         self.watcher

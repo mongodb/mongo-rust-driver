@@ -15,10 +15,9 @@ pub(crate) struct RawOutput<Op>(pub(crate) Op);
 
 impl<Op: Operation> Operation for RawOutput<Op> {
     type O = RawCommandResponse;
-    type Command = Op::Command;
     const NAME: &'static str = Op::NAME;
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.0.build(description)
     }
 

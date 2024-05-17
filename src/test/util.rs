@@ -167,7 +167,7 @@ impl TestClient {
         );
         let server_info_doc = client
             .database("admin")
-            .run_command(hello.body)
+            .run_command(hello.body.try_into().unwrap())
             .await
             .unwrap();
         let server_info = bson::from_document(server_info_doc).unwrap();

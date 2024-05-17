@@ -171,11 +171,9 @@ where
 {
     type O = R;
 
-    type Command = RawDocumentBuf;
-
     const NAME: &'static str = "bulkWrite";
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         let max_message_size: usize =
             Checked::new(description.max_message_size_bytes).try_into()?;
         let max_operations: usize = Checked::new(description.max_write_batch_size).try_into()?;

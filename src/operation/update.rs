@@ -93,11 +93,10 @@ impl Update {
 
 impl OperationWithDefaults for Update {
     type O = UpdateResult;
-    type Command = RawDocumentBuf;
 
     const NAME: &'static str = "update";
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.ns.coll.clone(),
         };

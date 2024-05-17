@@ -1,13 +1,15 @@
 use std::{collections::VecDeque, time::Duration};
 
+use bson::{rawdoc, RawBson};
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Bson, Document, RawDocumentBuf},
+    bson::{doc, Bson, RawDocumentBuf},
     change_stream::event::ResumeToken,
+    checked::Checked,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     cursor::CursorInformation,
-    error::{ErrorKind, Result},
+    error::Result,
     operation::OperationWithDefaults,
     options::SelectionCriteria,
     results::GetMoreResult,
@@ -46,36 +48,32 @@ impl<'conn> GetMore<'conn> {
 
 impl<'conn> OperationWithDefaults for GetMore<'conn> {
     type O = GetMoreResult;
-    type Command = Document;
 
     const NAME: &'static str = "getMore";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
-        let mut body = doc! {
+        let mut body = rawdoc! {
             Self::NAME: self.cursor_id,
             "collection": self.ns.coll.clone(),
         };
 
         if let Some(batch_size) = self.batch_size {
-            if batch_size > std::i32::MAX as u32 {
-                return Err(ErrorKind::InvalidArgument {
-                    message: "The batch size must fit into a signed 32-bit integer".to_string(),
-                }
-                .into());
-            } else if batch_size != 0 {
-                body.insert("batchSize", batch_size);
+            let batch_size = Checked::from(batch_size).try_into::<i32>()?;
+            if batch_size != 0 {
+                body.append("batchSize", batch_size);
             }
         }
 
         if let Some(ref max_time) = self.max_time {
-            body.insert(
+            body.append(
                 "maxTimeMS",
                 max_time.as_millis().try_into().unwrap_or(i32::MAX),
             );
         }
 
-        if let Some(ref comment) = self.comment {
-            body.insert("comment", comment);
+        if let Some(comment) = &self.comment {
+            let raw_comment: RawBson = comment.clone().try_into()?;
+            body.append("comment", raw_comment);
         }
 
         Ok(Command::new(

@@ -41,7 +41,6 @@ impl ChangeStreamAggregate {
 
 impl OperationWithDefaults for ChangeStreamAggregate {
     type O = (CursorSpecification, ChangeStreamData);
-    type Command = Document;
 
     const NAME: &'static str = "aggregate";
 

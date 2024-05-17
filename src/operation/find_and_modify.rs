@@ -56,10 +56,9 @@ impl<T: DeserializeOwned> FindAndModify<T> {
 
 impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
     type O = Option<T>;
-    type Command = RawDocumentBuf;
     const NAME: &'static str = "findAndModify";
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if let Some(ref options) = self.options {
             if options.hint.is_some() && description.max_wire_version.unwrap_or(0) < 8 {
                 return Err(ErrorKind::InvalidArgument {

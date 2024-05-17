@@ -47,7 +47,6 @@ impl Delete {
 
 impl OperationWithDefaults for Delete {
     type O = DeleteResult;
-    type Command = Document;
 
     const NAME: &'static str = "delete";
 
@@ -77,7 +76,7 @@ impl OperationWithDefaults for Delete {
         Ok(Command::new(
             Self::NAME.to_string(),
             self.ns.db.clone(),
-            body,
+            (&body).try_into()?,
         ))
     }
 

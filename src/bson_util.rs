@@ -1,7 +1,10 @@
 use std::{
+    collections::HashSet,
     convert::TryFrom,
     io::{Read, Write},
 };
+
+use serde::Serialize;
 
 use crate::{
     bson::{
@@ -15,7 +18,7 @@ use crate::{
         RawDocumentBuf,
     },
     checked::Checked,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     runtime::SyncLittleEndianRead,
 };
 
@@ -62,6 +65,13 @@ pub(crate) fn to_raw_bson_array(docs: &[Document]) -> Result<RawBson> {
     let mut array = RawArrayBuf::new();
     for doc in docs {
         array.push(RawDocumentBuf::from_document(doc)?);
+    }
+    Ok(RawBson::Array(array))
+}
+pub(crate) fn to_raw_bson_array_ser<T: Serialize>(values: &[T]) -> Result<RawBson> {
+    let mut array = RawArrayBuf::new();
+    for value in values {
+        array.push(bson::to_raw_document_buf(value)?);
     }
     Ok(RawBson::Array(array))
 }
@@ -162,10 +172,39 @@ pub(crate) fn extend_raw_document_buf(
     this: &mut RawDocumentBuf,
     other: RawDocumentBuf,
 ) -> Result<()> {
+    let mut keys: HashSet<String> = HashSet::new();
+    for elem in this.iter_elements() {
+        keys.insert(elem?.key().to_owned());
+    }
     for result in other.iter() {
         let (k, v) = result?;
+        if keys.contains(k) {
+            return Err(Error::internal(format!(
+                "duplicate raw document key {:?}",
+                k
+            )));
+        }
         this.append(k, v.to_raw_bson());
     }
+    Ok(())
+}
+
+pub(crate) fn append_ser(
+    this: &mut RawDocumentBuf,
+    key: impl AsRef<str>,
+    value: impl Serialize,
+) -> Result<()> {
+    #[derive(Serialize)]
+    struct Helper<T> {
+        value: T,
+    }
+    let raw_doc = bson::to_raw_document_buf(&Helper { value })?;
+    this.append_ref(
+        key,
+        raw_doc
+            .get("value")?
+            .ok_or_else(|| Error::internal("no value"))?,
+    );
     Ok(())
 }
 

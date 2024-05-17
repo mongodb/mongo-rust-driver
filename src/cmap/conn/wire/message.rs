@@ -2,7 +2,6 @@ use std::io::Read;
 
 use bitflags::bitflags;
 use bson::{doc, Array, Document};
-use serde::Serialize;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 #[cfg(any(
@@ -48,10 +47,7 @@ pub(crate) struct DocumentSequence {
 impl Message {
     /// Creates a `Message` from a given `Command`. Note that the `response_to` field must be set
     /// manually.
-    pub(crate) fn from_command<T: Serialize>(
-        command: Command<T>,
-        request_id: Option<i32>,
-    ) -> Result<Self> {
+    pub(crate) fn from_command(command: Command, request_id: Option<i32>) -> Result<Self> {
         let document_payload = bson::to_raw_document_buf(&command)?;
 
         let mut flags = MessageFlags::empty();

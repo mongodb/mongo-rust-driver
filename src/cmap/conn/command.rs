@@ -17,10 +17,7 @@ use crate::{
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Command<T = Document>
-where
-    T: Serialize,
-{
+pub(crate) struct Command {
     #[serde(skip)]
     pub(crate) name: String,
 
@@ -28,7 +25,7 @@ where
     pub(crate) exhaust_allowed: bool,
 
     #[serde(flatten)]
-    pub(crate) body: T,
+    pub(crate) body: RawDocumentBuf,
 
     #[serde(skip)]
     pub(crate) document_sequences: Vec<DocumentSequence>,
@@ -58,11 +55,8 @@ where
     recovery_token: Option<Document>,
 }
 
-impl<T> Command<T>
-where
-    T: Serialize,
-{
-    pub(crate) fn new(name: impl ToString, target_db: impl ToString, body: T) -> Self {
+impl Command {
+    pub(crate) fn new(name: impl ToString, target_db: impl ToString, body: RawDocumentBuf) -> Self {
         Self {
             name: name.to_string(),
             target_db: target_db.to_string(),
@@ -85,7 +79,7 @@ where
         name: String,
         target_db: String,
         read_concern: Option<ReadConcern>,
-        body: T,
+        body: RawDocumentBuf,
     ) -> Self {
         Self {
             name,

@@ -104,15 +104,12 @@ pub(crate) trait Operation {
     /// The output type of this operation.
     type O;
 
-    /// The format of the command body constructed in `build`.
-    type Command: CommandBody;
-
     /// The name of the server side command associated with this operation.
     const NAME: &'static str;
 
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
-    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>>;
+    fn build(&mut self, description: &StreamDescription) -> Result<Command>;
 
     /// Parse the response for the atClusterTime field.
     /// Depending on the operation, this may be found in different locations.
@@ -161,15 +158,12 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     /// The output type of this operation.
     type O;
 
-    /// The format of the command body constructed in `build`.
-    type Command: CommandBody;
-
     /// The name of the server side command associated with this operation.
     const NAME: &'static str;
 
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
-    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>>;
+    fn build(&mut self, description: &StreamDescription) -> Result<Command>;
 
     /// Parse the response for the atClusterTime field.
     /// Depending on the operation, this may be found in different locations.
@@ -254,9 +248,8 @@ where
     T: Send + Sync,
 {
     type O = T::O;
-    type Command = T::Command;
     const NAME: &'static str = T::NAME;
-    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.build(description)
     }
     fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
@@ -301,38 +294,19 @@ where
     }
 }
 
-pub(crate) trait CommandBody: Serialize {
-    fn should_redact(&self) -> bool {
+fn should_redact_body(body: &RawDocumentBuf) -> bool {
+    if let Some(Ok((command_name, _))) = body.into_iter().next() {
+        HELLO_COMMAND_NAMES.contains(command_name.to_lowercase().as_str())
+            && body.get("speculativeAuthenticate").ok().flatten().is_some()
+    } else {
         false
     }
 }
 
-impl CommandBody for Document {
-    fn should_redact(&self) -> bool {
-        if let Some(command_name) = bson_util::first_key(self) {
-            HELLO_COMMAND_NAMES.contains(command_name.to_lowercase().as_str())
-                && self.contains_key("speculativeAuthenticate")
-        } else {
-            false
-        }
-    }
-}
-
-impl CommandBody for RawDocumentBuf {
-    fn should_redact(&self) -> bool {
-        if let Some(Ok((command_name, _))) = self.into_iter().next() {
-            HELLO_COMMAND_NAMES.contains(command_name.to_lowercase().as_str())
-                && self.get("speculativeAuthenticate").ok().flatten().is_some()
-        } else {
-            false
-        }
-    }
-}
-
-impl<T: CommandBody> Command<T> {
+impl Command {
     pub(crate) fn should_redact(&self) -> bool {
         let name = self.name.to_lowercase();
-        REDACTED_COMMANDS.contains(name.as_str()) || self.body.should_redact()
+        REDACTED_COMMANDS.contains(name.as_str()) || should_redact_body(&self.body)
     }
 
     pub(crate) fn should_compress(&self) -> bool {
