@@ -59,7 +59,7 @@ The `data` option is a document that may be used to specify options that control
 
 ## Speeding Up Tests
 
-See [Speeding Up Tests](../../retryable-reads/tests/README.rst#speeding-up-tests) in the retryable reads spec tests.
+See [Speeding Up Tests](../../retryable-reads/tests/README.md#speeding-up-tests) in the retryable reads spec tests.
 
 ## Test Format
 

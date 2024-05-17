@@ -8,7 +8,6 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        spec::unified_runner::run_unified_tests,
         util::fail_point::{FailPoint, FailPointMode},
     },
     Client,
@@ -38,14 +37,6 @@ impl PartialBulkWriteResult {
             Self::Verbose(verbose_result) => Some(&verbose_result.update_results),
         }
     }
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn run_unified() {
-    run_unified_tests(&["crud", "unified", "new-bulk-write"])
-        // TODO RUST-1405: unskip this test
-        .skip_files(&["client-bulkWrite-errorResponse.json"])
-        .await;
 }
 
 // CRUD prose test 3

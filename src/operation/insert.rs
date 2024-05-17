@@ -56,6 +56,8 @@ impl<'a> OperationWithDefaults for Insert<'a> {
     const NAME: &'static str = "insert";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
+        self.inserted_ids.clear();
+
         let max_doc_size: usize = Checked::new(description.max_bson_object_size).try_into()?;
         let max_message_size: usize =
             Checked::new(description.max_message_size_bytes).try_into()?;

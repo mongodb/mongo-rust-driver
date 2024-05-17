@@ -539,18 +539,21 @@ impl ExpectError {
         }
 
         if let Some(ref expected_result) = self.expect_result {
-            let actual_result = match *error.kind {
+            match *error.kind {
                 ErrorKind::BulkWrite(BulkWriteError {
-                    partial_result: Some(ref partial_result),
-                    ..
-                }) => Some(
-                    bson::to_bson(partial_result)
-                        .map_err(|e| e.to_string())
-                        .unwrap(),
-                ),
-                _ => None,
-            };
-            results_match(actual_result.as_ref(), expected_result, false, None).expect(&context);
+                    ref partial_result, ..
+                }) => {
+                    let actual_result = partial_result
+                        .as_ref()
+                        .map(|result| bson::to_bson(result).expect(&context));
+                    results_match(actual_result.as_ref(), expected_result, false, None)
+                        .expect(&context);
+                }
+                // Skip this assertion for insert_many tests, as InsertManyError does not report
+                // partial results.
+                ErrorKind::InsertMany(_) => {}
+                _ => panic!("{context}expected error with partial result"),
+            }
         }
 
         if let Some(ref write_errors) = self.write_errors {
