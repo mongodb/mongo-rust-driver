@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{
@@ -12,9 +10,19 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_impl, option_setters};
+use super::{action_impl, deeplink, option_setters};
 
 impl Client {
+    /// Executes the provided list of write operations.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    ///
+    /// `await` will return d[`Result<SummaryBulkWriteResult`] or d[`Result<VerboseBulkWriteResult`]
+    /// if [`verbose_results`](BulkWrite::verbose_results) is configured.
+    #[deeplink]
     pub fn bulk_write(
         &self,
         models: impl IntoIterator<Item = impl Into<WriteModel>>,
@@ -27,6 +35,28 @@ impl Client {
     }
 }
 
+#[cfg(feature = "sync")]
+impl crate::sync::Client {
+    /// Executes the provided list of write operations.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    ///
+    /// [`run`](BulkWrite::run) will return d[`Result<SummaryBulkWriteResult`] or
+    /// d[`Result<VerboseBulkWriteResult`] if [`verbose_results`](BulkWrite::verbose_results) is
+    /// configured.
+    #[deeplink]
+    pub fn bulk_write(
+        &self,
+        models: impl IntoIterator<Item = impl Into<WriteModel>>,
+    ) -> BulkWrite<SummaryBulkWriteResult> {
+        self.async_client.bulk_write(models)
+    }
+}
+
+/// Performs multiple write operations. Construct with [`Client::bulk_write`].
 #[must_use]
 pub struct BulkWrite<'a, R> {
     client: &'a Client,
@@ -37,6 +67,8 @@ pub struct BulkWrite<'a, R> {
 }
 
 impl<'a> BulkWrite<'a, SummaryBulkWriteResult> {
+    /// Return a [`VerboseBulkWriteResult`] with individual results for each successfully performed
+    /// write.
     pub fn verbose_results(self) -> BulkWrite<'a, VerboseBulkWriteResult> {
         BulkWrite {
             client: self.client,
@@ -60,8 +92,9 @@ where
         write_concern: WriteConcern,
     );
 
-    pub fn session(mut self, session: &'a mut ClientSession) -> Self {
-        self.session = Some(session);
+    /// Use the provided session when running the operation.
+    pub fn session(mut self, session: impl Into<&'a mut ClientSession>) -> Self {
+        self.session = Some(session.into());
         self
     }
 
