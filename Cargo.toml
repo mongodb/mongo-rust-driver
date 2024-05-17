@@ -33,6 +33,7 @@ sync = []
 rustls-tls = ["dep:rustls", "dep:rustls-pemfile", "dep:tokio-rustls"]
 openssl-tls = ["dep:openssl", "dep:openssl-probe", "dep:tokio-openssl"]
 dns-resolver = ["dep:trust-dns-resolver", "dep:trust-dns-proto"]
+projection_macro = ["dep:projection_macro"]
 
 # Enable support for MONGODB-AWS authentication.
 # This can only be used with the tokio-runtime feature flag.
@@ -64,6 +65,7 @@ tracing-unstable = ["dep:tracing", "dep:log"]
 
 [dependencies]
 action_macro = { path = "action_macro" }
+projection_macro = { path = "projection_macro", optional = true }
 async-trait = "0.1.42"
 base64 = "0.13.0"
 bitflags = "1.1.0"

@@ -15,6 +15,9 @@
 //!                   .build();
 //! ```
 
+#[cfg(feature = "projection_macro")]
+pub use projection_macro::Project;
+
 #[cfg(any(
     feature = "zstd-compression",
     feature = "zlib-compression",
