@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use std::borrow::Borrow;
 
 use serde::{Deserialize, Serialize};
@@ -16,25 +14,47 @@ use crate::{
     Namespace,
 };
 
+/// The supported options for [`bulk_write`](crate::Client::bulk_write).
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct BulkWriteOptions {
+    /// Whether the operations should be performed in the order in which they were specified. If
+    /// true, no more writes will be performed if a single write fails. If false, writes will
+    /// continue to be attempted if a single write fails.
+    ///
+    /// Defaults to true.
     #[serialize_always]
     #[serde(serialize_with = "serialize_bool_or_true")]
     pub ordered: Option<bool>,
+
+    /// Whether document-level validation should be bypassed.
+    ///
+    /// Defaults to false.
     pub bypass_document_validation: Option<bool>,
+
+    /// An arbitrary comment to help trace the operation through the database profiler, currentOp
+    /// and logs.
     pub comment: Option<Bson>,
+
+    /// A map of parameter names and values to apply to all operations within the bulk write.
+    /// Values must be constant or closed expressions that do not reference document fields.
+    /// Parameters can then be accessed as variables in an aggregate expression context (e.g.
+    /// "$$var").
     #[serde(rename = "let")]
     pub let_vars: Option<Document>,
+
+    /// The write concern to use for this operation.
     pub write_concern: Option<WriteConcern>,
 }
 
+/// A single write to be performed within a [`bulk_write`](crate::Client::bulk_write) operation.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum WriteModel {
     InsertOne(InsertOneModel),
     UpdateOne(UpdateOneModel),
@@ -44,6 +64,7 @@ pub enum WriteModel {
     DeleteMany(DeleteManyModel),
 }
 
+/// Inserts a single document.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, TypedBuilder)]
 #[cfg_attr(test, derive(Deserialize))]
@@ -51,10 +72,12 @@ pub enum WriteModel {
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct InsertOneModel {
+    /// The namespace on which the insert should be performed.
     #[serde(skip_serializing)]
     #[builder(!default)]
     pub namespace: Namespace,
 
+    /// The document to insert.
     #[builder(!default)]
     pub document: Document,
 }
@@ -65,6 +88,7 @@ impl From<InsertOneModel> for WriteModel {
     }
 }
 
+/// Updates a single document.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, TypedBuilder)]
 #[cfg_attr(test, derive(Deserialize))]
@@ -72,23 +96,33 @@ impl From<InsertOneModel> for WriteModel {
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct UpdateOneModel {
+    /// The namespace on which the update should be performed.
     #[serde(skip_serializing)]
     #[builder(!default)]
     pub namespace: Namespace,
 
+    /// The filter to use. The first document matching this filter will be updated.
     #[builder(!default)]
     pub filter: Document,
 
+    /// The update to perform.
     #[serde(rename(serialize = "updateMods"))]
     #[builder(!default)]
     pub update: UpdateModifications,
 
+    /// A set of filters specifying to which array elements an update should apply.
     pub array_filters: Option<Array>,
 
+    /// The collation to use.
     pub collation: Option<Document>,
 
+    /// The index to use. Specify either the index name as a string or the index key pattern. If
+    /// specified, then the query system will only consider plans using the hinted index.
     pub hint: Option<Bson>,
 
+    /// Whether a new document should be created if no document matches the filter.
+    ///
+    /// Defaults to false.
     pub upsert: Option<bool>,
 }
 
@@ -98,6 +132,7 @@ impl From<UpdateOneModel> for WriteModel {
     }
 }
 
+/// Updates multiple documents.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, TypedBuilder)]
 #[cfg_attr(test, derive(Deserialize))]
@@ -105,23 +140,33 @@ impl From<UpdateOneModel> for WriteModel {
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct UpdateManyModel {
+    /// The namespace on which the update should be performed.
     #[serde(skip_serializing)]
     #[builder(!default)]
     pub namespace: Namespace,
 
+    /// The filter to use. All documents matching this filter will be updated.
     #[builder(!default)]
     pub filter: Document,
 
+    /// The update to perform.
     #[serde(rename(serialize = "updateMods"))]
     #[builder(!default)]
     pub update: UpdateModifications,
 
+    /// A set of filters specifying to which array elements an update should apply.
     pub array_filters: Option<Array>,
 
+    /// The collation to use.
     pub collation: Option<Document>,
 
+    /// The index to use. Specify either the index name as a string or the index key pattern. If
+    /// specified, then the query system will only consider plans using the hinted index.
     pub hint: Option<Bson>,
 
+    /// Whether a new document should be created if no document matches the filter.
+    ///
+    /// Defaults to false.
     pub upsert: Option<bool>,
 }
 
@@ -131,6 +176,7 @@ impl From<UpdateManyModel> for WriteModel {
     }
 }
 
+/// Replaces a single document.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, TypedBuilder)]
 #[cfg_attr(test, derive(Deserialize))]
@@ -138,21 +184,30 @@ impl From<UpdateManyModel> for WriteModel {
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct ReplaceOneModel {
+    /// The namespace on which the replace should be performed.
     #[serde(skip_serializing)]
     #[builder(!default)]
     pub namespace: Namespace,
 
+    /// The filter to use.
     #[builder(!default)]
     pub filter: Document,
 
+    /// The replacement document.
     #[serde(rename(serialize = "updateMods"))]
     #[builder(!default)]
     pub replacement: Document,
 
+    /// The collation to use.
     pub collation: Option<Document>,
 
+    /// The index to use. Specify either the index name as a string or the index key pattern. If
+    /// specified, then the query system will only consider plans using the hinted index.
     pub hint: Option<Bson>,
 
+    /// Whether a new document should be created if no document matches the filter.
+    ///
+    /// Defaults to false.
     pub upsert: Option<bool>,
 }
 
@@ -162,6 +217,7 @@ impl From<ReplaceOneModel> for WriteModel {
     }
 }
 
+/// Deletes a single document.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, TypedBuilder)]
 #[cfg_attr(test, derive(Deserialize))]
@@ -169,15 +225,20 @@ impl From<ReplaceOneModel> for WriteModel {
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct DeleteOneModel {
+    /// The namespace on which the delete should be performed.
     #[serde(skip_serializing)]
     #[builder(!default)]
     pub namespace: Namespace,
 
+    /// The filter to use. The first document matching this filter will be deleted.
     #[builder(!default)]
     pub filter: Document,
 
+    /// The collation to use.
     pub collation: Option<Document>,
 
+    /// The index to use. Specify either the index name as a string or the index key pattern. If
+    /// specified, then the query system will only consider plans using the hinted index.
     pub hint: Option<Bson>,
 }
 
@@ -187,6 +248,7 @@ impl From<DeleteOneModel> for WriteModel {
     }
 }
 
+/// Deletes multiple documents.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, TypedBuilder)]
 #[cfg_attr(test, derive(Deserialize))]
@@ -194,14 +256,19 @@ impl From<DeleteOneModel> for WriteModel {
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct DeleteManyModel {
+    /// The namespace on which the delete should be performed.
     #[serde(skip_serializing)]
     #[builder(!default)]
     pub namespace: Namespace,
 
+    /// The filter to use. All documents matching this filter will be deleted.
     pub filter: Document,
 
+    /// The collation to use.
     pub collation: Option<Document>,
 
+    /// The index to use. Specify either the index name as a string or the index key pattern. If
+    /// specified, then the query system will only consider plans using the hinted index.
     pub hint: Option<Bson>,
 }
 
@@ -215,6 +282,11 @@ impl<T> Collection<T>
 where
     T: Send + Sync + Serialize,
 {
+    /// Constructs an [`InsertOneModel`] with this collection's namespace by serializing the
+    /// provided value into a [`Document`]. Returns an error if serialization fails.
+    ///
+    /// Note that the returned value must be provided to [`bulk_write`](crate::Client::bulk_write)
+    /// for the insert to be performed.
     pub fn insert_one_model(&self, document: impl Borrow<T>) -> Result<InsertOneModel> {
         let document = bson::to_document(document.borrow())?;
         Ok(InsertOneModel::builder()
@@ -223,6 +295,11 @@ where
             .build())
     }
 
+    /// Constructs a [`ReplaceOneModel`] with this collection's namespace by serializing the
+    /// provided value into a [`Document`]. Returns an error if serialization fails.
+    ///
+    /// Note that the returned value must be provided to [`bulk_write`](crate::Client::bulk_write)
+    /// for the replace to be performed.
     pub fn replace_one_model(
         &self,
         filter: Document,
