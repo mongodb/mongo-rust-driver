@@ -32,7 +32,7 @@ impl PendingUpdates {
         let text = self
             .files
             .entry(location.path)
-            .or_insert_with(|| std::fs::read_to_string(dbg!(location.path)).unwrap());
+            .or_insert_with(|| std::fs::read_to_string(location.path).unwrap());
 
         if !location.pattern.is_match(text) {
             panic!("no match for {:?}", location);
