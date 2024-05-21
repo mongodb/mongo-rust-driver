@@ -26,7 +26,13 @@ if [[ "${DRY_RUN}" == "yes" ]]; then
 fi
 
 if [[ "${PACKAGE_ONLY}" == "yes" ]]; then
+  pushd macros
+  cargo package --no-verify --allow-dirty
+  popd
   cargo package --no-verify --allow-dirty
 else
+  pushd macros
+  cargo publish --token $CRATES_IO_TOKEN ${EXTRA}
+  popd
   cargo publish --token $CRATES_IO_TOKEN ${EXTRA}
 fi

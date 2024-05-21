@@ -142,6 +142,7 @@ functions:
         version: ${CRATE_VERSION}
         filenames:
           - src/target/package/mongodb-${CRATE_VERSION}.crate
+          - src/macros/target/package/mongodb-internal-macros-${CRATE_VERSION}.crate
 
   "sign release":
     - command: subprocess.exec

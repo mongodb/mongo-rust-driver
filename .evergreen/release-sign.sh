@@ -15,3 +15,11 @@ docker run \
   -w $(pwd) \
   artifactory.corp.mongodb.com/release-tools-container-registry-local/garasign-gpg \
   /bin/bash -c "gpgloader && gpg --yes -v --armor -o mongodb-${CRATE_VERSION}.sig --detach-sign target/package/mongodb-${CRATE_VERSION}.crate"
+
+docker run \
+  --env-file=signing-envfile \
+  --rm \
+  -v $(pwd):$(pwd) \
+  -w $(pwd) \
+  artifactory.corp.mongodb.com/release-tools-container-registry-local/garasign-gpg \
+  /bin/bash -c "gpgloader && gpg --yes -v --armor -o mongodb-internal-macros-${CRATE_VERSION}.sig --detach-sign macros/target/package/mongodb-internal-macros-${CRATE_VERSION}.crate"
