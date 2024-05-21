@@ -32,7 +32,7 @@ impl PendingUpdates {
         let text = self
             .files
             .entry(location.path)
-            .or_insert_with(|| std::fs::read_to_string(location.path).unwrap());
+            .or_insert_with(|| std::fs::read_to_string(dbg!(location.path)).unwrap());
 
         if !location.pattern.is_match(text) {
             panic!("no match for {:?}", location);
@@ -85,10 +85,6 @@ fn main() {
             r#"name = "mongodb"\nversion = "(?<target>.*?)"\n"#,
         ),
         Location::new(
-            "Cargo.toml",
-            r#"mongodb-internal-macros = (?<target>\{ path = .* \})\n"#,
-        ),
-        Location::new(
             "macros/Cargo.toml",
             r#"name = "mongodb-internal-macros"\nversion = "(?<target>.*?)"\n"#,
         ),
@@ -97,17 +93,15 @@ fn main() {
             "README.md",
             r#"\[dependencies.mongodb\]\nversion = "(?<target>.*?)"\n"#,
         ),
-        Location::new("src/lib.rs", r#"//! mongodb = "(?<target>.*?)"\n"#),
-        Location::new("src/lib.rs", r#"//! version = "(?<target>.*?)"\n"#),
         Location::new(
             "src/lib.rs",
             r#"html_root_url = "https://docs.rs/mongodb/(?<target>.*?)""#,
         ),
-        Location::new(
-            "manual/src/installation_features.md",
-            r#"\[dependencies.mongodb\]\nversion = "(?<target>.*?)"\n"#,
-        ),
     ];
+    let quote_version_loc = Location::new(
+        "Cargo.toml",
+        r#"mongodb-internal-macros = (?<target>\{ path = .* \})\n"#,
+    );
     let bson_version_loc = Location::new("Cargo.toml", r#"bson = (?<target>\{ git = .*? \})\n"#);
     let mongocrypt_version_loc =
         Location::new("Cargo.toml", r#"mongocrypt = (?<target>\{ git = .*? \})\n"#);
@@ -118,6 +112,7 @@ fn main() {
     for loc in &version_locs {
         pending.apply(loc, &args.version);
     }
+    pending.apply(&quote_version_loc, &format!("{:?}", args.version));
     if let Some(bson) = args.bson {
         pending.apply(&bson_version_loc, &format!("{:?}", bson));
     }
