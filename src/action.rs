@@ -76,7 +76,7 @@ pub struct Single;
 #[allow(missing_docs)]
 pub struct Multiple;
 
-use action_macro::option_setters;
+use mongodb_internal_macros::option_setters;
 
 pub(crate) mod private {
     pub trait Sealed {}
@@ -109,7 +109,7 @@ pub trait Action: private::Sealed + IntoFuture {
     }
 }
 
-pub(crate) use action_macro::{action_impl, deeplink};
+pub(crate) use mongodb_internal_macros::{action_impl, deeplink};
 
 use crate::Collection;
 
