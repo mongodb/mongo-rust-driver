@@ -74,6 +74,7 @@ struct Args {
 }
 
 fn main() {
+    // nosemgrep: current-exe
     let zero = std::env::current_exe().unwrap();
     let self_dir = zero.parent().unwrap();
     let main_dir = self_dir.join("../../../..");
