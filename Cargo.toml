@@ -1,4 +1,3 @@
-workspace = { members = [".evergreen/generate-tasks"] }
 [package]
 authors = [
     "Saghm Rossi <saghmrossi@gmail.com>",
