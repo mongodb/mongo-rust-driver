@@ -66,6 +66,15 @@ tasks:
           TOPOLOGY: server
       - func: "run driver test suite"
 
+  - name: test-8.0-standalone
+    tags: [8.0, standalone]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: 8.0
+          TOPOLOGY: server
+      - func: "run driver test suite"
+
   - name: test-rapid-standalone
     tags: [rapid, standalone]
     commands:
@@ -147,6 +156,15 @@ tasks:
           TOPOLOGY: replica_set
       - func: "run driver test suite"
 
+  - name: test-8.0-replicaset
+    tags: [8.0, replicaset]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: 8.0
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+
   - name: test-rapid-replicaset
     tags: [rapid, replicaset]
     commands:
@@ -225,6 +243,15 @@ tasks:
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: 7.0
+          TOPOLOGY: sharded_cluster
+      - func: "run driver test suite"
+
+  - name: test-8.0-sharded
+    tags: [8.0, sharded]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: 8.0
           TOPOLOGY: sharded_cluster
       - func: "run driver test suite"
 

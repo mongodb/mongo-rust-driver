@@ -1,5 +1,5 @@
 static VERSIONS: &[&str] = &[
-    "3.6", "4.0", "4.2", "4.4", "5.0", "6.0", "7.0", "rapid", "latest",
+    "3.6", "4.0", "4.2", "4.4", "5.0", "6.0", "7.0", "8.0", "rapid", "latest",
 ];
 
 static TOPOLOGIES: &[(&str, &str)] = &[
