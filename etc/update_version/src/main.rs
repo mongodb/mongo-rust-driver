@@ -74,33 +74,38 @@ struct Args {
 }
 
 fn main() {
+    // nosemgrep: current-exe
+    let zero = std::env::current_exe().unwrap();
+    let self_dir = zero.parent().unwrap();
+    let main_dir = self_dir.join("../../../..");
+    std::env::set_current_dir(main_dir).unwrap();
+
     let version_locs = vec![
         Location::new(
-            "../../Cargo.toml",
+            "Cargo.toml",
             r#"name = "mongodb"\nversion = "(?<target>.*?)"\n"#,
         ),
-        Location::new("../../README.md", r#"mongodb = "(?<target>.*?)"\n"#),
         Location::new(
-            "../../README.md",
+            "macros/Cargo.toml",
+            r#"name = "mongodb-internal-macros"\nversion = "(?<target>.*?)"\n"#,
+        ),
+        Location::new("README.md", r#"mongodb = "(?<target>.*?)"\n"#),
+        Location::new(
+            "README.md",
             r#"\[dependencies.mongodb\]\nversion = "(?<target>.*?)"\n"#,
         ),
-        Location::new("../../src/lib.rs", r#"//! mongodb = "(?<target>.*?)"\n"#),
-        Location::new("../../src/lib.rs", r#"//! version = "(?<target>.*?)"\n"#),
         Location::new(
-            "../../src/lib.rs",
+            "src/lib.rs",
             r#"html_root_url = "https://docs.rs/mongodb/(?<target>.*?)""#,
         ),
-        Location::new(
-            "../../manual/src/installation_features.md",
-            r#"\[dependencies.mongodb\]\nversion = "(?<target>.*?)"\n"#,
-        ),
     ];
-    let bson_version_loc =
-        Location::new("../../Cargo.toml", r#"bson = (?<target>\{ git = .*? \})\n"#);
-    let mongocrypt_version_loc = Location::new(
-        "../../Cargo.toml",
-        r#"mongocrypt = (?<target>\{ git = .*? \})\n"#,
+    let quote_version_loc = Location::new(
+        "Cargo.toml",
+        r#"mongodb-internal-macros = (?<target>\{ path = .* \})\n"#,
     );
+    let bson_version_loc = Location::new("Cargo.toml", r#"bson = (?<target>\{ git = .*? \})\n"#);
+    let mongocrypt_version_loc =
+        Location::new("Cargo.toml", r#"mongocrypt = (?<target>\{ git = .*? \})\n"#);
 
     let args: Args = argh::from_env();
 
@@ -108,11 +113,15 @@ fn main() {
     for loc in &version_locs {
         pending.apply(loc, &args.version);
     }
+    pending.apply(&quote_version_loc, &format!("{:?}", args.version));
     if let Some(bson) = args.bson {
         pending.apply(&bson_version_loc, &format!("{:?}", bson));
     }
     if let Some(mongocrypt) = args.mongocrypt {
-        pending.apply(&mongocrypt_version_loc, &format!("{{ version = {:?}, optional = true }}", mongocrypt));
+        pending.apply(
+            &mongocrypt_version_loc,
+            &format!("{{ version = {:?}, optional = true }}", mongocrypt),
+        );
     }
     pending.write();
 }

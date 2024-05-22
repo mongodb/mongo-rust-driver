@@ -14,7 +14,8 @@
 #
 # If the changes need to be developed against the main branch, more steps are needed:
 #
-# 1. Add dummy version numbers to the Cargo.toml lines for action_macro, bson, and libmongocrypt
+# 1. Add dummy version numbers to the Cargo.toml lines for mongodb-internal-macros, bson,
+#    and libmongocrypt
 # 2. Comment out the "fetch tag" func call from the "publish-release" task in this file
 # 3. Execute:
 #
@@ -141,6 +142,7 @@ functions:
         version: ${CRATE_VERSION}
         filenames:
           - src/target/package/mongodb-${CRATE_VERSION}.crate
+          - src/macros/target/package/mongodb-internal-macros-${CRATE_VERSION}.crate
 
   "sign release":
     - command: subprocess.exec
