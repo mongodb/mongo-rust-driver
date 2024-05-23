@@ -255,7 +255,7 @@ impl EventBuffer<Event> {
         }
         match &cevs[0..2] {
             [CommandEvent::Started(started), CommandEvent::Succeeded(succeeded)] => {
-                return (started.clone(), succeeded.clone())
+                (started.clone(), succeeded.clone())
             }
             pair => panic!(
                 "First event pair for {:?} not (Started, Succeded): {:?}",
