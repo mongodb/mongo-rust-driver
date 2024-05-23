@@ -138,15 +138,12 @@ async fn batch_exhaustion() {
     assert_eq!(4, v.len());
 
     // Assert that the last `getMore` response always has id 0, i.e. is exhausted.
-    #[allow(deprecated)]
-    let replies: Vec<_> = {
-        let mut events = client.events.clone();
-        events
-            .get_command_events(&["getMore"])
-            .into_iter()
-            .filter_map(|e| e.as_command_succeeded().map(|e| e.reply.clone()))
-            .collect()
-    };
+    let replies: Vec<_> = client
+        .events
+        .get_command_events(&["getMore"])
+        .into_iter()
+        .filter_map(|e| e.as_command_succeeded().map(|e| e.reply.clone()))
+        .collect();
     let last = replies.last().unwrap();
     let cursor = last.get_document("cursor").unwrap();
     let id = cursor.get_i64("id").unwrap();

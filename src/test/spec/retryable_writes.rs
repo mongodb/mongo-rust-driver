@@ -454,11 +454,7 @@ async fn retry_write_different_mongos() {
         .insert_one(doc! {})
         .await;
     assert!(result.is_err());
-    #[allow(deprecated)]
-    let events = {
-        let mut events = client.events.clone();
-        events.get_command_events(&["insert"])
-    };
+    let events = client.events.get_command_events(&["insert"]);
     assert!(
         matches!(
             &events[..],
@@ -516,11 +512,7 @@ async fn retry_write_same_mongos() {
         .insert_one(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
-    #[allow(deprecated)]
-    let events = {
-        let mut events = client.events.clone();
-        events.get_command_events(&["insert"])
-    };
+    let events = client.events.get_command_events(&["insert"]);
     assert!(
         matches!(
             &events[..],

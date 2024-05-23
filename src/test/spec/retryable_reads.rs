@@ -200,11 +200,7 @@ async fn retry_read_different_mongos() {
         .find(doc! {})
         .await;
     assert!(result.is_err());
-    #[allow(deprecated)]
-    let events = {
-        let mut events = client.events.clone();
-        events.get_command_events(&["find"])
-    };
+    let events = client.events.get_command_events(&["find"]);
     assert!(
         matches!(
             &events[..],
@@ -261,11 +257,7 @@ async fn retry_read_same_mongos() {
         .find(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
-    #[allow(deprecated)]
-    let events = {
-        let mut events = client.events.clone();
-        events.get_command_events(&["find"])
-    };
+    let events = client.events.get_command_events(&["find"]);
     assert!(
         matches!(
             &events[..],

@@ -197,15 +197,12 @@ async fn first_op_update_op_time() {
         .await
         .unwrap();
 
-        #[allow(deprecated)]
-        let event = {
-            let mut events = client.events.clone();
-            events
-                .get_command_events(&[name])
-                .into_iter()
-                .find(|e| matches!(e, CommandEvent::Succeeded(_) | CommandEvent::Failed(_)))
-                .unwrap_or_else(|| panic!("no event found for {}", name))
-        };
+        let event = client
+            .events
+            .get_command_events(&[name])
+            .into_iter()
+            .find(|e| matches!(e, CommandEvent::Succeeded(_) | CommandEvent::Failed(_)))
+            .unwrap_or_else(|| panic!("no event found for {}", name));
 
         match event {
             CommandEvent::Succeeded(s) => {

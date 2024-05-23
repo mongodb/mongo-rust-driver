@@ -232,21 +232,14 @@ impl EventBuffer<Event> {
             .collect()
     }
 
-    /// Remove all command events from the buffer, returning those matching any of the command
-    /// names.
-    #[deprecated = "use immutable methods"]
-    pub(crate) fn get_command_events(&mut self, command_names: &[&str]) -> Vec<CommandEvent> {
-        let mut out = vec![];
-        self.retain(|ev| match ev {
-            Event::Command(cev) => {
-                if command_names.contains(&cev.command_name()) {
-                    out.push(cev.clone());
-                }
-                false
+    /// Gets all command events matching any of the command names.
+    pub(crate) fn get_command_events(&self, command_names: &[&str]) -> Vec<CommandEvent> {
+        self.filter_map(|e| match e {
+            Event::Command(cev) if command_names.iter().any(|&n| n == cev.command_name()) => {
+                Some(cev.clone())
             }
-            _ => true,
-        });
-        out
+            _ => None,
+        })
     }
 
     /// Gets the first started/succeeded pair of events for the given command name, popping off all
