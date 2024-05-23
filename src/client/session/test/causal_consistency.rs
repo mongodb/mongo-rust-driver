@@ -144,6 +144,8 @@ async fn first_read_no_after_cluser_time() {
     }
 
     for op in all_session_ops().filter(|o| o.is_read) {
+        client.events.clone().clear_cached_events();
+
         let mut session = client
             .start_session()
             .causal_consistency(true)
@@ -160,10 +162,7 @@ async fn first_read_no_after_cluser_time() {
         .await
         .unwrap_or_else(|e| panic!("{} failed: {}", name, e));
         #[allow(deprecated)]
-        let (started, _) = {
-            let mut events = client.events.clone();
-            events.get_successful_command_execution(name)
-        };
+        let (started, _) = client.events.get_successful_command_execution(name);
 
         // assert that no read concern was set.
         started.command.get_document("readConcern").unwrap_err();
@@ -487,11 +486,7 @@ async fn omit_cluster_time_standalone() {
 
     coll.find_one(doc! {}).await.unwrap();
 
-    #[allow(deprecated)]
-    let (started, _) = {
-        let mut events = client.events.clone();
-        events.get_successful_command_execution("find")
-    };
+    let (started, _) = client.events.get_successful_command_execution("find");
     started.command.get_document("$clusterTime").unwrap_err();
 }
 
@@ -510,9 +505,6 @@ async fn cluster_time_sent_in_commands() {
 
     coll.find_one(doc! {}).await.unwrap();
 
-    #[allow(deprecated)]
-    let mut events = client.events.clone();
-    #[allow(deprecated)]
-    let (started, _) = events.get_successful_command_execution("find");
+    let (started, _) = client.events.get_successful_command_execution("find");
     started.command.get_document("$clusterTime").unwrap();
 }

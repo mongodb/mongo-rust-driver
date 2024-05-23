@@ -242,45 +242,25 @@ impl EventBuffer<Event> {
         })
     }
 
-    /// Gets the first started/succeeded pair of events for the given command name, popping off all
-    /// command events before and between them.
+    /// Gets the first started/succeeded pair of events for the given command name.
     ///
     /// Panics if the command failed or could not be found in the events.
-    #[deprecated = "use immutable methods"]
     pub(crate) fn get_successful_command_execution(
-        &mut self,
+        &self,
         command_name: &str,
     ) -> (CommandStartedEvent, CommandSucceededEvent) {
-        let mut started = None;
-        let mut succeeded = None;
-        self.retain(|ev| match (ev, &started, &succeeded) {
-            (Event::Command(cev), None, None) => {
-                if cev.command_name() == command_name {
-                    started = Some(
-                        cev.as_command_started()
-                            .unwrap_or_else(|| {
-                                panic!("first event not a command started event {:?}", cev)
-                            })
-                            .clone(),
-                    );
-                }
-                false
+        let cevs = self.get_command_events(&[command_name]);
+        if cevs.len() < 2 {
+            panic!("too few command events for {:?}: {:?}", command_name, cevs);
+        }
+        match &cevs[0..2] {
+            [CommandEvent::Started(started), CommandEvent::Succeeded(succeeded)] => {
+                return (started.clone(), succeeded.clone())
             }
-            (Event::Command(cev), Some(started), None) => {
-                if cev.request_id() == started.request_id {
-                    succeeded = Some(
-                        cev.as_command_succeeded()
-                            .expect("second event not a command succeeded event")
-                            .clone(),
-                    );
-                }
-                false
-            }
-            _ => true,
-        });
-        match (started, succeeded) {
-            (Some(started), Some(succeeded)) => (started, succeeded),
-            _ => panic!("could not find event for {} command", command_name),
+            pair => panic!(
+                "First event pair for {:?} not (Started, Succeded): {:?}",
+                command_name, pair
+            ),
         }
     }
 

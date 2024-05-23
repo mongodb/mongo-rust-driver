@@ -383,7 +383,6 @@ async fn session_usage() {
         return;
     }
 
-    #[allow(deprecated)]
     async fn session_usage_test<F, G>(command_name: &str, operation: F)
     where
         F: Fn(EventClient) -> G,
@@ -391,9 +390,7 @@ async fn session_usage() {
     {
         let client = Client::test_builder().monitor_events().build().await;
         operation(client.clone()).await;
-        let mut events = client.events.clone();
-        #[allow(deprecated)]
-        let (command_started, _) = events.get_successful_command_execution(command_name);
+        let (command_started, _) = client.events.get_successful_command_execution(command_name);
         assert!(
             command_started.command.get("lsid").is_some(),
             "implicit session not passed to {}",
@@ -427,11 +424,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
     let mut cursor = coll.find(doc! {}).await.expect("find should succeed");
     assert!(matches!(cursor.next().await, Some(Ok(_))));
 
-    #[allow(deprecated)]
-    let (find_started, _) = {
-        let mut events = client.events.clone();
-        events.get_successful_command_execution("find")
-    };
+    let (find_started, _) = client.events.get_successful_command_execution("find");
     let session_id = find_started
         .command
         .get("lsid")
@@ -480,11 +473,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
         assert!(matches!(cursor.next().await, Some(Ok(_))));
     }
 
-    #[allow(deprecated)]
-    let (find_started, _) = {
-        let mut events = client.events.clone();
-        events.get_successful_command_execution("find")
-    };
+    let (find_started, _) = client.events.get_successful_command_execution("find");
 
     let session_id = find_started
         .command
@@ -545,6 +534,8 @@ async fn find_and_getmore_share_session() {
         coll: &Collection<Document>,
         read_preference: ReadPreference,
     ) {
+        client.events.clone().clear_cached_events();
+
         let options = FindOptions::builder()
             .batch_size(2)
             .selection_criteria(SelectionCriteria::ReadPreference(read_preference.clone()))
@@ -582,17 +573,14 @@ async fn find_and_getmore_share_session() {
                 });
         }
 
-        let mut events = client.events.clone();
-        #[allow(deprecated)]
-        let (find_started, _) = events.get_successful_command_execution("find");
+        let (find_started, _) = client.events.get_successful_command_execution("find");
         let session_id = find_started
             .command
             .get("lsid")
             .expect("find should use implicit session");
         assert!(session_id != &Bson::Null);
 
-        #[allow(deprecated)]
-        let (command_started, _) = events.get_successful_command_execution("getMore");
+        let (command_started, _) = client.events.get_successful_command_execution("getMore");
         let getmore_session_id = command_started
             .command
             .get("lsid")
