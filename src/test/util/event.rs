@@ -6,12 +6,15 @@ use crate::{
     bson::doc,
     event::{
         cmap::CmapEvent,
-        command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
+        command::{CommandEvent, CommandSucceededEvent},
         sdam::SdamEvent,
     },
     test::get_client_options,
     Client,
 };
+
+#[cfg(feature = "in-use-encryption-unstable")]
+use crate::event::command::CommandStartedEvent;
 
 #[derive(Clone, Debug, From, Serialize)]
 #[serde(untagged)]
