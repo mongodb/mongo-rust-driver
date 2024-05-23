@@ -82,18 +82,15 @@ async fn tracks_resume_token() -> Result<()> {
         tokens.push(stream.resume_token().unwrap().parsed()?);
     }
 
-    #[allow(deprecated)]
-    let events: Vec<_> = {
-        let mut events = client.events.clone();
-        events
-            .get_command_events(&["aggregate", "getMore"])
-            .into_iter()
-            .filter_map(|ev| match ev {
-                CommandEvent::Succeeded(s) => Some(s),
-                _ => None,
-            })
-            .collect()
-    };
+    let events: Vec<_> = client
+        .events
+        .get_command_events(&["aggregate", "getMore"])
+        .into_iter()
+        .filter_map(|ev| match ev {
+            CommandEvent::Succeeded(s) => Some(s),
+            _ => None,
+        })
+        .collect();
     let mut expected = vec![];
     // Token from `aggregate`
     if let Some(initial) = events[0]
@@ -229,11 +226,7 @@ async fn empty_batch_not_closed() -> Result<()> {
     coll.insert_one(doc! {}).await?;
     stream.next().await.transpose()?;
 
-    #[allow(deprecated)]
-    let events = {
-        let mut events = client.events.clone();
-        events.get_command_events(&["aggregate", "getMore"])
-    };
+    let events = client.events.get_command_events(&["aggregate", "getMore"]);
     let cursor_id = match &events[1] {
         CommandEvent::Succeeded(CommandSucceededEvent { reply, .. }) => {
             reply.get_document("cursor")?.get_i64("id")?
@@ -315,11 +308,7 @@ async fn resume_start_at_operation_time() -> Result<()> {
     coll.insert_one(doc! { "_id": 2 }).await?;
     stream.next().await.transpose()?;
 
-    #[allow(deprecated)]
-    let events = {
-        let mut events = client.events.clone();
-        events.get_command_events(&["aggregate"])
-    };
+    let events = client.events.get_command_events(&["aggregate"]);
     assert_eq!(events.len(), 4);
 
     fn has_saot(command: &Document) -> Result<bool> {
@@ -362,11 +351,7 @@ async fn batch_end_resume_token() -> Result<()> {
 
     assert_eq!(stream.next_if_any().await?, None);
     let token = stream.resume_token().unwrap().parsed()?;
-    #[allow(deprecated)]
-    let commands = {
-        let mut events = client.events.clone();
-        events.get_command_events(&["aggregate", "getMore"])
-    };
+    let commands = client.events.get_command_events(&["aggregate", "getMore"]);
     assert!(matches!(commands.last(), Some(
         CommandEvent::Succeeded(CommandSucceededEvent {
             reply,

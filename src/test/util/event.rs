@@ -6,12 +6,15 @@ use crate::{
     bson::doc,
     event::{
         cmap::CmapEvent,
-        command::{CommandEvent, CommandStartedEvent, CommandSucceededEvent},
+        command::{CommandEvent, CommandSucceededEvent},
         sdam::SdamEvent,
     },
     test::get_client_options,
     Client,
 };
+
+#[cfg(feature = "in-use-encryption-unstable")]
+use crate::event::command::CommandStartedEvent;
 
 #[derive(Clone, Debug, From, Serialize)]
 #[serde(untagged)]
@@ -86,21 +89,6 @@ impl CommandEvent {
             CommandEvent::Started(event) => event.command_name.as_str(),
             CommandEvent::Failed(event) => event.command_name.as_str(),
             CommandEvent::Succeeded(event) => event.command_name.as_str(),
-        }
-    }
-
-    pub(crate) fn request_id(&self) -> i32 {
-        match self {
-            CommandEvent::Started(event) => event.request_id,
-            CommandEvent::Failed(event) => event.request_id,
-            CommandEvent::Succeeded(event) => event.request_id,
-        }
-    }
-
-    pub(crate) fn as_command_started(&self) -> Option<&CommandStartedEvent> {
-        match self {
-            CommandEvent::Started(e) => Some(e),
-            _ => None,
         }
     }
 

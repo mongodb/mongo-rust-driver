@@ -45,12 +45,13 @@ async fn transaction_ids_excluded() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
-    #[allow(deprecated)]
-    let mut events = client.events.clone();
-    let mut excludes_txn_number = move |command_name: &str| -> bool {
-        #[allow(deprecated)]
-        let (started, _) = events.get_successful_command_execution(command_name);
-        !started.command.contains_key("txnNumber")
+    let excludes_txn_number = {
+        let events = client.events.clone();
+        move |command_name: &str| -> bool {
+            let (started, _) = events.get_successful_command_execution(command_name);
+            events.clone().clear_cached_events();
+            !started.command.contains_key("txnNumber")
+        }
     };
 
     coll.update_many(doc! {}, doc! { "$set": doc! { "x": 1 } })
@@ -93,12 +94,13 @@ async fn transaction_ids_included() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
-    #[allow(deprecated)]
-    let mut events = client.events.clone();
-    let mut includes_txn_number = move |command_name: &str| -> bool {
-        #[allow(deprecated)]
-        let (started, _) = events.get_successful_command_execution(command_name);
-        started.command.contains_key("txnNumber")
+    let includes_txn_number = {
+        let events = client.events.clone();
+        move |command_name: &str| -> bool {
+            let (started, _) = events.get_successful_command_execution(command_name);
+            events.clone().clear_cached_events();
+            started.command.contains_key("txnNumber")
+        }
     };
 
     coll.insert_one(doc! { "x": 1 }).await.unwrap();
@@ -454,11 +456,7 @@ async fn retry_write_different_mongos() {
         .insert_one(doc! {})
         .await;
     assert!(result.is_err());
-    #[allow(deprecated)]
-    let events = {
-        let mut events = client.events.clone();
-        events.get_command_events(&["insert"])
-    };
+    let events = client.events.get_command_events(&["insert"]);
     assert!(
         matches!(
             &events[..],
@@ -516,11 +514,7 @@ async fn retry_write_same_mongos() {
         .insert_one(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);
-    #[allow(deprecated)]
-    let events = {
-        let mut events = client.events.clone();
-        events.get_command_events(&["insert"])
-    };
+    let events = client.events.get_command_events(&["insert"]);
     assert!(
         matches!(
             &events[..],

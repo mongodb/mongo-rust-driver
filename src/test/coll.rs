@@ -696,10 +696,7 @@ async fn no_read_preference_to_standalone() {
         .await
         .unwrap();
 
-    #[allow(deprecated)]
-    let mut events = client.events.clone();
-    #[allow(deprecated)]
-    let command_started = events.get_successful_command_execution("find").0;
+    let command_started = client.events.get_successful_command_execution("find").0;
 
     assert!(!command_started.command.contains_key("$readPreference"));
 }

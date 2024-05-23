@@ -144,6 +144,8 @@ async fn first_read_no_after_cluser_time() {
     }
 
     for op in all_session_ops().filter(|o| o.is_read) {
+        client.events.clone().clear_cached_events();
+
         let mut session = client
             .start_session()
             .causal_consistency(true)
@@ -160,10 +162,7 @@ async fn first_read_no_after_cluser_time() {
         .await
         .unwrap_or_else(|e| panic!("{} failed: {}", name, e));
         #[allow(deprecated)]
-        let (started, _) = {
-            let mut events = client.events.clone();
-            events.get_successful_command_execution(name)
-        };
+        let (started, _) = client.events.get_successful_command_execution(name);
 
         // assert that no read concern was set.
         started.command.get_document("readConcern").unwrap_err();
@@ -181,6 +180,8 @@ async fn first_op_update_op_time() {
     }
 
     for op in all_session_ops() {
+        client.events.clone().clear_cached_events();
+
         let mut session = client
             .start_session()
             .causal_consistency(true)
@@ -197,15 +198,12 @@ async fn first_op_update_op_time() {
         .await
         .unwrap();
 
-        #[allow(deprecated)]
-        let event = {
-            let mut events = client.events.clone();
-            events
-                .get_command_events(&[name])
-                .into_iter()
-                .find(|e| matches!(e, CommandEvent::Succeeded(_) | CommandEvent::Failed(_)))
-                .unwrap_or_else(|| panic!("no event found for {}", name))
-        };
+        let event = client
+            .events
+            .get_command_events(&[name])
+            .into_iter()
+            .find(|e| matches!(e, CommandEvent::Succeeded(_) | CommandEvent::Failed(_)))
+            .unwrap_or_else(|| panic!("no event found for {}", name));
 
         match event {
             CommandEvent::Succeeded(s) => {
@@ -490,11 +488,7 @@ async fn omit_cluster_time_standalone() {
 
     coll.find_one(doc! {}).await.unwrap();
 
-    #[allow(deprecated)]
-    let (started, _) = {
-        let mut events = client.events.clone();
-        events.get_successful_command_execution("find")
-    };
+    let (started, _) = client.events.get_successful_command_execution("find");
     started.command.get_document("$clusterTime").unwrap_err();
 }
 
@@ -513,9 +507,6 @@ async fn cluster_time_sent_in_commands() {
 
     coll.find_one(doc! {}).await.unwrap();
 
-    #[allow(deprecated)]
-    let mut events = client.events.clone();
-    #[allow(deprecated)]
-    let (started, _) = events.get_successful_command_execution("find");
+    let (started, _) = client.events.get_successful_command_execution("find");
     started.command.get_document("$clusterTime").unwrap();
 }
