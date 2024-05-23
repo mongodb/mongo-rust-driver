@@ -180,6 +180,8 @@ async fn first_op_update_op_time() {
     }
 
     for op in all_session_ops() {
+        client.events.clone().clear_cached_events();
+
         let mut session = client
             .start_session()
             .causal_consistency(true)
