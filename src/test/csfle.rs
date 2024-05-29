@@ -1641,6 +1641,10 @@ impl DeadlockExpectation {
     }
 }
 
+const KMS_EXPIRED: &str = "127.0.0.1:9000";
+const KMS_WRONG_HOST: &str = "127.0.0.1:9001";
+const KMS_CORRECT: &str = "127.0.0.1:9002";
+
 // Prose test 10. KMS TLS Tests
 #[tokio::test]
 async fn kms_tls() -> Result<()> {
@@ -1649,7 +1653,7 @@ async fn kms_tls() -> Result<()> {
     }
 
     // Invalid KMS Certificate
-    let err = run_kms_tls_test("127.0.0.1:9000").await.unwrap_err();
+    let err = run_kms_tls_test(KMS_EXPIRED).await.unwrap_err();
     assert!(
         err.to_string().contains("certificate verify failed"),
         "unexpected error: {}",
@@ -1657,7 +1661,7 @@ async fn kms_tls() -> Result<()> {
     );
 
     // Invalid Hostname in KMS Certificate
-    let err = run_kms_tls_test("127.0.0.1:9001").await.unwrap_err();
+    let err = run_kms_tls_test(KMS_WRONG_HOST).await.unwrap_err();
     assert!(
         err.to_string().contains("certificate verify failed"),
         "unexpected error: {}",
@@ -1716,12 +1720,12 @@ async fn kms_tls_options() -> Result<()> {
         .get_mut(&KmsProvider::Azure)
         .unwrap()
         .0
-        .insert("identityPlatformEndpoint", "127.0.0.1:9002");
+        .insert("identityPlatformEndpoint", KMS_CORRECT);
     base_providers
         .get_mut(&KmsProvider::Gcp)
         .unwrap()
         .0
-        .insert("endpoint", "127.0.0.1:9002");
+        .insert("endpoint", KMS_CORRECT);
 
     let cert_dir = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
     let ca_path = cert_dir.join("ca.pem");
@@ -1754,17 +1758,17 @@ async fn kms_tls_options() -> Result<()> {
             .get_mut(&KmsProvider::Azure)
             .unwrap()
             .0
-            .insert("identityPlatformEndpoint", "127.0.0.1:9000");
+            .insert("identityPlatformEndpoint", KMS_EXPIRED);
         providers
             .get_mut(&KmsProvider::Gcp)
             .unwrap()
             .0
-            .insert("endpoint", "127.0.0.1:9000");
+            .insert("endpoint", KMS_EXPIRED);
         providers
             .get_mut(&KmsProvider::Kmip)
             .unwrap()
             .0
-            .insert("endpoint", "127.0.0.1:9000");
+            .insert("endpoint", KMS_EXPIRED);
 
         ClientEncryption::new(
             TestClient::new().await.into_client(),
@@ -1782,17 +1786,17 @@ async fn kms_tls_options() -> Result<()> {
             .get_mut(&KmsProvider::Azure)
             .unwrap()
             .0
-            .insert("identityPlatformEndpoint", "127.0.0.1:9001");
+            .insert("identityPlatformEndpoint", KMS_WRONG_HOST);
         providers
             .get_mut(&KmsProvider::Gcp)
             .unwrap()
             .0
-            .insert("endpoint", "127.0.0.1:9001");
+            .insert("endpoint", KMS_WRONG_HOST);
         providers
             .get_mut(&KmsProvider::Kmip)
             .unwrap()
             .0
-            .insert("endpoint", "127.0.0.1:9001");
+            .insert("endpoint", KMS_WRONG_HOST);
 
         ClientEncryption::new(
             TestClient::new().await.into_client(),
@@ -1832,25 +1836,25 @@ async fn kms_tls_options() -> Result<()> {
 
     provider_test(
         &client_encryption_no_client_cert,
-        aws_key("127.0.0.1:9002"),
+        aws_key(KMS_CORRECT),
         &["SSL routines", "connection was forcibly closed"],
     )
     .await?;
     provider_test(
         &client_encryption_with_tls,
-        aws_key("127.0.0.1:9002"),
+        aws_key(KMS_CORRECT),
         &["parse error"],
     )
     .await?;
     provider_test(
         &client_encryption_expired,
-        aws_key("127.0.0.1:9000"),
+        aws_key(KMS_EXPIRED),
         &["certificate verify failed"],
     )
     .await?;
     provider_test(
         &client_encryption_invalid_hostname,
-        aws_key("127.0.0.1:9001"),
+        aws_key(KMS_WRONG_HOST),
         &["certificate verify failed"],
     )
     .await?;

@@ -30,6 +30,7 @@ pre:
 
 # Functions to run after all tasks (except those in task groups).
 post:
+  - func: "stop csfle servers"
   - func: "stop load balancer"
   - func: "stop mongo orchestration"
   - func: "tear down aws"
@@ -357,7 +358,7 @@ buildvariants:
 
   - name: in-use-encryption-openssl
     display_name: "In-Use Encryption (OpenSSL)"
-    patchable: false
+    #patchable: false
     run_on:
       - rhel80-small
     expansions:
@@ -980,8 +981,7 @@ tasks:
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
-      - func: "run kmip server"
-      - func: "run mock azure imds server"
+      - func: "start csfle servers"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-serverless
@@ -1431,6 +1431,39 @@ functions:
           set -x
 
           .evergreen/run-atlas-tests.sh
+
+  "start csfle servers":
+    - command: ec2.assume_role
+      params:
+        role_arn: ${aws_test_secrets_role}
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: bash
+        include_expansions_in_env: ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"]
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/csfle/setup-secrets.sh
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: bash
+        background: true
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/csfle/start-servers.sh
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/csfle/await-servers.sh
+
+  "stop csfle servers":
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/csfle/stop-servers.sh
 
   "run kmip server":
     - command: shell.exec
