@@ -222,23 +222,12 @@ impl CryptExecutor {
                                 &crate::runtime::HttpClient::default(),
                             )
                             .await?;
-                            fn dbg_redacted(value: &str) -> &str {
-                                let chars: Vec<_> = value.chars().collect();
-                                let mut tmp = "...".to_owned();
-                                if chars.len() > 6 {
-                                    for ix in chars.len() - 3..chars.len() {
-                                        tmp.push(chars[ix]);
-                                    }
-                                }
-                                dbg!(tmp);
-                                value
-                            }
                             let mut creds = rawdoc! {
-                                "accessKeyId": dbg_redacted(aws_creds.access_key()),
-                                "secretAccessKey": dbg_redacted(aws_creds.secret_key()),
+                                "accessKeyId": aws_creds.access_key(),
+                                "secretAccessKey": aws_creds.secret_key(),
                             };
                             if let Some(token) = aws_creds.session_token() {
-                                creds.append("sessionToken", dbg_redacted(token));
+                                creds.append("sessionToken", token);
                             }
                             kms_providers.append("aws", creds);
                         }

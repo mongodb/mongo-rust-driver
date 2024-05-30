@@ -358,7 +358,6 @@ buildvariants:
 
   - name: in-use-encryption-openssl
     display_name: "In-Use Encryption (OpenSSL)"
-    #patchable: false
     run_on:
       - rhel80-small
     expansions:
@@ -905,7 +904,7 @@ tasks:
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: replica_set
-      - func: "run mock azure imds server"
+      - func: "start csfle servers"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-4.4
@@ -916,7 +915,7 @@ tasks:
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: replica_set
-      - func: "run mock azure imds server"
+      - func: "start csfle servers"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-5.0
@@ -927,7 +926,7 @@ tasks:
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: replica_set
-      - func: "run mock azure imds server"
+      - func: "start csfle servers"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-6.0
@@ -938,7 +937,7 @@ tasks:
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: replica_set
-      - func: "run mock azure imds server"
+      - func: "start csfle servers"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-7.0
@@ -949,7 +948,7 @@ tasks:
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: replica_set
-      - func: "run mock azure imds server"
+      - func: "start csfle servers"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-rapid
@@ -960,7 +959,7 @@ tasks:
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
-      - func: "run mock azure imds server"
+      - func: "start csfle servers"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-latest
@@ -971,7 +970,7 @@ tasks:
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: replica_set
-      - func: "run mock azure imds server"
+      - func: "start csfle servers"
       - func: "run csfle tests"
 
   - name: test-in-use-encryption-openssl
@@ -993,8 +992,7 @@ tasks:
         params:
           file: serverless-expansion.yml
       - func: "install libmongocrypt"
-      - func: "run kmip server"
-      - func: "run mock azure imds server"
+      - func: "start csfle servers"
       - func: "run csfle serverless tests"
 
   - name: test-load-balancer-5.0
@@ -1465,27 +1463,6 @@ functions:
         args:
           - ${DRIVERS_TOOLS}/.evergreen/csfle/stop-servers.sh
 
-  "run kmip server":
-    - command: shell.exec
-      params:
-        working_dir: src
-        shell: bash
-        background: true
-        script: |
-          ${PREPARE_SHELL}
-          export TLS_FEATURE=${TLS_FEATURE}
-          .evergreen/run-csfle-kmip-servers.sh
-
-  "run mock azure imds server":
-    - command: subprocess.exec
-      params:
-        working_dir: src
-        background: true
-        binary: bash
-        args:
-          - .evergreen/run-csfle-mock-azure-imds.sh
-        add_expansions_to_env: true
-
   "run csfle tests":
     - command: subprocess.exec
       type: test
@@ -1494,15 +1471,7 @@ functions:
         binary: bash
         args:
           - .evergreen/run-csfle-tests.sh
-        #add_expansions_to_env: true
-        include_expansions_in_env:
-          - DRIVERS_TOOLS
-          - PROJECT_DIRECTORY
-          - MONGOCRYPT_LIB_DIR
-          - LD_LIBRARY_PATH
-          - CSFLE_LOCAL_KEY
-          - AZURE_IMDS_MOCK_PORT
-          - MONGODB_URI
+        add_expansions_to_env: true
 
   "run csfle serverless tests":
     - command: shell.exec

@@ -27,7 +27,7 @@ cargo_test() {
   LOG_PATH=$(mktemp)
   tail -f ${LOG_PATH} &
   TAIL_PID=$!
-  LOG_UNCAPTURED=${LOG_PATH} RUST_BACKTRACE=1 cargo nextest run --nocapture --profile ci $(cargo_test_options $1)
+  LOG_UNCAPTURED=${LOG_PATH} RUST_BACKTRACE=1 cargo nextest run --profile ci $(cargo_test_options $1)
   ((CARGO_RESULT = ${CARGO_RESULT} || $?))
   mv target/nextest/ci/junit.xml $2
   kill ${TAIL_PID}

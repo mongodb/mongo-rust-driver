@@ -99,8 +99,8 @@ static KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
         (
             KmsProvider::Azure,
             doc! {
-                "tenantId": env("FLE_AZURE_CLIENTID"),
-                "clientId": env("FLE_AZURE_TENANTID"),
+                "tenantId": env("FLE_AZURE_TENANTID"),
+                "clientId": env("FLE_AZURE_CLIENTID"),
                 "clientSecret": env("FLE_AZURE_CLIENTSECRET"),
             },
             None,
