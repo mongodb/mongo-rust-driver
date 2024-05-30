@@ -1494,7 +1494,15 @@ functions:
         binary: bash
         args:
           - .evergreen/run-csfle-tests.sh
-        add_expansions_to_env: true
+        #add_expansions_to_env: true
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+          - MONGOCRYPT_LIB_DIR
+          - LD_LIBRARY_PATH
+          - CSFLE_LOCAL_KEY
+          - AZURE_IMDS_MOCK_PORT
+          - MONGODB_URI
 
   "run csfle serverless tests":
     - command: shell.exec

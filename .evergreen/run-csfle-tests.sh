@@ -30,6 +30,7 @@ fi
 #export PYTHON=python  # use the venv-provided python
 #export AWS_DEFAULT_REGION=us-east-1
 #. ${DRIVERS_TOOLS}/.evergreen/csfle/set-temp-creds.sh
+
 echo exporting secrets
 . ./secrets-export.sh
 echo exporting secrets: done
@@ -41,11 +42,20 @@ set +o errexit
 #cargo_test test::csfle prose.xml
 #cargo_test test::spec::client_side_encryption spec.xml
 
+echo access key sum:
+echo ${AWS_ACCESS_KEY_ID} | shasum
+echo secret sum:
+echo ${AWS_SECRET_ACCESS_KEY} | shasum
+echo session token sum:
+echo ${AWS_SESSION_TOKEN} | shasum
+
+echo running test
+cargo_test test::csfle::on_demand_aws_success results.xml
+
 # Unset variables for on-demand credential failure tests.
 #unset AWS_ACCESS_KEY_ID
 #unset AWS_SECRET_ACCESS_KEY
 #cargo_test test::csfle::on_demand_aws_failure failure.xml
-cargo_test test::csfle::on_demand_aws_success results.xml
 
 #junit-report-merger results.xml prose.xml spec.xml failure.xml
 

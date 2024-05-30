@@ -91,25 +91,25 @@ static KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
         (
             KmsProvider::Aws,
             doc! {
-                "accessKeyId": env("AWS_ACCESS_KEY_ID"),
-                "secretAccessKey": env("AWS_SECRET_ACCESS_KEY"),
+                "accessKeyId": env("FLE_AWS_KEY"),
+                "secretAccessKey": env("FLE_AWS_SECRET"),
             },
             None,
         ),
         (
             KmsProvider::Azure,
             doc! {
-                "tenantId": env("AZURE_TENANT_ID"),
-                "clientId": env("AZURE_CLIENT_ID"),
-                "clientSecret": env("AZURE_CLIENT_SECRET"),
+                "tenantId": env("FLE_AZURE_CLIENTID"),
+                "clientId": env("FLE_AZURE_TENANTID"),
+                "clientSecret": env("FLE_AZURE_CLIENTSECRET"),
             },
             None,
         ),
         (
             KmsProvider::Gcp,
             doc! {
-                "email": env("GCP_EMAIL"),
-                "privateKey": env("GCP_PRIVATE_KEY"),
+                "email": env("FLE_GCP_EMAIL"),
+                "privateKey": env("FLE_GCP_PRIVATEKEY"),
             },
             None,
         ),
