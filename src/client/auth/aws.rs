@@ -170,6 +170,14 @@ pub(crate) struct AwsCredential {
     expiration: Option<bson::DateTime>,
 }
 
+fn non_empty(s: Option<String>) -> Option<String> {
+    match s {
+        None => None,
+        Some(s) if s.is_empty() => None,
+        Some(s) => Some(s),
+    }
+}
+
 impl AwsCredential {
     /// Derives the credentials for an authentication attempt given the set of credentials the user
     /// passed in.
@@ -177,17 +185,17 @@ impl AwsCredential {
         let access_key = credential
             .username
             .clone()
-            .or_else(|| std::env::var("AWS_ACCESS_KEY_ID").ok());
+            .or_else(|| non_empty(std::env::var("AWS_ACCESS_KEY_ID").ok()));
         let secret_key = credential
             .password
             .clone()
-            .or_else(|| std::env::var("AWS_SECRET_ACCESS_KEY").ok());
+            .or_else(|| non_empty(std::env::var("AWS_SECRET_ACCESS_KEY").ok()));
         let session_token = credential
             .mechanism_properties
             .as_ref()
             .and_then(|d| d.get_str("AWS_SESSION_TOKEN").ok())
             .map(|s| s.to_string())
-            .or_else(|| std::env::var("AWS_SESSION_TOKEN").ok());
+            .or_else(|| non_empty(std::env::var("AWS_SESSION_TOKEN").ok()));
 
         let found_access_key = access_key.is_some();
         let found_secret_key = secret_key.is_some();
