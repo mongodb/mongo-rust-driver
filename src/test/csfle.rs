@@ -315,6 +315,7 @@ async fn data_key_double_encryption() -> Result<()> {
             KmsProvider::Kmip,
             MasterKey::Kmip {
                 key_id: None,
+                delegated: None,
                 endpoint: None,
             },
         ),
@@ -1185,6 +1186,7 @@ async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
 
     let master_key = MasterKey::Kmip {
         key_id: Some("1".to_string()),
+        delegated: None,
         endpoint: None,
     };
 
@@ -1210,6 +1212,7 @@ async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
 
     let master_key = MasterKey::Kmip {
         key_id: Some("1".to_string()),
+        delegated: None,
         endpoint: Some("localhost:5698".to_string()),
     };
 
@@ -1227,6 +1230,7 @@ async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
 
     let master_key = MasterKey::Kmip {
         key_id: Some("1".to_string()),
+        delegated: None,
         endpoint: Some("doesnotexist.local:5698".to_string()),
     };
 
@@ -1929,6 +1933,7 @@ async fn kms_tls_options() -> Result<()> {
     // Case 4: KMIP
     let kmip_key = MasterKey::Kmip {
         key_id: None,
+        delegated: None,
         endpoint: None,
     };
 

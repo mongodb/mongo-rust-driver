@@ -227,6 +227,8 @@ pub enum MasterKey {
         /// keyId is the KMIP Unique Identifier to a 96 byte KMIP Secret Data managed object.  If
         /// keyId is omitted, the driver creates a random 96 byte KMIP Secret Data managed object.
         key_id: Option<String>,
+        /// If true (recommended), the KMIP server must decrypt this key. Defaults to false.
+        delegated: Option<bool>,
         /// Host with optional port.
         endpoint: Option<String>,
     },
