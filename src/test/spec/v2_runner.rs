@@ -446,6 +446,16 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
     }
 
     for test in &test_file.tests {
+        if let Ok(description) = std::env::var("TEST_DESCRIPTION") {
+            if !test
+                .description
+                .to_lowercase()
+                .contains(&description.to_lowercase())
+            {
+                continue;
+            }
+        }
+
         log_uncaptured(format!("Running {}", &test.description));
 
         if test

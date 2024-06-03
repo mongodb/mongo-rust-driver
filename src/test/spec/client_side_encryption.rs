@@ -5,6 +5,7 @@ async fn run_unified() {
     let mut skipped_tests = vec![];
     if cfg!(not(feature = "openssl-tls")) {
         skipped_tests.push("create datakey with KMIP KMS provider");
+        skipped_tests.push("create datakey with KMIP delegated KMS provider");
     }
 
     run_unified_tests(&["client-side-encryption", "unified"])
