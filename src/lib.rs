@@ -3,15 +3,12 @@
 #![warn(rustdoc::missing_crate_level_docs)]
 #![warn(clippy::cast_possible_truncation)]
 #![warn(clippy::cast_possible_wrap)]
-#![cfg_attr(
-    feature = "clippy",
-    allow(
-        clippy::unreadable_literal,
-        clippy::cognitive_complexity,
-        clippy::float_cmp,
-        clippy::match_like_matches_macro,
-        clippy::derive_partial_eq_without_eq
-    )
+#![allow(
+    clippy::unreadable_literal,
+    clippy::cognitive_complexity,
+    clippy::float_cmp,
+    clippy::match_like_matches_macro,
+    clippy::derive_partial_eq_without_eq
 )]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]

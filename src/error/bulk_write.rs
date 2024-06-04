@@ -9,7 +9,7 @@ use crate::{
 ///
 /// If an additional error occurred that was not the result of an individual write failing or a
 /// write concern error, it can be retrieved by calling [`source`](core::error::Error::source) on
-/// the [`Error`](crate::error::Error) in which this value is stored.
+/// the [`Error`](struct@crate::error::Error) in which this value is stored.
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct BulkWriteError {

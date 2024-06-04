@@ -174,3 +174,6 @@ serde_path_to_error = "0.1"
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
 all-features = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(mongodb_internal_tracking_arc)'] }
