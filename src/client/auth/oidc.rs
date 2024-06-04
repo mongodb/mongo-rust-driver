@@ -7,7 +7,7 @@ use std::{
 use tokio::sync::Mutex;
 use typed_builder::TypedBuilder;
 
-#[cfg(feature = "azure-oidc")]
+#[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
 use crate::client::auth::{
     AZURE_ENVIRONMENT_VALUE_STR,
     ENVIRONMENT_PROP_STR,
@@ -204,6 +204,46 @@ impl Callback {
                         Ok(IdpServerResponse {
                             access_token,
                             expires,
+                            refresh_token: None,
+                        })
+                    }
+                    .boxed()
+                },
+                CallbackKind::Machine,
+            ),
+            cache: Cache::new(),
+        }
+    }
+
+    /// Create gcp callback.
+    #[cfg(feature = "gcp-oidc")]
+    fn gcp_callback(resource: &str) -> CallbackInner {
+        use futures_util::FutureExt;
+        let url = format!(
+            "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity?audience={}",
+            resource
+        );
+        CallbackInner {
+            function: Self::new_function(
+                move |_| {
+                    let url = url.clone();
+                    async move {
+                        let url = url.clone();
+                        let response = crate::runtime::HttpClient::default()
+                            .get(&url)
+                            .headers(&[("Metadata-Flavor", "Google")])
+                            .send_and_get_string()
+                            .await
+                            .map_err(|e| {
+                                Error::authentication_error(
+                                    MONGODB_OIDC_STR,
+                                    &format!("Failed to get access token from GCP IDMS: {}", e),
+                                )
+                            });
+                        let access_token = response?;
+                        Ok(IdpServerResponse {
+                            access_token,
+                            expires: None,
                             refresh_token: None,
                         })
                     }
@@ -467,25 +507,31 @@ pub(crate) async fn reauthenticate_stream(
     authenticate_stream(conn, credential, server_api, None).await
 }
 
-#[cfg(feature = "azure-oidc")]
-async fn setup_automatic_providers(credential: &Credential, state: &mut Option<CallbackInner>) {
+#[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
+async fn setup_automatic_providers(credential: &Credential, callback: &mut Option<CallbackInner>) {
     // If there is already a function, there is no need to set up an automatic provider
     // this could happen in the case of a reauthentication, or if the user has already set up
     // a function. A situation where the user has set up a function and an automatic provider
     // would already have caused an InvalidArgument error in `validate_credential`.
-    if state.is_some() {
+    if callback.is_some() {
         return;
     }
     if let Some(ref p) = credential.mechanism_properties {
         let environment = p.get_str(ENVIRONMENT_PROP_STR).unwrap_or("");
-        let client_id = credential.username.as_deref();
         let resource = p.get_str(TOKEN_RESOURCE_PROP_STR).unwrap_or("");
         match environment {
             AZURE_ENVIRONMENT_VALUE_STR => {
-                *state = Some(Callback::azure_callback(client_id, resource))
+                #[cfg(feature = "azure-oidc")]
+                {
+                    let client_id = credential.username.as_deref();
+                    *callback = Some(Callback::azure_callback(client_id, resource))
+                }
             }
             GCP_ENVIRONMENT_VALUE_STR => {
-                // TODO RUST-1627: Implement GCP automatic provider
+                #[cfg(feature = "gcp-oidc")]
+                {
+                    *callback = Some(Callback::gcp_callback(resource))
+                }
             }
             _ => {}
         }
@@ -503,7 +549,7 @@ pub(crate) async fn authenticate_stream(
     // always matches that in the Credential Cache.
     let mut guard = credential.oidc_callback.inner.lock().await;
 
-    #[cfg(feature = "azure-oidc")]
+    #[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
     setup_automatic_providers(credential, &mut guard).await;
     let CallbackInner {
         cache,

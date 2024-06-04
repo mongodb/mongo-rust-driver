@@ -3,7 +3,8 @@ mod acknowledged_message;
     feature = "aws-auth",
     feature = "azure-kms",
     feature = "gcp-kms",
-    feature = "azure-oidc"
+    feature = "azure-oidc",
+    feature = "gcp-oidc"
 ))]
 mod http;
 mod join_handle;
@@ -36,7 +37,8 @@ use crate::{error::Result, options::ServerAddress};
     feature = "aws-auth",
     feature = "azure-kms",
     feature = "gcp-kms",
-    feature = "azure-oidc"
+    feature = "azure-oidc",
+    feature = "gcp-oidc"
 ))]
 pub(crate) use http::HttpClient;
 #[cfg(feature = "openssl-tls")]

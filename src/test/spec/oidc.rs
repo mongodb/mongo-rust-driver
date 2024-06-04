@@ -1231,3 +1231,48 @@ mod azure {
         Ok(())
     }
 }
+
+mod gcp {
+    use crate::client::{options::ClientOptions, Client};
+    use bson::{doc, Document};
+
+    #[tokio::test]
+    async fn machine_5_4_gcp_with_no_username() -> anyhow::Result<()> {
+        get_env_or_skip!("OIDC");
+
+        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        opts.credential.as_mut().unwrap().source = None;
+        let client = Client::with_options(opts)?;
+        client
+            .database("test")
+            .collection::<Document>("test")
+            .find_one(doc! {})
+            .await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn machine_5_5_token_resource_must_be_set_for_gcp() -> anyhow::Result<()> {
+        get_env_or_skip!("OIDC");
+        use crate::client::auth::{ENVIRONMENT_PROP_STR, GCP_ENVIRONMENT_VALUE_STR};
+
+        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        opts.credential.as_mut().unwrap().source = None;
+        opts.credential.as_mut().unwrap().mechanism_properties = Some(doc! {
+            ENVIRONMENT_PROP_STR: GCP_ENVIRONMENT_VALUE_STR,
+        });
+        let client = Client::with_options(opts)?;
+        let res = client
+            .database("test")
+            .collection::<Document>("test")
+            .find_one(doc! {})
+            .await;
+
+        assert!(res.is_err());
+        assert!(matches!(
+            *res.unwrap_err().kind,
+            crate::error::ErrorKind::InvalidArgument { .. },
+        ));
+        Ok(())
+    }
+}
