@@ -224,7 +224,8 @@ impl AuthMechanism {
                     _ => {
                         if has_token_resource {
                             return Err(Error::invalid_argument(format!(
-                                "`{}` must not be set for {} authentication unless using the `{}` or `{}` `{}`",
+                                "`{}` must not be set for {} authentication unless using the `{}` \
+                                 or `{}` `{}`",
                                 TOKEN_RESOURCE_PROP_STR,
                                 MONGODB_OIDC_STR,
                                 AZURE_ENVIRONMENT_VALUE_STR,
