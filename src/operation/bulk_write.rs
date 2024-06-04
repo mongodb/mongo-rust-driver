@@ -22,7 +22,13 @@ use crate::{
     SessionCursor,
 };
 
-use super::{ExecutionContext, Retryability, WriteResponseBody, OP_MSG_OVERHEAD_BYTES};
+use super::{
+    ExecutionContext,
+    Retryability,
+    WriteResponseBody,
+    OP_MSG_OVERHEAD_BYTES,
+    SERVER_8_0_0_WIRE_VERSION,
+};
 
 use server_responses::*;
 
@@ -174,6 +180,13 @@ where
     const NAME: &'static str = "bulkWrite";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
+        if description.max_wire_version.unwrap_or(0) < SERVER_8_0_0_WIRE_VERSION {
+            return Err(ErrorKind::IncompatibleServer {
+                message: "the bulk write feature is only supported on MongoDB 8.0+".to_string(),
+            }
+            .into());
+        }
+
         let max_message_size: usize =
             Checked::new(description.max_message_size_bytes).try_into()?;
         let max_operations: usize = Checked::new(description.max_write_batch_size).try_into()?;

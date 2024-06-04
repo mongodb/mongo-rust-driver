@@ -564,3 +564,21 @@ async fn encryption_error() {
         Some("bulkWrite does not currently support automatic encryption".to_string())
     );
 }
+
+#[tokio::test]
+async fn unsupported_server_client_error() {
+    let client = Client::test_builder().build().await;
+
+    if client.server_version_gte(8, 0) {
+        return;
+    }
+
+    let error = client
+        .bulk_write(vec![InsertOneModel::builder()
+            .namespace(Namespace::new("db", "coll"))
+            .document(doc! { "a": "b" })
+            .build()])
+        .await
+        .unwrap_err();
+    assert!(matches!(*error.kind, ErrorKind::IncompatibleServer { .. }));
+}
