@@ -1352,7 +1352,7 @@ tasks:
           export AZUREOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tar
           rustup default stable
           export RUSTFLAGS="-C target-feature=+crt-static"
-          cargo test --features azure-oidc --target x86_64-unknown-linux-gnu test::atlas_planned_maintenance_testing::get_exe_name -- --ignored
+          cargo test --features azure-oidc --target x86_64-unknown-linux-gnu get_exe_name -- --ignored
           export TEST_FILE=$(cat exe_name.txt)
           rm "$AZUREOIDC_DRIVERS_TAR_FILE" || true
           tar -cf $AZUREOIDC_DRIVERS_TAR_FILE $TEST_FILE
