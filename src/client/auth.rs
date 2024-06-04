@@ -203,14 +203,14 @@ impl AuthMechanism {
                         MONGODB_OIDC_STR, ENVIRONMENT_PROP_STR
                     )));
                 }
+                let has_token_resource = credential
+                    .mechanism_properties
+                    .as_ref()
+                    .unwrap_or(default_document)
+                    .contains_key(TOKEN_RESOURCE_PROP_STR);
                 match environment {
                     Ok(AZURE_ENVIRONMENT_VALUE_STR) | Ok(GCP_ENVIRONMENT_VALUE_STR) => {
-                        if !credential
-                            .mechanism_properties
-                            .as_ref()
-                            .unwrap_or(default_document)
-                            .contains_key(TOKEN_RESOURCE_PROP_STR)
-                        {
+                        if !has_token_resource {
                             return Err(Error::invalid_argument(format!(
                                 "`{}` must be set for {} authentication in the `{}` or `{}` `{}`",
                                 TOKEN_RESOURCE_PROP_STR,
@@ -221,7 +221,18 @@ impl AuthMechanism {
                             )));
                         }
                     }
-                    _ => (),
+                    _ => {
+                        if has_token_resource {
+                            return Err(Error::invalid_argument(format!(
+                                "`{}` must not be set for {} authentication unless using the `{}` or `{}` `{}`",
+                                TOKEN_RESOURCE_PROP_STR,
+                                MONGODB_OIDC_STR,
+                                AZURE_ENVIRONMENT_VALUE_STR,
+                                GCP_ENVIRONMENT_VALUE_STR,
+                                ENVIRONMENT_PROP_STR,
+                            )));
+                        }
+                    }
                 }
                 if credential
                     .source
