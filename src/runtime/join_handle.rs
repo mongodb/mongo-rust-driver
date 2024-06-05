@@ -14,7 +14,11 @@ impl<T> AsyncJoinHandle<T> {
         F: Future<Output = T> + Send + 'static,
         T: Send + 'static,
     {
+        #[cfg(not(feature = "sync"))]
         let handle = tokio::runtime::Handle::current();
+        #[cfg(feature = "sync")]
+        let handle = tokio::runtime::Handle::try_current()
+            .unwrap_or_else(|_| crate::sync::TOKIO_RUNTIME.handle().clone());
         AsyncJoinHandle(handle.spawn(fut))
     }
 }
