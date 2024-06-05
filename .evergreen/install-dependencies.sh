@@ -30,31 +30,13 @@ for arg; do
   elif [ $arg == "junit-dependencies" ]; then
     source ${CARGO_HOME}/env
 
-    # install npm/node
-    ./.evergreen/install-node.sh
-
     source ./.evergreen/env.sh
 
     # Install junit-compatible test runner
     cargo install cargo-nextest --locked
 
     # Install tool for merging different junit reports into a single one
-    set +o errexit
-    set -o pipefail
-
-    npm install -g junit-report-merger --cache $(mktemp -d) 2>&1 | tee npm-install-output
-    RESULT=$?
-    MATCH=$(grep -o '/\S*-debug.log' npm-install-output)
-    if [[ $MATCH != "" ]]; then
-      echo ===== BEGIN NPM LOG =====
-      cat $MATCH
-      echo ===== END NPM LOG =====
-    fi
-
-    set -o errexit
-    if [ $RESULT -ne 0 ]; then
-      exit $RESULT
-    fi
+    cargo install merge-junit
   elif [ $arg == "libmongocrypt" ]; then
     mkdir ${PROJECT_DIRECTORY}/libmongocrypt
     cd ${PROJECT_DIRECTORY}/libmongocrypt
