@@ -70,7 +70,7 @@ tracing-unstable = ["dep:tracing", "dep:log"]
 async-trait = "0.1.42"
 base64 = "0.13.0"
 bitflags = "1.1.0"
-bson = "2.10.0"
+bson = "2.11.0"
 chrono = { version = "0.4.7", default-features = false, features = ["clock", "std"] }
 derivative = "2.1.1"
 derive_more = "0.99.17"
