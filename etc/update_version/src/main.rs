@@ -86,6 +86,10 @@ fn main() {
             r#"name = "mongodb"\nversion = "(?<target>.*?)"\n"#,
         ),
         Location::new(
+            "Cargo.toml",
+            r#"mongodb-internal-macros = \{ path = "macros", version = "(?<target>.*?)" \}\n"#,
+        ),
+        Location::new(
             "macros/Cargo.toml",
             r#"name = "mongodb-internal-macros"\nversion = "(?<target>.*?)"\n"#,
         ),
@@ -99,10 +103,6 @@ fn main() {
             r#"html_root_url = "https://docs.rs/mongodb/(?<target>.*?)""#,
         ),
     ];
-    let quote_version_loc = Location::new(
-        "Cargo.toml",
-        r#"mongodb-internal-macros = (?<target>\{ path = .* \})\n"#,
-    );
     let bson_version_loc = Location::new("Cargo.toml", r#"bson = (?<target>\{ git = .*? \})\n"#);
     let mongocrypt_version_loc =
         Location::new("Cargo.toml", r#"mongocrypt = (?<target>\{ git = .*? \})\n"#);
@@ -113,7 +113,6 @@ fn main() {
     for loc in &version_locs {
         pending.apply(loc, &args.version);
     }
-    pending.apply(&quote_version_loc, &format!("{:?}", args.version));
     if let Some(bson) = args.bson {
         pending.apply(&bson_version_loc, &format!("{:?}", bson));
     }
