@@ -211,10 +211,6 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                                 )
                             });
 
-                        dbg!(expected_key);
-                        dbg!(expected_value);
-                        dbg!(actual_value);
-
                         if let Some(expected_number) = get_int(expected_value) {
                             let actual_number = get_int(actual_value).unwrap_or_else(|| {
                                 panic!(
