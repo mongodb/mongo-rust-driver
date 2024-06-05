@@ -189,7 +189,7 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                         })
                         .next()
                     {
-                        actual_options.insert("zlibCompressionLevel", zlib_compression_level);
+                        actual_options.insert("zlibcompressionlevel", zlib_compression_level);
                     }
                 }
 
@@ -210,6 +210,10 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                                     test_case.description, expected_key
                                 )
                             });
+
+                        dbg!(expected_key);
+                        dbg!(expected_value);
+                        dbg!(actual_value);
 
                         if let Some(expected_number) = get_int(expected_value) {
                             let actual_number = get_int(actual_value).unwrap_or_else(|| {

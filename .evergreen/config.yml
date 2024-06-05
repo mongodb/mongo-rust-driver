@@ -171,7 +171,7 @@ buildvariants:
 
   - name: compression
     display_name: "Compression"
-    patchable: false
+    #patchable: false
     run_on:
       - rhel87-small
     expansions:
