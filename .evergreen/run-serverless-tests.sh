@@ -21,6 +21,6 @@ cargo_test test::cursor cursor.xml
 cargo_test test::spec::collection_management coll.xml
 cargo_test test::spec::command_monitoring_unified monitoring.xml
 
-junit-report-merger results.xml crud.xml retryable_reads.xml retryable_writes.xml versioned_api.xml sessions.xml transactions.xml load_balancers.xml cursor.xml coll.xml monitoring.xml
+merge-junit -o results.xml crud.xml retryable_reads.xml retryable_writes.xml versioned_api.xml sessions.xml transactions.xml load_balancers.xml cursor.xml coll.xml monitoring.xml
 
 exit $CARGO_RESULT
