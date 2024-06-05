@@ -216,7 +216,7 @@ buildvariants:
 
   - name: aws-auth
     display_name: "AWS Authentication"
-    patchable: false
+    #patchable: false
     run_on:
       - ubuntu2004-small
     expansions:
@@ -226,7 +226,7 @@ buildvariants:
 
   - name: azure-kms
     display_name: "Azure KMS"
-    patchable: false
+    #patchable: false
     run_on:
       # The Azure CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
@@ -387,7 +387,7 @@ buildvariants:
 
   - name: aws-lambda
     display_name: "AWS Lambda"
-    patchable: false
+    #patchable: false
     run_on:
       - ubuntu2204-small
     tasks:

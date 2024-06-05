@@ -1,7 +1,10 @@
 use mongodb::{
     bson::doc,
-    Client, client_encryption::{ClientEncryption, MasterKey}, mongocrypt::ctx::KmsProvider, Namespace,
+    client_encryption::{ClientEncryption, MasterKey},
     error::Result,
+    mongocrypt::ctx::KmsProvider,
+    Client,
+    Namespace,
 };
 
 use std::env;
@@ -19,11 +22,10 @@ async fn main() -> Result<()> {
         .expect("KEY_VAULT_ENDPOINT environment variable should be set");
 
     c.create_data_key(MasterKey::Azure {
-        key_vault_endpoint: key_vault_endpoint,
-        key_name: key_name,
+        key_vault_endpoint,
+        key_name,
         key_version: None,
     })
-    .run()
     .await?;
 
     println!("Azure KMS integration test passed!");
