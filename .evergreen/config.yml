@@ -197,7 +197,6 @@ buildvariants:
 
   - name: sync-api
     display_name: "Sync API"
-    patchable: false
     run_on:
       - rhel87-small
     expansions:

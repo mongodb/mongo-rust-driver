@@ -189,7 +189,7 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                         })
                         .next()
                     {
-                        actual_options.insert("zlibCompressionLevel", zlib_compression_level);
+                        actual_options.insert("zlibcompressionlevel", zlib_compression_level);
                     }
                 }
 
