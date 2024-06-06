@@ -13,7 +13,7 @@ CRATE_VERSION=$(cargo metadata --format-version=1 --no-deps | jq --raw-output '.
 rm secrets-export.sh
 
 PAPERTRAIL_PRODUCT="rust-driver"
-if [[ "${DRY_RUN}" == "yes" ]]; then
+if [[ "${DRY_RUN:-}" == "yes" ]]; then
   PAPERTRAIL_PRODUCT="rust-driver-testing"
 fi
 
