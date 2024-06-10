@@ -239,11 +239,11 @@ impl MasterKey {
     /// Returns the `KmsProvider` associated with this key.
     pub fn provider(&self) -> KmsProvider {
         match self {
-            MasterKey::Aws { .. } => KmsProvider::Aws,
-            MasterKey::Azure { .. } => KmsProvider::Azure,
-            MasterKey::Gcp { .. } => KmsProvider::Gcp,
-            MasterKey::Kmip { .. } => KmsProvider::Kmip,
-            MasterKey::Local => KmsProvider::Local,
+            MasterKey::Aws { .. } => KmsProvider::Aws { name: None },
+            MasterKey::Azure { .. } => KmsProvider::Azure { name: None },
+            MasterKey::Gcp { .. } => KmsProvider::Gcp { name: None },
+            MasterKey::Kmip { .. } => KmsProvider::Kmip { name: None },
+            MasterKey::Local => KmsProvider::Local { name: None },
         }
     }
 }

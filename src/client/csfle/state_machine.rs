@@ -211,97 +211,108 @@ impl CryptExecutor {
                     #[allow(unused_mut)]
                     let mut kms_providers = rawdoc! {};
                     let credentials = self.kms_providers.credentials();
-                    if credentials
-                        .get(&KmsProvider::Aws)
-                        .map_or(false, Document::is_empty)
-                    {
-                        #[cfg(feature = "aws-auth")]
-                        {
-                            let aws_creds = crate::client::auth::aws::AwsCredential::get(
-                                &crate::client::auth::Credential::default(),
-                                &crate::runtime::HttpClient::default(),
-                            )
-                            .await?;
-                            let mut creds = rawdoc! {
-                                "accessKeyId": aws_creds.access_key(),
-                                "secretAccessKey": aws_creds.secret_key(),
-                            };
-                            if let Some(token) = aws_creds.session_token() {
-                                creds.append("sessionToken", token);
+                    for (provider, options) in credentials {
+                        if !options.is_empty() {
+                            continue;
+                        }
+
+                        match provider {
+                            KmsProvider::Aws { .. } => {
+                                #[cfg(feature = "aws-auth")]
+                                {
+                                    use crate::{
+                                        client::auth::{aws::AwsCredential, Credential},
+                                        runtime::HttpClient,
+                                    };
+
+                                    let aws_creds = AwsCredential::get(
+                                        &Credential::default(),
+                                        &HttpClient::default(),
+                                    )
+                                    .await?;
+                                    let mut creds = rawdoc! {
+                                        "accessKeyId": aws_creds.access_key(),
+                                        "secretAccessKey": aws_creds.secret_key(),
+                                    };
+                                    if let Some(token) = aws_creds.session_token() {
+                                        creds.append("sessionToken", token);
+                                    }
+                                    kms_providers.append(provider.name(), creds);
+                                }
+                                #[cfg(not(feature = "aws-auth"))]
+                                {
+                                    return Err(Error::invalid_argument(
+                                        "On-demand AWS KMS credentials require the `aws-auth` \
+                                         feature.",
+                                    ));
+                                }
                             }
-                            kms_providers.append("aws", creds);
-                        }
-                        #[cfg(not(feature = "aws-auth"))]
-                        {
-                            return Err(Error::invalid_argument(
-                                "On-demand AWS KMS credentials require the `aws-auth` feature.",
-                            ));
-                        }
-                    }
-                    if credentials
-                        .get(&KmsProvider::Azure)
-                        .map_or(false, Document::is_empty)
-                    {
-                        #[cfg(feature = "azure-kms")]
-                        {
-                            kms_providers.append("azure", self.azure.get_token().await?);
-                        }
-                        #[cfg(not(feature = "azure-kms"))]
-                        {
-                            return Err(Error::invalid_argument(
-                                "On-demand Azure KMS credentials require the `azure-kms` feature.",
-                            ));
-                        }
-                    }
-                    if credentials
-                        .get(&KmsProvider::Gcp)
-                        .map_or(false, Document::is_empty)
-                    {
-                        #[cfg(feature = "gcp-kms")]
-                        {
-                            use crate::runtime::HttpClient;
-                            use serde::Deserialize;
-
-                            #[derive(Deserialize)]
-                            struct ResponseBody {
-                                access_token: String,
+                            KmsProvider::Azure { .. } => {
+                                #[cfg(feature = "azure-kms")]
+                                {
+                                    kms_providers
+                                        .append(provider.name(), self.azure.get_token().await?);
+                                }
+                                #[cfg(not(feature = "azure-kms"))]
+                                {
+                                    return Err(Error::invalid_argument(
+                                        "On-demand Azure KMS credentials require the `azure-kms` \
+                                         feature.",
+                                    ));
+                                }
                             }
+                            KmsProvider::Gcp { .. } => {
+                                #[cfg(feature = "gcp-kms")]
+                                {
+                                    use crate::runtime::HttpClient;
+                                    use serde::Deserialize;
 
-                            fn kms_error(error: String) -> Error {
-                                let message = format!(
-                                    "An error occurred when obtaining GCP credentials: {}",
-                                    error
-                                );
-                                let error = mongocrypt::error::Error {
-                                    kind: mongocrypt::error::ErrorKind::Kms,
-                                    message: Some(message),
-                                    code: None,
-                                };
-                                error.into()
+                                    #[derive(Deserialize)]
+                                    struct ResponseBody {
+                                        access_token: String,
+                                    }
+
+                                    fn kms_error(error: String) -> Error {
+                                        let message = format!(
+                                            "An error occurred when obtaining GCP credentials: {}",
+                                            error
+                                        );
+                                        let error = mongocrypt::error::Error {
+                                            kind: mongocrypt::error::ErrorKind::Kms,
+                                            message: Some(message),
+                                            code: None,
+                                        };
+                                        error.into()
+                                    }
+
+                                    let http_client = HttpClient::default();
+                                    let host = std::env::var("GCE_METADATA_HOST")
+                                        .unwrap_or_else(|_| "metadata.google.internal".into());
+                                    let uri = format!(
+                                        "http://{}/computeMetadata/v1/instance/service-accounts/default/token",
+                                        host
+                                    );
+
+                                    let response: ResponseBody = http_client
+                                        .get(&uri)
+                                        .headers(&[("Metadata-Flavor", "Google")])
+                                        .send()
+                                        .await
+                                        .map_err(|e| kms_error(e.to_string()))?;
+                                    kms_providers.append(
+                                        "gcp",
+                                        rawdoc! { "accessToken": response.access_token },
+                                    );
+                                }
+                                #[cfg(not(feature = "gcp-kms"))]
+                                {
+                                    return Err(Error::invalid_argument(
+                                        "On-demand GCP KMS credentials require the `gcp-kms` \
+                                         feature.",
+                                    ));
+                                }
                             }
-
-                            let http_client = HttpClient::default();
-                            let host = std::env::var("GCE_METADATA_HOST")
-                                .unwrap_or_else(|_| "metadata.google.internal".into());
-                            let uri = format!(
-                                "http://{}/computeMetadata/v1/instance/service-accounts/default/token",
-                                host
-                            );
-
-                            let response: ResponseBody = http_client
-                                .get(&uri)
-                                .headers(&[("Metadata-Flavor", "Google")])
-                                .send()
-                                .await
-                                .map_err(|e| kms_error(e.to_string()))?;
-                            kms_providers
-                                .append("gcp", rawdoc! { "accessToken": response.access_token });
-                        }
-                        #[cfg(not(feature = "gcp-kms"))]
-                        {
-                            return Err(Error::invalid_argument(
-                                "On-demand GCP KMS credentials require the `gcp-kms` feature.",
-                            ));
+                            _ => {}
                         }
                     }
                     ctx.provide_kms_providers(&kms_providers)?;

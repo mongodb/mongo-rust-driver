@@ -131,6 +131,74 @@ impl KmsProviders {
     }
 
     #[cfg(test)]
+    pub(crate) fn set_test_options(&mut self) {
+        use crate::{bson::doc, test::KMS_PROVIDERS_MAP};
+
+        for (provider, credentials) in self.credentials.iter_mut().filter(|(p, _)| {
+            matches!(
+                p,
+                KmsProvider::Aws { .. }
+                    | KmsProvider::Azure { .. }
+                    | KmsProvider::Gcp { .. }
+                    | KmsProvider::Kmip { .. }
+            )
+        }) {
+            let (test_credentials, tls) = KMS_PROVIDERS_MAP.get(provider).unwrap().clone();
+            *credentials = test_credentials;
+
+            if let Some(tls) = tls {
+                self.tls_options
+                    .get_or_insert_with(KmsProvidersTlsOptions::new)
+                    .insert(provider.clone(), tls);
+            }
+        }
+
+        let aws_temp_provider = KmsProvider::Other("awsTemporary".to_string());
+        if self.credentials.contains_key(&aws_temp_provider) {
+            let aws_credentials = doc! {
+                "accessKeyId": std::env::var("CSFLE_AWS_TEMP_ACCESS_KEY_ID").unwrap(),
+                "secretAccessKey": std::env::var("CSFLE_AWS_TEMP_SECRET_ACCESS_KEY").unwrap(),
+                "sessionToken": std::env::var("CSFLE_AWS_TEMP_SESSION_TOKEN").unwrap()
+            };
+            self.credentials.insert(KmsProvider::aws(), aws_credentials);
+
+            let aws_tls = KMS_PROVIDERS_MAP
+                .get(&KmsProvider::aws())
+                .and_then(|(_, t)| t.as_ref());
+            if let Some(tls) = aws_tls {
+                self.tls_options
+                    .get_or_insert_with(KmsProvidersTlsOptions::new)
+                    .insert(KmsProvider::aws(), tls.clone());
+            }
+
+            self.clear(&aws_temp_provider);
+        }
+
+        let aws_temp_no_session_token_provider =
+            KmsProvider::Other("awsTemporaryNoSessionToken".to_string());
+        if self
+            .credentials
+            .contains_key(&aws_temp_no_session_token_provider)
+        {
+            let aws_credentials = doc! {
+                "accessKeyId": std::env::var("CSFLE_AWS_TEMP_ACCESS_KEY_ID").unwrap(),
+                "secretAccessKey": std::env::var("CSFLE_AWS_TEMP_SECRET_ACCESS_KEY").unwrap(),
+            };
+            self.credentials.insert(KmsProvider::aws(), aws_credentials);
+
+            let aws_tls = KMS_PROVIDERS_MAP
+                .get(&KmsProvider::aws())
+                .and_then(|(_, t)| t.as_ref());
+            if let Some(tls) = aws_tls {
+                self.tls_options
+                    .get_or_insert_with(KmsProvidersTlsOptions::new)
+                    .insert(KmsProvider::aws(), tls.clone());
+            }
+            self.clear(&aws_temp_no_session_token_provider);
+        }
+    }
+
+    #[cfg(test)]
     pub(crate) fn set(&mut self, provider: KmsProvider, creds: Document, tls: Option<TlsOptions>) {
         self.credentials.insert(provider.clone(), creds);
         if let Some(tls) = tls {

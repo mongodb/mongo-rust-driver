@@ -89,7 +89,7 @@ static KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
     }
     vec![
         (
-            KmsProvider::Aws,
+            KmsProvider::aws(),
             doc! {
                 "accessKeyId": env("FLE_AWS_KEY"),
                 "secretAccessKey": env("FLE_AWS_SECRET"),
@@ -97,7 +97,7 @@ static KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
             None,
         ),
         (
-            KmsProvider::Azure,
+            KmsProvider::azure(),
             doc! {
                 "tenantId": env("FLE_AZURE_TENANTID"),
                 "clientId": env("FLE_AZURE_CLIENTID"),
@@ -106,7 +106,7 @@ static KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
             None,
         ),
         (
-            KmsProvider::Gcp,
+            KmsProvider::gcp(),
             doc! {
                 "email": env("FLE_GCP_EMAIL"),
                 "privateKey": env("FLE_GCP_PRIVATEKEY"),
@@ -114,7 +114,7 @@ static KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
             None,
         ),
         (
-            KmsProvider::Local,
+            KmsProvider::local(),
             doc! {
                 "key": bson::Binary {
                     subtype: bson::spec::BinarySubtype::Generic,
@@ -124,7 +124,7 @@ static KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
             None,
         ),
         (
-            KmsProvider::Kmip,
+            KmsProvider::kmip(),
             doc! {
                 "endpoint": "localhost:5698",
             },
@@ -143,7 +143,7 @@ static KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
 static LOCAL_KMS: Lazy<KmsProviderList> = Lazy::new(|| {
     KMS_PROVIDERS
         .iter()
-        .filter(|(p, ..)| p == &KmsProvider::Local)
+        .filter(|(p, ..)| matches!(p, KmsProvider::Local { .. }))
         .cloned()
         .collect()
 });
@@ -279,7 +279,7 @@ async fn data_key_double_encryption() -> Result<()> {
     let mut events = client.events.subscribe();
     let provider_keys = [
         (
-            KmsProvider::Aws,
+            KmsProvider::aws(),
             MasterKey::Aws {
                 region: "us-east-1".to_string(),
                 key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0"
@@ -288,7 +288,7 @@ async fn data_key_double_encryption() -> Result<()> {
             },
         ),
         (
-            KmsProvider::Azure,
+            KmsProvider::azure(),
             MasterKey::Azure {
                 key_vault_endpoint: "key-vault-csfle.vault.azure.net".to_string(),
                 key_name: "key-name-csfle".to_string(),
@@ -296,7 +296,7 @@ async fn data_key_double_encryption() -> Result<()> {
             },
         ),
         (
-            KmsProvider::Gcp,
+            KmsProvider::gcp(),
             MasterKey::Gcp {
                 project_id: "devprod-drivers".to_string(),
                 location: "global".to_string(),
@@ -306,9 +306,9 @@ async fn data_key_double_encryption() -> Result<()> {
                 endpoint: None,
             },
         ),
-        (KmsProvider::Local, MasterKey::Local),
+        (KmsProvider::local(), MasterKey::Local),
         (
-            KmsProvider::Kmip,
+            KmsProvider::kmip(),
             MasterKey::Kmip {
                 key_id: None,
                 delegated: None,
@@ -814,11 +814,11 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
         let kms = KmsProvider::from_name(subdoc.get_str("kms")?);
         let key = match subdoc.get_str("identifier")? {
             "id" => EncryptKey::Id(base64_uuid(match kms {
-                KmsProvider::Local => "LOCALAAAAAAAAAAAAAAAAA==",
-                KmsProvider::Aws => "AWSAAAAAAAAAAAAAAAAAAA==",
-                KmsProvider::Azure => "AZUREAAAAAAAAAAAAAAAAA==",
-                KmsProvider::Gcp => "GCPAAAAAAAAAAAAAAAAAAA==",
-                KmsProvider::Kmip => "KMIPAAAAAAAAAAAAAAAAAA==",
+                KmsProvider::Local { .. } => "LOCALAAAAAAAAAAAAAAAAA==",
+                KmsProvider::Aws { .. } => "AWSAAAAAAAAAAAAAAAAAAA==",
+                KmsProvider::Azure { .. } => "AZUREAAAAAAAAAAAAAAAAA==",
+                KmsProvider::Gcp { .. } => "GCPAAAAAAAAAAAAAAAAAAA==",
+                KmsProvider::Kmip { .. } => "KMIPAAAAAAAAAAAAAAAAAA==",
                 _ => return Err(failure!("Invalid kms provider {:?}", kms)),
             })?),
             "altname" => EncryptKey::AltName(kms.name().to_string()),
@@ -914,7 +914,7 @@ async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
     let update_provider =
         |(provider, mut conf, tls): (KmsProvider, Document, Option<TlsOptions>)| {
             match provider {
-                KmsProvider::Azure => {
+                KmsProvider::Azure { .. } => {
                     conf.insert(
                         "identityPlatformEndpoint",
                         if valid {
@@ -924,7 +924,7 @@ async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
                         },
                     );
                 }
-                KmsProvider::Gcp => {
+                KmsProvider::Gcp { .. } => {
                     conf.insert(
                         "endpoint",
                         if valid {
@@ -934,7 +934,7 @@ async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
                         },
                     );
                 }
-                KmsProvider::Kmip => {
+                KmsProvider::Kmip { .. } => {
                     conf.insert(
                         "endpoint",
                         if valid {
@@ -1703,13 +1703,16 @@ async fn kms_tls_options() -> Result<()> {
         mut providers: HashMap<KmsProvider, (Document, Option<TlsOptions>)>,
         tls_opts: TlsOptions,
     ) -> KmsProviderList {
-        for provider in [
-            KmsProvider::Aws,
-            KmsProvider::Azure,
-            KmsProvider::Gcp,
-            KmsProvider::Kmip,
-        ] {
-            providers.get_mut(&provider).unwrap().1 = Some(tls_opts.clone());
+        for (provider, (_, tls_options)) in providers.iter_mut() {
+            if matches!(
+                provider,
+                KmsProvider::Aws { .. }
+                    | KmsProvider::Azure { .. }
+                    | KmsProvider::Gcp { .. }
+                    | KmsProvider::Kmip { .. }
+            ) {
+                *tls_options = Some(tls_opts.clone());
+            }
         }
         providers.into_iter().map(|(p, (o, t))| (p, o, t)).collect()
     }
@@ -1717,12 +1720,12 @@ async fn kms_tls_options() -> Result<()> {
     // Setup
     let mut base_providers = KMS_PROVIDERS_MAP.clone();
     base_providers
-        .get_mut(&KmsProvider::Azure)
+        .get_mut(&KmsProvider::azure())
         .unwrap()
         .0
         .insert("identityPlatformEndpoint", KMS_CORRECT);
     base_providers
-        .get_mut(&KmsProvider::Gcp)
+        .get_mut(&KmsProvider::gcp())
         .unwrap()
         .0
         .insert("endpoint", KMS_CORRECT);
@@ -1755,17 +1758,17 @@ async fn kms_tls_options() -> Result<()> {
     let client_encryption_expired = {
         let mut providers = base_providers.clone();
         providers
-            .get_mut(&KmsProvider::Azure)
+            .get_mut(&KmsProvider::azure())
             .unwrap()
             .0
             .insert("identityPlatformEndpoint", KMS_EXPIRED);
         providers
-            .get_mut(&KmsProvider::Gcp)
+            .get_mut(&KmsProvider::gcp())
             .unwrap()
             .0
             .insert("endpoint", KMS_EXPIRED);
         providers
-            .get_mut(&KmsProvider::Kmip)
+            .get_mut(&KmsProvider::kmip())
             .unwrap()
             .0
             .insert("endpoint", KMS_EXPIRED);
@@ -1783,17 +1786,17 @@ async fn kms_tls_options() -> Result<()> {
     let client_encryption_invalid_hostname = {
         let mut providers = base_providers.clone();
         providers
-            .get_mut(&KmsProvider::Azure)
+            .get_mut(&KmsProvider::azure())
             .unwrap()
             .0
             .insert("identityPlatformEndpoint", KMS_WRONG_HOST);
         providers
-            .get_mut(&KmsProvider::Gcp)
+            .get_mut(&KmsProvider::gcp())
             .unwrap()
             .0
             .insert("endpoint", KMS_WRONG_HOST);
         providers
-            .get_mut(&KmsProvider::Kmip)
+            .get_mut(&KmsProvider::kmip())
             .unwrap()
             .0
             .insert("endpoint", KMS_WRONG_HOST);
@@ -2623,7 +2626,7 @@ async fn on_demand_aws_failure() -> Result<()> {
     let ce = ClientEncryption::new(
         Client::test_builder().build().await.into_client(),
         KV_NAMESPACE.clone(),
-        [(KmsProvider::Aws, doc! {}, None)],
+        [(KmsProvider::aws(), doc! {}, None)],
     )?;
     let result = ce
         .create_data_key(MasterKey::Aws {
@@ -2649,7 +2652,7 @@ async fn on_demand_aws_success() -> Result<()> {
     let ce = ClientEncryption::new(
         Client::test_builder().build().await.into_client(),
         KV_NAMESPACE.clone(),
-        [(KmsProvider::Aws, doc! {}, None)],
+        [(KmsProvider::aws(), doc! {}, None)],
     )?;
     ce.create_data_key(MasterKey::Aws {
         region: "us-east-1".to_string(),
@@ -2672,7 +2675,7 @@ async fn on_demand_gcp_credentials() -> Result<()> {
     let client_encryption = ClientEncryption::new(
         util_client,
         KV_NAMESPACE.clone(),
-        [(KmsProvider::Gcp, doc! {}, None)],
+        [(KmsProvider::gcp(), doc! {}, None)],
     )?;
 
     let result = client_encryption
@@ -2784,7 +2787,7 @@ async fn azure_imds_integration_failure() -> Result<()> {
     let c = ClientEncryption::new(
         Client::test_builder().build().await.into_client(),
         KV_NAMESPACE.clone(),
-        [(KmsProvider::Azure, doc! {}, None)],
+        [(KmsProvider::azure(), doc! {}, None)],
     )?;
 
     let result = c
@@ -2889,7 +2892,7 @@ async fn auto_encryption_keys(master_key: MasterKey) -> Result<()> {
         KV_NAMESPACE.clone(),
         KMS_PROVIDERS
             .iter()
-            .filter(|(p, ..)| p == &KmsProvider::Local || p == &KmsProvider::Aws)
+            .filter(|(p, ..)| matches!(p, KmsProvider::Local { .. } | KmsProvider::Aws { .. }))
             .cloned()
             .collect::<Vec<_>>(),
     )?;

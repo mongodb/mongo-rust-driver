@@ -37,20 +37,12 @@ pub(crate) fn set_auto_enc(builder: TestClientBuilder, test: &Test) -> TestClien
     } else {
         return builder;
     };
+
     let kms_providers = &mut enc_opts.kms_providers;
-    for prov in [
-        KmsProvider::Aws,
-        KmsProvider::Azure,
-        KmsProvider::Gcp,
-        KmsProvider::Kmip,
-    ] {
-        if kms_providers.credentials().contains_key(&prov) {
-            let opts = KMS_PROVIDERS_MAP.get(&prov).unwrap().clone();
-            kms_providers.set(prov, opts.0, opts.1);
-        }
-    }
+    kms_providers.set_test_options();
+
     let aws_tls = KMS_PROVIDERS_MAP
-        .get(&KmsProvider::Aws)
+        .get(&KmsProvider::aws())
         .and_then(|(_, t)| t.as_ref());
     let aws_id = std::env::var("CSFLE_AWS_TEMP_ACCESS_KEY_ID").ok();
     let aws_key = std::env::var("CSFLE_AWS_TEMP_SECRET_ACCESS_KEY").ok();
@@ -60,7 +52,7 @@ pub(crate) fn set_auto_enc(builder: TestClientBuilder, test: &Test) -> TestClien
         .contains_key(&KmsProvider::Other("awsTemporary".to_string()))
     {
         kms_providers.set(
-            KmsProvider::Aws,
+            KmsProvider::aws(),
             doc! {
                 "accessKeyId": aws_id.unwrap(),
                 "secretAccessKey": aws_key.unwrap(),
@@ -76,7 +68,7 @@ pub(crate) fn set_auto_enc(builder: TestClientBuilder, test: &Test) -> TestClien
         ))
     {
         kms_providers.set(
-            KmsProvider::Aws,
+            KmsProvider::aws(),
             doc! {
                 "accessKeyId": aws_id.unwrap(),
                 "secretAccessKey": aws_key.unwrap(),
