@@ -159,7 +159,40 @@ functions:
           - .evergreen/release-sign.sh
 
   "save signature":
-    command: s3.push
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: bash
+        include_expansions_in_env:
+          - S3_UPLOAD_AWS_KEY
+        args:
+          - .evergreen/var-checksum.sh
+          - S3_UPLOAD_AWS_KEY
+
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: bash
+        include_expansions_in_env:
+          - S3_UPLOAD_AWS_SECRET
+        args:
+          - .evergreen/var-checksum.sh
+          - S3_UPLOAD_AWS_SECRET
+
+    - command: s3.put
+      params:
+        aws_key: ${S3_UPLOAD_AWS_KEY}
+        aws_secret: ${S3_UPLOAD_AWS_SECRET}
+        local_file: src/mongodb-${CRATE_VERSION}.sig
+        remote_file: rust-driver/${TEST_PREFIX}mongodb-${CRATE_VERSION}.sig
+        #local_files_include_filter:
+        #  - mongodb-${CRATE_VERSION}.sig
+        #  - mongodb-internal-macros-${CRATE_VERSION}.sig
+        #remote_file: rust-driver/${TEST_PREFIX}
+        bucket: cdn-origin-rust-driver
+        permissions: public-read
+        content_type: text/plain
+        display_name: signature-
 
 tasks:
   - name: "publish-release"
