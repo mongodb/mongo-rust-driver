@@ -2977,19 +2977,20 @@ async fn range_explicit_encryption() -> Result<()> {
         return Ok(());
     }
     let client = TestClient::new().await;
-    if client.server_version_lt(6, 2) || client.server_version_gte(8, 0) || client.is_standalone() {
+    if client.server_version_lt(8, 0) || client.is_standalone() {
         log_uncaptured("Skipping range_explicit_encryption due to unsupported topology");
         return Ok(());
     }
 
     range_explicit_encryption_test(
         "DecimalNoPrecision",
-        RangeOptions::builder().sparsity(1).build(),
+        RangeOptions::builder().sparsity(1).trim_factor(1).build(),
     )
     .await?;
     range_explicit_encryption_test(
         "DecimalPrecision",
         RangeOptions::builder()
+            .trim_factor(1)
             .sparsity(1)
             .min(Bson::Decimal128("0".parse()?))
             .max(Bson::Decimal128("200".parse()?))
@@ -2999,12 +3000,13 @@ async fn range_explicit_encryption() -> Result<()> {
     .await?;
     range_explicit_encryption_test(
         "DoubleNoPrecision",
-        RangeOptions::builder().sparsity(1).build(),
+        RangeOptions::builder().trim_factor(1).sparsity(1).build(),
     )
     .await?;
     range_explicit_encryption_test(
         "DoublePrecision",
         RangeOptions::builder()
+            .trim_factor(1)
             .sparsity(1)
             .min(Bson::Double(0.0))
             .max(Bson::Double(200.0))
@@ -3015,6 +3017,7 @@ async fn range_explicit_encryption() -> Result<()> {
     range_explicit_encryption_test(
         "Date",
         RangeOptions::builder()
+            .trim_factor(1)
             .sparsity(1)
             .min(Bson::DateTime(DateTime::from_millis(0)))
             .max(Bson::DateTime(DateTime::from_millis(200)))
@@ -3024,6 +3027,7 @@ async fn range_explicit_encryption() -> Result<()> {
     range_explicit_encryption_test(
         "Int",
         RangeOptions::builder()
+            .trim_factor(1)
             .sparsity(1)
             .min(Bson::Int32(0))
             .max(Bson::Int32(200))
@@ -3033,6 +3037,7 @@ async fn range_explicit_encryption() -> Result<()> {
     range_explicit_encryption_test(
         "Long",
         RangeOptions::builder()
+            .trim_factor(1)
             .sparsity(1)
             .min(Bson::Int64(0))
             .max(Bson::Int64(200))
@@ -3114,12 +3119,7 @@ async fn range_explicit_encryption_test(
 
     for (id, num) in bson_numbers.keys().enumerate() {
         let encrypted_value = client_encryption
-            .encrypt(
-                bson_numbers[num].clone(),
-                key1_id.clone(),
-                #[allow(deprecated)]
-                Algorithm::RangePreview,
-            )
+            .encrypt(bson_numbers[num].clone(), key1_id.clone(), Algorithm::Range)
             .contention_factor(0)
             .range_options(range_options.clone())
             .await?;
@@ -3134,12 +3134,7 @@ async fn range_explicit_encryption_test(
 
     // Case 1: Decrypt a payload
     let insert_payload = client_encryption
-        .encrypt(
-            bson_numbers[&6].clone(),
-            key1_id.clone(),
-            #[allow(deprecated)]
-            Algorithm::RangePreview,
-        )
+        .encrypt(bson_numbers[&6].clone(), key1_id.clone(), Algorithm::Range)
         .contention_factor(0)
         .range_options(range_options.clone())
         .await?;
@@ -3250,9 +3245,8 @@ async fn range_explicit_encryption_test(
     // Case 6: Encrypting a document greater than the maximum errors
     if bson_type != "DoubleNoPrecision" && bson_type != "DecimalNoPrecision" {
         let num = get_raw_bson_from_num(bson_type, 201);
-        #[allow(deprecated)]
         let error = client_encryption
-            .encrypt(num, key1_id.clone(), Algorithm::RangePreview)
+            .encrypt(num, key1_id.clone(), Algorithm::Range)
             .contention_factor(0)
             .range_options(range_options.clone())
             .await
@@ -3267,9 +3261,8 @@ async fn range_explicit_encryption_test(
         } else {
             rawdoc! { &key: { "$numberInt": "6" } }
         };
-        #[allow(deprecated)]
         let error = client_encryption
-            .encrypt(value, key1_id.clone(), Algorithm::RangePreview)
+            .encrypt(value, key1_id.clone(), Algorithm::Range)
             .contention_factor(0)
             .range_options(range_options.clone())
             .await
@@ -3286,12 +3279,7 @@ async fn range_explicit_encryption_test(
             .precision(2)
             .build();
         let error = client_encryption
-            .encrypt(
-                bson_numbers[&6].clone(),
-                key1_id.clone(),
-                #[allow(deprecated)]
-                Algorithm::RangePreview,
-            )
+            .encrypt(bson_numbers[&6].clone(), key1_id.clone(), Algorithm::Range)
             .contention_factor(0)
             .range_options(range_options)
             .await
