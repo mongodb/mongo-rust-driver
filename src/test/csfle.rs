@@ -218,11 +218,7 @@ async fn custom_key_material() -> Result<()> {
     datakeys.insert_one(key_doc).await?;
 
     let encrypted = enc
-        .encrypt(
-            "test",
-            EncryptKey::Id(new_key_id),
-            Algorithm::AeadAes256CbcHmacSha512Deterministic,
-        )
+        .encrypt("test", EncryptKey::Id(new_key_id), Algorithm::Deterministic)
         .await?;
     let expected = base64::decode(
         "AQAAAAAAAAAAAAAAAAAAAAACz0ZOLuuhEYi807ZXTdhbqhLaS2/t9wLifJnnNYwiw79d75QYIZ6M/\
@@ -370,7 +366,7 @@ async fn data_key_double_encryption() -> Result<()> {
             .encrypt(
                 format!("hello {}", provider.name()),
                 EncryptKey::Id(datakey_id),
-                Algorithm::AeadAes256CbcHmacSha512Deterministic,
+                Algorithm::Deterministic,
             )
             .await?;
         assert_eq!(encrypted.subtype, BinarySubtype::Encrypted);
@@ -390,7 +386,7 @@ async fn data_key_double_encryption() -> Result<()> {
             .encrypt(
                 format!("hello {}", provider.name()),
                 EncryptKey::AltName(format!("{}_altname", provider.name())),
-                Algorithm::AeadAes256CbcHmacSha512Deterministic,
+                Algorithm::Deterministic,
             )
             .await?;
         assert_eq!(other_encrypted.subtype, BinarySubtype::Encrypted);
@@ -491,7 +487,7 @@ async fn external_key_vault() -> Result<()> {
             .encrypt(
                 "test",
                 EncryptKey::Id(base64_uuid("LOCALAAAAAAAAAAAAAAAAA==")?),
-                Algorithm::AeadAes256CbcHmacSha512Deterministic,
+                Algorithm::Deterministic,
             )
             .await;
         if with_external_key_vault {
@@ -811,8 +807,8 @@ async fn run_corpus_test(local_schema: bool) -> Result<()> {
             return Err(failure!("Invalid method {:?}", method));
         }
         let algo = match subdoc.get_str("algo")? {
-            "rand" => Algorithm::AeadAes256CbcHmacSha512Random,
-            "det" => Algorithm::AeadAes256CbcHmacSha512Deterministic,
+            "rand" => Algorithm::Random,
+            "det" => Algorithm::Deterministic,
             s => return Err(failure!("Invalid algorithm {:?}", s)),
         };
         let kms = KmsProvider::from_name(subdoc.get_str("kms")?);
@@ -973,7 +969,7 @@ async fn validate_roundtrip(
         .encrypt(
             value.clone(),
             EncryptKey::Id(key_id),
-            Algorithm::AeadAes256CbcHmacSha512Deterministic,
+            Algorithm::Deterministic,
         )
         .await?;
     let decrypted = client_encryption.decrypt(encrypted.as_raw_binary()).await?;
@@ -1543,7 +1539,7 @@ impl DeadlockTestCase {
             .encrypt(
                 RawBson::String("string0".to_string()),
                 EncryptKey::AltName("local".to_string()),
-                Algorithm::AeadAes256CbcHmacSha512Deterministic,
+                Algorithm::Deterministic,
             )
             .await?;
 
@@ -2551,11 +2547,7 @@ impl DecryptionEventsTestdata {
         )?;
         let key_id = client_encryption.create_data_key(MasterKey::Local).await?;
         let ciphertext = client_encryption
-            .encrypt(
-                "hello",
-                EncryptKey::Id(key_id),
-                Algorithm::AeadAes256CbcHmacSha512Deterministic,
-            )
+            .encrypt("hello", EncryptKey::Id(key_id), Algorithm::Deterministic)
             .await?;
         let mut malformed_ciphertext = ciphertext.clone();
         let last = malformed_ciphertext.bytes.last_mut().unwrap();
@@ -3125,6 +3117,7 @@ async fn range_explicit_encryption_test(
             .encrypt(
                 bson_numbers[num].clone(),
                 key1_id.clone(),
+                #[allow(deprecated)]
                 Algorithm::RangePreview,
             )
             .contention_factor(0)
@@ -3144,6 +3137,7 @@ async fn range_explicit_encryption_test(
         .encrypt(
             bson_numbers[&6].clone(),
             key1_id.clone(),
+            #[allow(deprecated)]
             Algorithm::RangePreview,
         )
         .contention_factor(0)
@@ -3256,6 +3250,7 @@ async fn range_explicit_encryption_test(
     // Case 6: Encrypting a document greater than the maximum errors
     if bson_type != "DoubleNoPrecision" && bson_type != "DecimalNoPrecision" {
         let num = get_raw_bson_from_num(bson_type, 201);
+        #[allow(deprecated)]
         let error = client_encryption
             .encrypt(num, key1_id.clone(), Algorithm::RangePreview)
             .contention_factor(0)
@@ -3272,6 +3267,7 @@ async fn range_explicit_encryption_test(
         } else {
             rawdoc! { &key: { "$numberInt": "6" } }
         };
+        #[allow(deprecated)]
         let error = client_encryption
             .encrypt(value, key1_id.clone(), Algorithm::RangePreview)
             .contention_factor(0)
@@ -3293,6 +3289,7 @@ async fn range_explicit_encryption_test(
             .encrypt(
                 bson_numbers[&6].clone(),
                 key1_id.clone(),
+                #[allow(deprecated)]
                 Algorithm::RangePreview,
             )
             .contention_factor(0)

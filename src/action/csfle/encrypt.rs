@@ -51,6 +51,7 @@ impl ClientEncryption {
             client_enc: self,
             mode: Expression { value: expression },
             key: key.into(),
+            #[allow(deprecated)]
             algorithm: Algorithm::RangePreview,
             options: Some(EncryptOptions {
                 query_type: Some("rangePreview".into()),
