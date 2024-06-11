@@ -33,12 +33,16 @@ impl ClientEncryption {
         }
     }
 
-    /// NOTE: This method is experimental only. It is not intended for public use.
+    /// Encrypts a Match Expression or Aggregate Expression to query a range index.
+    /// `expression` is expected to be a BSON document of one of the following forms:
+    /// 1. A Match Expression of this form:
+    ///   {$and: [{<field>: {$gt: <value1>}}, {<field>: {$lt: <value2> }}]}
+    /// 2. An Aggregate Expression of this form:
+    ///   {$and: [{$gt: [<fieldpath>, <value1>]}, {$lt: [<fieldpath>, <value2>]}]
+    /// $gt may also be $gte. $lt may also be $lte.
     ///
-    /// Encrypts a match or aggregate expression with the given key.
-    ///
-    /// The expression will be encrypted using the [`Algorithm::RangePreview`] algorithm and the
-    /// "rangePreview" query type.
+    /// The expression will be encrypted using the [`Algorithm::Range`] algorithm and the
+    /// "range" query type.
     ///
     /// `await` will return a d[`Result<Document>`] containing the encrypted expression.
     #[deeplink]
@@ -51,10 +55,9 @@ impl ClientEncryption {
             client_enc: self,
             mode: Expression { value: expression },
             key: key.into(),
-            #[allow(deprecated)]
-            algorithm: Algorithm::RangePreview,
+            algorithm: Algorithm::Range,
             options: Some(EncryptOptions {
-                query_type: Some("rangePreview".into()),
+                query_type: Some("range".into()),
                 ..Default::default()
             }),
         }
@@ -109,19 +112,16 @@ pub struct EncryptOptions {
     pub contention_factor: Option<i64>,
     /// The query type.
     pub query_type: Option<String>,
-    /// NOTE: This method is experimental and not intended for public use.
-    ///
-    /// Set the range options. This method should only be called when the algorithm is
-    /// [`Algorithm::RangePreview`].
+    /// Set the range options. This should only be set when the algorithm is
+    /// [`Algorithm::Range`].
     pub range_options: Option<RangeOptions>,
 }
 
-/// NOTE: These options are experimental and not intended for public use.
-///
-/// The index options for a Queryable Encryption field supporting "rangePreview" queries.
+/// The index options for a Queryable Encryption field supporting "range" queries.
 /// The options set must match the values set in the encryptedFields of the destination collection.
 #[skip_serializing_none]
 #[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct RangeOptions {
@@ -130,6 +130,9 @@ pub struct RangeOptions {
 
     /// The maximum value. This option must be set if `precision` is set.
     pub max: Option<Bson>,
+
+    /// The trim factor.
+    pub trim_factor: i32,
 
     /// The sparsity.
     pub sparsity: i64,
