@@ -13,8 +13,10 @@ CRATE_VERSION=$(cargo metadata --format-version=1 --no-deps | jq --raw-output '.
 rm secrets-export.sh
 
 PAPERTRAIL_PRODUCT="rust-driver"
+TEST_PREFIX=""
 if [[ "${DRY_RUN:-}" == "yes" ]]; then
   PAPERTRAIL_PRODUCT="rust-driver-testing"
+  TEST_PREFIX="testing-"
 fi
 
 cat <<EOT >release-expansion.yml
@@ -27,4 +29,7 @@ ARTIFACTORY_USERNAME: "${ARTIFACTORY_USERNAME}"
 ARTIFACTORY_PASSWORD: "${ARTIFACTORY_PASSWORD}"
 GARASIGN_USERNAME: "${GARASIGN_USERNAME}"
 GARASIGN_PASSWORD: "${GARASIGN_PASSWORD}"
+S3_UPLOAD_AWS_KEY: "${S3_UPLOAD_AWS_KEY}"
+S3_UPLOAD_AWS_SECRET: "${S3_UPLOAD_AWS_SECRET}"
+TEST_PREFIX: "${TEST_PREFIX}"
 EOT
