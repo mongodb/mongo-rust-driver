@@ -16,7 +16,8 @@ N/A; the Rust driver does not bundle third-party dependencies
 N/A; the Rust driver does not bundle third-party dependencies
 
 **Static Analysis Findings**
-TODO RUST-1920 Link to static analysis report
+To request a copy of the static analysis report, please contact
+the MongoDB Rust driver team.
 
 **Signature Information**
 The release signature for this version can be found by visiting
