@@ -13,3 +13,5 @@ Cargo.lock
 .cargo
 .rustup
 mongocryptd.pid
+semgrep/
+sarif.json

@@ -317,7 +317,7 @@ impl ScramVersion {
         let normalized_password = match self {
             ScramVersion::Sha1 => {
                 // nosemgrep: insecure-hashes
-                let mut md5 = Md5::new();
+                let mut md5 = Md5::new(); // mongodb rating: No Fix Needed
                 md5.update(format!("{}:mongo:{}", username, password));
                 Cow::Owned(hex::encode(md5.finalize()))
             }
