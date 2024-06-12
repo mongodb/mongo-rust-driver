@@ -29,7 +29,6 @@
 #
 # Make sure to remove the changes from 1 and 2 before merging!
 
-
 exec_timeout_secs: 3600 
 
 functions:
@@ -176,6 +175,25 @@ functions:
         content_type: text/plain
         display_name: signature-
 
+  "create and upload SSDLC compliance report":
+    - command: subprocess.exec
+      params:
+        working_dir: "src"
+        include_expansions_in_env:
+          - CRATE_VERSION
+        binary: bash
+        args:
+          - .evergreen/create-ssdlc-compliance-report.sh
+    - command: s3.put
+      params:
+        aws_key: ${S3_UPLOAD_AWS_KEY}
+        aws_secret: ${S3_UPLOAD_AWS_SECRET}
+        local_file: src/.evergreen/${CRATE_VERSION}-ssdlc-compliance-report.md
+        remote_file: rust-driver/${TEST_PREFIX}${CRATE_VERSION}-ssdlc-compliance-report.md
+        bucket: cdn-origin-rust-driver
+        permissions: private
+        content_type: text/markdown
+
 tasks:
   - name: "publish-release"
     commands:
@@ -187,6 +205,7 @@ tasks:
       - func: "publish papertrail"
       - func: "sign release"
       - func: "save signature"
+      - func: "create and upload SSDLC compliance report"
 
 axes:
   - id: "os"
