@@ -2,23 +2,29 @@
 
 set -o errexit
 
-source ./.evergreen/env.sh
-
-. ${DRIVERS_TOOLS}/.evergreen/find-python3.sh
-PYTHON=$(find_python3)
+if [ -t 0 ] ; then
+    # Interactive shell
+    PYTHON3=${PYTHON3:-"python3"}
+else
+    # Evergreen run (probably)
+    source ./.evergreen/env.sh
+    source ${DRIVERS_TOOLS}/.evergreen/find-python3.sh
+    PYTHON3=$(find_python3)
+fi
 
 if [[ -f "semgrep/bin/activate" ]]; then
-    echo 'using existing virtualenv'
+    echo 'Using existing virtualenv...'
     . semgrep/bin/activate
 else
-    echo 'Creating new virtualenv'  
-    ${PYTHON} -m venv semgrep
-    echo 'Activating new virtualenv'
+    echo 'Creating new virtualenv...'
+    ${PYTHON3} -m venv semgrep
+    echo 'Activating new virtualenv...'
     . semgrep/bin/activate
+    echo 'Installing semgrep...'
     python3 -m pip install semgrep
 fi
 
-# Generate a SARIF report
-semgrep --config p/rust --sarif > mongo-rust-driver.json.sarif
-# And human-readable output
+# Show human-readable output
 semgrep --config p/rust --error
+# Generate a SARIF report
+semgrep --config p/rust --quiet --sarif -o sarif.json

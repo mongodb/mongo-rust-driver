@@ -143,7 +143,7 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
 
     if let Some(true) = cfg.allow_invalid_certificates {
         // nosemgrep: rustls-dangerous
-        config
+        config // mongodb rating: No Fix Needed
             .dangerous()
             .set_certificate_verifier(Arc::new(NoCertVerifier {}));
     }
