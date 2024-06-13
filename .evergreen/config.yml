@@ -1468,31 +1468,23 @@ functions:
           .evergreen/run-serverless-tests.sh
 
   "run atlas tests":
-    - command: shell.exec
+    - command: ec2.assume_role
+      params:
+        role_arn: ${aws_test_secrets_role}
+
+    - command: subprocess.exec
       type: test
       params:
         working_dir: src
-        silent: true
-        shell: bash
-        script: |
-          set +x
-          export MONGO_ATLAS_TESTS=1
-          export MONGO_ATLAS_FREE_TIER_REPL_URI='${MONGO_ATLAS_FREE_TIER_REPL_URI}'
-          export MONGO_ATLAS_FREE_TIER_REPL_URI_SRV='${MONGO_ATLAS_FREE_TIER_REPL_URI_SRV}'
-          export MONGO_ATLAS_SERVERLESS_URI='${MONGO_ATLAS_SERVERLESS_URI}'
-          export MONGO_ATLAS_SERVERLESS_URI_SRV='${MONGO_ATLAS_SERVERLESS_URI_SRV}'
-          export MONGO_ATLAS_REPL_URI='${MONGO_ATLAS_REPL_URI}'
-          export MONGO_ATLAS_REPL_URI_SRV='${MONGO_ATLAS_REPL_URI_SRV}'
-          export MONGO_ATLAS_SHARDED_URI='${MONGO_ATLAS_SHARDED_URI}'
-          export MONGO_ATLAS_SHARDED_URI_SRV='${MONGO_ATLAS_SHARDED_URI_SRV}'
-          export MONGO_ATLAS_TLS11_URI='${MONGO_ATLAS_TLS11_URI}'
-          export MONGO_ATLAS_TLS11_URI_SRV='${MONGO_ATLAS_TLS11_URI_SRV}'
-          export MONGO_ATLAS_TLS12_URI='${MONGO_ATLAS_TLS12_URI}'
-          export MONGO_ATLAS_TLS12_URI_SRV='${MONGO_ATLAS_TLS12_URI_SRV}'
-          export PROJECT_DIRECTORY='${PROJECT_DIRECTORY}'
-          set -x
-
-          .evergreen/run-atlas-tests.sh
+        binary: bash
+        args:
+          - .evergreen/run-atlas-tests.sh
+        include_expansions_in_env:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
 
   "start csfle servers":
     - command: ec2.assume_role
