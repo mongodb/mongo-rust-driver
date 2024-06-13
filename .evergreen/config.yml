@@ -207,7 +207,7 @@ buildvariants:
 
   - name: atlas-connectivity
     display_name: "Atlas Connectivity"
-    #patchable: false
+    patchable: false
     run_on:
       - rhel87-small
     tasks:
@@ -1484,16 +1484,6 @@ functions:
           - AWS_SECRET_ACCESS_KEY
           - AWS_SESSION_TOKEN
           - DRIVERS_TOOLS
-          - MONGO_ATLAS_SERVERLESS_URI
-          - MONGO_ATLAS_SERVERLESS_URI_SRV
-          - MONGO_ATLAS_REPL_URI
-          - MONGO_ATLAS_REPL_URI_SRV
-          - MONGO_ATLAS_SHARDED_URI
-          - MONGO_ATLAS_SHARDED_URI_SRV
-          - MONGO_ATLAS_TLS11_URI
-          - MONGO_ATLAS_TLS11_URI_SRV
-          - MONGO_ATLAS_TLS12_URI
-          - MONGO_ATLAS_TLS12_URI_SRV
           - PROJECT_DIRECTORY
 
   "start csfle servers":
