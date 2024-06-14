@@ -55,6 +55,7 @@ tests:
         arguments:
           document: &doc1 { _id: 1, encrypted_string_kmip_delegated: "string0" }
     expectations:
+    # Auto encryption will request the collection info.
     - command_started_event:
         command:
           listCollections: 1

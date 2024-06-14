@@ -38,8 +38,10 @@ tests:
           command_name: listCollections
 
   # Test that timeoutMS applies to the sum of all operations done for client-side encryption. This is done by blocking
-  # listCollections and find for 20ms each and running an insertOne with timeoutMS=50. There should be two
-  # listCollections commands and one "find" command, so the sum should take more than timeoutMS.
+  # listCollections and find for 30ms each and running an insertOne with timeoutMS=50. There should be one
+  # listCollections command and one "find" command, so the sum should take more than timeoutMS. A second listCollections
+  # event doesn't occur due to the internal MongoClient lacking configured auto encryption, plus libmongocrypt holds the
+  # collection schema in cache for a minute.
   #
   # This test does not include command monitoring expectations because the exact command sequence is dependent on the
   # amount of time taken by mongocryptd communication. In slow runs, mongocryptd communication can breach the timeout
@@ -47,11 +49,11 @@ tests:
   - description: "remaining timeoutMS applied to find to get keyvault data"
     failPoint:
       configureFailPoint: failCommand
-      mode: { times: 3 }
+      mode: { times: 2 }
       data:
         failCommands: ["listCollections", "find"]
         blockConnection: true
-        blockTimeMS: 20
+        blockTimeMS: 30
     clientOptions:
       autoEncryptOpts:
         kmsProviders:

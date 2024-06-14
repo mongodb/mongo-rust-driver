@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
+    env::var,
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -84,32 +85,60 @@ async fn init_client() -> Result<(EventClient, Collection<Document>)> {
 pub(crate) type KmsProviderList = Vec<(KmsProvider, bson::Document, Option<TlsOptions>)>;
 
 static KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
-    fn env(name: &str) -> String {
-        std::env::var(name).unwrap()
-    }
     vec![
         (
             KmsProvider::aws(),
             doc! {
-                "accessKeyId": env("FLE_AWS_KEY"),
-                "secretAccessKey": env("FLE_AWS_SECRET"),
+                "accessKeyId": var("FLE_AWS_KEY").unwrap(),
+                "secretAccessKey": var("FLE_AWS_SECRET").unwrap(),
+            },
+            None,
+        ),
+        (
+            KmsProvider::Aws {
+                name: Some("name1".to_string()),
+            },
+            doc! {
+                "accessKeyId": var("FLE_AWS_KEY").unwrap(),
+                "secretAccessKey": var("FLE_AWS_SECRET").unwrap(),
             },
             None,
         ),
         (
             KmsProvider::azure(),
             doc! {
-                "tenantId": env("FLE_AZURE_TENANTID"),
-                "clientId": env("FLE_AZURE_CLIENTID"),
-                "clientSecret": env("FLE_AZURE_CLIENTSECRET"),
+                "tenantId": var("FLE_AZURE_TENANTID").unwrap(),
+                "clientId": var("FLE_AZURE_CLIENTID").unwrap(),
+                "clientSecret": var("FLE_AZURE_CLIENTSECRET").unwrap(),
+            },
+            None,
+        ),
+        (
+            KmsProvider::Azure {
+                name: Some("name1".to_string()),
+            },
+            doc! {
+                "tenantId": var("FLE_AZURE_TENANTID").unwrap(),
+                "clientId": var("FLE_AZURE_CLIENTID").unwrap(),
+                "clientSecret": var("FLE_AZURE_CLIENTSECRET").unwrap(),
             },
             None,
         ),
         (
             KmsProvider::gcp(),
             doc! {
-                "email": env("FLE_GCP_EMAIL"),
-                "privateKey": env("FLE_GCP_PRIVATEKEY"),
+                "email": var("FLE_GCP_EMAIL").unwrap(),
+                "privateKey": var("FLE_GCP_PRIVATEKEY").unwrap(),
+            },
+            None,
+        ),
+        (
+            KmsProvider::Gcp {
+                name: Some("name1".to_string()),
+            },
+            doc! {
+                "email": var("FLE_GCP_EMAIL").unwrap(),
+                "privateKey": var("FLE_GCP_PRIVATEKEY").unwrap(),
             },
             None,
         ),
@@ -118,7 +147,19 @@ static KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
             doc! {
                 "key": bson::Binary {
                     subtype: bson::spec::BinarySubtype::Generic,
-                    bytes: base64::decode(env("CSFLE_LOCAL_KEY")).unwrap(),
+                    bytes: base64::decode(var("CSFLE_LOCAL_KEY").unwrap()).unwrap(),
+                },
+            },
+            None,
+        ),
+        (
+            KmsProvider::Local {
+                name: Some("name1".to_string()),
+            },
+            doc! {
+                "key": bson::Binary {
+                    subtype: bson::spec::BinarySubtype::Generic,
+                    bytes: base64::decode(var("CSFLE_LOCAL_KEY").unwrap()).unwrap(),
                 },
             },
             None,
@@ -129,7 +170,24 @@ static KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
                 "endpoint": "localhost:5698",
             },
             {
-                let cert_dir = PathBuf::from(env("CSFLE_TLS_CERT_DIR"));
+                let cert_dir = PathBuf::from(var("CSFLE_TLS_CERT_DIR").unwrap());
+                Some(
+                    TlsOptions::builder()
+                        .ca_file_path(cert_dir.join("ca.pem"))
+                        .cert_key_file_path(cert_dir.join("client.pem"))
+                        .build(),
+                )
+            },
+        ),
+        (
+            KmsProvider::Kmip {
+                name: Some("name1".to_string()),
+            },
+            doc! {
+                "endpoint": "localhost:5698",
+            },
+            {
+                let cert_dir = PathBuf::from(var("CSFLE_TLS_CERT_DIR").unwrap());
                 Some(
                     TlsOptions::builder()
                         .ca_file_path(cert_dir.join("ca.pem"))
