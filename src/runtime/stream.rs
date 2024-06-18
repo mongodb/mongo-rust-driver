@@ -20,6 +20,7 @@ use super::{
 };
 
 pub(crate) const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+#[cfg(not(target_os = "wasi"))]
 const KEEPALIVE_TIME: Duration = Duration::from_secs(120);
 
 /// An async stream possibly using TLS.
@@ -67,8 +68,11 @@ async fn tcp_try_connect(address: &SocketAddr) -> Result<TcpStream> {
     stream.set_nodelay(true)?;
 
     let socket = socket2::Socket::from(stream.into_std()?);
-    let conf = socket2::TcpKeepalive::new().with_time(KEEPALIVE_TIME);
-    socket.set_tcp_keepalive(&conf)?;
+    #[cfg(not(target_os = "wasi"))]
+    {
+        let conf = socket2::TcpKeepalive::new().with_time(KEEPALIVE_TIME);
+        socket.set_tcp_keepalive(&conf)?;
+    }
     let std_stream = std::net::TcpStream::from(socket);
     Ok(TcpStream::from_std(std_stream)?)
 }
