@@ -72,11 +72,7 @@ impl<T> EventBuffer<T> {
             .collect()
     }
 
-    /// Subscribe to events generated after the point of this call.
-    ///
-    /// New test code should prefer using `watch_all` over this.
-    #[deprecated = "use watch_all"]
-    #[allow(deprecated)]
+    /// Create a new asynchronous subscription to events generated after the point of this call.
     pub(crate) fn subscribe(&self) -> EventSubscriber<'_, T> {
         let (index, generation) = {
             let events = self.inner.events.lock().unwrap();
@@ -89,11 +85,7 @@ impl<T> EventBuffer<T> {
         }
     }
 
-    /// Subscribe to all events contained in the buffer.
-    ///
-    /// New test code should prefer using `watch_all` over this.
-    #[deprecated = "use watch_all"]
-    #[allow(deprecated)]
+    /// Create a new asynchronous subscription to all events contained in the buffer.
     pub(crate) fn subscribe_all(&self) -> EventSubscriber<'_, T> {
         EventSubscriber {
             buffer: self,
@@ -277,8 +269,8 @@ impl EventBuffer<Event> {
 
 /// Process events one at a time as they arrive asynchronously.
 ///
-/// New test code should prefer to use `EventBuffer`.
-#[deprecated = "use EventBuffer"]
+/// New test code should prefer `EventBuffer` to this; use this only when test actions need to be
+/// asynchronously interleaved with event validation.
 pub(crate) struct EventSubscriber<'a, T> {
     buffer: &'a EventBuffer<T>,
     index: usize,
