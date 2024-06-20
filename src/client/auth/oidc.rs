@@ -714,6 +714,7 @@ fn validate_address_with_allowed_hosts(
     mechanism_properties: Option<&Document>,
     address: &ServerAddress,
 ) -> Result<()> {
+    #[allow(irrefutable_let_patterns)]
     let hostname = if let ServerAddress::Tcp { host, .. } = address {
         host.as_str()
     } else {

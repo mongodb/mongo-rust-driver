@@ -1,0 +1,12 @@
+[package]
+name = "wasmedge_mongodb"
+version = "0.1.0"
+edition = "2021"
+
+[patch.crates-io]
+tokio = { git = "https://github.com/second-state/wasi_tokio.git", branch = "v1.36.x" }
+socket2 = { git = "https://github.com/second-state/socket2.git", branch = "v0.5.x" }
+
+[dependencies]
+mongodb = { path = "../../", default_features = false, features = ["compat-3-0-0", "rustls-tls"] }
+tokio = { version = "1", features = ["io-util", "fs", "net", "time", "rt", "macros"] }
