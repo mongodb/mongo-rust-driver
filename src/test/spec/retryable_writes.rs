@@ -280,7 +280,7 @@ async fn retry_write_pool_cleared() {
         .error_labels(vec![RETRYABLE_WRITE_ERROR]);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-    #[allow(deprecated)]
+
     let mut subscriber = buffer.subscribe();
 
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
@@ -444,7 +444,7 @@ async fn retry_write_different_mongos() {
         guards.push(client.enable_fail_point(fail_point).await.unwrap());
     }
 
-    #[allow(deprecated)]
+
     let client = Client::test_builder()
         .options(client_options)
         .monitor_events()
@@ -502,7 +502,7 @@ async fn retry_write_same_mongos() {
         client.enable_fail_point(fail_point).await.unwrap()
     };
 
-    #[allow(deprecated)]
+
     let client = Client::test_builder()
         .options(client_options)
         .monitor_events()

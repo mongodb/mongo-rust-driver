@@ -251,7 +251,6 @@ async fn sessions_not_supported_implicit_session_ignored() {
         return;
     };
 
-    #[allow(deprecated)]
     let mut subscriber = client.events.subscribe();
     let coll = client.database(name).collection(name);
 

@@ -535,7 +535,7 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
         .collection::<Document>(function_name!());
     coll.find(doc! {}).with_options(options).await.unwrap();
 
-    #[allow(deprecated)]
+
     let events = event_client.events.get_command_started_events(&["find"]);
     assert_eq!(events.len(), 1);
 
@@ -560,7 +560,7 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
         .with_options(options.clone())
         .await;
 
-    #[allow(deprecated)]
+
     let events = client.events.get_command_started_events(&["delete"]);
     assert_eq!(events.len(), 1);
 
@@ -611,7 +611,7 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
         .with_options(options.clone())
         .await;
 
-    #[allow(deprecated)]
+
     let events = client.events.get_command_started_events(&["findAndModify"]);
     assert_eq!(events.len(), 1);
 
@@ -1235,7 +1235,7 @@ async fn insert_many_document_sequences() {
     }
 
     let client = Client::test_builder().monitor_events().build().await;
-    #[allow(deprecated)]
+
     let mut subscriber = client.events.subscribe();
 
     let max_object_size = client.server_info.max_bson_object_size;

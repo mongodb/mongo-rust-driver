@@ -245,7 +245,6 @@ async fn cluster_time_in_commands() {
         F: Fn(Client) -> G,
         G: Future<Output = Result<R>>,
     {
-        #[allow(deprecated)]
         let mut subscriber = event_buffer.subscribe();
 
         operation(client.clone())
@@ -313,7 +312,6 @@ async fn cluster_time_in_commands() {
         }
     }
 
-    #[allow(deprecated)]
     let mut subscriber = buffer.subscribe();
 
     let client = Client::with_options(options).unwrap();
@@ -528,7 +526,6 @@ async fn find_and_getmore_share_session() {
         },
     ];
 
-    #[allow(deprecated)]
     async fn run_test(
         client: &EventClient,
         coll: &Collection<Document>,

@@ -139,9 +139,9 @@ impl TracingHandler {
     }
 
     /// Returns a `TracingSubscriber` that will listen for tracing events broadcast by this handler.
-    #[allow(deprecated)]
+
     pub(crate) fn subscribe(&self) -> EventSubscriber<TracingEvent> {
-        #[allow(deprecated)]
+
         self.buffer.subscribe()
     }
 }

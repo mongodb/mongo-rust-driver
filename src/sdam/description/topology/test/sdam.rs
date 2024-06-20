@@ -277,7 +277,7 @@ async fn run_test(test_file: TestFile) {
     options.sdam_event_handler = Some(buffer.handler());
     options.test_options_mut().disable_monitoring_threads = true;
 
-    #[allow(deprecated)]
+
     let mut event_subscriber = buffer.subscribe();
     let mut topology = Topology::new(options.clone()).unwrap();
 
@@ -598,7 +598,7 @@ async fn topology_closed_event_last() {
         .build()
         .await;
     let events = client.events.clone();
-    #[allow(deprecated)]
+
     let mut subscriber = events.subscribe_all();
 
     client
@@ -644,7 +644,7 @@ async fn heartbeat_events() {
         .build()
         .await;
 
-    #[allow(deprecated)]
+
     let mut subscriber = client.events.subscribe_all();
 
     if client.is_load_balanced() {

@@ -220,7 +220,7 @@ async fn load_balancing_test() {
         .retain_startup_events()
         .build()
         .await;
-    #[allow(deprecated)]
+
     let mut subscriber = client.events.subscribe_all();
 
     // wait for both servers pools to be saturated.
