@@ -277,7 +277,7 @@ pub(crate) struct EventSubscriber<'a, T> {
     generation: Generation,
 }
 
-#[allow(deprecated)]
+
 impl<'a, T: Clone> EventSubscriber<'a, T> {
     async fn next(&mut self, timeout: Duration) -> Option<T> {
         crate::runtime::timeout(timeout, async move {
@@ -396,7 +396,7 @@ impl<'a, T: Clone> EventSubscriber<'a, T> {
     }
 }
 
-#[allow(deprecated)]
+
 impl<'a> EventSubscriber<'a, Event> {
     /// Waits for the next CommandStartedEvent/CommandFailedEvent pair.
     /// If the next CommandStartedEvent is associated with a CommandFailedEvent, this method will

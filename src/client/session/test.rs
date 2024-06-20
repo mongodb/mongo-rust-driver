@@ -5,7 +5,7 @@ use std::{future::Future, sync::Arc, time::Duration};
 use bson::Document;
 use futures::stream::StreamExt;
 
-#[allow(deprecated)]
+
 use crate::test::EventClient;
 use crate::{
     bson::{doc, Bson},

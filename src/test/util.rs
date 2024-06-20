@@ -5,7 +5,7 @@ mod matchable;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
 
-#[allow(deprecated)]
+
 pub(crate) use self::event::EventClient;
 pub(crate) use self::{
     event::Event,

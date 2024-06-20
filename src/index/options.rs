@@ -147,13 +147,13 @@ pub enum IndexVersion {
     Custom(u32),
 }
 
-#[allow(deprecated)]
 impl Serialize for IndexVersion {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match self {
+            #[allow(deprecated)]
             IndexVersion::V0 => serializer.serialize_i32(0),
             IndexVersion::V1 => serializer.serialize_i32(1),
             IndexVersion::V2 => serializer.serialize_i32(2),
@@ -162,13 +162,13 @@ impl Serialize for IndexVersion {
     }
 }
 
-#[allow(deprecated)]
 impl<'de> Deserialize<'de> for IndexVersion {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         match i32::deserialize(deserializer)? {
+            #[allow(deprecated)]
             0 => Ok(IndexVersion::V0),
             1 => Ok(IndexVersion::V1),
             2 => Ok(IndexVersion::V2),

@@ -9,7 +9,7 @@ use std::{future::IntoFuture, sync::Arc, time::Duration};
 use futures::{future::BoxFuture, FutureExt};
 use semver::VersionReq;
 
-#[allow(deprecated)]
+
 use crate::test::EventClient;
 use crate::{
     bson::{doc, from_bson},
@@ -562,7 +562,7 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
     }
 }
 
-#[allow(deprecated)]
+
 fn assert_different_lsid_on_last_two_commands(client: &EventClient) {
     let events = client.events.get_all_command_started_events();
     let lsid1 = events[events.len() - 1].command.get("lsid").unwrap();
@@ -570,7 +570,7 @@ fn assert_different_lsid_on_last_two_commands(client: &EventClient) {
     assert_ne!(lsid1, lsid2);
 }
 
-#[allow(deprecated)]
+
 fn assert_same_lsid_on_last_two_commands(client: &EventClient) {
     let events = client.events.get_all_command_started_events();
     let lsid1 = events[events.len() - 1].command.get("lsid").unwrap();

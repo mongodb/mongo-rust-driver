@@ -87,23 +87,17 @@ async fn explicit_session_created_on_same_client() {
 // Sessions prose test 14
 #[tokio::test]
 async fn implicit_session_after_connection() {
-    struct EventHandler {
-        lsids: Mutex<Vec<Document>>,
-    }
-
-    #[allow(deprecated)]
-    impl crate::event::command::CommandEventHandler for EventHandler {
-        fn handle_command_started_event(&self, event: CommandStartedEvent) {
-            self.lsids
+    let lsids = Arc::new(Mutex::new(vec![]));
+    let event_handler = {
+        let lsids = Arc::clone(&lsids);
+        crate::event::EventHandler::callback(move |ev: CommandEvent| match ev {
+            CommandEvent::Started(CommandStartedEvent { command, .. }) => lsids
                 .lock()
                 .unwrap()
-                .push(event.command.get_document("lsid").unwrap().clone());
-        }
-    }
-
-    let event_handler = Arc::new(EventHandler {
-        lsids: Mutex::new(vec![]),
-    });
+                .push(command.get_document("lsid").unwrap().clone()),
+            _ => (),
+        })
+    };
 
     let mut min_lsids = usize::MAX;
     let mut max_lsids = 0usize;
@@ -113,7 +107,7 @@ async fn implicit_session_after_connection() {
             options.max_pool_size = Some(1);
             options.retry_writes = Some(true);
             options.hosts.drain(1..);
-            options.command_event_handler = Some(event_handler.clone().into());
+            options.command_event_handler = Some(event_handler.clone());
             Client::with_options(options).unwrap()
         };
 
@@ -172,7 +166,7 @@ async fn implicit_session_after_connection() {
 
         let _ = try_join_all(ops).await.unwrap();
 
-        let mut lsids = event_handler.lsids.lock().unwrap();
+        let mut lsids = lsids.lock().unwrap();
         let mut unique = vec![];
         'outer: for lsid in lsids.iter() {
             for u in &unique {

@@ -7,7 +7,7 @@ use std::{
 };
 use tracing::{field::Field, span, subscriber::Interest, Level, Metadata};
 
-#[allow(deprecated)]
+
 use super::event_buffer::{EventBuffer, EventSubscriber};
 
 /// Models the data reported in a tracing event.

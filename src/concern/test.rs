@@ -165,7 +165,7 @@ async fn snapshot_read_concern() {
     }
 }
 
-#[allow(deprecated)]
+
 async fn assert_event_contains_read_concern(client: &EventClient) {
     let event = client
         .events
