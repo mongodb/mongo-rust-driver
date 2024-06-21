@@ -12,7 +12,7 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        spec::{unified_runner::run_unified_tests, v2_runner::run_v2_tests},
+        spec::unified_runner::run_unified_tests,
         util::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
@@ -22,11 +22,6 @@ use crate::{
     },
     Client,
 };
-
-#[tokio::test(flavor = "multi_thread")]
-async fn run_legacy() {
-    run_v2_tests(&["retryable-reads", "legacy"]).await;
-}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
