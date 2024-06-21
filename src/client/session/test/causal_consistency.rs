@@ -161,7 +161,7 @@ async fn first_read_no_after_cluser_time() {
         )
         .await
         .unwrap_or_else(|e| panic!("{} failed: {}", name, e));
-        #[allow(deprecated)]
+
         let (started, _) = client.events.get_successful_command_execution(name);
 
         // assert that no read concern was set.
@@ -241,7 +241,6 @@ async fn read_includes_after_cluster_time() {
         let op_time = session.operation_time().unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
-        #[allow(deprecated)]
         let command_started = client
             .events
             .get_command_started_events(&[command_name])
@@ -287,7 +286,6 @@ async fn find_after_write_includes_after_cluster_time() {
         let op_time = session.operation_time().unwrap();
         coll.find_one(doc! {}).session(&mut session).await.unwrap();
 
-        #[allow(deprecated)]
         let command_started = client
             .events
             .get_command_started_events(&["find"])
@@ -332,7 +330,6 @@ async fn not_causally_consistent_omits_after_cluster_time() {
             .unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
-        #[allow(deprecated)]
         let command_started = client
             .events
             .get_command_started_events(&[command_name])
@@ -369,7 +366,6 @@ async fn omit_after_cluster_time_standalone() {
             .unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
-        #[allow(deprecated)]
         let command_started = client
             .events
             .get_command_started_events(&[command_name])
@@ -410,7 +406,6 @@ async fn omit_default_read_concern_level() {
         let op_time = session.operation_time().unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
-        #[allow(deprecated)]
         let command_started = client
             .events
             .get_command_started_events(&[command_name])
@@ -457,7 +452,6 @@ async fn test_causal_consistency_read_concern_merge() {
         let op_time = session.operation_time().unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
 
-        #[allow(deprecated)]
         let command_started = client
             .events
             .get_command_started_events(&[command_name])

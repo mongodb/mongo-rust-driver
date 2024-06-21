@@ -134,7 +134,6 @@ pub(crate) struct EventClientBuilder {
     retain_startup: bool,
 }
 
-#[allow(deprecated)]
 impl EventClientBuilder {
     pub(crate) fn retain_startup_events(mut self) -> Self {
         self.retain_startup = true;

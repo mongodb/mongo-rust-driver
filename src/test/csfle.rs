@@ -275,7 +275,7 @@ async fn data_key_double_encryption() -> Result<()> {
     )?;
 
     // Testing each provider:
-    #[allow(deprecated)]
+
     let mut events = client.events.subscribe();
     let provider_keys = [
         (
@@ -541,7 +541,7 @@ async fn bson_size_limits() -> Result<()> {
     // Setup: encrypted client.
     let mut opts = get_client_options().await.clone();
     let buffer = EventBuffer::<Event>::new();
-    #[allow(deprecated)]
+
     let mut events = buffer.subscribe();
     opts.command_event_handler = Some(buffer.handler());
     let client_encrypted =
@@ -1507,7 +1507,7 @@ impl DeadlockTestCase {
             .monitor_events()
             .build()
             .await;
-        #[allow(deprecated)]
+
         let mut keyvault_events = client_keyvault.events.subscribe();
         client_test
             .database("keyvault")
@@ -1545,7 +1545,7 @@ impl DeadlockTestCase {
 
         // Run test case
         let event_buffer = EventBuffer::new();
-        #[allow(deprecated)]
+
         let mut encrypted_events = event_buffer.subscribe();
         let mut opts = get_client_options().await.clone();
         opts.max_pool_size = Some(self.max_pool_size);

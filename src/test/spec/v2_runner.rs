@@ -9,8 +9,6 @@ use std::{future::IntoFuture, sync::Arc, time::Duration};
 use futures::{future::BoxFuture, FutureExt};
 use semver::VersionReq;
 
-#[allow(deprecated)]
-use crate::test::EventClient;
 use crate::{
     bson::{doc, from_bson},
     coll::options::DropCollectionOptions,
@@ -27,6 +25,7 @@ use crate::{
             fail_point::{FailPoint, FailPointGuard},
             get_default_name,
         },
+        EventClient,
         TestClient,
         SERVERLESS,
     },
@@ -120,7 +119,7 @@ struct TestContext {
     description: String,
     ns: Namespace,
     internal_client: TestClient,
-    #[allow(deprecated)]
+
     client: EventClient,
     fail_point_guards: Vec<FailPointGuard>,
     session0: Option<ClientSession>,
@@ -215,7 +214,7 @@ impl TestContext {
             .min_heartbeat_freq(Some(Duration::from_millis(50)));
         #[cfg(feature = "in-use-encryption-unstable")]
         let builder = csfle::set_auto_enc(builder, test);
-        #[allow(deprecated)]
+
         let client = builder.monitor_events().build().await;
 
         // TODO RUST-900: Remove this extraneous call.
@@ -307,7 +306,7 @@ pub(crate) struct OpSessions<'a> {
 pub(crate) struct OpRunner<'a> {
     description: String,
     internal_client: TestClient,
-    #[allow(deprecated)]
+
     client: EventClient,
     ns: Namespace,
     fail_point_guards: &'a mut Vec<FailPointGuard>,
@@ -518,7 +517,6 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
         }
 
         if let Some(expectations) = &test.expectations {
-            #[allow(deprecated)]
             let events: Vec<CommandStartedEvent> = test_ctx
                 .client
                 .events
@@ -562,7 +560,6 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
     }
 }
 
-#[allow(deprecated)]
 fn assert_different_lsid_on_last_two_commands(client: &EventClient) {
     let events = client.events.get_all_command_started_events();
     let lsid1 = events[events.len() - 1].command.get("lsid").unwrap();
@@ -570,7 +567,6 @@ fn assert_different_lsid_on_last_two_commands(client: &EventClient) {
     assert_ne!(lsid1, lsid2);
 }
 
-#[allow(deprecated)]
 fn assert_same_lsid_on_last_two_commands(client: &EventClient) {
     let events = client.events.get_all_command_started_events();
     let lsid1 = events[events.len() - 1].command.get("lsid").unwrap();

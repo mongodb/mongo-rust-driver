@@ -87,7 +87,6 @@ async fn deserialize_recovery_token() {
 
 #[tokio::test]
 async fn convenient_api_custom_error() {
-    #[allow(deprecated)]
     let client = Client::test_builder().monitor_events().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_custom_error: no transaction support.");
@@ -112,7 +111,7 @@ async fn convenient_api_custom_error() {
 
     assert!(result.is_err());
     assert!(result.unwrap_err().get_custom::<MyErr>().is_some());
-    #[allow(deprecated)]
+
     let events = client.events.get_all_command_started_events();
     let commands: Vec<_> = events.iter().map(|ev| &ev.command_name).collect();
     assert_eq!(&["find", "abortTransaction"], &commands[..]);
@@ -120,7 +119,6 @@ async fn convenient_api_custom_error() {
 
 #[tokio::test]
 async fn convenient_api_returned_value() {
-    #[allow(deprecated)]
     let client = Client::test_builder().monitor_events().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_returned_value: no transaction support.");
@@ -148,7 +146,6 @@ async fn convenient_api_returned_value() {
 
 #[tokio::test]
 async fn convenient_api_retry_timeout_callback() {
-    #[allow(deprecated)]
     let client = Client::test_builder().monitor_events().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_retry_timeout_callback: no transaction support.");
@@ -185,7 +182,7 @@ async fn convenient_api_retry_timeout_commit_unknown() {
         options.direct_connection = Some(true);
         options.hosts.drain(1..);
     }
-    #[allow(deprecated)]
+
     let client = Client::test_builder()
         .options(options)
         .monitor_events()
@@ -230,7 +227,7 @@ async fn convenient_api_retry_timeout_commit_transient() {
         options.direct_connection = Some(true);
         options.hosts.drain(1..);
     }
-    #[allow(deprecated)]
+
     let client = Client::test_builder()
         .options(options)
         .monitor_events()
