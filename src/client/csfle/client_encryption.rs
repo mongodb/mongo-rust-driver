@@ -220,7 +220,7 @@ pub struct AwsMasterKey {
     pub key: String,
 
     /// An alternate host identifier to send KMS requests to. May include port number. Defaults to
-    /// "kms.<region>.amazonaws.com".
+    /// "kms.\<region\>.amazonaws.com".
     pub endpoint: Option<String>,
 }
 
