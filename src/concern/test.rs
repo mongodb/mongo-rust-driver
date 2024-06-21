@@ -165,7 +165,6 @@ async fn snapshot_read_concern() {
     }
 }
 
-
 async fn assert_event_contains_read_concern(client: &EventClient) {
     let event = client
         .events
@@ -670,7 +669,6 @@ async fn command_contains_write_concern_aggregate() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_drop() {
-
     let client = Client::test_builder().monitor_events().build().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 

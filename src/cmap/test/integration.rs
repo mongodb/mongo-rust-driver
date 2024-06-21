@@ -249,7 +249,6 @@ async fn connection_error_during_operation() {
         FailPoint::fail_command(&["ping"], FailPointMode::Times(10)).close_connection(true);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-
     let mut subscriber = buffer.subscribe();
 
     client

@@ -105,7 +105,6 @@ async fn retry_read_pool_cleared() {
         .block_connection(Duration::from_secs(1));
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-
     let mut subscriber = buffer.subscribe();
 
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
@@ -188,7 +187,6 @@ async fn retry_read_different_mongos() {
         guards.push(client.enable_fail_point(fail_point).await.unwrap());
     }
 
-
     let client = Client::test_builder()
         .options(client_options)
         .monitor_events()
@@ -244,7 +242,6 @@ async fn retry_read_same_mongos() {
             .close_connection(true);
         client.enable_fail_point(fail_point).await.unwrap()
     };
-
 
     let client = Client::test_builder()
         .options(client_options)

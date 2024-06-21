@@ -277,7 +277,6 @@ async fn run_test(test_file: TestFile) {
     options.sdam_event_handler = Some(buffer.handler());
     options.test_options_mut().disable_monitoring_threads = true;
 
-
     let mut event_subscriber = buffer.subscribe();
     let mut topology = Topology::new(options.clone()).unwrap();
 
@@ -643,7 +642,6 @@ async fn heartbeat_events() {
         .monitor_events()
         .build()
         .await;
-
 
     let mut subscriber = client.events.subscribe_all();
 

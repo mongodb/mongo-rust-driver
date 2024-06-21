@@ -9,8 +9,6 @@ use std::{future::IntoFuture, sync::Arc, time::Duration};
 use futures::{future::BoxFuture, FutureExt};
 use semver::VersionReq;
 
-
-use crate::test::EventClient;
 use crate::{
     bson::{doc, from_bson},
     coll::options::DropCollectionOptions,
@@ -27,6 +25,7 @@ use crate::{
             fail_point::{FailPoint, FailPointGuard},
             get_default_name,
         },
+        EventClient,
         TestClient,
         SERVERLESS,
     },
@@ -518,7 +517,6 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
         }
 
         if let Some(expectations) = &test.expectations {
-
             let events: Vec<CommandStartedEvent> = test_ctx
                 .client
                 .events
@@ -562,14 +560,12 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
     }
 }
 
-
 fn assert_different_lsid_on_last_two_commands(client: &EventClient) {
     let events = client.events.get_all_command_started_events();
     let lsid1 = events[events.len() - 1].command.get("lsid").unwrap();
     let lsid2 = events[events.len() - 2].command.get("lsid").unwrap();
     assert_ne!(lsid1, lsid2);
 }
-
 
 fn assert_same_lsid_on_last_two_commands(client: &EventClient) {
     let events = client.events.get_all_command_started_events();

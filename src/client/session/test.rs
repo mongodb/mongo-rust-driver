@@ -5,8 +5,6 @@ use std::{future::Future, sync::Arc, time::Duration};
 use bson::Document;
 use futures::stream::StreamExt;
 
-
-use crate::test::EventClient;
 use crate::{
     bson::{doc, Bson},
     coll::options::CountOptions,
@@ -20,6 +18,7 @@ use crate::{
         log_uncaptured,
         util::event_buffer::EventBuffer,
         Event,
+        EventClient,
         TestClient,
     },
     Client,

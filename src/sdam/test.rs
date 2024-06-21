@@ -270,7 +270,6 @@ async fn removed_server_monitor_stops() -> crate::error::Result<()> {
     let hosts = options.hosts.clone();
     let set_name = options.repl_set_name.clone().unwrap();
 
-
     let mut subscriber = buffer.subscribe();
     let topology = Topology::new(options)?;
 

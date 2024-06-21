@@ -87,7 +87,6 @@ async fn deserialize_recovery_token() {
 
 #[tokio::test]
 async fn convenient_api_custom_error() {
-
     let client = Client::test_builder().monitor_events().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_custom_error: no transaction support.");
@@ -120,7 +119,6 @@ async fn convenient_api_custom_error() {
 
 #[tokio::test]
 async fn convenient_api_returned_value() {
-
     let client = Client::test_builder().monitor_events().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_returned_value: no transaction support.");
@@ -148,7 +146,6 @@ async fn convenient_api_returned_value() {
 
 #[tokio::test]
 async fn convenient_api_retry_timeout_callback() {
-
     let client = Client::test_builder().monitor_events().build().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_retry_timeout_callback: no transaction support.");

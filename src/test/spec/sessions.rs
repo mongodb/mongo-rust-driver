@@ -90,12 +90,13 @@ async fn implicit_session_after_connection() {
     let lsids = Arc::new(Mutex::new(vec![]));
     let event_handler = {
         let lsids = Arc::clone(&lsids);
-        crate::event::EventHandler::callback(move |ev: CommandEvent| match ev {
-            CommandEvent::Started(CommandStartedEvent { command, .. }) => lsids
-                .lock()
-                .unwrap()
-                .push(command.get_document("lsid").unwrap().clone()),
-            _ => (),
+        crate::event::EventHandler::callback(move |ev: CommandEvent| {
+            if let CommandEvent::Started(CommandStartedEvent { command, .. }) = ev {
+                lsids
+                    .lock()
+                    .unwrap()
+                    .push(command.get_document("lsid").unwrap().clone());
+            }
         })
     };
 

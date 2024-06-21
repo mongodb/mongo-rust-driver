@@ -2592,7 +2592,6 @@ impl DecryptionEventsHandler {
     }
 }
 
-
 impl crate::event::command::CommandEventHandler for DecryptionEventsHandler {
     fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {
         if event.command_name == "aggregate" {

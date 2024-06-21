@@ -535,7 +535,6 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
         .collection::<Document>(function_name!());
     coll.find(doc! {}).with_options(options).await.unwrap();
 
-
     let events = event_client.events.get_command_started_events(&["find"]);
     assert_eq!(events.len(), 1);
 
@@ -559,7 +558,6 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
         .delete_many(doc! {})
         .with_options(options.clone())
         .await;
-
 
     let events = client.events.get_command_started_events(&["delete"]);
     assert_eq!(events.len(), 1);
@@ -610,7 +608,6 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
         .find_one_and_delete(doc! {})
         .with_options(options.clone())
         .await;
-
 
     let events = client.events.get_command_started_events(&["findAndModify"]);
     assert_eq!(events.len(), 1);
