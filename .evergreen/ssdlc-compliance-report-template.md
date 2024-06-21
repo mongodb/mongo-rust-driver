@@ -7,7 +7,7 @@ The creator of this release can be determined by visiting
 https://github.com/mongodb/mongo-rust-driver/releases/tag/vRELEASE_VERSION.
 
 **Process Document**
-TODO RUST-1918 Link to "How We Develop Software" document
+Not available.  <!-- TODO RUST-1918 Link to "How We Develop Software" document -->
 
 **Tool used to track third party vulnerabilities**
 N/A; the Rust driver does not bundle third-party dependencies
@@ -24,7 +24,8 @@ The release signature for this version can be found by visiting
 https://downloads.mongodb.org/rust-driver/mongodb-RELEASE_VERSION.sig.
 
 **Security Testing Report**
-TODO RUST-1955 Link to security testing report
+See [Driver Security Testing Summary](https://docs.google.com/document/d/1y2K_RY4GZVXpQvv4JH_35mSzFRTawNJ3mibpvSBU8H0/edit?usp=sharing)
+(internal). Available as needed from the MongoDB Rust driver team.
 
 **Security Assessment Report**
 N/A; non-goal for client libraries
