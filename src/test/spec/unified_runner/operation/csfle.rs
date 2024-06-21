@@ -9,7 +9,7 @@ use super::{Entity, TestOperation, TestRunner};
 use crate::{
     action::csfle::DataKeyOptions,
     bson::{doc, Binary, Bson, RawBson},
-    client_encryption::MasterKey,
+    client_encryption::{LocalMasterKey, MasterKey},
     error::Result,
 };
 
@@ -143,7 +143,7 @@ impl<'de> Deserialize<'de> for CreateDataKey {
                 .as_ref()
                 .and_then(|o| o.master_key.as_ref())
                 .cloned()
-                .unwrap_or(MasterKey::Local),
+                .unwrap_or(LocalMasterKey::builder().build().into()),
             opts: t_op.opts.map(|to| DataKeyOptions {
                 key_alt_names: to.key_alt_names,
                 key_material: to.key_material.map(|bin| bin.bytes),

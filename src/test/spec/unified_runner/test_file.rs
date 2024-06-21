@@ -344,7 +344,7 @@ pub(crate) struct ClientEncryption {
 pub(crate) struct ClientEncryptionOpts {
     pub(crate) key_vault_client: String,
     pub(crate) key_vault_namespace: crate::Namespace,
-    pub(crate) kms_providers: Document,
+    pub(crate) kms_providers: HashMap<mongocrypt::ctx::KmsProvider, Document>,
 }
 
 /// Messages used for communicating with test runner "threads".

@@ -6,7 +6,7 @@ use std::{
 
 use bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
-use mongocrypt::ctx::{Ctx, KmsProvider, State};
+use mongocrypt::ctx::{Ctx, KmsProviderType, State};
 use rayon::ThreadPool;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -216,8 +216,8 @@ impl CryptExecutor {
                             continue;
                         }
 
-                        match provider {
-                            KmsProvider::Aws { .. } => {
+                        match provider.provider_type() {
+                            KmsProviderType::Aws => {
                                 #[cfg(feature = "aws-auth")]
                                 {
                                     use crate::{
@@ -237,7 +237,7 @@ impl CryptExecutor {
                                     if let Some(token) = aws_creds.session_token() {
                                         creds.append("sessionToken", token);
                                     }
-                                    kms_providers.append(provider.name(), creds);
+                                    kms_providers.append(provider.as_string(), creds);
                                 }
                                 #[cfg(not(feature = "aws-auth"))]
                                 {
@@ -247,11 +247,13 @@ impl CryptExecutor {
                                     ));
                                 }
                             }
-                            KmsProvider::Azure { .. } => {
+                            KmsProviderType::Azure => {
                                 #[cfg(feature = "azure-kms")]
                                 {
-                                    kms_providers
-                                        .append(provider.name(), self.azure.get_token().await?);
+                                    kms_providers.append(
+                                        provider.as_string(),
+                                        self.azure.get_token().await?,
+                                    );
                                 }
                                 #[cfg(not(feature = "azure-kms"))]
                                 {
@@ -261,7 +263,7 @@ impl CryptExecutor {
                                     ));
                                 }
                             }
-                            KmsProvider::Gcp { .. } => {
+                            KmsProviderType::Gcp => {
                                 #[cfg(feature = "gcp-kms")]
                                 {
                                     use crate::runtime::HttpClient;

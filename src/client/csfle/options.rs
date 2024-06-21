@@ -132,28 +132,32 @@ impl KmsProviders {
 
     #[cfg(test)]
     pub(crate) fn set_test_options(&mut self) {
-        use crate::{bson::doc, test::KMS_PROVIDERS_MAP};
+        use mongocrypt::ctx::KmsProviderType;
 
-        for (provider, credentials) in self.credentials.iter_mut().filter(|(p, _)| {
-            matches!(
-                p,
-                KmsProvider::Aws { .. }
-                    | KmsProvider::Azure { .. }
-                    | KmsProvider::Gcp { .. }
-                    | KmsProvider::Kmip { .. }
-            )
-        }) {
-            let (test_credentials, tls) = KMS_PROVIDERS_MAP.get(provider).unwrap().clone();
-            *credentials = test_credentials;
+        use crate::{bson::doc, test::csfle::ALL_KMS_PROVIDERS};
 
-            if let Some(tls) = tls {
+        let all_kms_providers = ALL_KMS_PROVIDERS.clone();
+        let mut aws_tls_options = None;
+        for (provider, test_credentials, tls_options) in all_kms_providers {
+            let Some(credentials) = self.credentials.get_mut(&provider) else {
+                continue;
+            };
+            if !matches!(provider.provider_type(), KmsProviderType::Local) {
+                *credentials = test_credentials;
+            }
+
+            if let Some(tls_options) = tls_options {
+                if matches!(provider.provider_type(), KmsProviderType::Aws) {
+                    aws_tls_options = Some(tls_options.clone());
+                }
+
                 self.tls_options
                     .get_or_insert_with(KmsProvidersTlsOptions::new)
-                    .insert(provider.clone(), tls);
+                    .insert(provider.clone(), tls_options);
             }
         }
 
-        let aws_temp_provider = KmsProvider::Other("awsTemporary".to_string());
+        let aws_temp_provider = KmsProvider::other("awsTemporary".to_string());
         if self.credentials.contains_key(&aws_temp_provider) {
             let aws_credentials = doc! {
                 "accessKeyId": std::env::var("CSFLE_AWS_TEMP_ACCESS_KEY_ID").unwrap(),
@@ -162,20 +166,16 @@ impl KmsProviders {
             };
             self.credentials.insert(KmsProvider::aws(), aws_credentials);
 
-            let aws_tls = KMS_PROVIDERS_MAP
-                .get(&KmsProvider::aws())
-                .and_then(|(_, t)| t.as_ref());
-            if let Some(tls) = aws_tls {
+            if let Some(ref aws_tls_options) = aws_tls_options {
                 self.tls_options
                     .get_or_insert_with(KmsProvidersTlsOptions::new)
-                    .insert(KmsProvider::aws(), tls.clone());
+                    .insert(KmsProvider::aws(), aws_tls_options.clone());
             }
 
             self.clear(&aws_temp_provider);
         }
 
-        let aws_temp_no_session_token_provider =
-            KmsProvider::Other("awsTemporaryNoSessionToken".to_string());
+        let aws_temp_no_session_token_provider = KmsProvider::other("awsTemporaryNoSessionToken");
         if self
             .credentials
             .contains_key(&aws_temp_no_session_token_provider)
@@ -186,14 +186,12 @@ impl KmsProviders {
             };
             self.credentials.insert(KmsProvider::aws(), aws_credentials);
 
-            let aws_tls = KMS_PROVIDERS_MAP
-                .get(&KmsProvider::aws())
-                .and_then(|(_, t)| t.as_ref());
-            if let Some(tls) = aws_tls {
+            if let Some(aws_tls_options) = aws_tls_options {
                 self.tls_options
                     .get_or_insert_with(KmsProvidersTlsOptions::new)
-                    .insert(KmsProvider::aws(), tls.clone());
+                    .insert(KmsProvider::aws(), aws_tls_options);
             }
+
             self.clear(&aws_temp_no_session_token_provider);
         }
     }

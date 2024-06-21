@@ -17,7 +17,7 @@ mod coll;
 ))]
 mod compression;
 #[cfg(feature = "in-use-encryption-unstable")]
-mod csfle;
+pub(crate) mod csfle;
 mod cursor;
 mod db;
 mod documentation_examples;
@@ -26,9 +26,6 @@ mod lambda_examples;
 pub(crate) mod spec;
 mod timeseries;
 pub(crate) mod util;
-
-#[cfg(feature = "in-use-encryption-unstable")]
-pub(crate) use self::csfle::{KmsProviderList, KMS_PROVIDERS_MAP};
 
 pub(crate) use self::{
     spec::{run_spec_test, RunOn, Serverless, Topology},

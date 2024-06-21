@@ -5,6 +5,7 @@ mod encrypt;
 
 use mongocrypt::{ctx::KmsProvider, Crypt};
 use serde::{Deserialize, Serialize};
+use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, spec::BinarySubtype, Binary, RawBinaryRef, RawDocumentBuf},
@@ -193,57 +194,169 @@ impl ClientEncryption {
 #[non_exhaustive]
 #[allow(missing_docs)]
 pub enum MasterKey {
-    #[serde(rename_all = "camelCase")]
-    Aws {
-        region: String,
-        /// The Amazon Resource Name (ARN) to the AWS customer master key (CMK).
-        key: String,
-        /// An alternate host identifier to send KMS requests to. May include port number. Defaults
-        /// to "kms.REGION.amazonaws.com"
-        endpoint: Option<String>,
-    },
-    #[serde(rename_all = "camelCase")]
-    Azure {
-        /// Host with optional port. Example: "example.vault.azure.net".
-        key_vault_endpoint: String,
-        key_name: String,
-        /// A specific version of the named key, defaults to using the key's primary version.
-        key_version: Option<String>,
-    },
-    #[serde(rename_all = "camelCase")]
-    Gcp {
-        project_id: String,
-        location: String,
-        key_ring: String,
-        key_name: String,
-        /// A specific version of the named key, defaults to using the key's primary version.
-        key_version: Option<String>,
-        /// Host with optional port. Defaults to "cloudkms.googleapis.com".
-        endpoint: Option<String>,
-    },
-    /// Master keys are not applicable to `KmsProvider::Local`.
-    Local,
-    #[serde(rename_all = "camelCase")]
-    Kmip {
-        /// keyId is the KMIP Unique Identifier to a 96 byte KMIP Secret Data managed object.  If
-        /// keyId is omitted, the driver creates a random 96 byte KMIP Secret Data managed object.
-        key_id: Option<String>,
-        /// If true (recommended), the KMIP server must decrypt this key. Defaults to false.
-        delegated: Option<bool>,
-        /// Host with optional port.
-        endpoint: Option<String>,
-    },
+    Aws(AwsMasterKey),
+    Azure(AzureMasterKey),
+    Gcp(GcpMasterKey),
+    Kmip(KmipMasterKey),
+    Local(LocalMasterKey),
+}
+
+/// An AWS master key.
+#[serde_with::skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AwsMasterKey {
+    /// The name for the key. The value for this field must be the same as the corresponding
+    /// [`KmsProvider`](mongocrypt::ctx::KmsProvider)'s name.
+    #[serde(skip)]
+    pub name: Option<String>,
+
+    /// The region.
+    pub region: String,
+
+    /// The Amazon Resource Name (ARN) to the AWS customer master key (CMK).
+    pub key: String,
+
+    /// An alternate host identifier to send KMS requests to. May include port number. Defaults to
+    /// "kms.<region>.amazonaws.com".
+    pub endpoint: Option<String>,
+}
+
+impl From<AwsMasterKey> for MasterKey {
+    fn from(aws_master_key: AwsMasterKey) -> Self {
+        Self::Aws(aws_master_key)
+    }
+}
+
+/// An Azure master key.
+#[serde_with::skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AzureMasterKey {
+    /// The name for the key. The value for this field must be the same as the corresponding
+    /// [`KmsProvider`](mongocrypt::ctx::KmsProvider)'s name.
+    #[serde(skip)]
+    pub name: Option<String>,
+
+    /// Host with optional port. Example: "example.vault.azure.net".
+    pub key_vault_endpoint: String,
+
+    /// The key name.
+    pub key_name: String,
+
+    /// A specific version of the named key, defaults to using the key's primary version.
+    pub key_version: Option<String>,
+}
+
+impl From<AzureMasterKey> for MasterKey {
+    fn from(azure_master_key: AzureMasterKey) -> Self {
+        Self::Azure(azure_master_key)
+    }
+}
+
+/// A GCP master key.
+#[serde_with::skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct GcpMasterKey {
+    /// The name for the key. The value for this field must be the same as the corresponding
+    /// [`KmsProvider`](mongocrypt::ctx::KmsProvider)'s name.
+    #[serde(skip)]
+    pub name: Option<String>,
+
+    /// The project ID.
+    pub project_id: String,
+
+    /// The location.
+    pub location: String,
+
+    /// The key ring.
+    pub key_ring: String,
+
+    /// The key name.
+    pub key_name: String,
+
+    /// A specific version of the named key. Defaults to using the key's primary version.
+    pub key_version: Option<String>,
+
+    /// Host with optional port. Defaults to "cloudkms.googleapis.com".
+    pub endpoint: Option<String>,
+}
+
+impl From<GcpMasterKey> for MasterKey {
+    fn from(gcp_master_key: GcpMasterKey) -> Self {
+        Self::Gcp(gcp_master_key)
+    }
+}
+
+/// A local master key.
+#[serde_with::skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct LocalMasterKey {
+    /// The name for the key. The value for this field must be the same as the corresponding
+    /// [`KmsProvider`](mongocrypt::ctx::KmsProvider)'s name.
+    #[serde(skip)]
+    pub name: Option<String>,
+}
+
+impl From<LocalMasterKey> for MasterKey {
+    fn from(local_master_key: LocalMasterKey) -> Self {
+        Self::Local(local_master_key)
+    }
+}
+
+/// A KMIP master key.
+#[serde_with::skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct KmipMasterKey {
+    /// The name for the key. The value for this field must be the same as the corresponding
+    /// [`KmsProvider`](mongocrypt::ctx::KmsProvider)'s name.
+    #[serde(skip)]
+    pub name: Option<String>,
+
+    /// The KMIP Unique Identifier to a 96 byte KMIP Secret Data managed object. If this field is
+    /// not specified, the driver creates a random 96 byte KMIP Secret Data managed object.
+    pub key_id: Option<String>,
+
+    /// If true (recommended), the KMIP server must decrypt this key. Defaults to false.
+    pub delegated: Option<bool>,
+
+    /// Host with optional port.
+    pub endpoint: Option<String>,
+}
+
+impl From<KmipMasterKey> for MasterKey {
+    fn from(kmip_master_key: KmipMasterKey) -> Self {
+        Self::Kmip(kmip_master_key)
+    }
 }
 
 impl MasterKey {
     /// Returns the `KmsProvider` associated with this key.
     pub fn provider(&self) -> KmsProvider {
-        match self {
-            MasterKey::Aws { .. } => KmsProvider::Aws { name: None },
-            MasterKey::Azure { .. } => KmsProvider::Azure { name: None },
-            MasterKey::Gcp { .. } => KmsProvider::Gcp { name: None },
-            MasterKey::Kmip { .. } => KmsProvider::Kmip { name: None },
-            MasterKey::Local => KmsProvider::Local { name: None },
+        let (provider, name) = match self {
+            MasterKey::Aws(AwsMasterKey { name, .. }) => (KmsProvider::aws(), name.clone()),
+            MasterKey::Azure(AzureMasterKey { name, .. }) => (KmsProvider::azure(), name.clone()),
+            MasterKey::Gcp(GcpMasterKey { name, .. }) => (KmsProvider::gcp(), name.clone()),
+            MasterKey::Kmip(KmipMasterKey { name, .. }) => (KmsProvider::kmip(), name.clone()),
+            MasterKey::Local(LocalMasterKey { name, .. }) => (KmsProvider::local(), name.clone()),
+        };
+        if let Some(name) = name {
+            provider.with_name(name)
+        } else {
+            provider
         }
     }
 }
