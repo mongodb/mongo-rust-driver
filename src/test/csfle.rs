@@ -257,7 +257,7 @@ async fn custom_key_material() -> Result<()> {
     )
     .unwrap();
     let id = enc
-        .create_data_key(MasterKey::Local(LocalMasterKey::builder().build()))
+        .create_data_key(LocalMasterKey::builder().build())
         .key_material(key)
         .await?;
     let mut key_doc = datakeys

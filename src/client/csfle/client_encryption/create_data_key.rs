@@ -43,7 +43,7 @@ impl ClientEncryption {
     ) -> Result<Ctx> {
         let mut builder = self.crypt.ctx_builder();
         let mut key_doc = doc! { "provider": kms_provider.as_string() };
-        if !matches!(master_key, MasterKey::Local { .. }) {
+        if !matches!(master_key, MasterKey::Local(_)) {
             let master_doc = bson::to_document(&master_key)?;
             key_doc.extend(master_doc);
         }
