@@ -25,9 +25,7 @@ use crate::{
 
 #[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
-    run_unified_tests(&["retryable-reads", "unified"])
-        .skip_files(&["gridfs-download.json", "gridfs-download-serverErrors.json"])
-        .await;
+    run_unified_tests(&["retryable-reads", "unified"]).await;
 }
 
 /// Test ensures that the connection used in the first attempt of a retry is released back into the
