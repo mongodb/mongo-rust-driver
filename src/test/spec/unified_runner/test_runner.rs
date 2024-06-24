@@ -48,9 +48,6 @@ use super::{
     TestFileEntity,
 };
 
-#[cfg(feature = "in-use-encryption-unstable")]
-use crate::test::KmsProviderList;
-
 #[cfg(feature = "tracing-unstable")]
 use crate::test::{
     spec::unified_runner::matcher::tracing_events_match,
@@ -305,9 +302,9 @@ impl TestRunner {
                     for (actual, expected) in actual_events.iter().zip(expected_events) {
                         if let Err(e) = events_match(actual, expected, Some(&entities)) {
                             panic!(
-                                "event mismatch: expected = {:#?}, actual = {:#?}\nmismatch \
+                                "event mismatch in {}: expected = {:#?}, actual = {:#?}\nmismatch \
                                  detail: {}",
-                                expected, actual, e,
+                                test_case.description, expected, actual, e,
                             );
                         }
                     }
@@ -607,9 +604,7 @@ impl TestRunner {
                         .client()
                         .unwrap()
                         .clone();
-                    let kms_providers: HashMap<mongocrypt::ctx::KmsProvider, Document> =
-                        bson::from_document(opts.kms_providers.clone()).unwrap();
-                    let kms_providers = fill_kms_placeholders(kms_providers);
+                    let kms_providers = fill_kms_placeholders(opts.kms_providers.clone());
                     let client_enc = crate::client_encryption::ClientEncryption::new(
                         kv_client,
                         opts.key_vault_namespace.clone(),
@@ -749,32 +744,31 @@ impl TestRunner {
 
 #[cfg(feature = "in-use-encryption-unstable")]
 fn fill_kms_placeholders(
-    kms_providers: HashMap<mongocrypt::ctx::KmsProvider, Document>,
-) -> KmsProviderList {
-    use crate::test::KMS_PROVIDERS_MAP;
+    kms_provider_map: HashMap<mongocrypt::ctx::KmsProvider, Document>,
+) -> crate::test::csfle::KmsProviderList {
+    use crate::{bson::doc, test::csfle::ALL_KMS_PROVIDERS};
 
-    let placeholder = bson::Bson::Document(doc! { "$$placeholder": 1 });
+    let placeholder = doc! { "$$placeholder": 1 };
+    let all_kms_providers = ALL_KMS_PROVIDERS.clone();
 
-    let mut out = vec![];
-    for (provider, mut config) in kms_providers {
+    let mut kms_providers = Vec::new();
+    for (provider, mut config) in kms_provider_map {
+        let test_kms_provider = all_kms_providers.iter().find(|(p, ..)| p == &provider);
+
         for (key, value) in config.iter_mut() {
-            if *value == placeholder {
-                let new_value = KMS_PROVIDERS_MAP
-                    .get(&provider)
-                    .unwrap_or_else(|| panic!("missing config for {:?}", provider))
-                    .0
-                    .get(key)
-                    .unwrap_or_else(|| {
-                        panic!("provider config {:?} missing key {:?}", provider, key)
-                    })
-                    .clone();
-                *value = new_value;
+            if value.as_document() == Some(&placeholder) {
+                let test_kms_provider = test_kms_provider
+                    .unwrap_or_else(|| panic!("missing config for {:?}", provider));
+                let placeholder_value = test_kms_provider.1.get(key).unwrap_or_else(|| {
+                    panic!("provider config {:?} missing key {:?}", provider, key)
+                });
+                *value = placeholder_value.clone();
             }
         }
-        let tls = KMS_PROVIDERS_MAP
-            .get(&provider)
-            .and_then(|(_, t)| t.clone());
-        out.push((provider, config, tls));
+
+        let tls_options = test_kms_provider.and_then(|(_, _, tls_options)| tls_options.clone());
+        kms_providers.push((provider, config, tls_options));
     }
-    out
+
+    kms_providers
 }

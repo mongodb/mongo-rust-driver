@@ -430,6 +430,10 @@ impl<'de> Deserialize<'de> for Operation {
             "listSearchIndexes" => deserialize_op::<ListSearchIndexes>(definition.arguments),
             "updateSearchIndex" => deserialize_op::<UpdateSearchIndex>(definition.arguments),
             "clientBulkWrite" => deserialize_op::<BulkWrite>(definition.arguments),
+            #[cfg(feature = "in-use-encryption-unstable")]
+            "encrypt" => deserialize_op::<Encrypt>(definition.arguments),
+            #[cfg(feature = "in-use-encryption-unstable")]
+            "decrypt" => deserialize_op::<Decrypt>(definition.arguments),
             s => Ok(Box::new(UnimplementedOperation {
                 _name: s.to_string(),
             }) as Box<dyn TestOperation>),
