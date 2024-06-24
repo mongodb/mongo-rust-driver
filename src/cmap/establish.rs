@@ -30,12 +30,17 @@ pub(crate) struct ConnectionEstablisher {
     tls_config: Option<TlsConfig>,
 
     connect_timeout: Duration,
+
+    #[cfg(test)]
+    test_patch_reply: Option<fn(&mut Result<HelloReply>)>,
 }
 
 pub(crate) struct EstablisherOptions {
     handshake_options: HandshakerOptions,
     tls_options: Option<TlsOptions>,
     connect_timeout: Option<Duration>,
+    #[cfg(test)]
+    pub(crate) test_patch_reply: Option<fn(&mut Result<HelloReply>)>,
 }
 
 impl EstablisherOptions {
@@ -55,6 +60,8 @@ impl EstablisherOptions {
             },
             tls_options: opts.tls_options(),
             connect_timeout: opts.connect_timeout,
+            #[cfg(test)]
+            test_patch_reply: None,
         }
     }
 }
@@ -80,6 +87,8 @@ impl ConnectionEstablisher {
             handshaker,
             tls_config,
             connect_timeout,
+            #[cfg(test)]
+            test_patch_reply: options.test_patch_reply,
         })
     }
 
@@ -106,7 +115,13 @@ impl ConnectionEstablisher {
             .map_err(|e| EstablishError::pre_hello(e, pool_gen.clone()))?;
 
         let mut connection = Connection::new_pooled(pending_connection, stream);
-        let handshake_result = self.handshaker.handshake(&mut connection, credential).await;
+        #[allow(unused_mut)]
+        let mut handshake_result = self.handshaker.handshake(&mut connection, credential).await;
+        #[cfg(test)]
+        if let Some(patch) = self.test_patch_reply {
+            patch(&mut handshake_result);
+        }
+        let handshake_result = handshake_result;
 
         // If the handshake response had a `serviceId` field, this is a connection to a load
         // balancer and must derive its generation from the service_generations map.

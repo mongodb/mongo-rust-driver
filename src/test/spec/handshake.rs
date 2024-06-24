@@ -14,17 +14,26 @@ use crate::{
 // Prose test 1: Test that the driver accepts an arbitrary auth mechanism
 #[tokio::test]
 async fn arbitrary_auth_mechanism() {
-    let options = get_client_options().await.clone();
-    let establisher =
-        ConnectionEstablisher::new(EstablisherOptions::from_client_options(&options)).unwrap();
+    let client_options = get_client_options().await;
+    let mut options = EstablisherOptions::from_client_options(&client_options);
+    options.test_patch_reply = Some(|reply| {
+        reply
+            .as_mut()
+            .unwrap()
+            .command_response
+            .sasl_supported_mechs
+            .get_or_insert_with(|| vec![])
+            .push("ArBiTrArY!".to_string());
+    });
+    let establisher = ConnectionEstablisher::new(options).unwrap();
     let pending = PendingConnection {
         id: 0,
-        address: options.hosts[0].clone(),
+        address: client_options.hosts[0].clone(),
         generation: crate::cmap::PoolGeneration::normal(),
         event_emitter: CmapEventEmitter::new(None, ObjectId::new()),
         time_created: Instant::now(),
     };
-    let _ = establisher
+    establisher
         .establish_connection(pending, None)
         .await
         .unwrap();
