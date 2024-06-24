@@ -188,7 +188,6 @@ impl ClientEncryption {
 }
 
 /// A KMS-specific key used to encrypt data keys.
-#[serde_with::skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 #[non_exhaustive]
