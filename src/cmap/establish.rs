@@ -92,7 +92,7 @@ impl ConnectionEstablisher {
     }
 
     /// Establishes a connection.
-    pub(super) async fn establish_connection(
+    pub(crate) async fn establish_connection(
         &self,
         pending_connection: PendingConnection,
         credential: Option<&Credential>,
