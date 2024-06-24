@@ -15,14 +15,14 @@ use crate::{
 #[tokio::test]
 async fn arbitrary_auth_mechanism() {
     let client_options = get_client_options().await;
-    let mut options = EstablisherOptions::from_client_options(&client_options);
+    let mut options = EstablisherOptions::from_client_options(client_options);
     options.test_patch_reply = Some(|reply| {
         reply
             .as_mut()
             .unwrap()
             .command_response
             .sasl_supported_mechs
-            .get_or_insert_with(|| vec![])
+            .get_or_insert_with(Vec::new)
             .push("ArBiTrArY!".to_string());
     });
     let establisher = ConnectionEstablisher::new(options).unwrap();
