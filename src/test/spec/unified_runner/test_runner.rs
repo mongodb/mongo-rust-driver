@@ -746,7 +746,7 @@ impl TestRunner {
 fn fill_kms_placeholders(
     kms_provider_map: HashMap<mongocrypt::ctx::KmsProvider, Document>,
 ) -> crate::test::csfle::KmsProviderList {
-    use crate::{bson::doc, test::csfle::ALL_KMS_PROVIDERS};
+    use crate::test::csfle::ALL_KMS_PROVIDERS;
 
     let placeholder = doc! { "$$placeholder": 1 };
     let all_kms_providers = ALL_KMS_PROVIDERS.clone();
