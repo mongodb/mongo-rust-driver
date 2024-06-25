@@ -886,6 +886,7 @@ tasks:
   - name: test-search-index
     commands:
       - command: subprocess.exec
+        type: test
         params:
           working_dir: src
           binary: bash

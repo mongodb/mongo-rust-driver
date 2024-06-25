@@ -7,8 +7,10 @@ use bson::{doc, oid::ObjectId, Document};
 use futures_util::TryStreamExt;
 
 use crate::{
+    search_index::SearchIndexType,
     test::{log_uncaptured, spec::unified_runner::run_unified_tests},
     Client,
+    Collection,
     SearchIndexModel,
 };
 
@@ -271,4 +273,118 @@ async fn search_index_drop_not_found() {
         .collection::<Document>(&coll_name);
 
     coll0.drop_search_index("test-search-index").await.unwrap();
+}
+
+async fn wait_for_index(coll: &Collection<Document>, name: &str) -> Document {
+    let deadline = Instant::now() + Duration::from_secs(60 * 5);
+    while Instant::now() < deadline {
+        let mut cursor = coll.list_search_indexes().name(name).await.unwrap();
+        while let Some(def) = cursor.try_next().await.unwrap() {
+            if def.get_str("name") == Ok(&name) && def.get_bool("queryable") == Ok(true) {
+                return def;
+            }
+        }
+        tokio::time::sleep(Duration::from_secs(5)).await;
+    }
+    panic!("search index creation timed out");
+}
+
+// SearchIndex Case 7: Driver can successfully handle search index types when creating indexes
+#[tokio::test]
+async fn search_index_create_with_type() {
+    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
+        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
+        return;
+    }
+    let client = Client::test_builder().build().await;
+    let coll_name = ObjectId::new().to_hex();
+    let db = client.database("search_index_test");
+    db.create_collection(&coll_name).await.unwrap();
+    let coll0 = db.collection::<Document>(&coll_name);
+
+    let name = coll0
+        .create_search_index(
+            SearchIndexModel::builder()
+                .name(String::from("test-search-index-case7-implicit"))
+                .definition(doc! { "mappings": { "dynamic": false } })
+                .build(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(name, "test-search-index-case7-implicit");
+    let index1 = wait_for_index(&coll0, &name).await;
+    assert_eq!(index1.get_str("type"), Ok("search"));
+
+    let name = coll0
+        .create_search_index(
+            SearchIndexModel::builder()
+                .name(String::from("test-search-index-case7-explicit"))
+                .index_type(SearchIndexType::Search)
+                .definition(doc! { "mappings": { "dynamic": false } })
+                .build(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(name, "test-search-index-case7-explicit");
+    let index2 = wait_for_index(&coll0, &name).await;
+    assert_eq!(index2.get_str("type"), Ok("search"));
+
+    let name = coll0
+        .create_search_index(
+            SearchIndexModel::builder()
+                .name(String::from("test-search-index-case7-vector"))
+                .index_type(SearchIndexType::VectorSearch)
+                .definition(doc! {
+                    "fields": [{
+                        "type": "vector",
+                        "path": "plot_embedding",
+                        "numDimensions": 1536,
+                        "similarity": "euclidean",
+                    }]
+                })
+                .build(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(name, "test-search-index-case7-vector");
+    let index3 = wait_for_index(&coll0, &name).await;
+    assert_eq!(index3.get_str("type"), Ok("vectorSearch"));
+}
+
+// SearchIndex Case 8: Driver requires explicit type to create a vector search index
+#[tokio::test]
+async fn search_index_requires_explicit_vector() {
+    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
+        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
+        return;
+    }
+    let client = Client::test_builder().build().await;
+    let coll_name = ObjectId::new().to_hex();
+    let db = client.database("search_index_test");
+    db.create_collection(&coll_name).await.unwrap();
+    let coll0 = db.collection::<Document>(&coll_name);
+
+    let result = coll0
+        .create_search_index(
+            SearchIndexModel::builder()
+                .name(String::from("test-search-index-case7-vector"))
+                .index_type(SearchIndexType::VectorSearch)
+                .definition(doc! {
+                    "fields": [{
+                        "type": "vector",
+                        "path": "plot_embedding",
+                        "numDimensions": 1536,
+                        "similarity": "euclidean",
+                    }]
+                })
+                .build(),
+        )
+        .await;
+    assert!(
+        result
+            .as_ref()
+            .is_err_and(|e| e.to_string().contains("Attribute mappings missing")),
+        "invalid result: {:?}",
+        result
+    );
 }

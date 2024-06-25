@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 /// Specifies the options for a search index.
+#[serde_with::skip_serializing_none]
 #[derive(Debug, Clone, Default, TypedBuilder, Serialize, Deserialize)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
@@ -13,8 +14,24 @@ pub struct SearchIndexModel {
     pub definition: Document,
 
     /// The name for this index, if present.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+
+    /// The type for this index, if present.
+    #[serde(rename = "type")]
+    pub index_type: Option<SearchIndexType>,
+}
+
+/// Specifies the type of search index.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SearchIndexType {
+    /// A regular search index.
+    Search,
+    /// A vector search index.
+    VectorSearch,
+    /// An unknown type of search index.
+    #[serde(untagged)]
+    Other(String),
 }
 
 pub mod options {
