@@ -280,7 +280,7 @@ async fn wait_for_index(coll: &Collection<Document>, name: &str) -> Document {
     while Instant::now() < deadline {
         let mut cursor = coll.list_search_indexes().name(name).await.unwrap();
         while let Some(def) = cursor.try_next().await.unwrap() {
-            if def.get_str("name") == Ok(&name) && def.get_bool("queryable") == Ok(true) {
+            if def.get_str("name") == Ok(name) && def.get_bool("queryable") == Ok(true) {
                 return def;
             }
         }
