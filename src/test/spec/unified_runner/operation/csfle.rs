@@ -1,14 +1,15 @@
 use std::fmt::Debug;
 
 use futures::{future::BoxFuture, stream::TryStreamExt, FutureExt};
+use mongocrypt::ctx::Algorithm;
 use serde::Deserialize;
 
 use super::{Entity, TestOperation, TestRunner};
 
 use crate::{
     action::csfle::DataKeyOptions,
-    bson::{doc, Bson},
-    client_encryption::MasterKey,
+    bson::{doc, Binary, Bson, RawBson},
+    client_encryption::{LocalMasterKey, MasterKey},
     error::Result,
 };
 
@@ -142,7 +143,7 @@ impl<'de> Deserialize<'de> for CreateDataKey {
                 .as_ref()
                 .and_then(|o| o.master_key.as_ref())
                 .cloned()
-                .unwrap_or(MasterKey::Local),
+                .unwrap_or(LocalMasterKey::builder().build().into()),
             opts: t_op.opts.map(|to| DataKeyOptions {
                 key_alt_names: to.key_alt_names,
                 key_material: to.key_material.map(|bin| bin.bytes),
@@ -213,6 +214,73 @@ impl TestOperation for RemoveKeyAltName {
                 None => Entity::None,
             };
             Ok(Some(entity))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct Encrypt {
+    value: RawBson,
+    opts: EncryptOptions,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct EncryptOptions {
+    key_alt_name: String,
+    algorithm: String,
+}
+
+fn algorithm_from_string(algorithm: &str) -> Algorithm {
+    match algorithm {
+        "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic" => Algorithm::Deterministic,
+        other => panic!("unsupported encrypt algorithm: {}", other),
+    }
+}
+
+impl TestOperation for Encrypt {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let client_encryption = test_runner.get_client_encryption(id).await;
+            let algorithm = algorithm_from_string(self.opts.algorithm.as_str());
+
+            let encrypted_value = client_encryption
+                .encrypt(
+                    self.value.clone(),
+                    self.opts.key_alt_name.clone(),
+                    algorithm,
+                )
+                .await?;
+
+            Ok(Some(Bson::Binary(encrypted_value).into()))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct Decrypt {
+    value: Binary,
+}
+
+impl TestOperation for Decrypt {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let client_encryption = test_runner.get_client_encryption(id).await;
+            let raw_value = self.value.as_raw_binary();
+            let decrypted_value: Bson = client_encryption.decrypt(raw_value).await?.try_into()?;
+            Ok(Some(decrypted_value.into()))
         }
         .boxed()
     }

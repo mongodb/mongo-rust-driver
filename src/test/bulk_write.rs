@@ -538,7 +538,7 @@ async fn encryption_error() {
     };
 
     let kms_providers = KmsProviders::new(vec![(
-        KmsProvider::Aws,
+        KmsProvider::aws(),
         doc! { "accessKeyId": "foo", "secretAccessKey": "bar" },
         None,
     )])

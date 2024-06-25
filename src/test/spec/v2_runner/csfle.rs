@@ -4,7 +4,7 @@ use mongocrypt::ctx::KmsProvider;
 use crate::{
     coll::options::CollectionOptions,
     options::WriteConcern,
-    test::{util::TestClientBuilder, KMS_PROVIDERS_MAP},
+    test::{csfle::AWS_KMS, util::TestClientBuilder},
     Client,
 };
 
@@ -37,55 +37,41 @@ pub(crate) fn set_auto_enc(builder: TestClientBuilder, test: &Test) -> TestClien
     } else {
         return builder;
     };
+
     let kms_providers = &mut enc_opts.kms_providers;
-    for prov in [
-        KmsProvider::Aws,
-        KmsProvider::Azure,
-        KmsProvider::Gcp,
-        KmsProvider::Kmip,
-    ] {
-        if kms_providers.credentials().contains_key(&prov) {
-            let opts = KMS_PROVIDERS_MAP.get(&prov).unwrap().clone();
-            kms_providers.set(prov, opts.0, opts.1);
-        }
-    }
-    let aws_tls = KMS_PROVIDERS_MAP
-        .get(&KmsProvider::Aws)
-        .and_then(|(_, t)| t.as_ref());
+    kms_providers.set_test_options();
+
     let aws_id = std::env::var("CSFLE_AWS_TEMP_ACCESS_KEY_ID").ok();
     let aws_key = std::env::var("CSFLE_AWS_TEMP_SECRET_ACCESS_KEY").ok();
     let aws_token = std::env::var("CSFLE_AWS_TEMP_SESSION_TOKEN").ok();
+
     if kms_providers
         .credentials()
-        .contains_key(&KmsProvider::Other("awsTemporary".to_string()))
+        .contains_key(&KmsProvider::other("awsTemporary"))
     {
         kms_providers.set(
-            KmsProvider::Aws,
+            KmsProvider::aws(),
             doc! {
                 "accessKeyId": aws_id.unwrap(),
                 "secretAccessKey": aws_key.unwrap(),
                 "sessionToken": aws_token.unwrap(),
             },
-            aws_tls.cloned(),
+            AWS_KMS.clone().2,
         );
-        kms_providers.clear(&KmsProvider::Other("awsTemporary".to_string()));
+        kms_providers.clear(&KmsProvider::other("awsTemporary"));
     } else if kms_providers
         .credentials()
-        .contains_key(&KmsProvider::Other(
-            "awsTemporaryNoSessionToken".to_string(),
-        ))
+        .contains_key(&KmsProvider::other("awsTemporaryNoSessionToken"))
     {
         kms_providers.set(
-            KmsProvider::Aws,
+            KmsProvider::aws(),
             doc! {
                 "accessKeyId": aws_id.unwrap(),
                 "secretAccessKey": aws_key.unwrap(),
             },
-            aws_tls.cloned(),
+            AWS_KMS.clone().2,
         );
-        kms_providers.clear(&KmsProvider::Other(
-            "awsTemporaryNoSessionToken".to_string(),
-        ));
+        kms_providers.clear(&KmsProvider::other("awsTemporaryNoSessionToken"));
     }
     builder.encrypted_options(enc_opts)
 }

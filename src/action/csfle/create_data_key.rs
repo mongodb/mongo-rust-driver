@@ -8,10 +8,10 @@ impl ClientEncryption {
     /// `await` will return d[`Result<Binary>`] (subtype 0x04) with the _id of the created
     /// document as a UUID.
     #[deeplink]
-    pub fn create_data_key(&self, master_key: MasterKey) -> CreateDataKey {
+    pub fn create_data_key(&self, master_key: impl Into<MasterKey>) -> CreateDataKey {
         CreateDataKey {
             client_enc: self,
-            master_key,
+            master_key: master_key.into(),
             options: None,
             #[cfg(test)]
             test_kms_provider: None,
