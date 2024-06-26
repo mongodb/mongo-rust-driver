@@ -8,7 +8,7 @@ For more details, including features, runnable examples, troubleshooting resourc
 ## Installation
 ### Requirements
 - Rust 1.64+ (See the [MSRV policy](#minimum-supported-rust-version-msrv-policy) for more information)
-- MongoDB 3.6+
+- MongoDB 4.0+
 
 #### Supported Platforms
 
