@@ -262,6 +262,32 @@ Run the following test(s) on MongoDB 4.4+.
              mode: "off",
          });
 
+Heartbeat Tests
+~~~~~~~~~~~~~~~
+
+1. Test that ``ServerHeartbeatStartedEvent`` is emitted before the monitoring socket was created
+
+   #. Create a mock TCP server (example shown below) that pushes a ``client connected`` event to a shared array when a client connects and a ``client hello received`` event when the server receives the client hello and then closes the connection::
+         
+        let events = [];
+        server = createServer(clientSocket => {
+          events.push('client connected');
+
+          clientSocket.on('data', () => {
+            events.push('client hello received');
+            clientSocket.destroy();
+          });
+        });
+        server.listen(9999);
+
+   #. Create a client with ``serverSelectionTimeoutMS: 500`` and listen to ``ServerHeartbeatStartedEvent`` and ``ServerHeartbeatFailedEvent``, pushing the event name to the same shared array as the mock TCP server
+    
+   #. Attempt to connect client to previously created TCP server, catching the error when the client fails to connect
+
+   #. Assert that the first four elements in the array are: ::
+
+        ['serverHeartbeatStartedEvent', 'client connected', 'client hello received', 'serverHeartbeatFailedEvent']
+
 .. Section for links.
 
 .. _Server Description Equality: /source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#server-description-equality
