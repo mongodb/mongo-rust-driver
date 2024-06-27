@@ -278,7 +278,7 @@ impl Error {
     }
 
     #[cfg(feature = "dns-resolver")]
-    pub(crate) fn from_resolve_error(error: trust_dns_resolver::error::ResolveError) -> Self {
+    pub(crate) fn from_resolve_error(error: hickory_resolver::error::ResolveError) -> Self {
         ErrorKind::DnsResolve {
             message: error.to_string(),
         }

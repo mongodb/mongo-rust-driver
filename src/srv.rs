@@ -67,7 +67,7 @@ impl SrvResolver {
         original_hostname: &str,
         dm: DomainMismatch,
     ) -> Result<LookupHosts> {
-        use trust_dns_proto::rr::RData;
+        use hickory_proto::rr::RData;
 
         let hostname_parts: Vec<_> = original_hostname.split('.').collect();
 
