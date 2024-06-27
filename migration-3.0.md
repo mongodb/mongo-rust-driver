@@ -115,8 +115,6 @@ let options = ClientOptions::builder()
 ## Future-proof Features
 Starting in 3.0, if the Rust driver is compiled with `no-default-features` it will require the use of a `compat` feature; this provides the flexibility to make features optional in future versions of the driver.  Lack of this had prevented `rustls` and `dns-resolution` from becoming optional in 2.x; they are now optional in 3.0.
 
-In addition, we have removed the various `bson-*` features from the driver, as those can be selected by including `bson` as a direct dependency.
-
 ## ReadConcern / WriteConcern Helpers
 The Rust driver provides convenience helpers for constructing commonly used read or write concerns (e.g. "majority").  In 2.x, these were an overlapping mix of constants and methods (`ReadConcern::MAJORITY` and `ReadConcern::majority()`).  In 3.0, these are only provided as methods.
 
