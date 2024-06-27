@@ -33,7 +33,7 @@ compat-3-0-0 = []
 sync = []
 rustls-tls = ["dep:rustls", "dep:rustls-pemfile", "dep:tokio-rustls"]
 openssl-tls = ["dep:openssl", "dep:openssl-probe", "dep:tokio-openssl"]
-dns-resolver = ["dep:trust-dns-resolver", "dep:trust-dns-proto"]
+dns-resolver = ["dep:hickory-resolver", "dep:hickory-proto"]
 
 # Enable support for MONGODB-AWS authentication.
 # This can only be used with the tokio-runtime feature flag.
@@ -83,6 +83,8 @@ futures-core = "0.3.14"
 futures-util = { version = "0.3.14", features = ["io"] }
 futures-executor = "0.3.14"
 hex = "0.4.0"
+hickory-proto = { version = "0.24.1", optional = true }
+hickory-resolver = { version = "0.24.1", optional = true }
 hmac = "0.12.1"
 once_cell = "1.19.0"
 log = { version = "0.4.17", optional = true }
@@ -108,8 +110,6 @@ take_mut = "0.2.2"
 thiserror = "1.0.24"
 tokio-openssl = { version = "0.6.3", optional = true }
 tracing = { version = "0.1.36", optional = true }
-trust-dns-proto = { version = "0.21.2", optional = true }
-trust-dns-resolver = { version = "0.21.2", optional = true }
 typed-builder = "0.10.0"
 webpki-roots = "0.25.2"
 zstd = { version = "0.11.2", optional = true }

@@ -569,11 +569,11 @@ pub struct ClientOptions {
     #[derivative(Debug = "ignore")]
     pub(crate) original_uri: Option<String>,
 
-    /// Configuration of the trust-dns resolver used for SRV and TXT lookups.
+    /// Configuration of the DNS resolver used for SRV and TXT lookups.
     /// By default, the host system's resolver configuration will be used.
     ///
-    /// On Windows, there is a known performance issue in trust-dns with using the default system
-    /// configuration, so a custom configuration is recommended.
+    /// On Windows, there is a known performance issue in [hickory_resolver] with using the default
+    /// system configuration, so a custom configuration is recommended.
     #[builder(setter(skip))]
     #[serde(skip)]
     #[derivative(Debug = "ignore")]

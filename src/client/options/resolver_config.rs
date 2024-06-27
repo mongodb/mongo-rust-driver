@@ -1,14 +1,14 @@
 #[cfg(feature = "dns-resolver")]
-use trust_dns_resolver::config::ResolverConfig as TrustDnsResolverConfig;
+use hickory_resolver::config::ResolverConfig as HickoryResolverConfig;
 
 /// Configuration for the upstream nameservers to use for resolution.
 ///
-/// This is a thin wrapper around a `trust_dns_resolver::config::ResolverConfig` provided to ensure
+/// This is a thin wrapper around a `hickory_resolver::config::ResolverConfig` provided to ensure
 /// API stability.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResolverConfig {
     #[cfg(feature = "dns-resolver")]
-    pub(crate) inner: TrustDnsResolverConfig,
+    pub(crate) inner: HickoryResolverConfig,
 }
 
 #[cfg(feature = "dns-resolver")]
@@ -19,7 +19,7 @@ impl ResolverConfig {
     /// Please see: <https://www.cloudflare.com/dns/>
     pub fn cloudflare() -> Self {
         ResolverConfig {
-            inner: TrustDnsResolverConfig::cloudflare(),
+            inner: HickoryResolverConfig::cloudflare(),
         }
     }
 
@@ -30,7 +30,7 @@ impl ResolverConfig {
     /// ISP’s track similar information in DNS.
     pub fn google() -> Self {
         ResolverConfig {
-            inner: TrustDnsResolverConfig::google(),
+            inner: HickoryResolverConfig::google(),
         }
     }
 
@@ -40,7 +40,7 @@ impl ResolverConfig {
     /// Please see: <https://www.quad9.net/faq/>
     pub fn quad9() -> Self {
         ResolverConfig {
-            inner: TrustDnsResolverConfig::quad9(),
+            inner: HickoryResolverConfig::quad9(),
         }
     }
 }

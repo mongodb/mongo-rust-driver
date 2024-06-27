@@ -1,4 +1,4 @@
-use trust_dns_resolver::{
+use hickory_resolver::{
     config::ResolverConfig,
     error::ResolveErrorKind,
     lookup::{SrvLookup, TxtLookup},
@@ -9,17 +9,14 @@ use crate::error::{Error, Result};
 
 /// An async runtime agnostic DNS resolver.
 pub(crate) struct AsyncResolver {
-    resolver: trust_dns_resolver::TokioAsyncResolver,
+    resolver: hickory_resolver::TokioAsyncResolver,
 }
 
 impl AsyncResolver {
     pub(crate) async fn new(config: Option<ResolverConfig>) -> Result<Self> {
         let resolver = match config {
-            Some(config) => {
-                trust_dns_resolver::TokioAsyncResolver::tokio(config, Default::default())
-                    .map_err(Error::from_resolve_error)?
-            }
-            None => trust_dns_resolver::TokioAsyncResolver::tokio_from_system_conf()
+            Some(config) => hickory_resolver::TokioAsyncResolver::tokio(config, Default::default()),
+            None => hickory_resolver::TokioAsyncResolver::tokio_from_system_conf()
                 .map_err(Error::from_resolve_error)?,
         };
 
