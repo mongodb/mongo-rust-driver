@@ -45,14 +45,6 @@ pub struct InsertManyResult {
     pub inserted_ids: HashMap<usize, Bson>,
 }
 
-impl InsertManyResult {
-    pub(crate) fn new() -> Self {
-        InsertManyResult {
-            inserted_ids: HashMap::new(),
-        }
-    }
-}
-
 /// The result of a [`Collection::update_one`](../struct.Collection.html#method.update_one) or
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
 #[skip_serializing_none]
