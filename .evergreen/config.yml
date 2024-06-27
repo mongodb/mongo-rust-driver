@@ -581,6 +581,7 @@ task_groups:
           add_expansions_to_env: true
           args:
             - ${DRIVERS_TOOLS}/.evergreen/atlas/teardown-atlas-cluster.sh
+      - func: "upload test results"
     tasks:
       - test-search-index
 

@@ -367,8 +367,7 @@ async fn search_index_requires_explicit_vector() {
     let result = coll0
         .create_search_index(
             SearchIndexModel::builder()
-                .name(String::from("test-search-index-case7-vector"))
-                .index_type(SearchIndexType::VectorSearch)
+                .name(String::from("test-search-index-case8-error"))
                 .definition(doc! {
                     "fields": [{
                         "type": "vector",
