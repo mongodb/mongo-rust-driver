@@ -46,7 +46,7 @@ impl OperationWithDefaults for Find {
 
             if options
                 .batch_size
-                .map(|batch_size| batch_size > std::i32::MAX as u32)
+                .map(|batch_size| batch_size > i32::MAX as u32)
                 == Some(true)
             {
                 return Err(ErrorKind::InvalidArgument {

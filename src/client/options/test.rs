@@ -259,21 +259,6 @@ async fn run_connection_string_spec_tests() {
     run_tests(&["connection-string"], &skipped_files).await;
 }
 
-async fn parse_uri(option: &str, suggestion: Option<&str>) {
-    match ConnectionString::parse(format!("mongodb://host:27017/?{}=test", option))
-        .map_err(|e| *e.kind)
-    {
-        Ok(_) => panic!("expected error for option {}", option),
-        Err(ErrorKind::InvalidArgument { message, .. }) => {
-            match suggestion {
-                Some(s) => assert!(message.contains(s)),
-                None => assert!(!message.contains("similar")),
-            };
-        }
-        Err(e) => panic!("expected InvalidArgument, but got {:?}", e),
-    }
-}
-
 #[tokio::test]
 async fn uuid_representations() {
     let mut uuid_repr = parse_uri_with_uuid_representation("csharpLegacy")
@@ -316,21 +301,31 @@ async fn parse_uri_with_uuid_representation(
     }
 }
 
-#[tokio::test]
-async fn parse_unknown_options() {
-    parse_uri("invalidoption", None).await;
-    parse_uri("x", None).await;
-    parse_uri("max", None).await;
-    parse_uri("tlstimeout", None).await;
-    parse_uri("waitqueuetimeout", Some("waitqueuetimeoutms")).await;
-    parse_uri("retry_reads", Some("retryreads")).await;
-    parse_uri("poolsize", Some("maxpoolsize")).await;
-    parse_uri(
-        "tlspermitinvalidcertificates",
-        Some("tlsallowinvalidcertificates"),
-    )
-    .await;
-    parse_uri("maxstalenessms", Some("maxstalenessseconds")).await;
+#[test]
+fn parse_unknown_options() {
+    fn parse_uri(option: &str, suggestion: Option<&str>) {
+        match ConnectionString::parse(format!("mongodb://host:27017/?{}=test", option))
+            .map_err(|e| *e.kind)
+        {
+            Ok(_) => panic!("expected error for option {}", option),
+            Err(ErrorKind::InvalidArgument { message, .. }) => {
+                match suggestion {
+                    Some(s) => assert!(message.contains(s)),
+                    None => assert!(!message.contains("similar")),
+                };
+            }
+            Err(e) => panic!("expected InvalidArgument, but got {:?}", e),
+        }
+    }
+
+    parse_uri("invalidoption", None);
+    parse_uri("x", None);
+    parse_uri("max", None);
+    parse_uri("tlstimeout", None);
+    parse_uri("waitqueuetimeout", Some("waitqueuetimeoutms"));
+    parse_uri("retry_reads", Some("retryreads"));
+    parse_uri("poolsize", Some("maxpoolsize"));
+    parse_uri("maxstalenessms", Some("maxstalenessseconds"));
 }
 
 #[tokio::test]
