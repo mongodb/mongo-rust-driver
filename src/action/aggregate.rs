@@ -218,8 +218,9 @@ impl<'a, T> Action for Aggregate<'a, ExplicitSession<'a>, T> {
             self.options,
         );
         let client = self.target.client();
+        let session = self.session;
         client
-            .execute_session_cursor_operation(aggregate, self.session.0)
+            .execute_session_cursor_operation(aggregate, session.0)
             .await
     }
 }
