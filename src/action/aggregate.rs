@@ -128,7 +128,7 @@ impl<'a, Session, T> Aggregate<'a, Session, T> {
     );
 }
 
-impl<'a> Aggregate<'a, ImplicitSession> {
+impl<'a, T> Aggregate<'a, ImplicitSession, T> {
     /// Use the provided session when running the operation.
     pub fn session(
         self,
@@ -144,7 +144,7 @@ impl<'a> Aggregate<'a, ImplicitSession> {
     }
 }
 
-impl<'a, Session> Aggregate<'a, Session, Document> {
+impl<'a, Session, T> Aggregate<'a, Session, T> {
     /// Use the provided type for the returned cursor.
     ///
     /// ```rust
@@ -167,7 +167,7 @@ impl<'a, Session> Aggregate<'a, Session, Document> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn with_type<T>(self) -> Aggregate<'a, Session, T> {
+    pub fn with_type<U>(self) -> Aggregate<'a, Session, U> {
         Aggregate {
             target: self.target,
             pipeline: self.pipeline,
@@ -199,11 +199,11 @@ impl<'a, T> Action for Aggregate<'a, ImplicitSession, T> {
     }
 }
 
-#[action_impl(sync = crate::sync::SessionCursor<Document>)]
-impl<'a> Action for Aggregate<'a, ExplicitSession<'a>> {
+#[action_impl(sync = crate::sync::SessionCursor<T>)]
+impl<'a, T> Action for Aggregate<'a, ExplicitSession<'a>, T> {
     type Future = AggregateSessionFuture;
 
-    async fn execute(mut self) -> Result<SessionCursor<Document>> {
+    async fn execute(mut self) -> Result<SessionCursor<T>> {
         resolve_read_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
         resolve_write_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
         resolve_selection_criteria_with_session!(
@@ -218,8 +218,9 @@ impl<'a> Action for Aggregate<'a, ExplicitSession<'a>> {
             self.options,
         );
         let client = self.target.client();
+        let session = self.session;
         client
-            .execute_session_cursor_operation(aggregate, self.session.0)
+            .execute_session_cursor_operation(aggregate, session.0)
             .await
     }
 }
