@@ -137,3 +137,6 @@ In 2.x, most but not all option struct builders would allow value conversion via
 
 ## `comment_bson` is now `comment`
 In 2.x, the `AggregateOptions`, `FindOptions`, and `FindOneOptions` structs had both `comment_bson` and legacy `comment` fields.  In 3.x, `comment_bson` has been renamed to `comment`, replacing the legacy field.
+
+## `bson-*` features removed
+The 2.x driver provided features like `bson-chrono-0_4` that did not add any additional driver functionality but would enable the corresponding feature of the `bson` dependency.  These have been removed from 3.x; if your project needs specific `bson` features, you should list it as a top-level dependency with those features enabled.
