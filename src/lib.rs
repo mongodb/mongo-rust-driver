@@ -71,7 +71,7 @@ pub use client::session::ClusterTime;
 pub use coll::Namespace;
 pub use index::IndexModel;
 pub use sdam::public::*;
-pub use search_index::SearchIndexModel;
+pub use search_index::{SearchIndexModel, SearchIndexType};
 
 /// A boxed future.
 pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
