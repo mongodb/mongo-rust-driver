@@ -7,6 +7,7 @@ use crate::{
     },
     test::Event,
     ServerType,
+    TopologyType,
 };
 use serde::Deserialize;
 
@@ -83,8 +84,15 @@ pub(crate) enum ExpectedSdamEvent {
         previous_description: Option<TestServerDescription>,
         new_description: Option<TestServerDescription>,
     },
-    #[serde(rename = "topologyDescriptionChangedEvent")]
-    TopologyDescriptionChanged {},
+    #[serde(rename = "topologyOpeningEvent")]
+    TopologyOpening {},
+    #[serde(rename = "topologyClosedEvent")]
+    TopologyClosed {},
+    #[serde(rename = "topologyDescriptionChangedEvent", rename_all = "camelCase")]
+    TopologyDescriptionChanged {
+        previous_description: Option<TestTopologyDescription>,
+        new_description: Option<TestTopologyDescription>,
+    },
     #[serde(rename = "serverHeartbeatStartedEvent", rename_all = "camelCase")]
     ServerHeartbeatStarted { awaited: Option<bool> },
     #[serde(rename = "serverHeartbeatSucceededEvent", rename_all = "camelCase")]
@@ -98,6 +106,13 @@ pub(crate) enum ExpectedSdamEvent {
 pub(crate) struct TestServerDescription {
     #[serde(rename = "type")]
     pub(crate) server_type: Option<ServerType>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TestTopologyDescription {
+    #[serde(rename = "type")]
+    pub(crate) topology_type: Option<TopologyType>,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize)]
@@ -132,6 +147,10 @@ pub(crate) enum ObserveEvent {
     ConnectionCheckedIn,
     #[serde(rename = "serverDescriptionChangedEvent")]
     ServerDescriptionChanged,
+    #[serde(rename = "topologyOpeningEvent")]
+    TopologyOpening,
+    #[serde(rename = "topologyClosedEvent")]
+    TopologyClosed,
     #[serde(rename = "topologyDescriptionChangedEvent")]
     TopologyDescriptionChanged,
     #[serde(rename = "serverHeartbeatStartedEvent")]
@@ -166,6 +185,8 @@ impl ObserveEvent {
             ) => true,
             (Self::ConnectionCheckedOut, Event::Cmap(CmapEvent::ConnectionCheckedOut(_))) => true,
             (Self::ConnectionCheckedIn, Event::Cmap(CmapEvent::ConnectionCheckedIn(_))) => true,
+            (Self::TopologyOpening, Event::Sdam(SdamEvent::TopologyOpening(_))) => true,
+            (Self::TopologyClosed, Event::Sdam(SdamEvent::TopologyClosed(_))) => true,
             (
                 Self::TopologyDescriptionChanged,
                 Event::Sdam(SdamEvent::TopologyDescriptionChanged(_)),

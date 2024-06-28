@@ -428,12 +428,11 @@ impl TopologyWorker {
             while close_futures.next().await.is_some() {}
 
             if let Some(emitter) = self.event_emitter {
-                if !self.topology_description.servers.is_empty()
-                    && self.options.load_balanced != Some(true)
-                {
+                if !self.topology_description.servers.is_empty() {
                     let previous_description = self.topology_description;
                     let mut new_description = previous_description.clone();
                     new_description.servers.clear();
+                    new_description.topology_type = TopologyType::Unknown;
 
                     emitter
                         .emit(SdamEvent::TopologyDescriptionChanged(Box::new(
