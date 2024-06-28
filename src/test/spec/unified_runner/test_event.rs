@@ -84,6 +84,10 @@ pub(crate) enum ExpectedSdamEvent {
         previous_description: Option<TestServerDescription>,
         new_description: Option<TestServerDescription>,
     },
+    #[serde(rename = "topologyOpeningEvent")]
+    TopologyOpening {},
+    #[serde(rename = "topologyClosedEvent")]
+    TopologyClosed {},
     #[serde(rename = "topologyDescriptionChangedEvent", rename_all = "camelCase")]
     TopologyDescriptionChanged {
         previous_description: Option<TestTopologyDescription>,
@@ -143,6 +147,10 @@ pub(crate) enum ObserveEvent {
     ConnectionCheckedIn,
     #[serde(rename = "serverDescriptionChangedEvent")]
     ServerDescriptionChanged,
+    #[serde(rename = "topologyOpeningEvent")]
+    TopologyOpening,
+    #[serde(rename = "topologyClosedEvent")]
+    TopologyClosed,
     #[serde(rename = "topologyDescriptionChangedEvent")]
     TopologyDescriptionChanged,
     #[serde(rename = "serverHeartbeatStartedEvent")]
@@ -177,6 +185,8 @@ impl ObserveEvent {
             ) => true,
             (Self::ConnectionCheckedOut, Event::Cmap(CmapEvent::ConnectionCheckedOut(_))) => true,
             (Self::ConnectionCheckedIn, Event::Cmap(CmapEvent::ConnectionCheckedIn(_))) => true,
+            (Self::TopologyOpening, Event::Sdam(SdamEvent::TopologyOpening(_))) => true,
+            (Self::TopologyClosed, Event::Sdam(SdamEvent::TopologyClosed(_))) => true,
             (
                 Self::TopologyDescriptionChanged,
                 Event::Sdam(SdamEvent::TopologyDescriptionChanged(_)),

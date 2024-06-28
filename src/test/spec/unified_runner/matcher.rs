@@ -351,6 +351,8 @@ fn sdam_events_match(actual: &SdamEvent, expected: &ExpectedSdamEvent) -> Result
             }
             Ok(())
         }
+        (SdamEvent::TopologyOpening(_), ExpectedSdamEvent::TopologyOpening {}) => Ok(()),
+        (SdamEvent::TopologyClosed(_), ExpectedSdamEvent::TopologyClosed {}) => Ok(()),
         (
             SdamEvent::TopologyDescriptionChanged(actual),
             ExpectedSdamEvent::TopologyDescriptionChanged {
