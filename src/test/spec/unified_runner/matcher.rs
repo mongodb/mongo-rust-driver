@@ -352,9 +352,26 @@ fn sdam_events_match(actual: &SdamEvent, expected: &ExpectedSdamEvent) -> Result
             Ok(())
         }
         (
-            SdamEvent::TopologyDescriptionChanged(_),
-            ExpectedSdamEvent::TopologyDescriptionChanged {},
-        ) => Ok(()),
+            SdamEvent::TopologyDescriptionChanged(actual),
+            ExpectedSdamEvent::TopologyDescriptionChanged {
+                previous_description,
+                new_description,
+            },
+        ) => {
+            if let Some(expected_prev) = previous_description {
+                match_opt(
+                    &actual.previous_description.topology_type(),
+                    &expected_prev.topology_type,
+                )?;
+            }
+            if let Some(expected_new) = new_description {
+                match_opt(
+                    &actual.new_description.topology_type(),
+                    &expected_new.topology_type,
+                )?;
+            }
+            Ok(())
+        }
         (
             SdamEvent::ServerHeartbeatStarted(actual),
             ExpectedSdamEvent::ServerHeartbeatStarted { awaited },
