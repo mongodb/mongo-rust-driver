@@ -22,6 +22,8 @@ impl Client {
     ///
     /// `await` will return d[`Result<SummaryBulkWriteResult`] or d[`Result<VerboseBulkWriteResult`]
     /// if [`verbose_results`](BulkWrite::verbose_results) is configured.
+    ///
+    /// Bulk write is only available on MongoDB 8.0+.
     #[deeplink]
     pub fn bulk_write(
         &self,
@@ -47,6 +49,8 @@ impl crate::sync::Client {
     /// [`run`](BulkWrite::run) will return d[`Result<SummaryBulkWriteResult`] or
     /// d[`Result<VerboseBulkWriteResult`] if [`verbose_results`](BulkWrite::verbose_results) is
     /// configured.
+    ///
+    /// Bulk write is only available on MongoDB 8.0+.
     #[deeplink]
     pub fn bulk_write(
         &self,
