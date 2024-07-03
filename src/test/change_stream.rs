@@ -662,3 +662,13 @@ async fn split_large_event() -> Result<()> {
 
     Ok(())
 }
+
+// Regression test: `Collection::watch` uses the type parameter.  This is not flagged as a test to
+// run because it's just asserting that this compiles.
+#[allow(unreachable_code, unused_variables)]
+async fn _collection_watch_typed() {
+    let coll: Collection<bson::RawDocumentBuf> = unimplemented!();
+    let mut stream = coll.watch().await.unwrap();
+    let _: Option<crate::error::Result<ChangeStreamEvent<bson::RawDocumentBuf>>> =
+        stream.next().await;
+}
