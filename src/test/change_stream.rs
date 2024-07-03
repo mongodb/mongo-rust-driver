@@ -665,7 +665,7 @@ async fn split_large_event() -> Result<()> {
 
 // Regression test: `Collection::watch` uses the type parameter.  This is not flagged as a test to
 // run because it's just asserting that this compiles.
-#[allow(unreachable_code, unused_variables)]
+#[allow(unreachable_code, unused_variables, clippy::diverging_sub_expression)]
 async fn _collection_watch_typed() {
     let coll: Collection<bson::RawDocumentBuf> = unimplemented!();
     let mut stream = coll.watch().await.unwrap();
