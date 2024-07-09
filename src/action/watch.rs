@@ -97,8 +97,8 @@ where
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
     ///
-    /// `await` will return d[`Result<ChangeStream<ChangeStreamEvent<Document>>>`] or
-    /// d[`Result<SessionChangeStream<ChangeStreamEvent<Document>>>`] if a
+    /// `await` will return d[`Result<ChangeStream<ChangeStreamEvent<T>>>`] or
+    /// d[`Result<SessionChangeStream<ChangeStreamEvent<T>>>`] if a
     /// [`ClientSession`] has been provided.
     #[deeplink]
     pub fn watch(&self) -> Watch<T> {
