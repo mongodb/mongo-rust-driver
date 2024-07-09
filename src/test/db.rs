@@ -405,7 +405,26 @@ async fn aggregate_with_generics() {
     let _: Cursor<Document> = database.aggregate(pipeline.clone()).await.unwrap();
 
     // Assert that data is properly deserialized when using with_type
-    let mut cursor = database.aggregate(pipeline).with_type::<A>().await.unwrap();
+    let mut cursor = database
+        .aggregate(pipeline.clone())
+        .with_type::<A>()
+        .await
+        .unwrap();
     assert!(cursor.advance().await.unwrap());
     assert_eq!(&cursor.deserialize_current().unwrap().str, "hi");
+
+    // Assert that `with_type` can be used with an explicit session.
+    let mut session = client.start_session().await.unwrap();
+    let _ = database
+        .aggregate(pipeline.clone())
+        .session(&mut session)
+        .with_type::<A>()
+        .await
+        .unwrap();
+    let _ = database
+        .aggregate(pipeline.clone())
+        .with_type::<A>()
+        .session(&mut session)
+        .await
+        .unwrap();
 }

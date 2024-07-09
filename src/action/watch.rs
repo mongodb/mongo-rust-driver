@@ -1,6 +1,7 @@
-use std::time::Duration;
+use std::{marker::PhantomData, time::Duration};
 
 use bson::{Bson, Document, Timestamp};
+use serde::de::DeserializeOwned;
 
 use super::{action_impl, deeplink, option_setters, ExplicitSession, ImplicitSession};
 use crate::{
@@ -96,11 +97,11 @@ where
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
     ///
-    /// `await` will return d[`Result<ChangeStream<ChangeStreamEvent<Document>>>`] or
-    /// d[`Result<SessionChangeStream<ChangeStreamEvent<Document>>>`] if a
+    /// `await` will return d[`Result<ChangeStream<ChangeStreamEvent<T>>>`] or
+    /// d[`Result<SessionChangeStream<ChangeStreamEvent<T>>>`] if a
     /// [`ClientSession`] has been provided.
     #[deeplink]
-    pub fn watch(&self) -> Watch {
+    pub fn watch(&self) -> Watch<T> {
         Watch::new(self.client(), self.namespace().into())
     }
 }
@@ -153,7 +154,7 @@ where
     ///
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
-    pub fn watch(&self) -> Watch {
+    pub fn watch(&self) -> Watch<T> {
         self.async_collection.watch()
     }
 }
@@ -161,16 +162,17 @@ where
 /// Starts a new [`ChangeStream`] that receives events for all changes in a given scope.  Create by
 /// calling [`Client::watch`], [`Database::watch`], or [`Collection::watch`].
 #[must_use]
-pub struct Watch<'a, S = ImplicitSession> {
+pub struct Watch<'a, T = Document, S = ImplicitSession> {
     client: &'a Client,
     target: AggregateTarget,
     pipeline: Vec<Document>,
     options: Option<ChangeStreamOptions>,
     session: S,
     cluster: bool,
+    phantom: PhantomData<fn() -> T>,
 }
 
-impl<'a> Watch<'a, ImplicitSession> {
+impl<'a, T> Watch<'a, T, ImplicitSession> {
     fn new(client: &'a Client, target: AggregateTarget) -> Self {
         Self {
             client,
@@ -179,6 +181,7 @@ impl<'a> Watch<'a, ImplicitSession> {
             options: None,
             session: ImplicitSession,
             cluster: false,
+            phantom: PhantomData,
         }
     }
 
@@ -190,6 +193,7 @@ impl<'a> Watch<'a, ImplicitSession> {
             options: None,
             session: ImplicitSession,
             cluster: true,
+            phantom: PhantomData,
         }
     }
 }
@@ -235,12 +239,12 @@ impl<'a, S> Watch<'a, S> {
     );
 }
 
-impl<'a> Watch<'a, ImplicitSession> {
+impl<'a, T> Watch<'a, T, ImplicitSession> {
     /// Use the provided ['ClientSession'].
     pub fn session<'s>(
         self,
         session: impl Into<&'s mut ClientSession>,
-    ) -> Watch<'a, ExplicitSession<'s>> {
+    ) -> Watch<'a, T, ExplicitSession<'s>> {
         Watch {
             client: self.client,
             target: self.target,
@@ -248,15 +252,16 @@ impl<'a> Watch<'a, ImplicitSession> {
             options: self.options,
             session: ExplicitSession(session.into()),
             cluster: self.cluster,
+            phantom: PhantomData,
         }
     }
 }
 
-#[action_impl(sync = crate::sync::ChangeStream<ChangeStreamEvent<Document>>)]
-impl<'a> Action for Watch<'a, ImplicitSession> {
+#[action_impl(sync = crate::sync::ChangeStream<ChangeStreamEvent<T>>)]
+impl<'a, T: DeserializeOwned + Unpin + Send + Sync> Action for Watch<'a, T, ImplicitSession> {
     type Future = WatchFuture;
 
-    async fn execute(mut self) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
+    async fn execute(mut self) -> Result<ChangeStream<ChangeStreamEvent<T>>> {
         resolve_options!(
             self.client,
             self.options,
@@ -273,11 +278,11 @@ impl<'a> Action for Watch<'a, ImplicitSession> {
     }
 }
 
-#[action_impl(sync = crate::sync::SessionChangeStream<ChangeStreamEvent<Document>>)]
-impl<'a> Action for Watch<'a, ExplicitSession<'a>> {
+#[action_impl(sync = crate::sync::SessionChangeStream<ChangeStreamEvent<T>>)]
+impl<'a, T: DeserializeOwned + Unpin + Send + Sync> Action for Watch<'a, T, ExplicitSession<'a>> {
     type Future = WatchSessionFuture;
 
-    async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
+    async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<T>>> {
         resolve_read_concern_with_session!(self.client, self.options, Some(&mut *self.session.0))?;
         resolve_selection_criteria_with_session!(
             self.client,
