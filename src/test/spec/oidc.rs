@@ -1074,12 +1074,22 @@ mod basic {
             .oidc_callback(oidc::Callback::human(move |_| {
                 let call_count = cb_call_count.clone();
                 async move {
-                    *call_count.lock().await += 1;
-                    Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
-                        expires: None,
-                        refresh_token: None,
-                    })
+                    let mut cc = call_count.lock().await;
+                    *cc += 1;
+                    if *cc == 1 {
+                        Ok(oidc::IdpServerResponse {
+                            access_token: tokio::fs::read_to_string(token_dir!("test_user1"))
+                                .await?,
+                            expires: None,
+                            refresh_token: Some("fake refresh token".to_string()),
+                        })
+                    } else {
+                        Ok(oidc::IdpServerResponse {
+                            access_token: "bad token".to_string(),
+                            expires: None,
+                            refresh_token: Some("fake refresh token".to_string()),
+                        })
+                    }
                 }
                 .boxed()
             }))
@@ -1112,7 +1122,7 @@ mod basic {
             crate::error::ErrorKind::Authentication { .. },
         ));
 
-        assert_eq!(2, *(*call_count).lock().await);
+        assert_eq!(3, *(*call_count).lock().await);
         Ok(())
     }
 
