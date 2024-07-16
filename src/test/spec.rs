@@ -24,7 +24,7 @@ mod sessions;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
 mod transactions;
-pub mod unified_runner;
+pub(crate) mod unified_runner;
 mod v2_runner;
 mod versioned_api;
 mod write_error;
