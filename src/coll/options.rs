@@ -834,7 +834,10 @@ pub struct FindOptions {
     #[serde(skip)]
     pub selection_criteria: Option<SelectionCriteria>,
 
-    /// Whether to return the record identifier for each document.
+    /// Whether to return the record identifier for each document. If true, adds a `$recordId`
+    /// field to the returned documents.
+    ///
+    /// Defaults to false.
     pub show_record_id: Option<bool>,
 
     /// The number of documents to skip before counting.
