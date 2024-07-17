@@ -55,6 +55,7 @@ use crate::{
         DeleteOptions,
         DistinctOptions,
         DropCollectionOptions,
+        DropIndexOptions,
         EstimatedDocumentCountOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
@@ -434,6 +435,7 @@ impl<'de> Deserialize<'de> for Operation {
             "encrypt" => deserialize_op::<Encrypt>(definition.arguments),
             #[cfg(feature = "in-use-encryption-unstable")]
             "decrypt" => deserialize_op::<Decrypt>(definition.arguments),
+            "dropIndex" => deserialize_op::<DropIndex>(definition.arguments),
             s => Ok(Box::new(UnimplementedOperation {
                 _name: s.to_string(),
             }) as Box<dyn TestOperation>),
@@ -2907,6 +2909,36 @@ impl TestOperation for IterateOnce {
                 TestCursor::Closed => panic!("Attempted to call IterateOnce on a closed cursor"),
             }
             test_runner.return_cursor(id, cursor).await;
+            Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct DropIndex {
+    session: Option<String>,
+    name: String,
+    #[serde(flatten)]
+    options: Option<DropIndexOptions>,
+}
+
+impl TestOperation for DropIndex {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let collection = test_runner.get_collection(id).await;
+            with_opt_session!(
+                test_runner,
+                &self.session,
+                collection
+                    .drop_index(&self.name)
+                    .with_options(self.options.clone())
+            )
+            .await?;
             Ok(None)
         }
         .boxed()

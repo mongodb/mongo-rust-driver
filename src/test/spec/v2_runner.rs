@@ -51,6 +51,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "mapReduce",
 ];
 
+#[cfg(feature = "in-use-encryption-unstable")]
 pub(crate) fn run_v2_tests(spec: &'static [&'static str]) -> RunV2TestsAction {
     RunV2TestsAction {
         spec,
