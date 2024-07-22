@@ -55,7 +55,7 @@ impl Benchmark for JsonMultiExportBenchmark {
 
                 for mut doc in docs {
                     doc.insert("file", i as i32);
-                    coll.insert_one(doc, None).await?;
+                    coll.insert_one(doc).await?;
                 }
 
                 let ok: anyhow::Result<()> = Ok(());
@@ -89,10 +89,7 @@ impl Benchmark for JsonMultiExportBenchmark {
                 let file_name = path.join(format!("ldjson{:03}.txt", i));
                 let mut file = File::open_write(&file_name).await.unwrap();
 
-                let mut cursor = coll_ref
-                    .find(Some(doc! { "file": i as i32 }), None)
-                    .await
-                    .unwrap();
+                let mut cursor = coll_ref.find(doc! { "file": i as i32 }).await.unwrap();
 
                 while let Some(doc) = cursor.try_next().await.unwrap() {
                     file.write_line(serde_json::to_string(&doc).unwrap().as_str())

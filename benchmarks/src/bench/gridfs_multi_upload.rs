@@ -1,6 +1,7 @@
 use std::{fs::read_dir, path::PathBuf};
 
 use anyhow::{Context, Result};
+use futures::AsyncWriteExt;
 use mongodb::{gridfs::GridFsBucket, Client};
 
 use crate::{
@@ -39,11 +40,9 @@ impl Benchmark for GridFsMultiUploadBenchmark {
 
     async fn before_task(&mut self) -> Result<()> {
         self.bucket.drop().await.context("bucket drop")?;
-
-        self.bucket
-            .upload_from_futures_0_3_reader("beforetask", &[11u8][..], None)
-            .await
-            .context("single byte upload")?;
+        let mut upload = self.bucket.open_upload_stream("beforetask").await?;
+        upload.write_all(&[11u8][..]).await?;
+        upload.close().await?;
 
         Ok(())
     }
@@ -57,10 +56,11 @@ impl Benchmark for GridFsMultiUploadBenchmark {
             tasks.push(crate::spawn(async move {
                 let path = entry?.path();
                 let file = open_async_read_compat(&path).await?;
-                bucket
-                    .upload_from_futures_0_3_reader(path.display().to_string(), file, None)
-                    .await
-                    .context("upload file")?;
+                let mut upload = bucket
+                    .open_upload_stream(path.display().to_string())
+                    .await?;
+                futures_util::io::copy(file, &mut upload).await?;
+                upload.close().await?;
 
                 let ok: anyhow::Result<()> = Ok(());
                 ok

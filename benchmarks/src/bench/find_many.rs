@@ -3,7 +3,7 @@ use std::{convert::TryInto, path::PathBuf};
 use anyhow::{bail, Result};
 use futures::stream::StreamExt;
 use mongodb::{
-    bson::{Bson, Document, RawDocumentBuf},
+    bson::{doc, Bson, Document, RawDocumentBuf},
     Client,
     Collection,
     Database,
@@ -59,7 +59,7 @@ impl Benchmark for FindManyBenchmark {
 
         let coll = db.collection(&COLL_NAME);
         let docs = vec![doc.clone(); num_iter];
-        coll.insert_many(docs, None).await?;
+        coll.insert_many(docs).await?;
 
         Ok(FindManyBenchmark {
             db,
@@ -74,7 +74,7 @@ impl Benchmark for FindManyBenchmark {
             bench: &FindManyBenchmark,
         ) -> Result<()> {
             let coll = bench.coll.clone_with_type::<T>();
-            let mut cursor = coll.find(None, None).await?;
+            let mut cursor = coll.find(doc! {}).await?;
             while let Some(doc) = cursor.next().await {
                 doc?;
             }

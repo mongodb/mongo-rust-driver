@@ -40,7 +40,7 @@ impl Benchmark for RunCommandBenchmark {
         for _ in 0..self.num_iter {
             let _doc = self
                 .db
-                .run_command(self.cmd.clone(), None)
+                .run_command(self.cmd.clone())
                 .await
                 .context("run command")?;
         }
