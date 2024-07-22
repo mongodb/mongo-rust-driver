@@ -149,7 +149,7 @@ pub async fn drop_database(uri: &str, database: &str) -> Result<()> {
 
     let hello = client
         .database("admin")
-        .run_command(doc! { "hello": true }, None)
+        .run_command(doc! { "hello": true })
         .await?;
 
     client.database(&database).drop().await?;
@@ -162,10 +162,10 @@ pub async fn drop_database(uri: &str, database: &str) -> Result<()> {
         for host in options.hosts {
             client
                 .database("admin")
-                .run_command(
-                    doc! { "flushRouterConfig": 1 },
-                    SelectionCriteria::Predicate(Arc::new(move |s| s.address() == &host)),
-                )
+                .run_command(doc! { "flushRouterConfig": 1 })
+                .selection_criteria(SelectionCriteria::Predicate(Arc::new(move |s| {
+                    s.address() == &host
+                })))
                 .await?;
         }
     }

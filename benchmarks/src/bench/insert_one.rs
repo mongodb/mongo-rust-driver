@@ -64,7 +64,7 @@ impl Benchmark for InsertOneBenchmark {
     async fn before_task(&mut self) -> Result<()> {
         self.coll.drop().await?;
         self.db
-            .create_collection(COLL_NAME.as_str(), None)
+            .create_collection(COLL_NAME.as_str())
             .await
             .context("create collection")?;
 
@@ -74,7 +74,7 @@ impl Benchmark for InsertOneBenchmark {
     async fn do_task(&self) -> Result<()> {
         for _ in 0..self.num_iter {
             self.coll
-                .insert_one(&self.doc, None)
+                .insert_one(&self.doc)
                 .await
                 .context("insert one")?;
         }

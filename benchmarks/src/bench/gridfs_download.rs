@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use futures::{AsyncReadExt, AsyncWriteExt};
 use mongodb::{bson::Bson, gridfs::GridFsBucket, Client};
 
 use crate::{
@@ -33,24 +34,25 @@ impl Benchmark for GridFsDownloadBenchmark {
         let bucket = db.gridfs_bucket(None);
 
         let file = open_async_read_compat(&options.path).await?;
-        let file_id = bucket
-            .upload_from_futures_0_3_reader("gridfstest", file, None)
-            .await
-            .context("upload file")?;
+        let mut upload = bucket.open_upload_stream("gridfstest").await?;
+        let file_id = upload.id().clone();
+        futures_util::io::copy(file, &mut upload).await?;
+        upload.close().await?;
 
         Ok(Self {
             uri: options.uri,
             bucket,
-            file_id: file_id.into(),
+            file_id,
         })
     }
 
     async fn do_task(&self) -> Result<()> {
         let mut buf = vec![];
-        self.bucket
-            .download_to_futures_0_3_writer(self.file_id.clone(), &mut buf)
-            .await
-            .context("download file")?;
+        let mut download = self
+            .bucket
+            .open_download_stream(self.file_id.clone())
+            .await?;
+        download.read_to_end(&mut buf).await?;
 
         Ok(())
     }

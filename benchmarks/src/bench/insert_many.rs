@@ -64,7 +64,7 @@ impl Benchmark for InsertManyBenchmark {
     async fn before_task(&mut self) -> Result<()> {
         self.coll.drop().await?;
         self.db
-            .create_collection(COLL_NAME.as_str(), None)
+            .create_collection(COLL_NAME.as_str())
             .await
             .context("create in before")?;
 
@@ -74,7 +74,7 @@ impl Benchmark for InsertManyBenchmark {
     async fn do_task(&self) -> Result<()> {
         let insertions = vec![&self.doc; self.num_copies];
         self.coll
-            .insert_many(insertions, None)
+            .insert_many(insertions)
             .await
             .context("insert many")?;
 

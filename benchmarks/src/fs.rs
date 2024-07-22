@@ -64,7 +64,7 @@ impl BufReader {
         }
     }
 
-    pub(crate) fn lines(self) -> impl Stream<Item = std::io::Result<String>> {
+    pub(crate) fn lines(self) -> impl tokio_stream::Stream<Item = std::io::Result<String>> {
         tokio_stream::wrappers::LinesStream::new(self.inner.lines())
     }
 }

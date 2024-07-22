@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use futures::AsyncWriteExt;
-use mongodb::{bson::oid::ObjectId, gridfs::GridFsBucket, Client};
+use mongodb::{bson::Bson, gridfs::GridFsBucket, Client};
 use once_cell::sync::Lazy;
 
 use crate::{
@@ -19,7 +19,7 @@ static DOWNLOAD_PATH: Lazy<PathBuf> =
 pub struct GridFsMultiDownloadBenchmark {
     uri: String,
     bucket: GridFsBucket,
-    ids: Vec<ObjectId>,
+    ids: Vec<Bson>,
 }
 
 pub struct Options {
@@ -46,10 +46,12 @@ impl Benchmark for GridFsMultiDownloadBenchmark {
             let path = entry?.path();
 
             let file = open_async_read_compat(&path).await?;
-            let id = bucket
-                .upload_from_futures_0_3_reader(path.display().to_string(), file, None)
-                .await
-                .context("upload file")?;
+            let mut upload = bucket
+                .open_upload_stream(path.display().to_string())
+                .await?;
+            let id = upload.id().clone();
+            futures_util::io::copy(file, &mut upload).await?;
+            upload.close().await?;
             ids.push(id);
         }
 
@@ -64,7 +66,7 @@ impl Benchmark for GridFsMultiDownloadBenchmark {
 
     async fn before_task(&mut self) -> Result<()> {
         for id in &self.ids {
-            let path = get_filename(id.clone());
+            let path = get_filename(&id);
             if Path::try_exists(&path)? {
                 remove_file(path)?;
             }
@@ -81,15 +83,12 @@ impl Benchmark for GridFsMultiDownloadBenchmark {
             let id = id.clone();
 
             tasks.push(crate::spawn(async move {
-                let download_path = get_filename(id);
+                let download_path = get_filename(&id);
                 let mut file = open_async_write_compat(&download_path)
                     .await
                     .context("open file")?;
-
-                bucket
-                    .download_to_futures_0_3_writer(id.into(), &mut file)
-                    .await
-                    .context("download file")?;
+                let download = bucket.open_download_stream(id).await?;
+                futures_util::io::copy(download, &mut file).await?;
 
                 file.flush().await?;
 
@@ -114,6 +113,6 @@ impl Benchmark for GridFsMultiDownloadBenchmark {
     }
 }
 
-fn get_filename(id: ObjectId) -> PathBuf {
+fn get_filename(id: &Bson) -> PathBuf {
     DOWNLOAD_PATH.join(format!("file{}.txt", id))
 }

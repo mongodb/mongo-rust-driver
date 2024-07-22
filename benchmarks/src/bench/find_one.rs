@@ -50,7 +50,7 @@ impl Benchmark for FindOneBenchmark {
         let coll = db.collection(&COLL_NAME);
         for i in 0..num_iter {
             doc.insert("_id", i as i32);
-            coll.insert_one(doc.clone(), None).await?;
+            coll.insert_one(doc.clone()).await?;
         }
 
         Ok(FindOneBenchmark {
@@ -63,9 +63,7 @@ impl Benchmark for FindOneBenchmark {
 
     async fn do_task(&self) -> Result<()> {
         for i in 0..self.num_iter {
-            self.coll
-                .find_one(Some(doc! { "_id": i as i32 }), None)
-                .await?;
+            self.coll.find_one(doc! { "_id": i as i32 }).await?;
         }
 
         Ok(())

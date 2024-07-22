@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use futures::AsyncReadExt;
+use futures::{AsyncReadExt, AsyncWriteExt};
 use mongodb::{gridfs::GridFsBucket, Client};
 
 use crate::{
@@ -44,20 +44,17 @@ impl Benchmark for GridFsUploadBenchmark {
 
     async fn before_task(&mut self) -> Result<()> {
         self.bucket.drop().await.context("bucket drop")?;
-
-        self.bucket
-            .upload_from_futures_0_3_reader("beforetask", &[11u8][..], None)
-            .await
-            .context("single byte upload")?;
+        let mut upload = self.bucket.open_upload_stream("beforetask").await?;
+        upload.write_all(&[11u8][..]).await?;
+        upload.close().await?;
 
         Ok(())
     }
 
     async fn do_task(&self) -> Result<()> {
-        self.bucket
-            .upload_from_futures_0_3_reader("gridfstest", &self.bytes[..], None)
-            .await
-            .context("upload bytes")?;
+        let mut upload = self.bucket.open_upload_stream("gridfstest").await?;
+        upload.write_all(&self.bytes[..]).await?;
+        upload.close().await?;
 
         Ok(())
     }
