@@ -43,7 +43,7 @@ features = ["sync"]
 | `aws-auth`                   | Enable support for the MONGODB-AWS authentication mechanism. |
 | `zlib-compression`           | Enable support for compressing messages with [`zlib`](https://zlib.net/). |
 | `zstd-compression`           | Enable support for compressing messages with [`zstd`](http://facebook.github.io/zstd/). |
-| `snappy-compression`         | Enable support for compressing messages with [`snappy`](http://google.github.io/snappy/) |
+| `snappy-compression`         | Enable support for compressing messages with [`snappy`](http://google.github.io/snappy/). |
 | `in-use-encryption-unstable` | Enable support for client-side field level encryption and queryable encryption. This API is unstable and may be subject to breaking changes in minor releases. |
 | `tracing-unstable`           | Enable support for emitting [`tracing`](https://docs.rs/tracing/latest/tracing/) events. This API is unstable and may be subject to breaking changes in minor releases. |
 | `compat-3-0-0`               | Required for future compatibility if default features are disabled. |
