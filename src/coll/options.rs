@@ -816,7 +816,13 @@ pub struct FindOptions {
     /// Whether the server should close the cursor after a period of inactivity.
     pub no_cursor_timeout: Option<bool>,
 
-    /// Limits the fields of the document being returned.
+    /// The [projection document](https://www.mongodb.com/docs/manual/reference/method/db.collection.find/#projection)
+    /// to determine which fields to include in the returned document.
+    ///
+    /// Specifying this option may cause deserialization errors if the returned fields do not fit
+    /// the schema of the collection's generic type. The
+    /// [`clone_with_type`](crate::Collection::clone_with_type) method can be used to retrieve a
+    /// handle to the collection with a different generic type configured.
     pub projection: Option<Document>,
 
     /// The read concern to use for this find query.
