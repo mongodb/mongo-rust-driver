@@ -138,10 +138,7 @@ functions:
     - command: expansions.update
       params:
         file: mo-expansion.yml
-
-  "run driver benchmarks":
     - command: shell.exec
-      type: test
       params:
         shell: bash
         working_dir: "src"
@@ -150,7 +147,20 @@ functions:
           export MONGODB_URI="${MONGODB_URI}"
           export SSL="${SSL}"
           . .evergreen/generate-uri.sh
+    - command: expansions.update
+      params:
+        file: src/uri-expansions.yml
 
+  "run driver benchmarks":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        include_expansions_in_env:
+          - MONGODB_URI
+        script: |
+          ${PREPARE_SHELL}
           .evergreen/run-driver-benchmarks.sh
 
   "run bson benchmarks":
