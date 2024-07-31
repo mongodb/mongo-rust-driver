@@ -9,7 +9,7 @@ use std::{
 use tokio::{io::AsyncWrite, net::TcpStream};
 
 use crate::{
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     options::ServerAddress,
     runtime,
 };
@@ -78,7 +78,12 @@ async fn tcp_try_connect(address: &SocketAddr) -> Result<TcpStream> {
 }
 
 async fn tcp_connect(address: &ServerAddress) -> Result<TcpStream> {
-    let mut socket_addrs: Vec<_> = runtime::resolve_address(address).await?.collect();
+    // "Happy Eyeballs": try addresses in parallel, interleaving IPv6 and IPv4, preferring IPv6.
+    // Based on the implementation in https://codeberg.org/KMK/happy-eyeballs.
+    let (addrs_v6, addrs_v4): (Vec<_>, Vec<_>) = runtime::resolve_address(address)
+        .await?
+        .partition(|a| matches!(a, SocketAddr::V6(_)));
+    let socket_addrs = interleave(addrs_v6, addrs_v4);
 
     if socket_addrs.is_empty() {
         return Err(ErrorKind::DnsResolve {
@@ -87,25 +92,75 @@ async fn tcp_connect(address: &ServerAddress) -> Result<TcpStream> {
         .into());
     }
 
-    // After considering various approaches, we decided to do what other drivers do, namely try
-    // each of the addresses in sequence with a preference for IPv4.
-    socket_addrs.sort_by_key(|addr| if addr.is_ipv4() { 0 } else { 1 });
-
-    let mut connect_error = None;
-
-    for address in &socket_addrs {
-        connect_error = match tcp_try_connect(address).await {
-            Ok(stream) => return Ok(stream),
-            Err(err) => Some(err),
-        };
+    fn handle_join(
+        result: std::result::Result<Result<TcpStream>, tokio::task::JoinError>,
+    ) -> Result<TcpStream> {
+        match result {
+            Ok(r) => r,
+            // JoinError indicates the task was cancelled or paniced, which should never happen
+            // here.
+            Err(e) => Err(Error::internal(format!("TCP connect task failure: {}", e))),
+        }
     }
 
+    static CONNECTION_ATTEMPT_DELAY: Duration = Duration::from_millis(250);
+
+    // Race connections
+    let mut attempts = tokio::task::JoinSet::new();
+    let mut connect_error = None;
+    'spawn: for a in socket_addrs {
+        attempts.spawn(async move { tcp_try_connect(&a).await });
+        let sleep = tokio::time::sleep(CONNECTION_ATTEMPT_DELAY);
+        tokio::pin!(sleep); // required for select!
+        while !attempts.is_empty() {
+            tokio::select! {
+                biased;
+                connect_res = attempts.join_next() => {
+                    match connect_res.map(handle_join) {
+                        // The gating `while !attempts.is_empty()` should mean this never happens.
+                        None => return Err(Error::internal("empty TCP connect task set")),
+                        // A connection succeeded, return it. The JoinSet will cancel remaining tasks on drop.
+                        Some(Ok(cnx)) => return Ok(cnx),
+                        // A connection failed. Remember the error and wait for any other remaining attempts.
+                        Some(Err(e)) => {
+                            connect_error.get_or_insert(e);
+                        },
+                    }
+                }
+                // CONNECTION_ATTEMPT_DELAY expired, spawn a new connection attempt.
+                _ = &mut sleep => continue 'spawn
+            }
+        }
+    }
+
+    // No more address to try. Drain the attempts until one succeeds.
+    while let Some(result) = attempts.join_next().await {
+        match handle_join(result) {
+            Ok(cnx) => return Ok(cnx),
+            Err(e) => {
+                connect_error.get_or_insert(e);
+            }
+        }
+    }
+
+    // All attempts failed.  Return the first error.
     Err(connect_error.unwrap_or_else(|| {
         ErrorKind::Internal {
             message: "connecting to all DNS results failed but no error reported".to_string(),
         }
         .into()
     }))
+}
+
+fn interleave<T>(left: Vec<T>, right: Vec<T>) -> Vec<T> {
+    let mut out = Vec::with_capacity(left.len() + right.len());
+    let (mut left, mut right) = (left.into_iter(), right.into_iter());
+    while let Some(a) = left.next() {
+        out.push(a);
+        std::mem::swap(&mut left, &mut right);
+    }
+    out.extend(right);
+    out
 }
 
 impl tokio::io::AsyncRead for AsyncStream {
