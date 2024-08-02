@@ -27,8 +27,7 @@ use std::{
 
 use anyhow::Result;
 use clap::{App, Arg, ArgMatches};
-use futures::Future;
-use futures::FutureExt;
+use futures::{Future, FutureExt};
 use mongodb::options::ClientOptions;
 use once_cell::sync::Lazy;
 
@@ -62,6 +61,7 @@ const DEEP_BSON_DECODING: &'static str = "Deep BSON Decoding";
 const FULL_BSON_ENCODING: &'static str = "Full BSON Encoding";
 const FULL_BSON_DECODING: &'static str = "Full BSON Decoding";
 const RUN_COMMAND_BENCH: &'static str = "Run Command";
+const RUN_COMMAND_COLD_START_BENCH: &'static str = "Run Command (cold start)";
 const FIND_ONE_BENCH: &'static str = "Find one";
 const FIND_MANY_BENCH: &'static str = "Find many and empty cursor";
 const FIND_MANY_BENCH_RAW: &'static str = "Find many and empty cursor (raw BSON)";
@@ -101,12 +101,14 @@ enum BenchmarkId {
     GridFsUpload,
     GridFsMultiDownload,
     GridFsMultiUpload,
+    RunCommandColdStart,
 }
 
 impl BenchmarkId {
     fn name(self) -> &'static str {
         match self {
             BenchmarkId::RunCommand => RUN_COMMAND_BENCH,
+            BenchmarkId::RunCommandColdStart => RUN_COMMAND_COLD_START_BENCH,
             BenchmarkId::FindOneById => FIND_ONE_BENCH,
             BenchmarkId::SmallDocInsertOne => SMALL_DOC_INSERT_ONE_BENCH,
             BenchmarkId::LargeDocInsertOne => LARGE_DOC_INSERT_ONE_BENCH,
@@ -186,7 +188,7 @@ const WRITE_BENCHES: &[&'static str] = &[
     GRIDFS_MULTI_UPLOAD_BENCH,
 ];
 
-const MAX_ID: u8 = BenchmarkId::GridFsMultiUpload as u8;
+const MAX_ID: u8 = BenchmarkId::RunCommandColdStart as u8;
 
 async fn run_benchmarks(
     uri: &str,
@@ -208,11 +210,26 @@ async fn run_benchmarks(
                 let run_command_options = bench::run_command::Options {
                     num_iter: 10000,
                     uri: uri.to_string(),
+                    cold_start: false,
                 };
                 let run_command =
                     bench::run_benchmark::<RunCommandBenchmark>(run_command_options).await?;
 
                 comp_score += score_test(run_command, RUN_COMMAND_BENCH, 0.13, more_info);
+            }
+
+            // Run command, including client setup time
+            BenchmarkId::RunCommandColdStart => {
+                let run_command_options = bench::run_command::Options {
+                    num_iter: 1,
+                    uri: uri.to_string(),
+                    cold_start: true,
+                };
+                let run_command =
+                    bench::run_benchmark::<RunCommandBenchmark>(run_command_options).await?;
+
+                comp_score +=
+                    score_test(run_command, RUN_COMMAND_COLD_START_BENCH, 0.13, more_info);
             }
 
             // Small doc insertOne
@@ -530,6 +547,7 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
 
     if matches.is_present("single") {
         ids.insert(BenchmarkId::RunCommand);
+        ids.insert(BenchmarkId::RunCommandColdStart);
         ids.insert(BenchmarkId::FindOneById);
         ids.insert(BenchmarkId::SmallDocInsertOne);
         ids.insert(BenchmarkId::LargeDocInsertOne);
@@ -557,6 +575,7 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
     }
     if matches.is_present("driver") {
         ids.insert(BenchmarkId::RunCommand);
+        ids.insert(BenchmarkId::RunCommandColdStart);
         ids.insert(BenchmarkId::FindOneById);
         ids.insert(BenchmarkId::SmallDocInsertOne);
         ids.insert(BenchmarkId::LargeDocInsertOne);
@@ -590,6 +609,13 @@ async fn main() {
         BenchmarkId::try_from(MAX_ID + 1).is_err(),
         "MAX_ID not up to date"
     );
+
+    let mut id_help = String::from("\nRun benchmarks by id number (comma-separated):\n");
+    for ix in 1..=MAX_ID {
+        let id = BenchmarkId::try_from(ix).unwrap();
+        id_help.push_str(&format!("    {}: {}\n", ix, id.name()));
+    }
+    id_help.push_str("    all: All benchmarks\n                    ");
 
     let matches = App::new("RustDriverBenchmark")
         .version(env!("CARGO_PKG_VERSION"))
@@ -637,33 +663,7 @@ async fn main() {
                 .long("ids")
                 .takes_value(true)
                 .help("Run benchmarks by id number (comma-separated)")
-                .long_help(
-                    "
-Run benchmarks by id number (comma-separated):
-    1: Run command
-    2: Find one by ID
-    3: Small doc insertOne
-    4: Large doc insertOne
-    5: Find many and empty the cursor
-    6: Small doc bulk insert
-    7: Large doc bulk insert
-    8: LDJSON multi-file import
-    9: LDJSON multi-file export
-    10: BSON flat document decode
-    11: BSON flat document encode
-    12: BSON deeply nested document decode
-    13: BSON deeply nested document encode
-    14: BSON full document decode
-    15: BSON full document encode
-    16: Find many and empty the cursor (raw BSON)
-    17: Find many and empty the cursor (serde structs)
-    18: GridFS download
-    19: GridFS upload
-    20: GridFS multi-file download
-    21: GridFS multi-file upload
-    all: All benchmarks
-                    ",
-                ),
+                .long_help(&id_help),
         )
         .arg(
             Arg::with_name("output")
