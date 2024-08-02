@@ -221,7 +221,7 @@ async fn run_benchmarks(
             // Run command, including client setup time
             BenchmarkId::RunCommandColdStart => {
                 let run_command_options = bench::run_command::Options {
-                    num_iter: 1,
+                    num_iter: 100,
                     uri: uri.to_string(),
                     cold_start: true,
                 };
