@@ -3444,6 +3444,8 @@ async fn range_explicit_encryption_defaults() -> Result<()> {
         return Ok(());
     }
 
+    dbg!(mongocrypt::version());
+
     // Setup
     let key_vault_client = Client::test_builder().build().await;
     let client_encryption = ClientEncryption::new(
@@ -3480,7 +3482,21 @@ async fn range_explicit_encryption_defaults() -> Result<()> {
         .await?;
     assert_eq!(payload_defaults.bytes.len(), payload.bytes.len());
 
-    todo!()
+    // Case 2: Accepts trimFactor 0
+    let payload = client_encryption
+        .encrypt(123, key_id.clone(), Algorithm::Range)
+        .contention_factor(0)
+        .range_options(
+            RangeOptions::builder()
+                .min(Bson::from(0))
+                .max(Bson::from(1000))
+                .trim_factor(0)
+                .build(),
+        )
+        .await?;
+    assert!(payload.bytes.len() > payload_defaults.bytes.len());
+
+    Ok(())
 }
 
 // FLE 2.0 Documentation Example
