@@ -3436,6 +3436,53 @@ async fn bind(addr: &str) -> Result<TcpListener> {
     Ok(TcpListener::bind(addr.parse::<std::net::SocketAddr>()?).await?)
 }
 
+// Prose test 23. Range explicit encryption applies defaults
+#[tokio::test]
+async fn range_explicit_encryption_defaults() -> Result<()> {
+    let name = "range_explicit_encryption_defaults";
+    if !check_env(name, false) || !fle2v2_ok(name).await {
+        return Ok(());
+    }
+
+    // Setup
+    let key_vault_client = Client::test_builder().build().await;
+    let client_encryption = ClientEncryption::new(
+        key_vault_client.into_client(),
+        KV_NAMESPACE.clone(),
+        vec![LOCAL_KMS.clone()],
+    )?;
+    let key_id = client_encryption
+        .create_data_key(LocalMasterKey::builder().build())
+        .await?;
+    let payload_defaults = client_encryption
+        .encrypt(123, key_id.clone(), Algorithm::Range)
+        .contention_factor(0)
+        .range_options(
+            RangeOptions::builder()
+                .min(Bson::from(0))
+                .max(Bson::from(1000))
+                .build(),
+        )
+        .await?;
+
+    // Case 1: Uses libmongocrypt defaults
+    let payload = client_encryption
+        .encrypt(123, key_id.clone(), Algorithm::Range)
+        .contention_factor(0)
+        .range_options(
+            RangeOptions::builder()
+                .min(Bson::from(0))
+                .max(Bson::from(1000))
+                .sparsity(2)
+                .trim_factor(6)
+                .build(),
+        )
+        .await?;
+    assert_eq!(payload_defaults.bytes.len(), payload.bytes.len());
+
+    todo!()
+}
+
 // FLE 2.0 Documentation Example
 #[tokio::test]
 async fn fle2_example() -> Result<()> {
