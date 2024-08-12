@@ -40,8 +40,7 @@ for arg; do
   elif [ $arg == "libmongocrypt" ]; then
     mkdir ${PROJECT_DIRECTORY}/libmongocrypt
     cd ${PROJECT_DIRECTORY}/libmongocrypt
-    #curl -sSfO https://s3.amazonaws.com/mciuploads/libmongocrypt/all/master/latest/libmongocrypt-all.tar.gz
-    curl -sSfO https://mciuploads.s3.amazonaws.com/libmongocrypt/all/1.11.0/libmongocrypt-all.tar.gz
+    curl -sSfO https://s3.amazonaws.com/mciuploads/libmongocrypt/all/master/latest/libmongocrypt-all.tar.gz
     tar xzf libmongocrypt-all.tar.gz
     if [ "Windows_NT" == "$OS" ]; then
       chmod +x ${MONGOCRYPT_LIB_DIR}/../bin/*.dll
