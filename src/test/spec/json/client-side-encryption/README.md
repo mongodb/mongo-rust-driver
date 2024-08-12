@@ -2815,11 +2815,12 @@ This test is continuation of the case 1 and provides a way to complete inserting
 
 ### 22. Range Explicit Encryption
 
-The Range Explicit Encryption tests require MongoDB server 8.0+.
+The Range Explicit Encryption tests require MongoDB server 8.0.0-rc14+ for SERVER-91889 and libmongocrypt containing
+MONGOCRYPT-705.
 
 > [!NOTE]
 > MongoDB Server 8.0 introduced a backwards breaking change to the Queryable Encryption (QE) range protocol: QE Range V2
-> libmongocrypt 1.10.0 is required to use the QE Range V2.
+> libmongocrypt 1.11.0 is required to use the QE Range V2.
 
 > [!NOTE]
 > MongoDB Server 7.0 introduced a backwards breaking change to the Queryable Encryption (QE) protocol: QEv2.
@@ -3210,3 +3211,88 @@ class EncryptOpts {
 ```
 
 Assert that an error was raised.
+
+### 23. Range Explicit Encryption applies defaults
+
+This test requires libmongocrypt with changes in
+[14ccd9ce](https://github.com/mongodb/libmongocrypt/commit/14ccd9ce8a030158aec07f63e8139d34b95d88e6)
+([MONGOCRYPT-698](https://jira.mongodb.org/browse/MONGOCRYPT-698)).
+
+#### Test Setup
+
+Create a MongoClient named `keyVaultClient`.
+
+Create a ClientEncryption object named `clientEncryption` with these options:
+
+```typescript
+class ClientEncryptionOpts {
+   keyVaultClient: keyVaultClient,
+   keyVaultNamespace: "keyvault.datakeys",
+   kmsProviders: { "local": { "key": "<base64 decoding of LOCAL_MASTERKEY>" } },
+}
+```
+
+Create a key with `clientEncryption.createDataKey`. Store the returned key ID in a variable named `keyId`.
+
+Call `clientEncryption.encrypt` to encrypt the int32 value `123` with these options:
+
+```typescript
+class EncryptOpts {
+   keyId : keyId,
+   algorithm: "Range",
+   contentionFactor: 0,
+   rangeOpts: RangeOpts {
+      min: 0,
+      max: 1000
+   }
+}
+```
+
+Store the result in a variable named `payload_defaults`.
+
+#### Case 1: Uses libmongocrypt defaults
+
+Call `clientEncryption.encrypt` to encrypt the int32 value `123` with these options:
+
+```typescript
+class EncryptOpts {
+   keyId : keyId,
+   algorithm: "Range",
+   contentionFactor: 0,
+   rangeOpts: RangeOpts {
+      min: 0,
+      max: 1000,
+      sparsity: 2,
+      trimFactor: 6
+   }
+}
+```
+
+Assert the returned payload size equals the size of `payload_defaults`.
+
+> [!NOTE]
+> Do not compare the payload contents. The payloads include random data. The `trimFactor` and `sparsity` directly affect
+> the payload size.
+
+#### Case 2: Accepts `trimFactor` 0
+
+Call `clientEncryption.encrypt` to encrypt the int32 value `123` with these options:
+
+```typescript
+class EncryptOpts {
+   keyId : keyId,
+   algorithm: "Range",
+   contentionFactor: 0,
+   rangeOpts: RangeOpts {
+      min: 0,
+      max: 1000,
+      trimFactor: 0
+   }
+}
+```
+
+Assert the returned payload size is greater than the size of `payload_defaults`.
+
+> [!NOTE]
+> Do not compare the payload contents. The payloads include random data. The `trimFactor` and `sparsity` directly affect
+> the payload size.
