@@ -131,13 +131,14 @@ pub struct RangeOptions {
     /// The maximum value. This option must be set if `precision` is set.
     pub max: Option<Bson>,
 
-    /// The trim factor.
-    pub trim_factor: i32,
+    /// May be used to tune performance. When omitted, a default value is used.
+    pub trim_factor: Option<i32>,
 
-    /// The sparsity.
-    pub sparsity: i64,
+    /// May be used to tune performance. When omitted, a default value is used.
+    pub sparsity: Option<i64>,
 
-    /// The precision. This value must only be set for Double and Decimal128 fields.
+    /// Determines the number of significant digits after the decimal point. This value must only
+    /// be set for Double and Decimal128 fields.
     pub precision: Option<i32>,
 }
 
