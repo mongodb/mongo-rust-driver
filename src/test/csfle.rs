@@ -3440,7 +3440,7 @@ async fn bind(addr: &str) -> Result<TcpListener> {
 #[tokio::test]
 async fn range_explicit_encryption_defaults() -> Result<()> {
     let name = "range_explicit_encryption_defaults";
-    if !check_env(name, false) || !fle2v2_ok(name).await {
+    if !check_env(name, false) {
         return Ok(());
     }
 
