@@ -1173,7 +1173,11 @@ functions:
         binary: bash
         args:
           - .evergreen/create-expansions.sh
-        add_expansions_to_env: true
+        include_expansions_in_env:
+          - is_patch
+          - version_id
+          - project
+          - LIBMONGOCRYPT_OS
     - command: expansions.update
       params:
         file: src/expansion.yml
@@ -1391,7 +1395,15 @@ functions:
         binary: sh
         args:
           - ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
-        add_expansions_to_env: true
+        include_expansions_in_env:
+          - AUTH
+          - SSL
+          - TOPOLOGY
+          - LOAD_BALANCER
+          - REQUIRE_API_VERSION
+          - MONGODB_VERSION
+          - ORCHESTRATION_FILE
+          - MONGODB_BINARIES
     - command: expansions.update
       params:
         file: mo-expansion.yml
@@ -1401,19 +1413,11 @@ functions:
         binary: bash
         args:
           - .evergreen/generate-uri.sh
-        add_expansions_to_env: true
-    - command: expansions.update
-      params:
-        file: src/uri-expansions.yml
-
-  "generate uris":
-    - command: subprocess.exec
-      params:
-        working_dir: src
-        binary: bash
-        args:
-          - .evergreen/generate-uri.sh
-        add_expansions_to_env: true
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - MONGODB_URI
+          - SINGLE_MONGOS_LB_URI
+          - MULTI_MONGOS_LB_URI
     - command: expansions.update
       params:
         file: src/uri-expansions.yml
@@ -1529,7 +1533,25 @@ functions:
         binary: bash
         args:
           - .evergreen/run-csfle-tests.sh
-        add_expansions_to_env: true
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - OPENSSL
+          - OS
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - FLE_AWS_KEY
+          - FLE_AWS_SECRET
+          - FLE_AZURE_TENANTID
+          - FLE_AZURE_CLIENTID
+          - FLE_AZURE_CLIENTSECRET
+          - FLE_GCP_EMAIL
+          - FLE_GCP_PRIVATEKEY
+          - CSFLE_LOCAL_KEY
+          - CSFLE_TLS_CERT_DIR
+          - CRYPT_SHARED_LIB_PATH
+          - DISABLE_CRYPT_SHARED
+          - ON_DEMAND_GCP_CREDS_SHOULD_SUCCEED
+          - AZURE_IMDS_MOCK_PORT
 
   "run csfle serverless tests":
     - command: shell.exec
@@ -1669,7 +1691,8 @@ functions:
       type: test
       params:
         working_dir: src
-        add_expansions_to_env: true
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
         binary: bash
         args:
           - .evergreen/check-semgrep.sh
