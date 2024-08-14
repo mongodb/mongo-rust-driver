@@ -73,5 +73,15 @@ pub(crate) fn set_auto_enc(builder: TestClientBuilder, test: &Test) -> TestClien
         );
         kms_providers.clear(&KmsProvider::other("awsTemporaryNoSessionToken"));
     }
+
+    if let Ok(val) = std::env::var("CRYPT_SHARED_LIB_PATH") {
+        if !val.is_empty() {
+            enc_opts
+                .extra_options
+                .get_or_insert_with(|| doc! {})
+                .insert("cryptSharedLibPath", val);
+        }
+    }
+
     builder.encrypted_options(enc_opts)
 }

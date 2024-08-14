@@ -1,6 +1,6 @@
 use std::{
     collections::BTreeMap,
-    env::var,
+    env,
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -103,8 +103,8 @@ pub(crate) static AWS_KMS: Lazy<KmsInfo> = Lazy::new(|| {
     (
         KmsProvider::aws(),
         doc! {
-        "accessKeyId": var("FLE_AWS_KEY").unwrap(),
-        "secretAccessKey": var("FLE_AWS_SECRET").unwrap()},
+        "accessKeyId": env::var("FLE_AWS_KEY").unwrap(),
+        "secretAccessKey": env::var("FLE_AWS_SECRET").unwrap()},
         None,
     )
 });
@@ -116,8 +116,8 @@ pub(crate) static AWS_KMS_NAME2: Lazy<KmsInfo> = Lazy::new(|| {
     (
         KmsProvider::aws().with_name("name2"),
         doc! {
-            "accessKeyId": var("FLE_AWS_KEY").unwrap(),
-            "secretAccessKey": var("FLE_AWS_SECRET").unwrap()
+            "accessKeyId": env::var("FLE_AWS_KEY").unwrap(),
+            "secretAccessKey": env::var("FLE_AWS_SECRET").unwrap()
         },
         None,
     )
@@ -126,9 +126,9 @@ pub(crate) static AZURE_KMS: Lazy<KmsInfo> = Lazy::new(|| {
     (
         KmsProvider::azure(),
         doc! {
-            "tenantId": var("FLE_AZURE_TENANTID").unwrap(),
-            "clientId": var("FLE_AZURE_CLIENTID").unwrap(),
-            "clientSecret": var("FLE_AZURE_CLIENTSECRET").unwrap(),
+            "tenantId": env::var("FLE_AZURE_TENANTID").unwrap(),
+            "clientId": env::var("FLE_AZURE_CLIENTID").unwrap(),
+            "clientSecret": env::var("FLE_AZURE_CLIENTSECRET").unwrap(),
         },
         None,
     )
@@ -141,8 +141,8 @@ pub(crate) static GCP_KMS: Lazy<KmsInfo> = Lazy::new(|| {
     (
         KmsProvider::gcp(),
         doc! {
-            "email": var("FLE_GCP_EMAIL").unwrap(),
-            "privateKey": var("FLE_GCP_PRIVATEKEY").unwrap(),
+            "email": env::var("FLE_GCP_EMAIL").unwrap(),
+            "privateKey": env::var("FLE_GCP_PRIVATEKEY").unwrap(),
         },
         None,
     )
@@ -157,7 +157,7 @@ pub(crate) static LOCAL_KMS: Lazy<KmsInfo> = Lazy::new(|| {
         doc! {
             "key": bson::Binary {
                 subtype: bson::spec::BinarySubtype::Generic,
-                bytes: base64::decode(var("CSFLE_LOCAL_KEY").unwrap()).unwrap(),
+                bytes: base64::decode(env::var("CSFLE_LOCAL_KEY").unwrap()).unwrap(),
             },
         },
         None,
@@ -168,7 +168,7 @@ pub(crate) static LOCAL_KMS_NAME1: Lazy<KmsInfo> = Lazy::new(|| {
     (local_info.0.with_name("name1"), local_info.1, local_info.2)
 });
 pub(crate) static KMIP_KMS: Lazy<KmsInfo> = Lazy::new(|| {
-    let cert_dir = PathBuf::from(var("CSFLE_TLS_CERT_DIR").unwrap());
+    let cert_dir = PathBuf::from(env::var("CSFLE_TLS_CERT_DIR").unwrap());
     let tls_options = TlsOptions::builder()
         .ca_file_path(cert_dir.join("ca.pem"))
         .cert_key_file_path(cert_dir.join("client.pem"))
@@ -212,14 +212,14 @@ pub(crate) static ALL_KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
 });
 
 static EXTRA_OPTIONS: Lazy<Document> =
-    Lazy::new(|| doc! { "cryptSharedLibPath": std::env::var("CRYPT_SHARED_LIB_PATH").unwrap() });
+    Lazy::new(|| doc! { "cryptSharedLibPath": env::var("CRYPT_SHARED_LIB_PATH").unwrap() });
 static KV_NAMESPACE: Lazy<Namespace> =
     Lazy::new(|| Namespace::from_str("keyvault.datakeys").unwrap());
 static DISABLE_CRYPT_SHARED: Lazy<bool> =
-    Lazy::new(|| std::env::var("DISABLE_CRYPT_SHARED").map_or(false, |s| s == "true"));
+    Lazy::new(|| env::var("DISABLE_CRYPT_SHARED").map_or(false, |s| s == "true"));
 
 fn check_env(name: &str, kmip: bool) -> bool {
-    if std::env::var("CSFLE_LOCAL_KEY").is_err() {
+    if env::var("CSFLE_LOCAL_KEY").is_err() {
         log_uncaptured(format!(
             "skipping csfle test {}: no kms providers configured",
             name
@@ -1757,7 +1757,7 @@ async fn kms_tls_options() -> Result<()> {
         base_providers
     }
 
-    let cert_dir = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
+    let cert_dir = PathBuf::from(env::var("CSFLE_TLS_CERT_DIR").unwrap());
     let ca_path = cert_dir.join("ca.pem");
     let key_path = cert_dir.join("client.pem");
 
@@ -2731,8 +2731,7 @@ async fn on_demand_aws_failure() -> Result<()> {
     if !check_env("on_demand_aws_failure", false) {
         return Ok(());
     }
-    if std::env::var("AWS_ACCESS_KEY_ID").is_ok() && std::env::var("AWS_SECRET_ACCESS_KEY").is_ok()
-    {
+    if env::var("AWS_ACCESS_KEY_ID").is_ok() && env::var("AWS_SECRET_ACCESS_KEY").is_ok() {
         log_uncaptured("Skipping on_demand_aws_failure: credentials set");
         return Ok(());
     }
@@ -2803,7 +2802,7 @@ async fn on_demand_gcp_credentials() -> Result<()> {
         )
         .await;
 
-    if std::env::var("ON_DEMAND_GCP_CREDS_SHOULD_SUCCEED").is_ok() {
+    if env::var("ON_DEMAND_GCP_CREDS_SHOULD_SUCCEED").is_ok() {
         result.unwrap();
     } else {
         let error = result.unwrap_err();
@@ -2830,10 +2829,7 @@ async fn azure_imds() -> Result<()> {
     let mut azure_exec = crate::client::csfle::state_machine::azure::ExecutorState::new()?;
     azure_exec.test_host = Some((
         "localhost",
-        std::env::var("AZURE_IMDS_MOCK_PORT")
-            .unwrap()
-            .parse()
-            .unwrap(),
+        env::var("AZURE_IMDS_MOCK_PORT").unwrap().parse().unwrap(),
     ));
 
     // Case 1: Success
@@ -3220,6 +3216,7 @@ async fn range_explicit_encryption_test(
         KV_NAMESPACE.clone(),
         vec![LOCAL_KMS.clone()],
     )?
+    .extra_options(EXTRA_OPTIONS.clone())
     .bypass_query_analysis(true)
     .build()
     .await?;
@@ -3564,6 +3561,7 @@ async fn fle2_example() -> Result<()> {
         KV_NAMESPACE.clone(),
         vec![LOCAL_KMS.clone()],
     )?
+    .extra_options(EXTRA_OPTIONS.clone())
     .encrypted_fields_map(encrypted_fields_map)
     .build()
     .await?;
