@@ -378,7 +378,7 @@ buildvariants:
 
   - name: search-index
     display_name: "Search Index Helpers"
-    patchable: false
+    #patchable: false
     run_on:
       - rhel87-small
     tasks:
@@ -902,7 +902,10 @@ tasks:
         params:
           working_dir: src
           binary: bash
-          add_expansions_to_env: true
+          include_expansions_in_env:
+            - PROJECT_DIRECTORY
+            - MONGODB_URI
+            - PATH
           args:
             - .evergreen/run-search-index-test.sh
 
