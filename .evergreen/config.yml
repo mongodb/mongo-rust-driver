@@ -378,7 +378,7 @@ buildvariants:
 
   - name: search-index
     display_name: "Search Index Helpers"
-    #patchable: false
+    patchable: false
     run_on:
       - rhel87-small
     tasks:
@@ -386,7 +386,7 @@ buildvariants:
 
   - name: aws-lambda
     display_name: "AWS Lambda"
-    patchable: false
+    #patchable: false
     run_on:
       - ubuntu2204-small
     tasks:
@@ -610,7 +610,14 @@ task_groups:
         params:
           working_dir: src
           binary: bash
-          add_expansions_to_env: true
+          include_expansions_in_env:
+            - DRIVERS_ATLAS_PUBLIC_API_KEY
+            - DRIVERS_ATLAS_PRIVATE_API_KEY
+            - DRIVERS_ATLAS_GROUP_ID
+            - DRIVERS_ATLAS_LAMBDA_USER
+            - DRIVERS_ATLAS_LAMBDA_PASSWORD
+            - LAMBDA_STACK_NAME
+            - MONGODB_VERSION
           args:
             - ${DRIVERS_TOOLS}/.evergreen/atlas/setup-atlas-cluster.sh
       - command: expansions.update
@@ -621,7 +628,11 @@ task_groups:
         params:
           working_dir: src
           binary: bash
-          add_expansions_to_env: true
+          include_expansions_in_env:
+            - DRIVERS_ATLAS_PUBLIC_API_KEY
+            - DRIVERS_ATLAS_PRIVATE_API_KEY
+            - DRIVERS_ATLAS_GROUP_ID
+            - CLUSTER_NAME
           args:
             - ${DRIVERS_TOOLS}/.evergreen/atlas/teardown-atlas-cluster.sh
     setup_group_can_fail_task: true
@@ -1102,9 +1113,22 @@ tasks:
         params:
           working_dir: src
           binary: bash
-          add_expansions_to_env: true
           args:
             - .evergreen/run-aws-lambda-test.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+            - DRIVERS_ATLAS_PUBLIC_API_KEY
+            - DRIVERS_ATLAS_PRIVATE_API_KEY
+            - DRIVERS_ATLAS_LAMBDA_USER
+            - DRIVERS_ATLAS_LAMBDA_PASSWORD
+            - DRIVERS_ATLAS_GROUP_ID
+            - LAMBDA_STACK_NAME
+            - PROJECT_DIRECTORY
+            - DRIVERS_TOOLS
+            - CLUSTER_NAME
+            - MONGODB_URI
           env:
             TEST_LAMBDA_DIRECTORY: ${PROJECT_DIRECTORY}/.evergreen/aws-lambda-test
             AWS_REGION: us-east-1
