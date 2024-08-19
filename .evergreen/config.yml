@@ -565,7 +565,14 @@ task_groups:
         params:
           working_dir: src
           binary: bash
-          add_expansions_to_env: true
+          include_expansions_in_env:
+            - DRIVERS_ATLAS_PUBLIC_API_KEY
+            - DRIVERS_ATLAS_PRIVATE_API_KEY
+            - DRIVERS_ATLAS_GROUP_ID
+            - DRIVERS_ATLAS_LAMBDA_USER
+            - DRIVERS_ATLAS_LAMBDA_PASSWORD
+            - LAMBDA_STACK_NAME
+            - MONGODB_VERSION
           env:
             MONGODB_VERSION: "7.0"
           args:
@@ -578,7 +585,11 @@ task_groups:
         params:
           working_dir: src
           binary: bash
-          add_expansions_to_env: true
+          include_expansions_in_env:
+            - DRIVERS_ATLAS_PUBLIC_API_KEY
+            - DRIVERS_ATLAS_PRIVATE_API_KEY
+            - DRIVERS_ATLAS_GROUP_ID
+            - CLUSTER_NAME
           args:
             - ${DRIVERS_TOOLS}/.evergreen/atlas/teardown-atlas-cluster.sh
       - func: "upload test results"
@@ -599,7 +610,14 @@ task_groups:
         params:
           working_dir: src
           binary: bash
-          add_expansions_to_env: true
+          include_expansions_in_env:
+            - DRIVERS_ATLAS_PUBLIC_API_KEY
+            - DRIVERS_ATLAS_PRIVATE_API_KEY
+            - DRIVERS_ATLAS_GROUP_ID
+            - DRIVERS_ATLAS_LAMBDA_USER
+            - DRIVERS_ATLAS_LAMBDA_PASSWORD
+            - LAMBDA_STACK_NAME
+            - MONGODB_VERSION
           args:
             - ${DRIVERS_TOOLS}/.evergreen/atlas/setup-atlas-cluster.sh
       - command: expansions.update
@@ -610,7 +628,11 @@ task_groups:
         params:
           working_dir: src
           binary: bash
-          add_expansions_to_env: true
+          include_expansions_in_env:
+            - DRIVERS_ATLAS_PUBLIC_API_KEY
+            - DRIVERS_ATLAS_PRIVATE_API_KEY
+            - DRIVERS_ATLAS_GROUP_ID
+            - CLUSTER_NAME
           args:
             - ${DRIVERS_TOOLS}/.evergreen/atlas/teardown-atlas-cluster.sh
     setup_group_can_fail_task: true
@@ -891,7 +913,10 @@ tasks:
         params:
           working_dir: src
           binary: bash
-          add_expansions_to_env: true
+          include_expansions_in_env:
+            - PROJECT_DIRECTORY
+            - MONGODB_URI
+            - PATH
           args:
             - .evergreen/run-search-index-test.sh
 
@@ -1088,9 +1113,22 @@ tasks:
         params:
           working_dir: src
           binary: bash
-          add_expansions_to_env: true
           args:
             - .evergreen/run-aws-lambda-test.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+            - DRIVERS_ATLAS_PUBLIC_API_KEY
+            - DRIVERS_ATLAS_PRIVATE_API_KEY
+            - DRIVERS_ATLAS_LAMBDA_USER
+            - DRIVERS_ATLAS_LAMBDA_PASSWORD
+            - DRIVERS_ATLAS_GROUP_ID
+            - LAMBDA_STACK_NAME
+            - PROJECT_DIRECTORY
+            - DRIVERS_TOOLS
+            - CLUSTER_NAME
+            - MONGODB_URI
           env:
             TEST_LAMBDA_DIRECTORY: ${PROJECT_DIRECTORY}/.evergreen/aws-lambda-test
             AWS_REGION: us-east-1
@@ -1173,7 +1211,11 @@ functions:
         binary: bash
         args:
           - .evergreen/create-expansions.sh
-        add_expansions_to_env: true
+        include_expansions_in_env:
+          - is_patch
+          - version_id
+          - project
+          - LIBMONGOCRYPT_OS
     - command: expansions.update
       params:
         file: src/expansion.yml
@@ -1391,7 +1433,15 @@ functions:
         binary: sh
         args:
           - ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
-        add_expansions_to_env: true
+        include_expansions_in_env:
+          - AUTH
+          - SSL
+          - TOPOLOGY
+          - LOAD_BALANCER
+          - REQUIRE_API_VERSION
+          - MONGODB_VERSION
+          - ORCHESTRATION_FILE
+          - MONGODB_BINARIES
     - command: expansions.update
       params:
         file: mo-expansion.yml
@@ -1401,19 +1451,12 @@ functions:
         binary: bash
         args:
           - .evergreen/generate-uri.sh
-        add_expansions_to_env: true
-    - command: expansions.update
-      params:
-        file: src/uri-expansions.yml
-
-  "generate uris":
-    - command: subprocess.exec
-      params:
-        working_dir: src
-        binary: bash
-        args:
-          - .evergreen/generate-uri.sh
-        add_expansions_to_env: true
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - MONGODB_URI
+          - SINGLE_MONGOS_LB_URI
+          - MULTI_MONGOS_LB_URI
+          - SSL
     - command: expansions.update
       params:
         file: src/uri-expansions.yml
@@ -1426,9 +1469,6 @@ functions:
         binary: bash
         args:
           - .evergreen/run-tests.sh
-        # The driver uses the absence/presence of variables defined in the project's settings to
-        # determine how to create a test client, so the relevant expansions here MUST be listed
-        # explicitly rather than setting add_expansions_to_env: true.
         include_expansions_in_env:
           - PROJECT_DIRECTORY
           - OPENSSL
@@ -1447,7 +1487,6 @@ functions:
         binary: bash
         args:
           - .evergreen/run-sync-tests.sh
-        # Ditto comment above regarding explicitly listing expansions.
         include_expansions_in_env:
           - PROJECT_DIRECTORY
           - MONGODB_URI
@@ -1529,7 +1568,20 @@ functions:
         binary: bash
         args:
           - .evergreen/run-csfle-tests.sh
-        add_expansions_to_env: true
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+          - MONGODB_URI
+          - MONGOCRYPT_LIB_DIR
+          - OPENSSL
+          - OS
+          - LD_LIBRARY_PATH
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - CSFLE_LOCAL_KEY
+          - CRYPT_SHARED_LIB_PATH
+          - DISABLE_CRYPT_SHARED
+          - AZURE_IMDS_MOCK_PORT
 
   "run csfle serverless tests":
     - command: shell.exec
@@ -1669,7 +1721,10 @@ functions:
       type: test
       params:
         working_dir: src
-        add_expansions_to_env: true
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+          - MONGOCRYPT_LIB_DIR
         binary: bash
         args:
           - .evergreen/check-semgrep.sh

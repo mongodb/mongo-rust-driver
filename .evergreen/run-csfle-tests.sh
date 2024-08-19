@@ -3,7 +3,7 @@
 set -o errexit
 set -o pipefail
 
-source ./.evergreen/env.sh
+source .evergreen/env.sh
 source .evergreen/cargo-test.sh
 
 set -o xtrace

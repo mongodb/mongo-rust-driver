@@ -50,7 +50,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// [`ErrorKind`](enum.ErrorKind.html) is wrapped in an `Arc` to allow the errors to be
 /// cloned.
 #[derive(Clone, Debug, Error)]
-#[error("Kind: {kind}, labels: {labels:?}")]
+#[cfg_attr(test, error("Kind: {kind}, labels: {labels:?}, backtrace: {bt}"))]
+#[cfg_attr(not(test), error("Kind: {kind}, labels: {labels:?}"))]
 #[non_exhaustive]
 pub struct Error {
     /// The type of error that occurred.
@@ -59,6 +60,8 @@ pub struct Error {
     pub(crate) wire_version: Option<i32>,
     #[source]
     pub(crate) source: Option<Box<Error>>,
+    #[cfg(test)]
+    bt: Arc<std::backtrace::Backtrace>,
 }
 
 impl Error {
@@ -90,6 +93,8 @@ impl Error {
             labels,
             wire_version: None,
             source: None,
+            #[cfg(test)]
+            bt: Arc::new(std::backtrace::Backtrace::capture()),
         }
     }
 
