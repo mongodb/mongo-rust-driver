@@ -149,7 +149,7 @@ where
                     match bv {
                         BatchValue::Some { doc, .. } => {
                             self.data.document_returned = true;
-                            return Ok(Some(bson::from_slice(doc.as_bytes())?));
+                            return Ok(Some(crate::de::from_slice(doc.as_bytes())?));
                         }
                         BatchValue::Empty | BatchValue::Exhausted => return Ok(None),
                     }

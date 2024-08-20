@@ -81,3 +81,13 @@ compile_error!(
     "The feature 'compat-3-0-0' must be enabled to ensure forward compatibility with future \
      versions of this crate."
 );
+
+#[cfg(not(feature = "deserialize-utf8-lossy"))]
+pub(crate) mod de {
+    pub(crate) use ::bson::from_slice;
+}
+
+#[cfg(feature = "deserialize-utf8-lossy")]
+pub(crate) mod de {
+    pub(crate) use ::bson::from_slice_utf8_lossy as from_slice;
+}

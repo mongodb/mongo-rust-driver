@@ -306,7 +306,7 @@ impl<T> SessionCursor<T> {
     where
         T: Deserialize<'a>,
     {
-        bson::from_slice(self.current().as_bytes()).map_err(Error::from)
+        crate::de::from_slice(self.current().as_bytes()).map_err(Error::from)
     }
 
     /// Update the type streamed values will be parsed as.

@@ -61,6 +61,8 @@ snappy-compression = ["dep:snap"]
 # The In Use Encryption API is unstable and may have backwards-incompatible changes in minor version updates.
 in-use-encryption-unstable = ["dep:mongocrypt", "dep:rayon", "dep:num_cpus"]
 
+deserialize-utf8-lossy = []
+
 # Enables support for emitting tracing events.
 # The tracing API is unstable and may have backwards-incompatible changes in minor version updates.
 # TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.

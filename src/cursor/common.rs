@@ -278,7 +278,7 @@ where
             Poll::Pending => return Poll::Pending,
             Poll::Ready(bv) => match bv? {
                 BatchValue::Some { doc, .. } => {
-                    return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)))
+                    return Poll::Ready(Some(Ok(crate::de::from_slice(doc.as_bytes())?)))
                 }
                 BatchValue::Empty => continue,
                 BatchValue::Exhausted => return Poll::Ready(None),

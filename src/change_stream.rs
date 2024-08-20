@@ -159,7 +159,7 @@ where
     /// ```
     pub async fn next_if_any(&mut self) -> Result<Option<T>> {
         Ok(match NextInBatchFuture::new(self).await? {
-            BatchValue::Some { doc, .. } => Some(bson::from_slice(doc.as_bytes())?),
+            BatchValue::Some { doc, .. } => Some(crate::de::from_slice(doc.as_bytes())?),
             BatchValue::Empty | BatchValue::Exhausted => None,
         })
     }
