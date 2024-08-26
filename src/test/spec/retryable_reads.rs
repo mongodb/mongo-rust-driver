@@ -100,7 +100,7 @@ async fn retry_read_pool_cleared() {
         .block_connection(Duration::from_secs(1));
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-    let mut subscriber = buffer.subscribe();
+    let mut subscriber = buffer.stream();
 
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
     for _ in 0..2 {

@@ -328,7 +328,7 @@ async fn data_key_double_encryption() -> Result<()> {
 
     // Testing each provider:
 
-    let mut events = client.events.subscribe();
+    let mut events = client.events.stream();
     let provider_keys: [(KmsProvider, MasterKey); 5] = [
         (
             KmsProvider::aws(),
@@ -588,7 +588,7 @@ async fn bson_size_limits() -> Result<()> {
     let mut opts = get_client_options().await.clone();
     let buffer = EventBuffer::<Event>::new();
 
-    let mut events = buffer.subscribe();
+    let mut events = buffer.stream();
     opts.command_event_handler = Some(buffer.handler());
     let client_encrypted =
         Client::encrypted_builder(opts, KV_NAMESPACE.clone(), vec![LOCAL_KMS.clone()])?
@@ -1551,7 +1551,7 @@ impl DeadlockTestCase {
             .build()
             .await;
 
-        let mut keyvault_events = client_keyvault.events.subscribe();
+        let mut keyvault_events = client_keyvault.events.stream();
         client_test
             .database("keyvault")
             .collection::<Document>("datakeys")
@@ -1589,7 +1589,7 @@ impl DeadlockTestCase {
         // Run test case
         let event_buffer = EventBuffer::new();
 
-        let mut encrypted_events = event_buffer.subscribe();
+        let mut encrypted_events = event_buffer.stream();
         let mut opts = get_client_options().await.clone();
         opts.max_pool_size = Some(self.max_pool_size);
         opts.command_event_handler = Some(event_buffer.handler());

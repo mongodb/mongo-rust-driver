@@ -20,7 +20,9 @@ use super::Event;
 /// A buffer of events that provides utility methods for querying the buffer and awaiting new event
 /// arrival.
 ///
-/// New test code should prefer to use this over `EventSubscriber`.
+/// If working with events one at a time as they arrive is more convenient for a particular test,
+/// register an `EventBuffer` with the `Client` and then use `EventBuffer::stream` or
+/// `EventBuffer::stream_all`.
 #[derive(Clone, Debug)]
 pub(crate) struct EventBuffer<T = Event> {
     inner: Arc<EventBufferInner<T>>,
@@ -72,22 +74,22 @@ impl<T> EventBuffer<T> {
             .collect()
     }
 
-    /// Create a new asynchronous subscription to events generated after the point of this call.
-    pub(crate) fn subscribe(&self) -> EventSubscriber<'_, T> {
+    /// Create a new stream view of events buffered after the point of this call.
+    pub(crate) fn stream(&self) -> EventStream<'_, T> {
         let (index, generation) = {
             let events = self.inner.events.lock().unwrap();
             (events.data.len(), events.generation)
         };
-        EventSubscriber {
+        EventStream {
             buffer: self,
             index,
             generation,
         }
     }
 
-    /// Create a new asynchronous subscription to all events contained in the buffer.
-    pub(crate) fn subscribe_all(&self) -> EventSubscriber<'_, T> {
-        EventSubscriber {
+    /// Create a new stream view, starting with events already contained in the buffer.
+    pub(crate) fn stream_all(&self) -> EventStream<'_, T> {
+        EventStream {
             buffer: self,
             index: 0,
             generation: self.inner.events.lock().unwrap().generation,
@@ -268,16 +270,13 @@ impl EventBuffer<Event> {
 }
 
 /// Process events one at a time as they arrive asynchronously.
-///
-/// New test code should prefer `EventBuffer` to this; use this only when test actions need to be
-/// asynchronously interleaved with event validation.
-pub(crate) struct EventSubscriber<'a, T> {
+pub(crate) struct EventStream<'a, T> {
     buffer: &'a EventBuffer<T>,
     index: usize,
     generation: Generation,
 }
 
-impl<'a, T: Clone> EventSubscriber<'a, T> {
+impl<'a, T: Clone> EventStream<'a, T> {
     async fn next(&mut self, timeout: Duration) -> Option<T> {
         crate::runtime::timeout(timeout, async move {
             loop {
@@ -395,7 +394,7 @@ impl<'a, T: Clone> EventSubscriber<'a, T> {
     }
 }
 
-impl<'a> EventSubscriber<'a, Event> {
+impl<'a> EventStream<'a, Event> {
     /// Waits for the next CommandStartedEvent/CommandFailedEvent pair.
     /// If the next CommandStartedEvent is associated with a CommandFailedEvent, this method will
     /// panic.

@@ -146,7 +146,7 @@ impl Executor {
     }
 
     async fn execute_test(self) {
-        let mut subscriber = self.state.events.subscribe();
+        let mut subscriber = self.state.events.stream();
 
         let (updater, mut receiver) = TopologyUpdater::channel();
 
@@ -262,7 +262,7 @@ impl Operation {
                 }
             }
             Operation::CheckIn { connection } => {
-                let mut subscriber = state.events.subscribe();
+                let mut subscriber = state.events.stream();
                 let conn = state.connections.write().await.remove(&connection).unwrap();
                 let id = conn.id;
                 // connections are checked in via tasks spawned in their drop implementation,
@@ -300,7 +300,7 @@ impl Operation {
                 }
             }
             Operation::Close => {
-                let mut subscriber = state.events.subscribe();
+                let mut subscriber = state.events.stream();
 
                 // pools are closed via their drop implementation
                 state.pool.write().await.take();

@@ -74,7 +74,7 @@ async fn streaming_min_heartbeat_frequency() {
         let h = buffer.clone();
         tasks.push(runtime::spawn(async move {
 
-            let mut subscriber = h.subscribe();
+            let mut subscriber = h.stream();
             for _ in 0..5 {
                 let event = subscriber
                     .wait_for_event(Duration::from_millis(750), |e| {
@@ -125,7 +125,7 @@ async fn heartbeat_frequency_is_respected() {
         let h = buffer.clone();
         tasks.push(runtime::spawn(async move {
 
-            let mut subscriber = h.subscribe();
+            let mut subscriber = h.stream();
 
             // collect events for 2 seconds, should see between 2 and 3 heartbeats.
             let events = subscriber.collect_events(Duration::from_secs(3), |e| {
@@ -180,7 +180,7 @@ async fn rtt_is_updated() {
 
     let client = Client::with_options(options).unwrap();
 
-    let mut subscriber = buffer.subscribe();
+    let mut subscriber = buffer.stream();
 
     // run a find to wait for the primary to be discovered
     client

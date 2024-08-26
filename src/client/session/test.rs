@@ -244,7 +244,7 @@ async fn cluster_time_in_commands() {
         F: Fn(Client) -> G,
         G: Future<Output = Result<R>>,
     {
-        let mut subscriber = event_buffer.subscribe();
+        let mut subscriber = event_buffer.stream();
 
         operation(client.clone())
             .await
@@ -311,7 +311,7 @@ async fn cluster_time_in_commands() {
         }
     }
 
-    let mut subscriber = buffer.subscribe();
+    let mut subscriber = buffer.stream();
 
     let client = Client::with_options(options).unwrap();
 

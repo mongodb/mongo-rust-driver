@@ -1233,7 +1233,7 @@ async fn insert_many_document_sequences() {
 
     let client = Client::test_builder().monitor_events().build().await;
 
-    let mut subscriber = client.events.subscribe();
+    let mut subscriber = client.events.stream();
 
     let max_object_size = client.server_info.max_bson_object_size;
     let max_message_size = client.server_info.max_message_size_bytes;

@@ -103,7 +103,7 @@ async fn sdam_pool_management() {
         .build()
         .await;
 
-    let mut subscriber = client.events.subscribe_all();
+    let mut subscriber = client.events.stream_all();
 
     if !VersionReq::parse(">= 4.2.9")
         .unwrap()
@@ -186,7 +186,7 @@ async fn hello_ok_true() {
 
     let buffer = EventBuffer::new();
 
-    let mut subscriber = buffer.subscribe();
+    let mut subscriber = buffer.stream();
 
     let mut options = setup_client_options.clone();
     options.sdam_event_handler = Some(buffer.handler());
@@ -270,7 +270,7 @@ async fn removed_server_monitor_stops() -> crate::error::Result<()> {
     let hosts = options.hosts.clone();
     let set_name = options.repl_set_name.clone().unwrap();
 
-    let mut subscriber = buffer.subscribe();
+    let mut subscriber = buffer.stream();
     let topology = Topology::new(options)?;
 
     // Wait until all three monitors have started.

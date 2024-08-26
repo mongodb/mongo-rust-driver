@@ -277,7 +277,7 @@ async fn run_test(test_file: TestFile) {
     options.sdam_event_handler = Some(buffer.handler());
     options.test_options_mut().disable_monitoring_threads = true;
 
-    let mut event_subscriber = buffer.subscribe();
+    let mut event_subscriber = buffer.stream();
     let mut topology = Topology::new(options.clone()).unwrap();
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
@@ -598,7 +598,7 @@ async fn topology_closed_event_last() {
         .await;
     let events = client.events.clone();
 
-    let mut subscriber = events.subscribe_all();
+    let mut subscriber = events.stream_all();
 
     client
         .database(function_name!())
@@ -643,7 +643,7 @@ async fn heartbeat_events() {
         .build()
         .await;
 
-    let mut subscriber = client.events.subscribe_all();
+    let mut subscriber = client.events.stream_all();
 
     if client.is_load_balanced() {
         log_uncaptured("skipping heartbeat_events tests due to load-balanced topology");

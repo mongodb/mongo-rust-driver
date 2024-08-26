@@ -7,7 +7,7 @@ use std::{
 };
 use tracing::{field::Field, span, subscriber::Interest, Level, Metadata};
 
-use super::event_buffer::{EventBuffer, EventSubscriber};
+use super::event_buffer::{EventBuffer, EventStream};
 
 /// Models the data reported in a tracing event.
 #[derive(Debug, Clone)]
@@ -139,8 +139,8 @@ impl TracingHandler {
 
     /// Returns a `TracingSubscriber` that will listen for tracing events broadcast by this handler.
 
-    pub(crate) fn subscribe(&self) -> EventSubscriber<TracingEvent> {
-        self.buffer.subscribe()
+    pub(crate) fn subscribe(&self) -> EventStream<TracingEvent> {
+        self.buffer.stream()
     }
 }
 

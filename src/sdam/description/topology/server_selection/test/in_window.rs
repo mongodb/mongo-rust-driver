@@ -221,7 +221,7 @@ async fn load_balancing_test() {
         .build()
         .await;
 
-    let mut subscriber = client.events.subscribe_all();
+    let mut subscriber = client.events.stream_all();
 
     // wait for both servers pools to be saturated.
     for address in hosts {

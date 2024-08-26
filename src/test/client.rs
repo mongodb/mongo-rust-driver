@@ -713,7 +713,7 @@ async fn retry_commit_txn_check_out() {
     let fail_point = FailPoint::fail_command(&["ping"], FailPointMode::Times(1)).error_code(11600);
     let _guard = setup_client.enable_fail_point(fail_point).await.unwrap();
 
-    let mut subscriber = buffer.subscribe();
+    let mut subscriber = buffer.stream();
     client
         .database("foo")
         .run_command(doc! { "ping": 1 })
