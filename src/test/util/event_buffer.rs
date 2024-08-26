@@ -4,7 +4,7 @@ use std::{
 };
 
 use time::OffsetDateTime;
-use tokio::sync::{futures::Notified, Notify};
+use tokio::sync::Notify;
 
 use crate::{
     client::options::ClientOptions,
@@ -127,27 +127,9 @@ impl<T> EventBuffer<T> {
 }
 
 impl<T: Clone> EventBuffer<T> {
-    /// Returns a list of current events and a future to await for more being received.
-    pub(crate) fn watch_all(&self) -> (Vec<T>, Notified) {
-        // The `Notify` must be created *before* reading the events to ensure any added
-        // events trigger notifications.
-        let notify = self.inner.event_received.notified();
-        let events = self
-            .inner
-            .events
-            .lock()
-            .unwrap()
-            .data
-            .iter()
-            .map(|(ev, _)| ev)
-            .cloned()
-            .collect();
-        (events, notify)
-    }
-
     /// Returns a list of current events.
     pub(crate) fn all(&self) -> Vec<T> {
-        self.watch_all().0
+        self.all_timed().into_iter().map(|(ev, _)| ev).collect()
     }
 
     pub(crate) fn all_timed(&self) -> Vec<(T, OffsetDateTime)> {
@@ -277,7 +259,7 @@ pub(crate) struct EventStream<'a, T> {
 }
 
 impl<'a, T: Clone> EventStream<'a, T> {
-    async fn next(&mut self, timeout: Duration) -> Option<T> {
+    pub(crate) async fn next(&mut self, timeout: Duration) -> Option<T> {
         crate::runtime::timeout(timeout, async move {
             loop {
                 let notified = self.buffer.inner.event_received.notified();
