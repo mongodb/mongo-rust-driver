@@ -724,7 +724,7 @@ async fn retry_commit_txn_check_out() {
     // wait for the mark unknown and subsequent succeeded heartbeat
     let mut primary = None;
     event_stream
-        .wait_for_event(Duration::from_secs(1), |e| {
+        .next_match(Duration::from_secs(1), |e| {
             if let Event::Sdam(SdamEvent::ServerDescriptionChanged(event)) = e {
                 if event.is_marked_unknown_event() {
                     primary = Some(event.address.clone());
@@ -741,7 +741,7 @@ async fn retry_commit_txn_check_out() {
     // heartbeatFrequencyMS (which is 2 minutes) and ignore the immediate check requests from the
     // ping command in the meantime due to already being in the middle of their checks.
     event_stream
-        .wait_for_event(Duration::from_secs(1), |e| {
+        .next_match(Duration::from_secs(1), |e| {
             if let Event::Sdam(SdamEvent::ServerDescriptionChanged(event)) = e {
                 if &event.address == primary.as_ref().unwrap()
                     && event.previous_description.server_type() == ServerType::Unknown
@@ -768,7 +768,7 @@ async fn retry_commit_txn_check_out() {
 
     // ensure the first check out attempt fails
     event_stream
-        .wait_for_event(Duration::from_secs(1), |e| {
+        .next_match(Duration::from_secs(1), |e| {
             matches!(e, Event::Cmap(CmapEvent::ConnectionCheckoutFailed(_)))
         })
         .await
@@ -776,7 +776,7 @@ async fn retry_commit_txn_check_out() {
 
     // ensure the second one succeeds
     event_stream
-        .wait_for_event(Duration::from_secs(1), |e| {
+        .next_match(Duration::from_secs(1), |e| {
             matches!(e, Event::Cmap(CmapEvent::ConnectionCheckedOut(_)))
         })
         .await

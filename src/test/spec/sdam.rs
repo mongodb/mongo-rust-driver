@@ -77,7 +77,7 @@ async fn streaming_min_heartbeat_frequency() {
             let mut event_stream = h.stream();
             for _ in 0..5 {
                 let event = event_stream
-                    .wait_for_event(Duration::from_millis(750), |e| {
+                    .next_match(Duration::from_millis(750), |e| {
                         matches!(e, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) if e.server_address == address)
                     })
                     .await;
@@ -128,7 +128,7 @@ async fn heartbeat_frequency_is_respected() {
             let mut event_stream = h.stream();
 
             // collect events for 2 seconds, should see between 2 and 3 heartbeats.
-            let events = event_stream.collect_events(Duration::from_secs(3), |e| {
+            let events = event_stream.collect(Duration::from_secs(3), |e| {
                 matches!(e, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) if e.server_address == address)
             }).await;
 
@@ -192,7 +192,7 @@ async fn rtt_is_updated() {
 
     // wait for multiple heartbeats, assert their RTT is > 0
     let events = event_stream
-        .collect_events(Duration::from_secs(2), |e| {
+        .collect(Duration::from_secs(2), |e| {
             if let Event::Sdam(SdamEvent::ServerDescriptionChanged(e)) = e {
                 assert!(
                     e.new_description.average_round_trip_time().unwrap() > Duration::from_millis(0)

@@ -116,21 +116,21 @@ async fn retry_read_pool_cleared() {
         .expect("all should succeed");
 
     let _ = event_stream
-        .wait_for_event(Duration::from_millis(500), |event| {
+        .next_match(Duration::from_millis(500), |event| {
             matches!(event, Event::Cmap(CmapEvent::ConnectionCheckedOut(_)))
         })
         .await
         .expect("first checkout should succeed");
 
     let _ = event_stream
-        .wait_for_event(Duration::from_millis(500), |event| {
+        .next_match(Duration::from_millis(500), |event| {
             matches!(event, Event::Cmap(CmapEvent::PoolCleared(_)))
         })
         .await
         .expect("pool clear should occur");
 
     let next_cmap_events = event_stream
-        .collect_events(Duration::from_millis(1000), |event| {
+        .collect(Duration::from_millis(1000), |event| {
             matches!(event, Event::Cmap(_))
         })
         .await;

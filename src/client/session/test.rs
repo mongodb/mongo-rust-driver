@@ -255,7 +255,7 @@ async fn cluster_time_in_commands() {
             .expect("operation should succeed");
 
         let (first_command_started, first_command_succeeded) = event_stream
-            .wait_for_successful_command_execution(Duration::from_secs(5), command_name)
+            .next_successful_command_execution(Duration::from_secs(5), command_name)
             .await
             .unwrap_or_else(|| {
                 panic!(
@@ -271,7 +271,7 @@ async fn cluster_time_in_commands() {
             .expect("should get cluster time from command response");
 
         let (second_command_started, _) = event_stream
-            .wait_for_successful_command_execution(Duration::from_secs(5), command_name)
+            .next_successful_command_execution(Duration::from_secs(5), command_name)
             .await
             .unwrap_or_else(|| {
                 panic!(
@@ -317,7 +317,7 @@ async fn cluster_time_in_commands() {
 
     // Wait for initial monitor check to complete and discover the server.
     event_stream
-        .wait_for_event(Duration::from_secs(5), |event| match event {
+        .next_match(Duration::from_secs(5), |event| match event {
             Event::Sdam(SdamEvent::ServerDescriptionChanged(e)) => {
                 !e.previous_description.server_type().is_available()
                     && e.new_description.server_type().is_available()

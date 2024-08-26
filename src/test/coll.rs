@@ -1252,7 +1252,7 @@ async fn insert_many_document_sequences() {
     collection.insert_many(docs).await.unwrap();
 
     let (started, _) = event_stream
-        .wait_for_successful_command_execution(Duration::from_millis(500), "insert")
+        .next_successful_command_execution(Duration::from_millis(500), "insert")
         .await
         .expect("did not observe successful command events for insert");
     let insert_documents = started.command.get_array("documents").unwrap();
@@ -1272,14 +1272,14 @@ async fn insert_many_document_sequences() {
     collection.insert_many(docs).await.unwrap();
 
     let (first_started, _) = event_stream
-        .wait_for_successful_command_execution(Duration::from_millis(500), "insert")
+        .next_successful_command_execution(Duration::from_millis(500), "insert")
         .await
         .expect("did not observe successful command events for insert");
     let first_batch_len = first_started.command.get_array("documents").unwrap().len();
     assert!(first_batch_len < total_docs);
 
     let (second_started, _) = event_stream
-        .wait_for_successful_command_execution(Duration::from_millis(500), "insert")
+        .next_successful_command_execution(Duration::from_millis(500), "insert")
         .await
         .expect("did not observe successful command events for insert");
     let second_batch_len = second_started.command.get_array("documents").unwrap().len();

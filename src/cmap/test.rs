@@ -203,7 +203,7 @@ impl Executor {
         let filter = |e: &CmapEvent| !ignored_event_names.iter().any(|name| e.name() == name);
         for expected_event in self.events {
             let actual_event = event_stream
-                .wait_for_event(EVENT_TIMEOUT, filter)
+                .next_match(EVENT_TIMEOUT, filter)
                 .await
                 .unwrap_or_else(|| {
                     panic!(
@@ -214,7 +214,12 @@ impl Executor {
             assert_matches(&actual_event, &expected_event, Some(description.as_str()));
         }
 
-        assert_eq!(event_stream.all(filter), Vec::new(), "{}", description);
+        assert_eq!(
+            event_stream.collect_now(filter),
+            Vec::new(),
+            "{}",
+            description
+        );
     }
 }
 
@@ -271,7 +276,7 @@ impl Operation {
 
                 // wait for event to be emitted to ensure check in has completed.
                 event_stream
-                    .wait_for_event(EVENT_TIMEOUT, |e| {
+                    .next_match(EVENT_TIMEOUT, |e| {
                         matches!(e, CmapEvent::ConnectionCheckedIn(event) if event.connection_id == id)
                     })
                     .await
@@ -307,7 +312,7 @@ impl Operation {
 
                 // wait for event to be emitted to ensure drop has completed.
                 event_stream
-                    .wait_for_event(EVENT_TIMEOUT, |e| matches!(e, CmapEvent::PoolClosed(_)))
+                    .next_match(EVENT_TIMEOUT, |e| matches!(e, CmapEvent::PoolClosed(_)))
                     .await
                     .expect("did not receive ConnectionPoolClosed event after closing pool");
             }

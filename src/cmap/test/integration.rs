@@ -216,7 +216,7 @@ async fn connection_error_during_establishment() {
     pool.check_out().await.expect_err("check out should fail");
 
     event_stream
-        .wait_for_event(EVENT_TIMEOUT, |e| match e {
+        .next_match(EVENT_TIMEOUT, |e| match e {
             CmapEvent::ConnectionClosed(event) => {
                 event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
             }
@@ -258,7 +258,7 @@ async fn connection_error_during_operation() {
         .expect_err("ping should fail due to fail point");
 
     event_stream
-        .wait_for_event(EVENT_TIMEOUT, |e| match e {
+        .next_match(EVENT_TIMEOUT, |e| match e {
             CmapEvent::ConnectionClosed(event) => {
                 event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
             }

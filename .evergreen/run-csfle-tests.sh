@@ -26,6 +26,9 @@ fi
 
 set +o errexit
 
+cargo_test test::csfle::bson_size_limits results.xml
+exit ${CARGO_RESULT}
+
 cargo_test test::csfle prose.xml
 cargo_test test::spec::client_side_encryption spec.xml
 

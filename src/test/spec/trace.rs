@@ -92,7 +92,7 @@ async fn command_logging_truncation_default_limit() {
         .expect("insert many should succeed");
 
     let events = tracing_stream
-        .collect_events(Duration::from_millis(500), |_| true)
+        .collect(Duration::from_millis(500), |_| true)
         .await;
     assert_eq!(events.len(), 2);
 
@@ -106,7 +106,7 @@ async fn command_logging_truncation_default_limit() {
 
     coll.find(doc! {}).await.expect("find should succeed");
     let succeeded = tracing_stream
-        .wait_for_event(Duration::from_millis(500), |e| {
+        .next_match(Duration::from_millis(500), |e| {
             e.get_value_as_string("message") == "Command succeeded"
         })
         .await
@@ -135,7 +135,7 @@ async fn command_logging_truncation_explicit_limit() {
         .expect("hello command should succeed");
 
     let events = tracing_stream
-        .collect_events(Duration::from_millis(500), |_| true)
+        .collect(Duration::from_millis(500), |_| true)
         .await;
     assert_eq!(events.len(), 2);
 
@@ -183,7 +183,7 @@ async fn command_logging_truncation_mid_codepoint() {
         .expect("insert many should succeed");
 
     let started = tracing_stream
-        .wait_for_event(Duration::from_millis(500), |e| {
+        .next_match(Duration::from_millis(500), |e| {
             e.get_value_as_string("message") == "Command started"
         })
         .await
@@ -200,7 +200,7 @@ async fn command_logging_truncation_mid_codepoint() {
         .await
         .expect("find should succeed");
     let succeeded = tracing_stream
-        .wait_for_event(Duration::from_millis(500), |e| {
+        .next_match(Duration::from_millis(500), |e| {
             e.get_value_as_string("message") == "Command succeeded"
                 && e.get_value_as_string("commandName") == "find"
         })

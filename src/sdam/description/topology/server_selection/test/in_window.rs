@@ -243,7 +243,7 @@ async fn load_balancing_test() {
     let mut conns = 0;
     while conns < max_pool_size * 2 {
         subscriber
-            .wait_for_event(Duration::from_secs(30), |event| {
+            .next_match(Duration::from_secs(30), |event| {
                 matches!(event, Event::Cmap(CmapEvent::ConnectionReady(_)))
             })
             .await
