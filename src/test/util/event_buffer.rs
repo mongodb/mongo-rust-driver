@@ -107,10 +107,13 @@ impl<T> EventBuffer<T> {
         out
     }
 
+    /// Clear all cached events.  This will cause any derived `EventStream`s to error.
     pub(crate) fn clear_cached_events(&mut self) {
         self.invalidate(|data| data.clear());
     }
 
+    /// Remove all cached events that don't match the predicate.  This will cause any derived
+    /// `EventStream`s to error.
     pub(crate) fn retain(&mut self, mut f: impl FnMut(&T) -> bool) {
         self.invalidate(|data| data.retain(|(ev, _)| f(ev)));
     }
