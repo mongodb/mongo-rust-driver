@@ -208,7 +208,7 @@ impl ClientEntity {
                     continue;
                 };
                 let entities = &*entities.read().await;
-                if events_match(&ev, expected, Some(&entities)).is_ok() {
+                if events_match(&ev, expected, Some(entities)).is_ok() {
                     matched += 1;
                     if matched >= count {
                         return Ok(());
