@@ -100,7 +100,7 @@ async fn retry_read_pool_cleared() {
         .block_connection(Duration::from_secs(1));
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-    let mut subscriber = buffer.stream();
+    let mut event_stream = buffer.stream();
 
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
     for _ in 0..2 {
@@ -115,21 +115,21 @@ async fn retry_read_pool_cleared() {
         .collect::<Result<Vec<_>>>()
         .expect("all should succeed");
 
-    let _ = subscriber
+    let _ = event_stream
         .wait_for_event(Duration::from_millis(500), |event| {
             matches!(event, Event::Cmap(CmapEvent::ConnectionCheckedOut(_)))
         })
         .await
         .expect("first checkout should succeed");
 
-    let _ = subscriber
+    let _ = event_stream
         .wait_for_event(Duration::from_millis(500), |event| {
             matches!(event, Event::Cmap(CmapEvent::PoolCleared(_)))
         })
         .await
         .expect("pool clear should occur");
 
-    let next_cmap_events = subscriber
+    let next_cmap_events = event_stream
         .collect_events(Duration::from_millis(1000), |event| {
             matches!(event, Event::Cmap(_))
         })

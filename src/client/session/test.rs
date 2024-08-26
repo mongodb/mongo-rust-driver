@@ -244,7 +244,7 @@ async fn cluster_time_in_commands() {
         F: Fn(Client) -> G,
         G: Future<Output = Result<R>>,
     {
-        let mut subscriber = event_buffer.stream();
+        let mut event_stream = event_buffer.stream();
 
         operation(client.clone())
             .await
@@ -254,7 +254,7 @@ async fn cluster_time_in_commands() {
             .await
             .expect("operation should succeed");
 
-        let (first_command_started, first_command_succeeded) = subscriber
+        let (first_command_started, first_command_succeeded) = event_stream
             .wait_for_successful_command_execution(Duration::from_secs(5), command_name)
             .await
             .unwrap_or_else(|| {
@@ -270,7 +270,7 @@ async fn cluster_time_in_commands() {
             .get("$clusterTime")
             .expect("should get cluster time from command response");
 
-        let (second_command_started, _) = subscriber
+        let (second_command_started, _) = event_stream
             .wait_for_successful_command_execution(Duration::from_secs(5), command_name)
             .await
             .unwrap_or_else(|| {
@@ -311,12 +311,12 @@ async fn cluster_time_in_commands() {
         }
     }
 
-    let mut subscriber = buffer.stream();
+    let mut event_stream = buffer.stream();
 
     let client = Client::with_options(options).unwrap();
 
     // Wait for initial monitor check to complete and discover the server.
-    subscriber
+    event_stream
         .wait_for_event(Duration::from_secs(5), |event| match event {
             Event::Sdam(SdamEvent::ServerDescriptionChanged(e)) => {
                 !e.previous_description.server_type().is_available()

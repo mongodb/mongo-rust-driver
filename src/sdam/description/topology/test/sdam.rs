@@ -277,7 +277,7 @@ async fn run_test(test_file: TestFile) {
     options.sdam_event_handler = Some(buffer.handler());
     options.test_options_mut().disable_monitoring_threads = true;
 
-    let mut event_subscriber = buffer.stream();
+    let mut event_stream = buffer.stream();
     let mut topology = Topology::new(options.clone()).unwrap();
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
@@ -374,7 +374,7 @@ async fn run_test(test_file: TestFile) {
                 );
             }
             Outcome::Events(EventsOutcome { events: expected }) => {
-                let actual = event_subscriber
+                let actual = event_stream
                     .collect_events(Duration::from_millis(500), |e| matches!(e, Event::Sdam(_)))
                     .await
                     .into_iter()

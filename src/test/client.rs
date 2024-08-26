@@ -713,7 +713,7 @@ async fn retry_commit_txn_check_out() {
     let fail_point = FailPoint::fail_command(&["ping"], FailPointMode::Times(1)).error_code(11600);
     let _guard = setup_client.enable_fail_point(fail_point).await.unwrap();
 
-    let mut subscriber = buffer.stream();
+    let mut event_stream = buffer.stream();
     client
         .database("foo")
         .run_command(doc! { "ping": 1 })
@@ -723,7 +723,7 @@ async fn retry_commit_txn_check_out() {
     // failing with a state change error will request an immediate check
     // wait for the mark unknown and subsequent succeeded heartbeat
     let mut primary = None;
-    subscriber
+    event_stream
         .wait_for_event(Duration::from_secs(1), |e| {
             if let Event::Sdam(SdamEvent::ServerDescriptionChanged(event)) = e {
                 if event.is_marked_unknown_event() {
@@ -740,7 +740,7 @@ async fn retry_commit_txn_check_out() {
     // This is because the monitors are waiting for the next heartbeat from the server for
     // heartbeatFrequencyMS (which is 2 minutes) and ignore the immediate check requests from the
     // ping command in the meantime due to already being in the middle of their checks.
-    subscriber
+    event_stream
         .wait_for_event(Duration::from_secs(1), |e| {
             if let Event::Sdam(SdamEvent::ServerDescriptionChanged(event)) = e {
                 if &event.address == primary.as_ref().unwrap()
@@ -767,7 +767,7 @@ async fn retry_commit_txn_check_out() {
     session.commit_transaction().await.unwrap();
 
     // ensure the first check out attempt fails
-    subscriber
+    event_stream
         .wait_for_event(Duration::from_secs(1), |e| {
             matches!(e, Event::Cmap(CmapEvent::ConnectionCheckoutFailed(_)))
         })
@@ -775,7 +775,7 @@ async fn retry_commit_txn_check_out() {
         .expect("should see check out failed event");
 
     // ensure the second one succeeds
-    subscriber
+    event_stream
         .wait_for_event(Duration::from_secs(1), |e| {
             matches!(e, Event::Cmap(CmapEvent::ConnectionCheckedOut(_)))
         })

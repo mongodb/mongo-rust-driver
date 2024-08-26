@@ -246,11 +246,11 @@ async fn sessions_not_supported_implicit_session_ignored() {
         return;
     };
 
-    let mut subscriber = client.events.stream();
+    let mut event_stream = client.events.stream();
     let coll = client.database(name).collection(name);
 
     let _ = coll.find(doc! {}).await;
-    let event = subscriber
+    let event = event_stream
         .filter_map_event(Duration::from_millis(500), |event| match event {
             Event::Command(CommandEvent::Started(command_started_event))
                 if command_started_event.command_name == "find" =>
@@ -264,7 +264,7 @@ async fn sessions_not_supported_implicit_session_ignored() {
     assert!(!event.command.contains_key("lsid"));
 
     let _ = coll.insert_one(doc! { "x": 1 }).await;
-    let event = subscriber
+    let event = event_stream
         .filter_map_event(Duration::from_millis(500), |event| match event {
             Event::Command(CommandEvent::Started(command_started_event))
                 if command_started_event.command_name == "insert" =>
