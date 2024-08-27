@@ -1233,7 +1233,7 @@ async fn insert_many_document_sequences() {
 
     let client = Client::test_builder().monitor_events().build().await;
 
-    let mut subscriber = client.events.subscribe();
+    let mut event_stream = client.events.stream();
 
     let max_object_size = client.server_info.max_bson_object_size;
     let max_message_size = client.server_info.max_message_size_bytes;
@@ -1251,8 +1251,8 @@ async fn insert_many_document_sequences() {
     ];
     collection.insert_many(docs).await.unwrap();
 
-    let (started, _) = subscriber
-        .wait_for_successful_command_execution(Duration::from_millis(500), "insert")
+    let (started, _) = event_stream
+        .next_successful_command_execution(Duration::from_millis(500), "insert")
         .await
         .expect("did not observe successful command events for insert");
     let insert_documents = started.command.get_array("documents").unwrap();
@@ -1271,15 +1271,15 @@ async fn insert_many_document_sequences() {
     let total_docs = docs.len();
     collection.insert_many(docs).await.unwrap();
 
-    let (first_started, _) = subscriber
-        .wait_for_successful_command_execution(Duration::from_millis(500), "insert")
+    let (first_started, _) = event_stream
+        .next_successful_command_execution(Duration::from_millis(500), "insert")
         .await
         .expect("did not observe successful command events for insert");
     let first_batch_len = first_started.command.get_array("documents").unwrap().len();
     assert!(first_batch_len < total_docs);
 
-    let (second_started, _) = subscriber
-        .wait_for_successful_command_execution(Duration::from_millis(500), "insert")
+    let (second_started, _) = event_stream
+        .next_successful_command_execution(Duration::from_millis(500), "insert")
         .await
         .expect("did not observe successful command events for insert");
     let second_batch_len = second_started.command.get_array("documents").unwrap().len();

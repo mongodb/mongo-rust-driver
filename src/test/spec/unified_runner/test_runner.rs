@@ -244,12 +244,12 @@ impl TestRunner {
             }
 
             #[cfg(feature = "tracing-unstable")]
-            let (mut tracing_subscriber, _levels_guard) = {
+            let (mut tracing_stream, _levels_guard) = {
                 let tracing_levels =
                     max_verbosity_levels_for_test_case(&test_file.create_entities, test_case);
                 let guard = DEFAULT_GLOBAL_TRACING_HANDLER.set_levels(tracing_levels);
-                let subscriber = DEFAULT_GLOBAL_TRACING_HANDLER.subscribe();
-                (subscriber, guard)
+                let stream = DEFAULT_GLOBAL_TRACING_HANDLER.event_stream();
+                (stream, guard)
             };
 
             for operation in &test_case.operations {
@@ -315,8 +315,8 @@ impl TestRunner {
             if let Some(ref expected_messages) = test_case.expect_log_messages {
                 self.sync_workers().await;
 
-                let all_tracing_events = tracing_subscriber
-                    .collect_events(Duration::from_millis(1000), |_| true)
+                let all_tracing_events = tracing_stream
+                    .collect(Duration::from_millis(1000), |_| true)
                     .await;
 
                 for expectation in expected_messages {

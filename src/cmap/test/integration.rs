@@ -199,7 +199,7 @@ async fn connection_error_during_establishment() {
 
     let buffer = EventBuffer::<CmapEvent>::new();
 
-    let mut subscriber = buffer.subscribe();
+    let mut event_stream = buffer.stream();
 
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
     options.ready = Some(true);
@@ -215,8 +215,8 @@ async fn connection_error_during_establishment() {
 
     pool.check_out().await.expect_err("check out should fail");
 
-    subscriber
-        .wait_for_event(EVENT_TIMEOUT, |e| match e {
+    event_stream
+        .next_match(EVENT_TIMEOUT, |e| match e {
             CmapEvent::ConnectionClosed(event) => {
                 event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
             }
@@ -249,7 +249,7 @@ async fn connection_error_during_operation() {
         FailPoint::fail_command(&["ping"], FailPointMode::Times(10)).close_connection(true);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-    let mut subscriber = buffer.subscribe();
+    let mut event_stream = buffer.stream();
 
     client
         .database("test")
@@ -257,8 +257,8 @@ async fn connection_error_during_operation() {
         .await
         .expect_err("ping should fail due to fail point");
 
-    subscriber
-        .wait_for_event(EVENT_TIMEOUT, |e| match e {
+    event_stream
+        .next_match(EVENT_TIMEOUT, |e| match e {
             CmapEvent::ConnectionClosed(event) => {
                 event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
             }

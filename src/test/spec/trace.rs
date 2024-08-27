@@ -84,15 +84,15 @@ async fn command_logging_truncation_default_limit() {
         COMMAND_TRACING_EVENT_TARGET.to_string(),
         tracing::Level::DEBUG,
     )]));
-    let mut tracing_subscriber = DEFAULT_GLOBAL_TRACING_HANDLER.subscribe();
+    let mut tracing_stream = DEFAULT_GLOBAL_TRACING_HANDLER.event_stream();
 
     let docs = iter::repeat(doc! { "x": "y" }).take(100);
     coll.insert_many(docs)
         .await
         .expect("insert many should succeed");
 
-    let events = tracing_subscriber
-        .collect_events(Duration::from_millis(500), |_| true)
+    let events = tracing_stream
+        .collect(Duration::from_millis(500), |_| true)
         .await;
     assert_eq!(events.len(), 2);
 
@@ -105,8 +105,8 @@ async fn command_logging_truncation_default_limit() {
     assert!(reply.len() <= DEFAULT_MAX_DOCUMENT_LENGTH_BYTES + 3); // +3 for trailing "..."
 
     coll.find(doc! {}).await.expect("find should succeed");
-    let succeeded = tracing_subscriber
-        .wait_for_event(Duration::from_millis(500), |e| {
+    let succeeded = tracing_stream
+        .next_match(Duration::from_millis(500), |e| {
             e.get_value_as_string("message") == "Command succeeded"
         })
         .await
@@ -126,7 +126,7 @@ async fn command_logging_truncation_explicit_limit() {
         COMMAND_TRACING_EVENT_TARGET.to_string(),
         tracing::Level::DEBUG,
     )]));
-    let mut tracing_subscriber = DEFAULT_GLOBAL_TRACING_HANDLER.subscribe();
+    let mut tracing_stream = DEFAULT_GLOBAL_TRACING_HANDLER.event_stream();
 
     client
         .database("tracing_test")
@@ -134,8 +134,8 @@ async fn command_logging_truncation_explicit_limit() {
         .await
         .expect("hello command should succeed");
 
-    let events = tracing_subscriber
-        .collect_events(Duration::from_millis(500), |_| true)
+    let events = tracing_stream
+        .collect(Duration::from_millis(500), |_| true)
         .await;
     assert_eq!(events.len(), 2);
 
@@ -175,15 +175,15 @@ async fn command_logging_truncation_mid_codepoint() {
         COMMAND_TRACING_EVENT_TARGET.to_string(),
         tracing::Level::DEBUG,
     )]));
-    let mut tracing_subscriber = DEFAULT_GLOBAL_TRACING_HANDLER.subscribe();
+    let mut tracing_stream = DEFAULT_GLOBAL_TRACING_HANDLER.event_stream();
 
     let docs = iter::repeat(doc! { "🤔": "🤔🤔🤔🤔🤔🤔" }).take(10);
     coll.insert_many(docs)
         .await
         .expect("insert many should succeed");
 
-    let started = tracing_subscriber
-        .wait_for_event(Duration::from_millis(500), |e| {
+    let started = tracing_stream
+        .next_match(Duration::from_millis(500), |e| {
             e.get_value_as_string("message") == "Command started"
         })
         .await
@@ -199,8 +199,8 @@ async fn command_logging_truncation_mid_codepoint() {
         .projection(doc! { "_id": 0, "🤔": 1 })
         .await
         .expect("find should succeed");
-    let succeeded = tracing_subscriber
-        .wait_for_event(Duration::from_millis(500), |e| {
+    let succeeded = tracing_stream
+        .next_match(Duration::from_millis(500), |e| {
             e.get_value_as_string("message") == "Command succeeded"
                 && e.get_value_as_string("commandName") == "find"
         })

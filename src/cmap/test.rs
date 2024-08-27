@@ -146,7 +146,7 @@ impl Executor {
     }
 
     async fn execute_test(self) {
-        let mut subscriber = self.state.events.subscribe();
+        let mut event_stream = self.state.events.stream();
 
         let (updater, mut receiver) = TopologyUpdater::channel();
 
@@ -202,8 +202,8 @@ impl Executor {
         let description = self.description;
         let filter = |e: &CmapEvent| !ignored_event_names.iter().any(|name| e.name() == name);
         for expected_event in self.events {
-            let actual_event = subscriber
-                .wait_for_event(EVENT_TIMEOUT, filter)
+            let actual_event = event_stream
+                .next_match(EVENT_TIMEOUT, filter)
                 .await
                 .unwrap_or_else(|| {
                     panic!(
@@ -214,7 +214,12 @@ impl Executor {
             assert_matches(&actual_event, &expected_event, Some(description.as_str()));
         }
 
-        assert_eq!(subscriber.all(filter), Vec::new(), "{}", description);
+        assert_eq!(
+            event_stream.collect_now(filter),
+            Vec::new(),
+            "{}",
+            description
+        );
     }
 }
 
@@ -262,7 +267,7 @@ impl Operation {
                 }
             }
             Operation::CheckIn { connection } => {
-                let mut subscriber = state.events.subscribe();
+                let mut event_stream = state.events.stream();
                 let conn = state.connections.write().await.remove(&connection).unwrap();
                 let id = conn.id;
                 // connections are checked in via tasks spawned in their drop implementation,
@@ -270,8 +275,8 @@ impl Operation {
                 drop(conn);
 
                 // wait for event to be emitted to ensure check in has completed.
-                subscriber
-                    .wait_for_event(EVENT_TIMEOUT, |e| {
+                event_stream
+                    .next_match(EVENT_TIMEOUT, |e| {
                         matches!(e, CmapEvent::ConnectionCheckedIn(event) if event.connection_id == id)
                     })
                     .await
@@ -300,14 +305,14 @@ impl Operation {
                 }
             }
             Operation::Close => {
-                let mut subscriber = state.events.subscribe();
+                let mut event_stream = state.events.stream();
 
                 // pools are closed via their drop implementation
                 state.pool.write().await.take();
 
                 // wait for event to be emitted to ensure drop has completed.
-                subscriber
-                    .wait_for_event(EVENT_TIMEOUT, |e| matches!(e, CmapEvent::PoolClosed(_)))
+                event_stream
+                    .next_match(EVENT_TIMEOUT, |e| matches!(e, CmapEvent::PoolClosed(_)))
                     .await
                     .expect("did not receive ConnectionPoolClosed event after closing pool");
             }

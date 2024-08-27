@@ -4,7 +4,7 @@ use std::{
 };
 
 use time::OffsetDateTime;
-use tokio::sync::{futures::Notified, Notify};
+use tokio::sync::Notify;
 
 use crate::{
     client::options::ClientOptions,
@@ -20,7 +20,9 @@ use super::Event;
 /// A buffer of events that provides utility methods for querying the buffer and awaiting new event
 /// arrival.
 ///
-/// New test code should prefer to use this over `EventSubscriber`.
+/// If working with events one at a time as they arrive is more convenient for a particular test,
+/// register an `EventBuffer` with the `Client` and then use `EventBuffer::stream` or
+/// `EventBuffer::stream_all`.
 #[derive(Clone, Debug)]
 pub(crate) struct EventBuffer<T = Event> {
     inner: Arc<EventBufferInner<T>>,
@@ -72,22 +74,22 @@ impl<T> EventBuffer<T> {
             .collect()
     }
 
-    /// Create a new asynchronous subscription to events generated after the point of this call.
-    pub(crate) fn subscribe(&self) -> EventSubscriber<'_, T> {
+    /// Create a new stream view of events buffered after the point of this call.
+    pub(crate) fn stream(&self) -> EventStream<'_, T> {
         let (index, generation) = {
             let events = self.inner.events.lock().unwrap();
             (events.data.len(), events.generation)
         };
-        EventSubscriber {
+        EventStream {
             buffer: self,
             index,
             generation,
         }
     }
 
-    /// Create a new asynchronous subscription to all events contained in the buffer.
-    pub(crate) fn subscribe_all(&self) -> EventSubscriber<'_, T> {
-        EventSubscriber {
+    /// Create a new stream view, starting with events already contained in the buffer.
+    pub(crate) fn stream_all(&self) -> EventStream<'_, T> {
+        EventStream {
             buffer: self,
             index: 0,
             generation: self.inner.events.lock().unwrap().generation,
@@ -105,10 +107,13 @@ impl<T> EventBuffer<T> {
         out
     }
 
+    /// Clear all cached events.  This will cause any derived `EventStream`s to error.
     pub(crate) fn clear_cached_events(&mut self) {
         self.invalidate(|data| data.clear());
     }
 
+    /// Remove all cached events that don't match the predicate.  This will cause any derived
+    /// `EventStream`s to error.
     pub(crate) fn retain(&mut self, mut f: impl FnMut(&T) -> bool) {
         self.invalidate(|data| data.retain(|(ev, _)| f(ev)));
     }
@@ -125,27 +130,9 @@ impl<T> EventBuffer<T> {
 }
 
 impl<T: Clone> EventBuffer<T> {
-    /// Returns a list of current events and a future to await for more being received.
-    pub(crate) fn watch_all(&self) -> (Vec<T>, Notified) {
-        // The `Notify` must be created *before* reading the events to ensure any added
-        // events trigger notifications.
-        let notify = self.inner.event_received.notified();
-        let events = self
-            .inner
-            .events
-            .lock()
-            .unwrap()
-            .data
-            .iter()
-            .map(|(ev, _)| ev)
-            .cloned()
-            .collect();
-        (events, notify)
-    }
-
     /// Returns a list of current events.
     pub(crate) fn all(&self) -> Vec<T> {
-        self.watch_all().0
+        self.all_timed().into_iter().map(|(ev, _)| ev).collect()
     }
 
     pub(crate) fn all_timed(&self) -> Vec<(T, OffsetDateTime)> {
@@ -267,31 +254,14 @@ impl EventBuffer<Event> {
     }
 }
 
-/// Process events one at a time as they arrive asynchronously.
-///
-/// New test code should prefer `EventBuffer` to this; use this only when test actions need to be
-/// asynchronously interleaved with event validation.
-pub(crate) struct EventSubscriber<'a, T> {
+/// Iterate one at a time over events in an `EventBuffer`.
+pub(crate) struct EventStream<'a, T> {
     buffer: &'a EventBuffer<T>,
     index: usize,
     generation: Generation,
 }
 
-impl<'a, T: Clone> EventSubscriber<'a, T> {
-    async fn next(&mut self, timeout: Duration) -> Option<T> {
-        crate::runtime::timeout(timeout, async move {
-            loop {
-                let notified = self.buffer.inner.event_received.notified();
-                if let Some(next) = self.try_next() {
-                    return Some(next);
-                }
-                notified.await;
-            }
-        })
-        .await
-        .unwrap_or(None)
-    }
-
+impl<'a, T: Clone> EventStream<'a, T> {
     fn try_next(&mut self) -> Option<T> {
         let events = self.buffer.inner.events.lock().unwrap();
         if events.generation != self.generation {
@@ -305,12 +275,25 @@ impl<'a, T: Clone> EventSubscriber<'a, T> {
         None
     }
 
-    /// Consume and pass events to the provided closure until it returns Some or the timeout is hit.
-    pub(crate) async fn filter_map_event<F, R>(
-        &mut self,
-        timeout: Duration,
-        mut filter_map: F,
-    ) -> Option<R>
+    /// Get the next unread event from the underlying buffer, waiting for a new one to arrive if all
+    /// current ones have been read.
+    pub(crate) async fn next(&mut self, timeout: Duration) -> Option<T> {
+        crate::runtime::timeout(timeout, async move {
+            loop {
+                let notified = self.buffer.inner.event_received.notified();
+                if let Some(next) = self.try_next() {
+                    return Some(next);
+                }
+                notified.await;
+            }
+        })
+        .await
+        .unwrap_or(None)
+    }
+
+    /// Get the next unread event for which the provided closure returnes `Some`, waiting for new
+    /// events to arrive if all current ones have been read.
+    pub(crate) async fn next_map<F, R>(&mut self, timeout: Duration, mut filter_map: F) -> Option<R>
     where
         F: FnMut(T) -> Option<R>,
     {
@@ -326,22 +309,25 @@ impl<'a, T: Clone> EventSubscriber<'a, T> {
         .unwrap_or(None)
     }
 
-    /// Waits for an event to occur within the given duration that passes the given filter.
-    pub(crate) async fn wait_for_event<F>(&mut self, timeout: Duration, mut filter: F) -> Option<T>
+    /// Get the next unread event for which the provided closure returnes `true`, waiting for new
+    /// events to arrive if all current ones have been read.
+    pub(crate) async fn next_match<F>(&mut self, timeout: Duration, mut filter: F) -> Option<T>
     where
         F: FnMut(&T) -> bool,
     {
-        self.filter_map_event(timeout, |e| if filter(&e) { Some(e) } else { None })
+        self.next_map(timeout, |e| if filter(&e) { Some(e) } else { None })
             .await
     }
 
-    pub(crate) async fn collect_events<F>(&mut self, timeout: Duration, mut filter: F) -> Vec<T>
+    /// Collect all unread events matching a predicate, waiting up to a timeout for additional ones
+    /// to arrive.
+    pub(crate) async fn collect<F>(&mut self, timeout: Duration, mut filter: F) -> Vec<T>
     where
         F: FnMut(&T) -> bool,
     {
         let mut events = Vec::new();
         let _ = runtime::timeout(timeout, async {
-            while let Some(event) = self.wait_for_event(timeout, &mut filter).await {
+            while let Some(event) = self.next_match(timeout, &mut filter).await {
                 events.push(event);
             }
         })
@@ -350,17 +336,13 @@ impl<'a, T: Clone> EventSubscriber<'a, T> {
     }
 
     #[cfg(feature = "in-use-encryption-unstable")]
-    pub(crate) async fn collect_events_map<F, R>(
-        &mut self,
-        timeout: Duration,
-        mut filter: F,
-    ) -> Vec<R>
+    pub(crate) async fn collect_map<F, R>(&mut self, timeout: Duration, mut filter: F) -> Vec<R>
     where
         F: FnMut(T) -> Option<R>,
     {
         let mut events = Vec::new();
         let _ = runtime::timeout(timeout, async {
-            while let Some(event) = self.filter_map_event(timeout, &mut filter).await {
+            while let Some(event) = self.next_map(timeout, &mut filter).await {
                 events.push(event);
             }
         })
@@ -368,13 +350,8 @@ impl<'a, T: Clone> EventSubscriber<'a, T> {
         events
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
-    pub(crate) async fn clear_events(&mut self, timeout: Duration) {
-        self.collect_events(timeout, |_| true).await;
-    }
-
-    /// Returns the received events without waiting for any more.
-    pub(crate) fn all<F>(&mut self, filter: F) -> Vec<T>
+    /// Collects all unread events matching a predicate without waiting for any more.
+    pub(crate) fn collect_now<F>(&mut self, filter: F) -> Vec<T>
     where
         F: Fn(&T) -> bool,
     {
@@ -395,18 +372,18 @@ impl<'a, T: Clone> EventSubscriber<'a, T> {
     }
 }
 
-impl<'a> EventSubscriber<'a, Event> {
-    /// Waits for the next CommandStartedEvent/CommandFailedEvent pair.
+impl<'a> EventStream<'a, Event> {
+    /// Gets the next unread CommandStartedEvent/CommandFailedEvent pair.
     /// If the next CommandStartedEvent is associated with a CommandFailedEvent, this method will
     /// panic.
-    pub(crate) async fn wait_for_successful_command_execution(
+    pub(crate) async fn next_successful_command_execution(
         &mut self,
         timeout: Duration,
         command_name: impl AsRef<str>,
     ) -> Option<(CommandStartedEvent, CommandSucceededEvent)> {
         runtime::timeout(timeout, async {
             let started = self
-                .filter_map_event(Duration::MAX, |event| match event {
+                .next_map(Duration::MAX, |event| match event {
                     Event::Command(CommandEvent::Started(s))
                         if s.command_name == command_name.as_ref() =>
                     {
@@ -418,7 +395,7 @@ impl<'a> EventSubscriber<'a, Event> {
                 .unwrap();
 
             let succeeded = self
-                .filter_map_event(Duration::MAX, |event| match event {
+                .next_map(Duration::MAX, |event| match event {
                     Event::Command(CommandEvent::Succeeded(s))
                         if s.request_id == started.request_id =>
                     {

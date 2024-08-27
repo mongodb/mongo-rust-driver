@@ -221,7 +221,7 @@ async fn load_balancing_test() {
         .build()
         .await;
 
-    let mut subscriber = client.events.subscribe_all();
+    let mut subscriber = client.events.stream_all();
 
     // wait for both servers pools to be saturated.
     for address in hosts {
@@ -243,7 +243,7 @@ async fn load_balancing_test() {
     let mut conns = 0;
     while conns < max_pool_size * 2 {
         subscriber
-            .wait_for_event(Duration::from_secs(30), |event| {
+            .next_match(Duration::from_secs(30), |event| {
                 matches!(event, Event::Cmap(CmapEvent::ConnectionReady(_)))
             })
             .await

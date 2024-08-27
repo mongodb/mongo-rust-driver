@@ -328,7 +328,7 @@ async fn data_key_double_encryption() -> Result<()> {
 
     // Testing each provider:
 
-    let mut events = client.events.subscribe();
+    let mut events = client.events.stream();
     let provider_keys: [(KmsProvider, MasterKey); 5] = [
         (
             KmsProvider::aws(),
@@ -382,7 +382,7 @@ async fn data_key_double_encryption() -> Result<()> {
             provider.as_string()
         );
         let found = events
-            .wait_for_event(
+            .next_match(
                 Duration::from_millis(500),
                 ok_pred(|ev| {
                     let ev = match ev.as_command_started_event() {
@@ -588,7 +588,6 @@ async fn bson_size_limits() -> Result<()> {
     let mut opts = get_client_options().await.clone();
     let buffer = EventBuffer::<Event>::new();
 
-    let mut events = buffer.subscribe();
     opts.command_event_handler = Some(buffer.handler());
     let client_encrypted =
         Client::encrypted_builder(opts, KV_NAMESPACE.clone(), vec![LOCAL_KMS.clone()])?
@@ -616,7 +615,7 @@ async fn bson_size_limits() -> Result<()> {
 
     // Test operation 3
     let value = "a".repeat(2_097_152);
-    events.clear_events(Duration::from_millis(500)).await;
+    let mut events = buffer.stream();
     coll.insert_many(vec![
         doc! {
             "_id": "over_2mib_1",
@@ -629,7 +628,7 @@ async fn bson_size_limits() -> Result<()> {
     ])
     .await?;
     let inserts = events
-        .collect_events(Duration::from_millis(500), |ev| {
+        .collect(Duration::from_millis(500), |ev| {
             let ev = match ev.as_command_started_event() {
                 Some(e) => e,
                 None => return false,
@@ -645,10 +644,10 @@ async fn bson_size_limits() -> Result<()> {
     doc.insert("unencrypted", "a".repeat(2_097_152 - 2_000));
     let mut doc2 = doc.clone();
     doc2.insert("_id", "encryption_exceeds_2mib_2");
-    events.clear_events(Duration::from_millis(500)).await;
+    let mut events = buffer.stream();
     coll.insert_many(vec![doc, doc2]).await?;
     let inserts = events
-        .collect_events(Duration::from_millis(500), |ev| {
+        .collect(Duration::from_millis(500), |ev| {
             let ev = match ev.as_command_started_event() {
                 Some(e) => e,
                 None => return false,
@@ -1551,7 +1550,7 @@ impl DeadlockTestCase {
             .build()
             .await;
 
-        let mut keyvault_events = client_keyvault.events.subscribe();
+        let mut keyvault_events = client_keyvault.events.stream();
         client_test
             .database("keyvault")
             .collection::<Document>("datakeys")
@@ -1589,7 +1588,7 @@ impl DeadlockTestCase {
         // Run test case
         let event_buffer = EventBuffer::new();
 
-        let mut encrypted_events = event_buffer.subscribe();
+        let mut encrypted_events = event_buffer.stream();
         let mut opts = get_client_options().await.clone();
         opts.max_pool_size = Some(self.max_pool_size);
         opts.command_event_handler = Some(event_buffer.handler());
@@ -1631,7 +1630,7 @@ impl DeadlockTestCase {
         assert_eq!(found, Some(doc! { "_id": 0, "encrypted": "string0" }));
 
         let encrypted_events = encrypted_events
-            .collect_events(Duration::from_millis(500), |_| true)
+            .collect(Duration::from_millis(500), |_| true)
             .await;
         let client_count = encrypted_events
             .iter()
@@ -1648,7 +1647,7 @@ impl DeadlockTestCase {
         }
 
         let keyvault_commands = keyvault_events
-            .collect_events_map(Duration::from_millis(500), |ev| {
+            .collect_map(Duration::from_millis(500), |ev| {
                 ev.into_command_started_event()
             })
             .await;

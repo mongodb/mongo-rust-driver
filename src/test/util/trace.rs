@@ -7,7 +7,7 @@ use std::{
 };
 use tracing::{field::Field, span, subscriber::Interest, Level, Metadata};
 
-use super::event_buffer::{EventBuffer, EventSubscriber};
+use super::event_buffer::{EventBuffer, EventStream};
 
 /// Models the data reported in a tracing event.
 #[derive(Debug, Clone)]
@@ -100,8 +100,8 @@ impl Serialize for TracingEventValue {
 /// for the scope of a test using [`TracingHandler::set_levels`].
 ///
 /// The handler will listen for tracing events for its associated components/levels and
-/// publish them to a broadcast channel. To receive the broadcasted events, call
-/// [`TracingHandler::subscribe`] to create a new [`TracingSubscriber`].
+/// buffer them. To stream the buffered events, call
+/// [`TracingHandler::event_stream`] to create a new [`EventStream`].
 #[derive(Clone, Debug)]
 pub(crate) struct TracingHandler {
     buffer: EventBuffer<TracingEvent>,
@@ -137,10 +137,9 @@ impl TracingHandler {
         TracingLevelsGuard { handler: self }
     }
 
-    /// Returns a `TracingSubscriber` that will listen for tracing events broadcast by this handler.
-
-    pub(crate) fn subscribe(&self) -> EventSubscriber<TracingEvent> {
-        self.buffer.subscribe()
+    /// Returns an `EventStream` that will yield events received by this handler.
+    pub(crate) fn event_stream(&self) -> EventStream<TracingEvent> {
+        self.buffer.stream()
     }
 }
 

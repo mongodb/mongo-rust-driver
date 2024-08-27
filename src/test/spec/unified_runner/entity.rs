@@ -199,20 +199,21 @@ impl ClientEntity {
         count: usize,
         entities: Arc<RwLock<EntityMap>>,
     ) -> Result<()> {
-        crate::runtime::timeout(Duration::from_secs(10), async {
+        const TIMEOUT: Duration = Duration::from_secs(10);
+        crate::runtime::timeout(TIMEOUT, async {
+            let mut stream = self.events.stream_all();
+            let mut matched = 0;
             loop {
-                let (events, notified) = self.events.watch_all();
-                let matched = {
-                    let entities = &*entities.read().await;
-                    events
-                        .into_iter()
-                        .filter(|e| events_match(e, expected, Some(entities)).is_ok())
-                        .count()
+                let Some(ev) = stream.next(TIMEOUT).await else {
+                    continue;
                 };
-                if matched >= count {
-                    return Ok(());
+                let entities = &*entities.read().await;
+                if events_match(&ev, expected, Some(entities)).is_ok() {
+                    matched += 1;
+                    if matched >= count {
+                        return Ok(());
+                    }
                 }
-                notified.await;
             }
         })
         .await?

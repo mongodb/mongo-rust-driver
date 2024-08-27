@@ -103,7 +103,7 @@ async fn sdam_pool_management() {
         .build()
         .await;
 
-    let mut subscriber = client.events.subscribe_all();
+    let mut subscriber = client.events.stream_all();
 
     if !VersionReq::parse(">= 4.2.9")
         .unwrap()
@@ -116,14 +116,14 @@ async fn sdam_pool_management() {
     }
 
     subscriber
-        .wait_for_event(Duration::from_millis(500), |event| {
+        .next_match(Duration::from_millis(500), |event| {
             matches!(event, Event::Cmap(CmapEvent::PoolReady(_)))
         })
         .await
         .expect("should see pool ready event");
 
     subscriber
-        .wait_for_event(Duration::from_millis(500), |event| {
+        .next_match(Duration::from_millis(500), |event| {
             matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)))
         })
         .await
@@ -143,9 +143,7 @@ async fn sdam_pool_management() {
 
     // Since there is no deterministic ordering, simply collect all the events and check for their
     // presence.
-    let events = subscriber
-        .collect_events(Duration::from_secs(1), |_| true)
-        .await;
+    let events = subscriber.collect(Duration::from_secs(1), |_| true).await;
     assert!(events
         .iter()
         .any(|e| matches!(e, Event::Sdam(SdamEvent::ServerHeartbeatFailed(_)))));
@@ -186,7 +184,7 @@ async fn hello_ok_true() {
 
     let buffer = EventBuffer::new();
 
-    let mut subscriber = buffer.subscribe();
+    let mut event_stream = buffer.stream();
 
     let mut options = setup_client_options.clone();
     options.sdam_event_handler = Some(buffer.handler());
@@ -195,8 +193,8 @@ async fn hello_ok_true() {
     let _client = Client::with_options(options).expect("client creation should succeed");
 
     // first heartbeat should be legacy hello but contain helloOk
-    subscriber
-        .wait_for_event(Duration::from_millis(2000), |event| {
+    event_stream
+        .next_match(Duration::from_millis(2000), |event| {
             if let Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) = event {
                 assert_eq!(e.reply.get_bool("helloOk"), Ok(true));
                 assert!(e.reply.get(LEGACY_HELLO_COMMAND_NAME_LOWERCASE).is_some());
@@ -210,8 +208,8 @@ async fn hello_ok_true() {
 
     // subsequent heartbeats should just be hello
     for _ in 0..3 {
-        subscriber
-            .wait_for_event(Duration::from_millis(2000), |event| {
+        event_stream
+            .next_match(Duration::from_millis(2000), |event| {
                 if let Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) = event {
                     assert!(e.reply.get("isWritablePrimary").is_some());
                     assert!(e.reply.get(LEGACY_HELLO_COMMAND_NAME_LOWERCASE).is_none());
@@ -270,13 +268,13 @@ async fn removed_server_monitor_stops() -> crate::error::Result<()> {
     let hosts = options.hosts.clone();
     let set_name = options.repl_set_name.clone().unwrap();
 
-    let mut subscriber = buffer.subscribe();
+    let mut event_stream = buffer.stream();
     let topology = Topology::new(options)?;
 
     // Wait until all three monitors have started.
     let mut seen_monitors = HashSet::new();
-    subscriber
-        .wait_for_event(Duration::from_millis(500), |event| {
+    event_stream
+        .next_match(Duration::from_millis(500), |event| {
             if let Event::Sdam(SdamEvent::ServerHeartbeatStarted(e)) = event {
                 seen_monitors.insert(e.server_address.clone());
             }
@@ -315,13 +313,13 @@ async fn removed_server_monitor_stops() -> crate::error::Result<()> {
         ))
         .await;
 
-    subscriber.wait_for_event(Duration::from_secs(1), |event| {
+    event_stream.next_match(Duration::from_secs(1), |event| {
         matches!(event, Event::Sdam(SdamEvent::ServerClosed(e)) if e.address == hosts[2])
     }).await.expect("should see server closed event");
 
     // Capture heartbeat events for 1 second. The monitor for the removed server should stop
     // publishing them.
-    let events = subscriber.collect_events(Duration::from_secs(1), |event| {
+    let events = event_stream.collect(Duration::from_secs(1), |event| {
         matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatStarted(e)) if e.server_address == hosts[2])
     }).await;
 
