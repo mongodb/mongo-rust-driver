@@ -97,7 +97,7 @@ struct FileContext {
 
 impl FileContext {
     async fn new(path: &std::path::Path) -> Self {
-        let internal_client = TestClient::new().await;
+        let internal_client = Client::test_builder().build().await;
         let is_csfle_test = path.to_string_lossy().contains("client-side-encryption");
 
         Self {

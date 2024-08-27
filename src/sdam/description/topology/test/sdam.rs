@@ -691,7 +691,7 @@ async fn heartbeat_events() {
 #[tokio::test]
 #[function_name::named]
 async fn direct_connection() {
-    let test_client = TestClient::new().await;
+    let test_client = Client::test_builder().build().await;
     if !test_client.is_replica_set() {
         log_uncaptured("Skipping direct_connection test due to non-replica set topology");
         return;

@@ -14,8 +14,6 @@ use crate::{
     Namespace,
 };
 
-use super::TestClient;
-
 impl PartialBulkWriteResult {
     fn inserted_count(&self) -> i64 {
         match self {
@@ -125,7 +123,7 @@ async fn max_message_size_bytes_batching() {
 async fn write_concern_error_batches() {
     let mut options = get_client_options().await.clone();
     options.retry_writes = Some(false);
-    if TestClient::new().await.is_sharded() {
+    if Client::test_builder().build().await.is_sharded() {
         options.hosts.drain(1..);
     }
     let client = Client::test_builder()
@@ -318,7 +316,7 @@ async fn cursor_iteration_in_a_transaction() {
 #[tokio::test(flavor = "multi_thread")]
 async fn failed_cursor_iteration() {
     let mut options = get_client_options().await.clone();
-    if TestClient::new().await.is_sharded() {
+    if Client::test_builder().build().await.is_sharded() {
         options.hosts.drain(1..);
     }
     let client = Client::test_builder()

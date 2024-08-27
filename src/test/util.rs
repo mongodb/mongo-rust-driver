@@ -148,10 +148,6 @@ impl TestClientBuilder {
 
 impl TestClient {
     // TODO RUST-1449 Remove uses of direct constructors in favor of `TestClientBuilder`.
-    pub(crate) async fn new() -> Self {
-        Self::with_options(None).await
-    }
-
     pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
         Client::test_builder().options(options).build().await
     }
@@ -437,7 +433,7 @@ impl TestClient {
             }
             None => default_options,
         };
-        if Self::new().await.is_sharded() && !use_multiple_mongoses {
+        if Client::test_builder().build().await.is_sharded() && !use_multiple_mongoses {
             options.hosts = options.hosts.iter().take(1).cloned().collect();
         }
         options

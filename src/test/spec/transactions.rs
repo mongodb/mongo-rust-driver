@@ -11,7 +11,6 @@ use crate::{
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
         util::fail_point::{FailPoint, FailPointMode},
-        TestClient,
     },
     Client,
     Collection,
@@ -47,7 +46,7 @@ async fn deserialize_recovery_token() {
         _str: String,
     }
 
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     if !client.is_sharded() || client.server_version_lt(4, 2) {
         log_uncaptured("skipping deserialize_recovery_token due to test topology");
         return;

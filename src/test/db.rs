@@ -16,7 +16,6 @@ use crate::{
         ValidationLevel,
     },
     results::{CollectionSpecification, CollectionType},
-    test::util::TestClient,
     Client,
     Cursor,
     Database,
@@ -41,7 +40,7 @@ async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<Collectio
 #[tokio::test]
 #[function_name::named]
 async fn list_collections() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let db = client.database(function_name!());
     db.drop().await.unwrap();
 
@@ -74,7 +73,7 @@ async fn list_collections() {
 #[tokio::test]
 #[function_name::named]
 async fn list_collections_filter() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let db = client.database(function_name!());
     db.drop().await.unwrap();
 
@@ -109,7 +108,7 @@ async fn list_collections_filter() {
 #[tokio::test]
 #[function_name::named]
 async fn list_collection_names() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let db = client.database(function_name!());
     db.drop().await.unwrap();
 
@@ -137,7 +136,7 @@ async fn list_collection_names() {
 #[tokio::test]
 #[function_name::named]
 async fn collection_management() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let db = client.database(function_name!());
     db.drop().await.unwrap();
 
@@ -221,7 +220,7 @@ async fn collection_management() {
 
 #[tokio::test]
 async fn db_aggregate() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
 
     if client.server_version_lt(4, 0) {
         log_uncaptured("skipping db_aggregate due to server version < 4.0");
@@ -263,7 +262,7 @@ async fn db_aggregate() {
 
 #[tokio::test]
 async fn db_aggregate_disk_use() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
 
     if client.server_version_lt(4, 0) {
         log_uncaptured("skipping db_aggregate_disk_use due to server version < 4.0");
@@ -353,7 +352,7 @@ fn deserialize_clustered_index_option_from_bool() {
 
 #[tokio::test]
 async fn clustered_index_list_collections() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let database = client.database("db");
 
     if client.server_version_lt(5, 3) {
@@ -387,7 +386,7 @@ async fn aggregate_with_generics() {
         str: String,
     }
 
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let database = client.database("aggregate_with_generics");
 
     if client.server_version_lt(5, 1) {

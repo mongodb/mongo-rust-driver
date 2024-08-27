@@ -224,7 +224,7 @@ async fn hello_ok_true() {
 
 #[tokio::test]
 async fn repl_set_name_mismatch() -> crate::error::Result<()> {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     if !client.is_replica_set() {
         log_uncaptured("skipping repl_set_name_mismatch due to non-replica set topology");
         return Ok(());

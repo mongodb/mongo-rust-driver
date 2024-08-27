@@ -146,7 +146,7 @@ async fn transaction_ids_included() {
 #[tokio::test]
 #[function_name::named]
 async fn mmapv1_error_raised() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
 
     let req = semver::VersionReq::parse("<=4.0").unwrap();
     if !req.matches(&client.server_version) || !client.is_replica_set() {

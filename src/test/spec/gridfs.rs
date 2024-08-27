@@ -14,6 +14,7 @@ use crate::{
         util::fail_point::{FailPoint, FailPointMode},
         TestClient,
     },
+    Client,
 };
 
 #[tokio::test]
@@ -28,7 +29,7 @@ async fn run_unified() {
 
 #[tokio::test]
 async fn download_stream_across_buffers() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
 
     let options = GridFsBucketOptions::builder().chunk_size_bytes(3).build();
     let bucket = client
@@ -74,7 +75,7 @@ async fn download_stream_across_buffers() {
 
 #[tokio::test]
 async fn upload_stream() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let bucket_options = GridFsBucketOptions::builder().chunk_size_bytes(4).build();
     let bucket = client
         .database("upload_stream")
@@ -134,7 +135,7 @@ async fn upload_test(bucket: &GridFsBucket, data: &[u8], options: Option<GridFsU
 
 #[tokio::test]
 async fn upload_stream_multiple_buffers() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let bucket_options = GridFsBucketOptions::builder().chunk_size_bytes(3).build();
     let bucket = client
         .database("upload_stream_multiple_buffers")
@@ -191,7 +192,7 @@ async fn upload_stream_multiple_buffers() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn upload_stream_errors() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let client = if client.is_sharded() {
         let mut options = get_client_options().await.clone();
         options.hosts.drain(1..);
@@ -258,7 +259,7 @@ async fn upload_stream_errors() {
 
 #[tokio::test]
 async fn drop_aborts() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let bucket = client.database("upload_stream_abort").gridfs_bucket(None);
     bucket.drop().await.unwrap();
 
@@ -275,7 +276,7 @@ async fn drop_aborts() {
 
 #[tokio::test]
 async fn write_future_dropped() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let bucket = client
         .database("upload_stream_abort")
         .gridfs_bucket(GridFsBucketOptions::builder().chunk_size_bytes(1).build());
@@ -343,7 +344,7 @@ async fn assert_no_chunks_written(bucket: &GridFsBucket, id: &Bson) {
 #[tokio::test]
 async fn test_gridfs_bucket_find_one() {
     let data = &[1, 2, 3, 4];
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
 
     let options = GridFsBucketOptions::default();
     let bucket = client.database("gridfs_find_one").gridfs_bucket(options);

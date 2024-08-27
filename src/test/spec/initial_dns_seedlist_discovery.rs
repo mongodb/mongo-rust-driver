@@ -6,7 +6,7 @@ use crate::{
     bson::doc,
     client::Client,
     options::{ClientOptions, ResolverConfig},
-    test::{get_client_options, log_uncaptured, run_spec_test, TestClient},
+    test::{get_client_options, log_uncaptured, run_spec_test},
 };
 
 #[derive(Debug, Deserialize)]
@@ -127,7 +127,7 @@ async fn run_test(mut test_file: TestFile) {
         Some(ref options) => options.ssl,
         None => true,
     };
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     if requires_tls != client.options().tls_options().is_some() {
         log_uncaptured(
             "skipping initial_dns_seedlist_discovery test case due to TLS requirement mismatch",
@@ -205,7 +205,7 @@ async fn run_test(mut test_file: TestFile) {
 
 #[tokio::test]
 async fn replica_set() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let skip =
         if client.is_replica_set() && client.options().repl_set_name.as_deref() != Some("repl0") {
             Some("repl_set_name != repl0")
@@ -228,7 +228,7 @@ async fn replica_set() {
 
 #[tokio::test]
 async fn load_balanced() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     if !client.is_load_balanced() {
         log_uncaptured(
             "skipping initial_dns_seedlist_discovery::load_balanced due to unmet topology \
@@ -245,7 +245,7 @@ async fn load_balanced() {
 
 #[tokio::test]
 async fn sharded() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     if !client.is_sharded() {
         log_uncaptured(
             "skipping initial_dns_seedlist_discovery::sharded due to unmet topology requirement \

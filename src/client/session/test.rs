@@ -19,7 +19,6 @@ use crate::{
         util::event_buffer::EventBuffer,
         Event,
         EventClient,
-        TestClient,
     },
     Client,
     Collection,
@@ -196,7 +195,7 @@ macro_rules! for_each_op {
 /// This test also satisifies the `endSession` testing requirement of prose test 5.
 #[tokio::test]
 async fn pool_is_lifo() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     // Wait for the implicit sessions created in TestClient::new to be returned to the pool.
     tokio::time::sleep(Duration::from_millis(500)).await;
 
@@ -229,7 +228,7 @@ async fn pool_is_lifo() {
 #[tokio::test]
 #[function_name::named]
 async fn cluster_time_in_commands() {
-    let test_client = TestClient::new().await;
+    let test_client = Client::test_builder().build().await;
     if test_client.is_standalone() {
         log_uncaptured("skipping cluster_time_in_commands test due to standalone topology");
         return;
@@ -375,7 +374,7 @@ async fn cluster_time_in_commands() {
 #[tokio::test]
 #[function_name::named]
 async fn session_usage() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     if client.is_standalone() {
         return;
     }

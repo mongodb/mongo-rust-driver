@@ -4,11 +4,9 @@ use bson::doc;
 
 use crate::{bson::Document, client::auth::aws::test_utils::*, test::DEFAULT_URI, Client};
 
-use super::TestClient;
-
 #[tokio::test]
 async fn auth_aws() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
 
     coll.find_one(doc! {}).await.unwrap();

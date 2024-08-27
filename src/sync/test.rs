@@ -20,7 +20,7 @@ use crate::{
         WriteConcern,
     },
     sync::{Client, ClientSession, Collection},
-    test::TestClient as AsyncTestClient,
+    Client as AsyncClient,
 };
 
 fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collection<Document> {
@@ -234,7 +234,7 @@ fn typed_collection() {
 #[function_name::named]
 fn transactions() {
     let should_skip = crate::sync::TOKIO_RUNTIME.block_on(async {
-        let test_client = AsyncTestClient::new().await;
+        let test_client = AsyncClient::test_builder().build().await;
         !test_client.supports_transactions()
     });
     if should_skip {
@@ -427,7 +427,8 @@ fn mixed_sync_and_async() -> Result<()> {
     const COLL_NAME: &str = "test";
 
     let sync_client = Client::with_options(CLIENT_OPTIONS.clone())?;
-    let async_client = crate::sync::TOKIO_RUNTIME.block_on(async { AsyncTestClient::new().await });
+    let async_client =
+        crate::sync::TOKIO_RUNTIME.block_on(async { AsyncClient::test_builder().build().await });
     let sync_db = sync_client.database(DB_NAME);
     sync_db.drop().run()?;
     sync_db

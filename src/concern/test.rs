@@ -4,7 +4,7 @@ use crate::{
     bson::{doc, Bson, Document},
     error::ErrorKind,
     options::{Acknowledgment, ReadConcern, WriteConcern},
-    test::{EventClient, TestClient},
+    test::EventClient,
     Client,
     Collection,
 };
@@ -92,7 +92,7 @@ fn write_concern_deserialize() {
 #[tokio::test]
 #[function_name::named]
 async fn inconsistent_write_concern_rejected() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let db = client.database(function_name!());
 
     let coll = db.collection(function_name!());
@@ -112,7 +112,7 @@ async fn inconsistent_write_concern_rejected() {
 #[tokio::test]
 #[function_name::named]
 async fn unacknowledged_write_concern_rejected() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
     let wc = WriteConcern {

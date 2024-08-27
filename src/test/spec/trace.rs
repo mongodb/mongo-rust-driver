@@ -34,6 +34,7 @@ use crate::{
         COMMAND_TRACING_EVENT_TARGET,
         DEFAULT_MAX_DOCUMENT_LENGTH_BYTES,
     },
+    Client,
     TopologyType,
 };
 
@@ -77,7 +78,7 @@ fn tracing_truncation() {
 /// Prose test 1: Default truncation limit
 #[tokio::test]
 async fn command_logging_truncation_default_limit() {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     let coll = client.init_db_and_coll("tracing_test", "truncation").await;
 
     let _levels_guard = DEFAULT_GLOBAL_TRACING_HANDLER.set_levels(HashMap::from([(

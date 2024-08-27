@@ -29,6 +29,7 @@ use crate::{
         SERVERLESS,
         SERVER_API,
     },
+    Client,
     ClientSession,
     ClusterTime,
     Collection,
@@ -81,7 +82,7 @@ pub(crate) struct TestRunner {
 impl TestRunner {
     pub(crate) async fn new() -> Self {
         Self {
-            internal_client: TestClient::new().await,
+            internal_client: Client::test_builder().build().await,
             entities: Default::default(),
             fail_point_guards: Default::default(),
             cluster_time: Default::default(),
@@ -488,7 +489,9 @@ impl TestRunner {
 
                     options.server_api = server_api;
 
-                    if client.use_multiple_mongoses() && TestClient::new().await.is_sharded() {
+                    if client.use_multiple_mongoses()
+                        && Client::test_builder().build().await.is_sharded()
+                    {
                         assert!(
                             options.hosts.len() > 1,
                             "[{}]: Test requires multiple mongos hosts",

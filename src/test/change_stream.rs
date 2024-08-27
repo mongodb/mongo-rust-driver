@@ -17,7 +17,7 @@ use crate::{
     Collection,
 };
 
-use super::{get_client_options, log_uncaptured, EventClient, TestClient};
+use super::{get_client_options, log_uncaptured, EventClient};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -31,7 +31,7 @@ async fn init_stream(
         ChangeStream<ChangeStreamEvent<Document>>,
     )>,
 > {
-    let init_client = TestClient::new().await;
+    let init_client = Client::test_builder().build().await;
     if !init_client.is_replica_set() && !init_client.is_sharded() {
         log_uncaptured("skipping change stream test on unsupported topology");
         return Ok(None);
@@ -587,7 +587,7 @@ async fn resume_uses_resume_after() -> Result<()> {
 
 #[tokio::test]
 async fn create_coll_pre_post() -> Result<()> {
-    let client = TestClient::new().await;
+    let client = Client::test_builder().build().await;
     if !VersionReq::parse(">=6.0")
         .unwrap()
         .matches(&client.server_version)
