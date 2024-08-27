@@ -11,7 +11,6 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
-    options::ClientOptions,
     runtime,
     runtime::{spawn, AcknowledgedMessage, AsyncJoinHandle},
     test::{
@@ -196,13 +195,11 @@ async fn label_not_added_second_read_error() {
 
 #[function_name::named]
 async fn label_not_added(retry_reads: bool) {
-    let options = ClientOptions::builder()
-        .hosts(vec![])
-        .retry_reads(retry_reads)
-        .build();
+    let mut options = get_client_options().await.clone();
+    options.retry_reads = Some(retry_reads);
     let client = Client::test_builder()
-        .additional_options(Some(options), false)
-        .await
+        .options(options)
+        .sharded_use_first_host()
         .build()
         .await;
 

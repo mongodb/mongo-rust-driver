@@ -5,7 +5,7 @@ use futures::stream::StreamExt;
 use crate::{
     bson::{doc, Document},
     error::{CommandError, ErrorKind},
-    options::{Acknowledgment, ClientOptions, WriteConcern},
+    options::{Acknowledgment, WriteConcern},
     selection_criteria::SelectionCriteria,
     test::{get_client_options, log_uncaptured, EventClient},
     Collection,
@@ -16,13 +16,11 @@ async fn run_test<F: Future>(
     name: &str,
     test: impl Fn(EventClient, Database, Collection<Document>) -> F,
 ) {
-    let options = ClientOptions::builder()
-        .hosts(get_client_options().await.hosts.clone())
-        .retry_writes(false)
-        .build();
+    let mut options = get_client_options().await.clone();
+    options.retry_writes = Some(false);
     let client = crate::Client::test_builder()
-        .additional_options(options, false)
-        .await
+        .options(options)
+        .sharded_use_first_host()
         .monitor_events()
         .build()
         .await;

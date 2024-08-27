@@ -68,6 +68,7 @@ impl Client {
             min_heartbeat_freq: None,
             #[cfg(feature = "in-use-encryption")]
             encrypted: None,
+            sharded_use_first_host: false,
         }
     }
 }
@@ -77,6 +78,7 @@ pub(crate) struct TestClientBuilder {
     min_heartbeat_freq: Option<Duration>,
     #[cfg(feature = "in-use-encryption")]
     encrypted: Option<crate::client::csfle::options::AutoEncryptionOptions>,
+    sharded_use_first_host: bool,
 }
 
 impl TestClientBuilder {
@@ -84,6 +86,12 @@ impl TestClientBuilder {
         let options = options.into();
         assert!(self.options.is_none() || options.is_none());
         self.options = options;
+        self
+    }
+
+    /// When running against a sharded topology, only use the first configured host.
+    pub(crate) fn sharded_use_first_host(mut self) -> Self {
+        self.sharded_use_first_host = true;
         self
     }
 
@@ -98,6 +106,7 @@ impl TestClientBuilder {
         assert!(self.options.is_none() || options.is_none());
         self.options =
             Some(TestClient::options_for_multiple_mongoses(options, use_multiple_mongoses).await);
+        self.sharded_use_first_host = !use_multiple_mongoses;
         self
     }
 
@@ -129,6 +138,16 @@ impl TestClientBuilder {
 
         if let Some(freq) = self.min_heartbeat_freq {
             options.test_options_mut().min_heartbeat_freq = Some(freq);
+        }
+
+        if self.sharded_use_first_host {
+            let tmp = TestClient::from_client(
+                Client::with_options(get_client_options().await.clone()).unwrap(),
+            )
+            .await;
+            if tmp.is_sharded() {
+                options.hosts = options.hosts.iter().take(1).cloned().collect();
+            }
         }
 
         #[cfg(feature = "in-use-encryption")]
@@ -413,16 +432,13 @@ impl TestClient {
         } else {
             get_client_options().await.clone()
         };
-        let mut options = match options {
+        let options = match options {
             Some(mut options) => {
                 options.merge(default_options);
                 options
             }
             None => default_options,
         };
-        if Client::test_builder().build().await.is_sharded() && !use_multiple_mongoses {
-            options.hosts = options.hosts.iter().take(1).cloned().collect();
-        }
         options
     }
 

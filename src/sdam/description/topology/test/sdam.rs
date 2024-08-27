@@ -589,8 +589,7 @@ async fn load_balanced() {
 #[function_name::named]
 async fn topology_closed_event_last() {
     let client = Client::test_builder()
-        .additional_options(None, false)
-        .await
+        .sharded_use_first_host()
         .min_heartbeat_freq(Duration::from_millis(50))
         .monitor_events()
         .build()
@@ -635,8 +634,8 @@ async fn heartbeat_events() {
     options.app_name = "heartbeat_events".to_string().into();
 
     let client = Client::test_builder()
-        .additional_options(options.clone(), false)
-        .await
+        .options(options.clone())
+        .sharded_use_first_host()
         .min_heartbeat_freq(Duration::from_millis(50))
         .monitor_events()
         .build()

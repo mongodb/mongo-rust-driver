@@ -3440,8 +3440,6 @@ async fn range_explicit_encryption_defaults() -> Result<()> {
         return Ok(());
     }
 
-    dbg!(mongocrypt::version());
-
     // Setup
     let key_vault_client = Client::test_builder().build().await;
     let client_encryption = ClientEncryption::new(

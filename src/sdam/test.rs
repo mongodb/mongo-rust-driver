@@ -98,8 +98,8 @@ async fn sdam_pool_management() {
     options.heartbeat_freq = Some(Duration::from_millis(50));
 
     let client = Client::test_builder()
-        .additional_options(options, false)
-        .await
+        .options(options)
+        .sharded_use_first_host()
         .min_heartbeat_freq(Duration::from_millis(50))
         .monitor_events()
         .build()
