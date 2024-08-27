@@ -184,14 +184,6 @@ impl TestClient {
         }
     }
 
-    pub(crate) async fn with_additional_options(options: Option<ClientOptions>) -> Self {
-        Client::test_builder()
-            .additional_options(options, false)
-            .await
-            .build()
-            .await
-    }
-
     pub(crate) async fn create_user(
         &self,
         user: &str,

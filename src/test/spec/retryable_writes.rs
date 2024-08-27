@@ -200,7 +200,11 @@ async fn label_not_added(retry_reads: bool) {
         .hosts(vec![])
         .retry_reads(retry_reads)
         .build();
-    let client = TestClient::with_additional_options(Some(options)).await;
+    let client = Client::test_builder()
+        .additional_options(Some(options), false)
+        .await
+        .build()
+        .await;
 
     // Configuring a failpoint is only supported on 4.0+ replica sets and 4.1.5+ sharded clusters.
     let req = VersionReq::parse(">=4.0").unwrap();
