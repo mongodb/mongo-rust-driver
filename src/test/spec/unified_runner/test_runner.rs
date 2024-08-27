@@ -92,7 +92,7 @@ impl TestRunner {
     pub(crate) async fn new_with_connection_string(connection_string: &str) -> Self {
         let options = ClientOptions::parse(connection_string).await.unwrap();
         Self {
-            internal_client: TestClient::with_options(Some(options)).await,
+            internal_client: Client::test_builder().options(options).build().await,
             entities: Arc::new(RwLock::new(EntityMap::new())),
             fail_point_guards: Arc::new(RwLock::new(Vec::new())),
             cluster_time: Default::default(),

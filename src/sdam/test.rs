@@ -21,7 +21,6 @@ use crate::{
             fail_point::{FailPoint, FailPointMode},
         },
         Event,
-        TestClient,
     },
     Client,
 };
@@ -36,7 +35,10 @@ async fn min_heartbeat_frequency() {
     setup_client_options.hosts.drain(1..);
     setup_client_options.direct_connection = Some(true);
 
-    let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
+    let setup_client = Client::test_builder()
+        .options(setup_client_options.clone())
+        .build()
+        .await;
 
     if !setup_client.supports_fail_command_appname_initial_handshake() {
         log_uncaptured(
@@ -173,7 +175,10 @@ async fn hello_ok_true() {
         return;
     }
 
-    let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
+    let setup_client = Client::test_builder()
+        .options(setup_client_options.clone())
+        .build()
+        .await;
     if !VersionReq::parse(">= 4.4.5")
         .unwrap()
         .matches(&setup_client.server_version)

@@ -24,7 +24,6 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
-        TestClient,
         DEFAULT_GLOBAL_TRACING_HANDLER,
         SERVER_API,
     },
@@ -121,7 +120,7 @@ async fn command_logging_truncation_default_limit() {
 async fn command_logging_truncation_explicit_limit() {
     let mut client_opts = get_client_options().await.clone();
     client_opts.tracing_max_document_length_bytes = Some(5);
-    let client = TestClient::with_options(Some(client_opts)).await;
+    let client = Client::test_builder().options(client_opts).build().await;
 
     let _levels_guard = DEFAULT_GLOBAL_TRACING_HANDLER.set_levels(HashMap::from([(
         COMMAND_TRACING_EVENT_TARGET.to_string(),
@@ -157,7 +156,7 @@ async fn command_logging_truncation_explicit_limit() {
 async fn command_logging_truncation_mid_codepoint() {
     let mut client_opts = get_client_options().await.clone();
     client_opts.tracing_max_document_length_bytes = Some(215);
-    let client = TestClient::with_options(Some(client_opts)).await;
+    let client = Client::test_builder().options(client_opts).build().await;
     // On non-standalone topologies the command includes a clusterTime and so gets truncated
     // differently.
     if !client.is_standalone() {

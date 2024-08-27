@@ -33,7 +33,6 @@ use crate::{
             fail_point::{FailPoint, FailPointMode},
         },
         Event,
-        TestClient,
     },
 };
 
@@ -670,7 +669,7 @@ async fn heartbeat_events() {
 
     options.app_name = None;
     options.heartbeat_freq = None;
-    let fp_client = TestClient::with_options(Some(options)).await;
+    let fp_client = Client::test_builder().options(options).build().await;
 
     let fail_point = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],

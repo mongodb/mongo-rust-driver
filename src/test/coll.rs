@@ -31,7 +31,7 @@ use crate::{
         WriteConcern,
     },
     results::DeleteResult,
-    test::{get_client_options, log_uncaptured, util::TestClient, EventClient},
+    test::{get_client_options, log_uncaptured, EventClient},
     Client,
     Collection,
     Cursor,
@@ -879,7 +879,7 @@ async fn count_documents_with_wc() {
         .build()
         .into();
 
-    let client = TestClient::with_options(Some(options)).await;
+    let client = Client::test_builder().options(options).build().await;
     let coll = client
         .database(function_name!())
         .collection(function_name!());

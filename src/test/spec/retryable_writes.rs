@@ -252,7 +252,10 @@ async fn retry_write_pool_cleared() {
         client_options.hosts.drain(1..);
     }
 
-    let client = TestClient::with_options(Some(client_options.clone())).await;
+    let client = Client::test_builder()
+        .options(client_options.clone())
+        .build()
+        .await;
     if !client.supports_block_connection() {
         log_uncaptured(
             "skipping retry_write_pool_cleared due to blockConnection not being supported",

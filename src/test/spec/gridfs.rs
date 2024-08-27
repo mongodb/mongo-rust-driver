@@ -12,7 +12,6 @@ use crate::{
         get_client_options,
         spec::unified_runner::run_unified_tests,
         util::fail_point::{FailPoint, FailPointMode},
-        TestClient,
     },
     Client,
 };
@@ -196,7 +195,7 @@ async fn upload_stream_errors() {
     let client = if client.is_sharded() {
         let mut options = get_client_options().await.clone();
         options.hosts.drain(1..);
-        TestClient::with_options(options).await
+        Client::test_builder().options(options).build().await
     } else {
         client
     };

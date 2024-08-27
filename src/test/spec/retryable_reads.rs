@@ -18,7 +18,6 @@ use crate::{
             fail_point::{FailPoint, FailPointMode},
         },
         Event,
-        TestClient,
     },
     Client,
 };
@@ -37,7 +36,7 @@ async fn retry_releases_connection() {
     client_options.retry_reads = Some(true);
     client_options.max_pool_size = Some(1);
 
-    let client = TestClient::with_options(Some(client_options)).await;
+    let client = Client::test_builder().options(client_options).build().await;
     if !client.supports_fail_command() {
         log_uncaptured("skipping retry_releases_connection due to failCommand not being supported");
         return;
@@ -78,7 +77,10 @@ async fn retry_read_pool_cleared() {
         client_options.hosts.drain(1..);
     }
 
-    let client = TestClient::with_options(Some(client_options.clone())).await;
+    let client = Client::test_builder()
+        .options(client_options.clone())
+        .build()
+        .await;
     if !client.supports_block_connection() {
         log_uncaptured(
             "skipping retry_read_pool_cleared due to blockConnection not being supported",

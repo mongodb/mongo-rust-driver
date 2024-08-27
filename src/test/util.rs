@@ -147,11 +147,6 @@ impl TestClientBuilder {
 }
 
 impl TestClient {
-    // TODO RUST-1449 Remove uses of direct constructors in favor of `TestClientBuilder`.
-    pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
-        Client::test_builder().options(options).build().await
-    }
-
     async fn from_client(client: Client) -> Self {
         let hello = hello_command(
             client.options().server_api.as_ref(),
