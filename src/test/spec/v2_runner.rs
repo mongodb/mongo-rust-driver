@@ -207,7 +207,7 @@ impl TestContext {
             additional_options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
         }
         let builder = Client::test_builder()
-            .additional_options(
+            .options_for_multiple_mongoses(
                 additional_options,
                 test.use_multiple_mongoses.unwrap_or(false),
             )
@@ -296,6 +296,44 @@ impl TestContext {
         };
 
         runner.run_operation(operation, sessions).await
+    }
+}
+
+impl crate::test::util::TestClientBuilder {
+    async fn options_for_multiple_mongoses(
+        mut self,
+        mut options: ClientOptions,
+        use_multiple_mongoses: bool,
+    ) -> Self {
+        let is_load_balanced = options
+            .load_balanced
+            .or(get_client_options().await.load_balanced)
+            .unwrap_or(false);
+
+        let default_options = if is_load_balanced {
+            // for serverless testing, ignore use_multiple_mongoses.
+            let uri = if use_multiple_mongoses && !*SERVERLESS {
+                crate::test::LOAD_BALANCED_MULTIPLE_URI
+                    .as_ref()
+                    .expect("MULTI_MONGOS_LB_URI is required")
+            } else {
+                crate::test::LOAD_BALANCED_SINGLE_URI
+                    .as_ref()
+                    .expect("SINGLE_MONGOS_LB_URI is required")
+            };
+            let mut o = ClientOptions::parse(uri).await.unwrap();
+            crate::test::update_options_for_testing(&mut o);
+            o
+        } else {
+            get_client_options().await.clone()
+        };
+        options.merge(default_options);
+
+        self = self.options(options);
+        if !use_multiple_mongoses {
+            self = self.sharded_use_first_host();
+        }
+        self
     }
 }
 

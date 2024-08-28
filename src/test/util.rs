@@ -34,13 +34,7 @@ use super::get_client_options;
 use crate::{
     error::Result,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
-    test::{
-        update_options_for_testing,
-        Topology,
-        LOAD_BALANCED_MULTIPLE_URI,
-        LOAD_BALANCED_SINGLE_URI,
-        SERVERLESS,
-    },
+    test::Topology,
     Client,
     Collection,
 };
@@ -92,21 +86,6 @@ impl TestClientBuilder {
     /// When running against a sharded topology, only use the first configured host.
     pub(crate) fn sharded_use_first_host(mut self) -> Self {
         self.sharded_use_first_host = true;
-        self
-    }
-
-    /// Modify options via `TestClient::options_for_multiple_mongoses` before setting them.
-    // TODO RUST-1449 Simplify or remove this entirely.
-    pub(crate) async fn additional_options(
-        mut self,
-        options: impl Into<Option<ClientOptions>>,
-        use_multiple_mongoses: bool,
-    ) -> Self {
-        let options = options.into();
-        assert!(self.options.is_none() || options.is_none());
-        self.options =
-            Some(TestClient::options_for_multiple_mongoses(options, use_multiple_mongoses).await);
-        self.sharded_use_first_host = !use_multiple_mongoses;
         self
     }
 
@@ -404,42 +383,6 @@ impl TestClient {
             .primary
             .as_ref()
             .map(|s| ServerAddress::parse(s).unwrap())
-    }
-
-    pub(crate) async fn options_for_multiple_mongoses(
-        options: Option<ClientOptions>,
-        use_multiple_mongoses: bool,
-    ) -> ClientOptions {
-        let is_load_balanced = options
-            .as_ref()
-            .and_then(|o| o.load_balanced)
-            .or(get_client_options().await.load_balanced)
-            .unwrap_or(false);
-        let default_options = if is_load_balanced {
-            // for serverless testing, ignore use_multiple_mongoses.
-            let uri = if use_multiple_mongoses && !*SERVERLESS {
-                LOAD_BALANCED_MULTIPLE_URI
-                    .as_ref()
-                    .expect("MULTI_MONGOS_LB_URI is required")
-            } else {
-                LOAD_BALANCED_SINGLE_URI
-                    .as_ref()
-                    .expect("SINGLE_MONGOS_LB_URI is required")
-            };
-            let mut o = ClientOptions::parse(uri).await.unwrap();
-            update_options_for_testing(&mut o);
-            o
-        } else {
-            get_client_options().await.clone()
-        };
-        let options = match options {
-            Some(mut options) => {
-                options.merge(default_options);
-                options
-            }
-            None => default_options,
-        };
-        options
     }
 
     #[allow(dead_code)]
