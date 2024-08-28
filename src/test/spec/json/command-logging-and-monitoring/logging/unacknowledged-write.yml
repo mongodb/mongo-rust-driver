@@ -5,6 +5,7 @@ schemaVersion: "1.16"
 createEntities:
   - client:
       id: &client client
+      useMultipleMongoses: false
       observeLogMessages:
         command: debug
   - database:

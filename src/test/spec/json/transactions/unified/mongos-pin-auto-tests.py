@@ -322,6 +322,7 @@ def create_pin_test(op_name, error_name):
     if op_name == 'clientBulkWrite':
         test += '    runOnRequirements:\n'
         test += '      - minServerVersion: "8.0" # `bulkWrite` added to server 8.0"\n'
+        test += '        serverless: forbid\n'
     return test
 
 
@@ -337,6 +338,7 @@ def create_unpin_test(op_name, error_name):
     if op_name == 'clientBulkWrite':
         test += '    runOnRequirements:\n'
         test += '      - minServerVersion: "8.0" # `bulkWrite` added to server 8.0"\n'
+        test += '        serverless: forbid\n'
     return test
 
 

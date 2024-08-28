@@ -1,10 +1,15 @@
 description: "unacknowledged-client-bulkWrite"
 
-schemaVersion: "1.1"
+schemaVersion: "1.7"
+
+runOnRequirements:
+  - minServerVersion: "8.0"
+    serverless: forbid
 
 createEntities:
   - client:
       id: &client client
+      useMultipleMongoses: false
       observeEvents:
         - commandStartedEvent
         - commandSucceededEvent
@@ -62,9 +67,21 @@ tests:
             $$unsetOrMatches: {}
           deleteResults:
             $$unsetOrMatches: {}
+      # Force completion of the w:0 write by executing a find on the same connection
+      - object: *collection
+        name: find
+        arguments:
+          filter: {}
+        expectResult:
+          - { _id: 1, x: 11 }
+          - { _id: 2, x: 22 }
+          - { _id: 3, x: 333 }
+          - { _id: 4, x: 44 }
+
     expectEvents:
       -
         client: *client
+        ignoreExtraEvents: true
         events:
           - commandStartedEvent:
               commandName: bulkWrite

@@ -269,29 +269,15 @@ buildvariants:
     tasks:
       - test-plain-auth
 
-  - name: serverless-passthrough
-    patchable: false
-    display_name: "Serverless (Passthrough)"
+  - name: serverless
+    # patchable: false
+    display_name: "Serverless"
     run_on:
       - rhel80-small
     expansions:
       LIBMONGOCRYPT_OS: rhel-80-64-bit
       AUTH: auth
       SSL: ssl
-      SERVERLESS_PROXY_TYPE: passthrough
-    tasks:
-      - serverless-task-group
-
-  - name: serverless-terminating
-    patchable: false
-    display_name: "Serverless (Terminating)"
-    run_on:
-      - rhel80-small
-    expansions:
-      LIBMONGOCRYPT_OS: rhel-80-64-bit
-      AUTH: auth
-      SSL: ssl
-      SERVERLESS_PROXY_TYPE: terminating
     tasks:
       - serverless-task-group
 
@@ -414,11 +400,7 @@ task_groups:
           shell: "bash"
           script: |
             ${PREPARE_SHELL}
-            if [ "terminating" = "${SERVERLESS_PROXY_TYPE}" ]; then
-              bash ${DRIVERS_TOOLS}/.evergreen/serverless/setup-secrets.sh serverless_next
-            else
-              bash ${DRIVERS_TOOLS}/.evergreen/serverless/setup-secrets.sh
-            fi
+            bash ${DRIVERS_TOOLS}/.evergreen/serverless/setup-secrets.sh
             bash ${DRIVERS_TOOLS}/.evergreen/serverless/create-instance.sh
       - command: expansions.update
         params:
