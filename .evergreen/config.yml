@@ -270,7 +270,7 @@ buildvariants:
       - test-plain-auth
 
   - name: serverless
-    # patchable: false
+    patchable: false
     display_name: "Serverless"
     run_on:
       - rhel80-small
