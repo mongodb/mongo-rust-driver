@@ -1223,7 +1223,7 @@ async fn configure_human_readable_serialization() {
 
 #[tokio::test]
 async fn insert_many_document_sequences() {
-    if cfg!(feature = "in-use-encryption-unstable") {
+    if cfg!(feature = "in-use-encryption") {
         log_uncaptured(
             "skipping insert_many_document_sequences: auto-encryption does not support document \
              sequences",

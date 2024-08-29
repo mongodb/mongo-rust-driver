@@ -1,5 +1,5 @@
 mod bulk_write;
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 mod csfle;
 mod search_index;
 
@@ -89,7 +89,7 @@ use crate::{
 };
 
 use bulk_write::*;
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 use csfle::*;
 use search_index::*;
 
@@ -410,19 +410,19 @@ impl<'de> Deserialize<'de> for Operation {
             "downloadByName" => deserialize_op::<DownloadByName>(definition.arguments),
             "delete" => deserialize_op::<Delete>(definition.arguments),
             "upload" => deserialize_op::<Upload>(definition.arguments),
-            #[cfg(feature = "in-use-encryption-unstable")]
+            #[cfg(feature = "in-use-encryption")]
             "getKeyByAltName" => deserialize_op::<GetKeyByAltName>(definition.arguments),
-            #[cfg(feature = "in-use-encryption-unstable")]
+            #[cfg(feature = "in-use-encryption")]
             "deleteKey" => deserialize_op::<DeleteKey>(definition.arguments),
-            #[cfg(feature = "in-use-encryption-unstable")]
+            #[cfg(feature = "in-use-encryption")]
             "getKey" => deserialize_op::<GetKey>(definition.arguments),
-            #[cfg(feature = "in-use-encryption-unstable")]
+            #[cfg(feature = "in-use-encryption")]
             "addKeyAltName" => deserialize_op::<AddKeyAltName>(definition.arguments),
-            #[cfg(feature = "in-use-encryption-unstable")]
+            #[cfg(feature = "in-use-encryption")]
             "createDataKey" => deserialize_op::<CreateDataKey>(definition.arguments),
-            #[cfg(feature = "in-use-encryption-unstable")]
+            #[cfg(feature = "in-use-encryption")]
             "getKeys" => deserialize_op::<GetKeys>(definition.arguments),
-            #[cfg(feature = "in-use-encryption-unstable")]
+            #[cfg(feature = "in-use-encryption")]
             "removeKeyAltName" => deserialize_op::<RemoveKeyAltName>(definition.arguments),
             "iterateOnce" => deserialize_op::<IterateOnce>(definition.arguments),
             "createSearchIndex" => deserialize_op::<CreateSearchIndex>(definition.arguments),
@@ -431,9 +431,9 @@ impl<'de> Deserialize<'de> for Operation {
             "listSearchIndexes" => deserialize_op::<ListSearchIndexes>(definition.arguments),
             "updateSearchIndex" => deserialize_op::<UpdateSearchIndex>(definition.arguments),
             "clientBulkWrite" => deserialize_op::<BulkWrite>(definition.arguments),
-            #[cfg(feature = "in-use-encryption-unstable")]
+            #[cfg(feature = "in-use-encryption")]
             "encrypt" => deserialize_op::<Encrypt>(definition.arguments),
-            #[cfg(feature = "in-use-encryption-unstable")]
+            #[cfg(feature = "in-use-encryption")]
             "decrypt" => deserialize_op::<Decrypt>(definition.arguments),
             "dropIndex" => deserialize_op::<DropIndex>(definition.arguments),
             s => Ok(Box::new(UnimplementedOperation {

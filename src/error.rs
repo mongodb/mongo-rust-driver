@@ -301,7 +301,7 @@ impl Error {
         )
     }
 
-    #[cfg(all(test, feature = "in-use-encryption-unstable"))]
+    #[cfg(all(test, feature = "in-use-encryption"))]
     pub(crate) fn is_csfle_error(&self) -> bool {
         matches!(self.kind.as_ref(), ErrorKind::Encryption(..))
     }
@@ -372,7 +372,7 @@ impl Error {
             ErrorKind::Transaction { message } => Some(message.clone()),
             ErrorKind::IncompatibleServer { message } => Some(message.clone()),
             ErrorKind::InvalidArgument { message } => Some(message.clone()),
-            #[cfg(feature = "in-use-encryption-unstable")]
+            #[cfg(feature = "in-use-encryption")]
             ErrorKind::Encryption(err) => err.message.clone(),
             _ => None,
         }
@@ -533,7 +533,7 @@ impl Error {
             | ErrorKind::Custom(_)
             | ErrorKind::Shutdown
             | ErrorKind::GridFs(_) => {}
-            #[cfg(feature = "in-use-encryption-unstable")]
+            #[cfg(feature = "in-use-encryption")]
             ErrorKind::Encryption(_) => {}
         }
     }
@@ -580,7 +580,7 @@ impl From<std::io::ErrorKind> for ErrorKind {
     }
 }
 
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 impl From<mongocrypt::error::Error> for ErrorKind {
     fn from(err: mongocrypt::error::Error) -> Self {
         Self::Encryption(err)
@@ -693,7 +693,7 @@ pub enum ErrorKind {
     MissingResumeToken,
 
     /// An error occurred during encryption or decryption.
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     #[error("An error occurred during client-side encryption: {0}")]
     Encryption(mongocrypt::error::Error),
 

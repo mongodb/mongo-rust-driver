@@ -33,7 +33,7 @@ impl<'conn> RunCommand<'conn> {
         })
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     pub(crate) fn new_raw(
         db: String,
         command: RawDocumentBuf,

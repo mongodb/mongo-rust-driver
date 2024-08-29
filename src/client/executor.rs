@@ -1,7 +1,7 @@
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 use bson::RawDocumentBuf;
 use bson::{doc, RawBsonRef, RawDocument, Timestamp};
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
 use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
@@ -621,7 +621,7 @@ impl Client {
 
         #[allow(unused_mut)]
         let mut message = Message::from_command(cmd, Some(request_id))?;
-        #[cfg(feature = "in-use-encryption-unstable")]
+        #[cfg(feature = "in-use-encryption")]
         {
             let guard = self.inner.csfle.read().await;
             if let Some(ref csfle) = *guard {
@@ -781,7 +781,7 @@ impl Client {
                 })
                 .await;
 
-                #[cfg(feature = "in-use-encryption-unstable")]
+                #[cfg(feature = "in-use-encryption")]
                 let response = {
                     let guard = self.inner.csfle.read().await;
                     if let Some(ref csfle) = *guard {
@@ -812,7 +812,7 @@ impl Client {
         }
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     fn auto_encrypt<'a>(
         &'a self,
         csfle: &'a super::csfle::ClientState,
@@ -828,7 +828,7 @@ impl Client {
         })
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     fn auto_decrypt<'a>(
         &'a self,
         csfle: &'a super::csfle::ClientState,

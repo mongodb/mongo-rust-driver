@@ -1,6 +1,6 @@
 pub mod action;
 pub mod auth;
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 pub(crate) mod csfle;
 mod executor;
 pub mod options;
@@ -11,7 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 pub use self::csfle::client_builder::*;
 use derivative::Derivative;
 use futures_core::Future;
@@ -123,7 +123,7 @@ struct ClientInner {
     options: ClientOptions,
     session_pool: ServerSessionPool,
     shutdown: Shutdown,
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
     #[cfg(test)]
     disable_command_events: AtomicBool,
@@ -159,7 +159,7 @@ impl Client {
                 pending_drops: SyncMutex::new(IdSet::new()),
                 executed: AtomicBool::new(false),
             },
-            #[cfg(feature = "in-use-encryption-unstable")]
+            #[cfg(feature = "in-use-encryption")]
             csfle: Default::default(),
             #[cfg(test)]
             disable_command_events: AtomicBool::new(false),
@@ -190,7 +190,7 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     pub fn encrypted_builder(
         client_options: ClientOptions,
         key_vault_namespace: crate::Namespace,
@@ -213,7 +213,7 @@ impl Client {
 
     /// Whether commands sent via this client should be auto-encrypted.
     pub(crate) async fn should_auto_encrypt(&self) -> bool {
-        #[cfg(feature = "in-use-encryption-unstable")]
+        #[cfg(feature = "in-use-encryption")]
         {
             let csfle = self.inner.csfle.read().await;
             match *csfle {
@@ -225,13 +225,13 @@ impl Client {
                 None => false,
             }
         }
-        #[cfg(not(feature = "in-use-encryption-unstable"))]
+        #[cfg(not(feature = "in-use-encryption"))]
         {
             false
         }
     }
 
-    #[cfg(all(test, feature = "in-use-encryption-unstable"))]
+    #[cfg(all(test, feature = "in-use-encryption"))]
     pub(crate) async fn mongocryptd_spawned(&self) -> bool {
         self.inner
             .csfle
@@ -241,7 +241,7 @@ impl Client {
             .map_or(false, |cs| cs.exec().mongocryptd_spawned())
     }
 
-    #[cfg(all(test, feature = "in-use-encryption-unstable"))]
+    #[cfg(all(test, feature = "in-use-encryption"))]
     pub(crate) async fn has_mongocryptd_client(&self) -> bool {
         self.inner
             .csfle
@@ -549,7 +549,7 @@ impl Client {
         &self.inner.topology
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     pub(crate) async fn primary_description(&self) -> Option<crate::sdam::ServerDescription> {
         let start_time = Instant::now();
         let timeout = self
@@ -578,7 +578,7 @@ impl Client {
         }
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     pub(crate) async fn auto_encryption_opts(
         &self,
     ) -> Option<tokio::sync::RwLockReadGuard<'_, csfle::options::AutoEncryptionOptions>> {

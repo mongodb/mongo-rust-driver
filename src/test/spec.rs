@@ -1,6 +1,6 @@
 mod auth;
 mod change_streams;
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 mod client_side_encryption;
 mod collection_management;
 mod command_monitoring;

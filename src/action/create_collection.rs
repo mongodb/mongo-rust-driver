@@ -64,7 +64,7 @@ impl<'a> CreateCollection<'a> {
         change_stream_pre_and_post_images: crate::db::options::ChangeStreamPreAndPostImages,
         clustered_index: crate::db::options::ClusteredIndex,
         comment: bson::Bson,
-        #[cfg(feature = "in-use-encryption-unstable")]
+        #[cfg(feature = "in-use-encryption")]
         encrypted_fields: Document,
     );
 

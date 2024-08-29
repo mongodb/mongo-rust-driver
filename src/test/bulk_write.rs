@@ -529,7 +529,7 @@ async fn too_large_client_error() {
 }
 
 // CRUD prose test 13
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 #[tokio::test]
 async fn encryption_error() {
     use crate::{

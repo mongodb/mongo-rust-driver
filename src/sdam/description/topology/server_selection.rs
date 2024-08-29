@@ -189,7 +189,7 @@ impl TopologyDescription {
             .filter(move |server| types.contains(&server.server_type))
     }
 
-    #[cfg(any(test, feature = "in-use-encryption-unstable"))]
+    #[cfg(any(test, feature = "in-use-encryption"))]
     pub(crate) fn primary(&self) -> Option<&ServerDescription> {
         self.servers_with_type(&[ServerType::RsPrimary]).next()
     }

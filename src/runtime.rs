@@ -8,7 +8,7 @@ mod acknowledged_message;
 ))]
 mod http;
 mod join_handle;
-#[cfg(any(feature = "in-use-encryption-unstable", test))]
+#[cfg(any(feature = "in-use-encryption", test))]
 pub(crate) mod process;
 #[cfg(feature = "dns-resolver")]
 mod resolver;

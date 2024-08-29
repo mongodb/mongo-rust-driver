@@ -335,7 +335,7 @@ impl<'a, T: Clone> EventStream<'a, T> {
         events
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     pub(crate) async fn collect_map<F, R>(&mut self, timeout: Duration, mut filter: F) -> Vec<R>
     where
         F: FnMut(T) -> Option<R>,

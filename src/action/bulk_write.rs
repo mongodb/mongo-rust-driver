@@ -120,7 +120,7 @@ where
     }
 
     async fn execute_inner(mut self) -> Result<R> {
-        #[cfg(feature = "in-use-encryption-unstable")]
+        #[cfg(feature = "in-use-encryption")]
         if self.client.should_auto_encrypt().await {
             use mongocrypt::error::{Error as EncryptionError, ErrorKind as EncryptionErrorKind};
 

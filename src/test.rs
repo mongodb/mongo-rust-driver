@@ -16,7 +16,7 @@ mod coll;
     feature = "snappy-compression"
 ))]
 mod compression;
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 pub(crate) mod csfle;
 mod cursor;
 mod db;

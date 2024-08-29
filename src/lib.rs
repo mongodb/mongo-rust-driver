@@ -18,7 +18,7 @@
 pub mod options;
 
 pub use ::bson;
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 pub use ::mongocrypt;
 
 pub mod action;
@@ -55,7 +55,7 @@ mod test;
 mod trace;
 pub(crate) mod tracking_arc;
 
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 pub use crate::client::csfle::client_encryption;
 pub use crate::{
     client::{session::ClientSession, Client},

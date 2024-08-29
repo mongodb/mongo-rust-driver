@@ -69,7 +69,7 @@ pub(crate) use find_and_modify::FindAndModify;
 pub(crate) use get_more::GetMore;
 pub(crate) use insert::Insert;
 pub(crate) use list_indexes::ListIndexes;
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 pub(crate) use raw_output::RawOutput;
 pub(crate) use search_index::{CreateSearchIndexes, DropSearchIndex, UpdateSearchIndex};
 pub(crate) use update::{Update, UpdateOrReplace};

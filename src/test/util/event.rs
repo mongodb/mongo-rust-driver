@@ -13,7 +13,7 @@ use crate::{
     Client,
 };
 
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 use crate::event::command::CommandStartedEvent;
 
 #[derive(Clone, Debug, From, Serialize)]
@@ -42,7 +42,7 @@ impl Event {
         }
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     pub(crate) fn as_command_started_event(&self) -> Option<&CommandStartedEvent> {
         match self {
             Event::Command(CommandEvent::Started(e)) => Some(e),
@@ -50,7 +50,7 @@ impl Event {
         }
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     pub(crate) fn into_command_started_event(self) -> Option<CommandStartedEvent> {
         match self {
             Self::Command(CommandEvent::Started(ev)) => Some(ev),

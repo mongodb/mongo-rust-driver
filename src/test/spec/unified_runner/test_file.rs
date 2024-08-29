@@ -162,7 +162,7 @@ pub(crate) enum TestFileEntity {
     Session(Session),
     Bucket(Bucket),
     Thread(Thread),
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     ClientEncryption(ClientEncryption),
 }
 
@@ -330,7 +330,7 @@ pub(crate) struct Thread {
     pub(crate) id: String,
 }
 
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ClientEncryption {
@@ -338,7 +338,7 @@ pub(crate) struct ClientEncryption {
     pub(crate) client_encryption_opts: ClientEncryptionOpts,
 }
 
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ClientEncryptionOpts {
