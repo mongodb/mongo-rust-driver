@@ -59,6 +59,14 @@ buildvariants:
       - name: compile-on-latest
       - name: compile-on-msrv
 
+  - name: download-from-crates
+    display_name: "Download from crates.io"
+    # patchable: false
+    run_on:
+      - rhel87-small
+    tasks:
+      - name: download-from-crates
+
   - name: lint
     display_name: "Lint"
     run_on:
@@ -717,6 +725,18 @@ tasks:
         vars:
           # Our minimum supported Rust version. This should be updated whenever the MSRV is bumped.
           RUST_VERSION: 1.67.0
+
+  - name: download-from-crates
+    commands:
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          binary: bash
+          include_expansions_in_env:
+            - PROJECT_DIRECTORY
+          args:
+            - .evergreen/compile-dependency.sh
 
   - name: check-cargo-deny
     tags: [lint]
