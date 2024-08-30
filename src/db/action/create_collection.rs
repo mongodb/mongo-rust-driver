@@ -18,7 +18,7 @@ impl<'a> Action for CreateCollection<'a> {
             coll: self.name,
         };
 
-        #[cfg(feature = "in-use-encryption-unstable")]
+        #[cfg(feature = "in-use-encryption")]
         let has_encrypted_fields = {
             self.db
                 .resolve_encrypted_fields(&ns, &mut self.options)
@@ -38,7 +38,7 @@ impl<'a> Action for CreateCollection<'a> {
             .execute_operation(create, self.session.as_deref_mut())
             .await?;
 
-        #[cfg(feature = "in-use-encryption-unstable")]
+        #[cfg(feature = "in-use-encryption")]
         if has_encrypted_fields {
             use crate::action::Action;
             use bson::{doc, Document};
@@ -56,7 +56,7 @@ impl<'a> Action for CreateCollection<'a> {
 }
 
 impl Database {
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     async fn resolve_encrypted_fields(
         &self,
         base_ns: &Namespace,
@@ -82,7 +82,7 @@ impl Database {
         }
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     #[allow(clippy::needless_option_as_deref)]
     async fn create_aux_collections(
         &self,

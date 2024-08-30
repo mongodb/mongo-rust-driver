@@ -111,7 +111,7 @@ pub struct DropCollection<'a> {
 impl<'a> DropCollection<'a> {
     option_setters!(options: DropCollectionOptions;
         write_concern: WriteConcern,
-        #[cfg(feature = "in-use-encryption-unstable")]
+        #[cfg(feature = "in-use-encryption")]
         encrypted_fields: bson::Document,
     );
 

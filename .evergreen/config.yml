@@ -1607,7 +1607,7 @@ functions:
 
           echo "Building test ... begin"
           . ${PROJECT_DIRECTORY}/.evergreen/env.sh
-          cargo test get_exe_name --features in-use-encryption-unstable,gcp-kms -- --ignored
+          cargo test get_exe_name --features in-use-encryption,gcp-kms -- --ignored
           cp $(cat exe_name.txt) test-contents/test-exe
           echo "Building test ... end"
 

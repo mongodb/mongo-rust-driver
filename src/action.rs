@@ -6,7 +6,7 @@ mod client_options;
 mod count;
 mod create_collection;
 mod create_index;
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 pub mod csfle;
 mod delete;
 mod distinct;

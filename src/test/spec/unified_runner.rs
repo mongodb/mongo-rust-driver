@@ -113,8 +113,8 @@ async fn valid_pass() {
         // unified format
         "poc-transactions-convenient-api.json",
     ];
-    // These tests need the in-use-encryption-unstable feature flag to be deserialized and run.
-    if cfg!(not(feature = "in-use-encryption-unstable")) {
+    // These tests need the in-use-encryption feature flag to be deserialized and run.
+    if cfg!(not(feature = "in-use-encryption")) {
         skipped_files.extend(&[
             "kmsProviders-placeholder_kms_credentials.json",
             "kmsProviders-unconfigured_kms.json",

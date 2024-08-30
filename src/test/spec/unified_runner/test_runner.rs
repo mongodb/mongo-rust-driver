@@ -594,7 +594,7 @@ impl TestRunner {
                     });
                     (thread.id.clone(), Entity::Thread(ThreadEntity { sender }))
                 }
-                #[cfg(feature = "in-use-encryption-unstable")]
+                #[cfg(feature = "in-use-encryption")]
                 TestFileEntity::ClientEncryption(client_enc) => {
                     let id = client_enc.id.clone();
                     let opts = &client_enc.client_encryption_opts;
@@ -706,7 +706,7 @@ impl TestRunner {
             .clone()
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     pub(crate) async fn get_client_encryption(
         &self,
         id: impl AsRef<str>,
@@ -742,7 +742,7 @@ impl TestRunner {
     }
 }
 
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 fn fill_kms_placeholders(
     kms_provider_map: HashMap<mongocrypt::ctx::KmsProvider, Document>,
 ) -> crate::test::csfle::KmsProviderList {

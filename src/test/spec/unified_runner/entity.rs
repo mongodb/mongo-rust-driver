@@ -48,7 +48,7 @@ pub(crate) enum Entity {
     EventList(EventList),
     Thread(ThreadEntity),
     TopologyDescription(TopologyDescription),
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     ClientEncryption(Arc<crate::client_encryption::ClientEncryption>),
     None,
 }
@@ -59,7 +59,7 @@ pub(crate) struct SessionPtr(pub(crate) *mut ClientSession);
 unsafe impl Send for SessionPtr {}
 unsafe impl Sync for SessionPtr {}
 
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 impl std::fmt::Debug for crate::client_encryption::ClientEncryption {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ClientEncryption").finish()
@@ -305,7 +305,7 @@ impl ClientEntity {
         }
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     pub(crate) fn client(&self) -> Option<&Client> {
         self.client.as_ref()
     }
@@ -522,7 +522,7 @@ impl Entity {
         }
     }
 
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     pub fn as_client_encryption(&self) -> &Arc<crate::client_encryption::ClientEncryption> {
         match self {
             Self::ClientEncryption(ce) => ce,

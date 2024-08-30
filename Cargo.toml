@@ -58,8 +58,9 @@ zlib-compression = ["dep:flate2"]
 snappy-compression = ["dep:snap"]
 
 # Enables support for client-side field level encryption and queryable encryption.
-# The In Use Encryption API is unstable and may have backwards-incompatible changes in minor version updates.
-in-use-encryption-unstable = ["dep:mongocrypt", "dep:rayon", "dep:num_cpus"]
+in-use-encryption = ["dep:mongocrypt", "dep:rayon", "dep:num_cpus"]
+# The in-use encryption API is stable; this is for backwards compatibility.
+in-use-encryption-unstable = ["in-use-encryption"]
 
 # Enables support for emitting tracing events.
 # The tracing API is unstable and may have backwards-incompatible changes in minor version updates.

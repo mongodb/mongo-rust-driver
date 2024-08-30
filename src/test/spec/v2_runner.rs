@@ -1,4 +1,4 @@
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 mod csfle;
 pub(crate) mod operation;
 pub(crate) mod test_event;
@@ -51,7 +51,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "mapReduce",
 ];
 
-#[cfg(feature = "in-use-encryption-unstable")]
+#[cfg(feature = "in-use-encryption")]
 pub(crate) fn run_v2_tests(spec: &'static [&'static str]) -> RunV2TestsAction {
     RunV2TestsAction {
         spec,
@@ -149,7 +149,7 @@ impl TestContext {
         let mut options = DropCollectionOptions::builder()
             .write_concern(WriteConcern::majority())
             .build();
-        #[cfg(feature = "in-use-encryption-unstable")]
+        #[cfg(feature = "in-use-encryption")]
         if let Some(enc_fields) = &test_file.encrypted_fields {
             options.encrypted_fields = Some(enc_fields.clone());
         }
@@ -165,7 +165,7 @@ impl TestContext {
         let mut options = CreateCollectionOptions::builder()
             .write_concern(WriteConcern::majority())
             .build();
-        #[cfg(feature = "in-use-encryption-unstable")]
+        #[cfg(feature = "in-use-encryption")]
         {
             if let Some(schema) = &test_file.json_schema {
                 options.validator = Some(doc! { "$jsonSchema": schema });
@@ -213,7 +213,7 @@ impl TestContext {
             )
             .await
             .min_heartbeat_freq(Some(Duration::from_millis(50)));
-        #[cfg(feature = "in-use-encryption-unstable")]
+        #[cfg(feature = "in-use-encryption")]
         let builder = csfle::set_auto_enc(builder, test);
 
         let client = builder.monitor_events().build().await;
@@ -492,7 +492,7 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
             }
         }
 
-        #[cfg(feature = "in-use-encryption-unstable")]
+        #[cfg(feature = "in-use-encryption")]
         csfle::populate_key_vault(&file_ctx.internal_client, test_file.key_vault_data.as_ref())
             .await;
 

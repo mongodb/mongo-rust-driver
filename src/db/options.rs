@@ -115,7 +115,7 @@ pub struct CreateCollectionOptions {
     pub comment: Option<Bson>,
 
     /// Map of encrypted fields for the created collection.
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     pub encrypted_fields: Option<Document>,
 }
 

@@ -162,7 +162,7 @@ impl Operation {
                             .iter()
                             .for_each(|label| assert!(!labels.contains(label)));
                     }
-                    #[cfg(feature = "in-use-encryption-unstable")]
+                    #[cfg(feature = "in-use-encryption")]
                     if let Some(t) = &operation_error.is_timeout_error {
                         assert_eq!(
                             *t,
@@ -203,7 +203,7 @@ pub(crate) struct OperationError {
     pub(crate) error_code: Option<i32>,
     pub(crate) error_labels_contain: Option<Vec<String>>,
     pub(crate) error_labels_omit: Option<Vec<String>>,
-    #[cfg(feature = "in-use-encryption-unstable")]
+    #[cfg(feature = "in-use-encryption")]
     pub(crate) is_timeout_error: Option<bool>,
 }
 
