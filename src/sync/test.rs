@@ -427,8 +427,7 @@ fn mixed_sync_and_async() -> Result<()> {
     const COLL_NAME: &str = "test";
 
     let sync_client = Client::with_options(CLIENT_OPTIONS.clone())?;
-    let async_client =
-        crate::sync::TOKIO_RUNTIME.block_on(async { AsyncClient::for_test().await });
+    let async_client = crate::sync::TOKIO_RUNTIME.block_on(async { AsyncClient::for_test().await });
     let sync_db = sync_client.database(DB_NAME);
     sync_db.drop().run()?;
     sync_db

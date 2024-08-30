@@ -47,10 +47,7 @@ async fn init_stream(
         options.direct_connection = Some(true);
         options.hosts.drain(1..);
     }
-    let client = Client::for_test()
-        .options(options)
-        .monitor_events()
-        .await;
+    let client = Client::for_test().options(options).monitor_events().await;
     let db = client.database("change_stream_tests");
     let coll = db.collection_with_options::<Document>(
         coll_name,

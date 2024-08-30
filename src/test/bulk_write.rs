@@ -126,10 +126,7 @@ async fn write_concern_error_batches() {
     if Client::for_test().await.is_sharded() {
         options.hosts.drain(1..);
     }
-    let client = Client::for_test()
-        .options(options)
-        .monitor_events()
-        .await;
+    let client = Client::for_test().options(options).monitor_events().await;
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping write_concern_error_batches: bulkWrite requires 8.0+");
@@ -318,10 +315,7 @@ async fn failed_cursor_iteration() {
     if Client::for_test().await.is_sharded() {
         options.hosts.drain(1..);
     }
-    let client = Client::for_test()
-        .options(options)
-        .monitor_events()
-        .await;
+    let client = Client::for_test().options(options).monitor_events().await;
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping failed_cursor_iteration: bulkWrite requires 8.0+");

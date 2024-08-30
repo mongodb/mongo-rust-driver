@@ -220,10 +220,7 @@ async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
     let options = ClientOptions::parse("mongodb://localhost:47017")
         .await
         .unwrap();
-    let client = Client::for_test()
-        .options(options)
-        .monitor_events()
-        .await;
+    let client = Client::for_test().options(options).monitor_events().await;
     assert!(client.server_info.logical_session_timeout_minutes.is_none());
 
     Some((client, process))
