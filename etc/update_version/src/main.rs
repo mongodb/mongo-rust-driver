@@ -80,6 +80,8 @@ fn main() {
     let main_dir = self_dir.join("../../../..");
     std::env::set_current_dir(main_dir).unwrap();
 
+    let args: Args = argh::from_env();
+
     let version_locs = vec![
         Location::new(
             "Cargo.toml",
@@ -103,24 +105,23 @@ fn main() {
             r#"html_root_url = "https://docs.rs/mongodb/(?<target>.*?)""#,
         ),
     ];
-    let bson_version_loc = Location::new("Cargo.toml", r#"bson = (?<target>\{ git = .*? \})\n"#);
-    let mongocrypt_version_loc =
-        Location::new("Cargo.toml", r#"mongocrypt = (?<target>\{ git = .*? \})\n"#);
-
-    let args: Args = argh::from_env();
-
     let mut pending = PendingUpdates::new();
     for loc in &version_locs {
         pending.apply(loc, &args.version);
     }
+
     if let Some(bson) = args.bson {
-        pending.apply(&bson_version_loc, &format!("{:?}", bson));
+        let bson_version_loc =
+            Location::new("Cargo.toml", r#"bson =.*version = "(?<target>.*?)".*"#);
+        pending.apply(&bson_version_loc, &bson);
     }
+
     if let Some(mongocrypt) = args.mongocrypt {
-        pending.apply(
-            &mongocrypt_version_loc,
-            &format!("{{ version = {:?}, optional = true }}", mongocrypt),
+        let mongocrypt_version_loc = Location::new(
+            "Cargo.toml",
+            r#"mongocrypt =.*version = "(?<target>.*?)".*"#,
         );
+        pending.apply(&mongocrypt_version_loc, &mongocrypt);
     }
     pending.write();
 }
