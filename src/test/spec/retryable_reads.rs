@@ -36,7 +36,7 @@ async fn retry_releases_connection() {
     client_options.retry_reads = Some(true);
     client_options.max_pool_size = Some(1);
 
-    let client = Client::test_builder().options(client_options).await;
+    let client = Client::for_test().options(client_options).await;
     if !client.supports_fail_command() {
         log_uncaptured("skipping retry_releases_connection due to failCommand not being supported");
         return;
@@ -77,7 +77,7 @@ async fn retry_read_pool_cleared() {
         client_options.hosts.drain(1..);
     }
 
-    let client = Client::test_builder().options(client_options.clone()).await;
+    let client = Client::for_test().options(client_options.clone()).await;
     if !client.supports_block_connection() {
         log_uncaptured(
             "skipping retry_read_pool_cleared due to blockConnection not being supported",
@@ -169,7 +169,7 @@ async fn retry_read_different_mongos() {
         let mut opts = client_options.clone();
         opts.hosts.remove(ix);
         opts.direct_connection = Some(true);
-        let client = Client::test_builder().options(opts).await;
+        let client = Client::for_test().options(opts).await;
         if !client.supports_fail_command() {
             log_uncaptured("skipping retry_read_different_mongos: requires failCommand");
             return;
@@ -181,7 +181,7 @@ async fn retry_read_different_mongos() {
         guards.push(client.enable_fail_point(fail_point).await.unwrap());
     }
 
-    let client = Client::test_builder()
+    let client = Client::for_test()
         .options(client_options)
         .monitor_events()
         .await;
@@ -212,7 +212,7 @@ async fn retry_read_different_mongos() {
 // Retryable Reads Are Retried on the Same mongos if No Others are Available
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_read_same_mongos() {
-    let init_client = Client::test_builder().await;
+    let init_client = Client::for_test().await;
     if !init_client.supports_fail_command() {
         log_uncaptured("skipping retry_read_same_mongos: requires failCommand");
         return;
@@ -228,7 +228,7 @@ async fn retry_read_same_mongos() {
     let fp_guard = {
         let mut client_options = client_options.clone();
         client_options.direct_connection = Some(true);
-        let client = Client::test_builder().options(client_options).await;
+        let client = Client::for_test().options(client_options).await;
 
         let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
             .error_code(6)
@@ -236,7 +236,7 @@ async fn retry_read_same_mongos() {
         client.enable_fail_point(fail_point).await.unwrap()
     };
 
-    let client = Client::test_builder()
+    let client = Client::for_test()
         .options(client_options)
         .monitor_events()
         .await;

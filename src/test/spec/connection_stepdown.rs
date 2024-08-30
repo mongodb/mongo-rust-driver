@@ -18,7 +18,7 @@ async fn run_test<F: Future>(
 ) {
     let mut options = get_client_options().await.clone();
     options.retry_writes = Some(false);
-    let client = crate::Client::test_builder()
+    let client = crate::Client::for_test()
         .options(options)
         .use_single_mongos()
         .monitor_events()

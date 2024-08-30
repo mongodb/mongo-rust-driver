@@ -7,7 +7,7 @@ type Result<T> = anyhow::Result<T>;
 
 #[tokio::test]
 async fn list_collections_timeseries() -> Result<()> {
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     if client.server_version_lt(5, 0) {
         log_uncaptured("Skipping list_collections_timeseries: timeseries require server >= 5.0");
         return Ok(());

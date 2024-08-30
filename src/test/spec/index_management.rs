@@ -35,7 +35,7 @@ async fn search_index_create_list() {
     let start = Instant::now();
     let deadline = start + Duration::from_secs(60 * 5);
 
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let db = client.database("search_index_test");
     let coll_name = ObjectId::new().to_hex();
     db.create_collection(&coll_name).await.unwrap();
@@ -81,7 +81,7 @@ async fn search_index_create_multiple() {
     let start = Instant::now();
     let deadline = start + Duration::from_secs(60 * 5);
 
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let db = client.database("search_index_test");
     let coll_name = ObjectId::new().to_hex();
     db.create_collection(&coll_name).await.unwrap();
@@ -145,7 +145,7 @@ async fn search_index_drop() {
     let start = Instant::now();
     let deadline = start + Duration::from_secs(60 * 5);
 
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let db = client.database("search_index_test");
     let coll_name = ObjectId::new().to_hex();
     db.create_collection(&coll_name).await.unwrap();
@@ -199,7 +199,7 @@ async fn search_index_update() {
     let start = Instant::now();
     let deadline = start + Duration::from_secs(60 * 5);
 
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let db = client.database("search_index_test");
     let coll_name = ObjectId::new().to_hex();
     db.create_collection(&coll_name).await.unwrap();
@@ -266,7 +266,7 @@ async fn search_index_drop_not_found() {
         log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
         return;
     }
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let coll_name = ObjectId::new().to_hex();
     let coll0 = client
         .database("search_index_test")
@@ -296,7 +296,7 @@ async fn search_index_create_with_type() {
         log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
         return;
     }
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let coll_name = ObjectId::new().to_hex();
     let db = client.database("search_index_test");
     db.create_collection(&coll_name).await.unwrap();
@@ -358,7 +358,7 @@ async fn search_index_requires_explicit_vector() {
         log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
         return;
     }
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let coll_name = ObjectId::new().to_hex();
     let db = client.database("search_index_test");
     db.create_collection(&coll_name).await.unwrap();

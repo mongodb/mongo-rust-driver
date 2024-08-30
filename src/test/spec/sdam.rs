@@ -45,7 +45,7 @@ async fn run_unified() {
 /// Streaming protocol prose test 1 from SDAM spec tests.
 #[tokio::test(flavor = "multi_thread")]
 async fn streaming_min_heartbeat_frequency() {
-    let test_client = Client::test_builder().await;
+    let test_client = Client::for_test().await;
     if test_client.is_load_balanced() {
         log_uncaptured("skipping streaming_min_heartbeat_frequency due to load balanced topology");
         return;
@@ -96,7 +96,7 @@ async fn streaming_min_heartbeat_frequency() {
 /// Variant of the previous prose test that checks for a non-minHeartbeatFrequencyMS value.
 #[tokio::test(flavor = "multi_thread")]
 async fn heartbeat_frequency_is_respected() {
-    let test_client = Client::test_builder().await;
+    let test_client = Client::for_test().await;
     if test_client.is_load_balanced() {
         log_uncaptured("skipping streaming_min_heartbeat_frequency due to load balanced topology");
         return;
@@ -147,7 +147,7 @@ async fn heartbeat_frequency_is_respected() {
 /// RTT prose test 1 from SDAM spec tests.
 #[tokio::test(flavor = "multi_thread")]
 async fn rtt_is_updated() {
-    let test_client = Client::test_builder().await;
+    let test_client = Client::for_test().await;
     if !test_client.supports_streaming_monitoring_protocol() {
         log_uncaptured(
             "skipping rtt_is_updated due to not supporting streaming monitoring protocol",

@@ -127,7 +127,7 @@ async fn load_balancing_test() {
 
     setup_client_options.hosts.drain(1..);
     setup_client_options.direct_connection = Some(true);
-    let setup_client = Client::test_builder().options(setup_client_options).await;
+    let setup_client = Client::for_test().options(setup_client_options).await;
 
     let version = VersionReq::parse(">= 4.2.9").unwrap();
     // blockConnection failpoint option only supported in 4.2.9+.
@@ -213,7 +213,7 @@ async fn load_balancing_test() {
     let hosts = options.hosts.clone();
     options.local_threshold = Duration::from_secs(30).into();
     options.min_pool_size = Some(max_pool_size);
-    let client = Client::test_builder()
+    let client = Client::for_test()
         .options(options)
         .monitor_events()
         .retain_startup_events()

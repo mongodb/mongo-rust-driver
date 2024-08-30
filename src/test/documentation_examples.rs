@@ -1237,7 +1237,7 @@ type GenericResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[allow(unused_variables)]
 async fn stable_api_examples() -> GenericResult<()> {
-    let setup_client = Client::test_builder().await;
+    let setup_client = Client::for_test().await;
     if setup_client.server_version_lt(4, 9) {
         log_uncaptured("skipping stable API examples due to unsupported server version");
         return Ok(());
@@ -1366,7 +1366,7 @@ async fn stable_api_examples() -> GenericResult<()> {
 
 #[allow(unused_imports)]
 async fn aggregation_examples() -> GenericResult<()> {
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let db = client.database("aggregation_examples");
     db.drop().await?;
     aggregation_data::populate(&db).await?;
@@ -1498,7 +1498,7 @@ async fn aggregation_examples() -> GenericResult<()> {
 }
 
 async fn run_command_examples() -> Result<()> {
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let db = client.database("run_command_examples");
     db.drop().await?;
     db.collection::<Document>("restaurants")
@@ -1525,7 +1525,7 @@ async fn run_command_examples() -> Result<()> {
 }
 
 async fn index_examples() -> Result<()> {
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let db = client.database("index_examples");
     db.drop().await?;
     db.collection::<Document>("records")
@@ -1596,7 +1596,7 @@ async fn change_streams_examples() -> Result<()> {
     use crate::{options::FullDocumentType, runtime};
     use std::time::Duration;
 
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     if !client.is_replica_set() && !client.is_sharded() {
         log_uncaptured("skipping change_streams_examples due to unsupported topology");
         return Ok(());
@@ -1667,7 +1667,7 @@ async fn convenient_transaction_examples() -> Result<()> {
     use crate::ClientSession;
     use futures::FutureExt;
 
-    let setup_client = Client::test_builder().await;
+    let setup_client = Client::for_test().await;
     if !setup_client.supports_transactions() {
         log_uncaptured(
             "skipping convenient transaction API examples due to no transaction support",
@@ -1740,7 +1740,7 @@ async fn convenient_transaction_examples() -> Result<()> {
 
 #[tokio::test]
 async fn test() {
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let coll = client
         .database("documentation_examples")
         .collection("inventory");

@@ -35,7 +35,7 @@ async fn min_heartbeat_frequency() {
     setup_client_options.hosts.drain(1..);
     setup_client_options.direct_connection = Some(true);
 
-    let setup_client = Client::test_builder()
+    let setup_client = Client::for_test()
         .options(setup_client_options.clone())
         .await;
 
@@ -96,7 +96,7 @@ async fn sdam_pool_management() {
     options.app_name = Some("SDAMPoolManagementTest".to_string());
     options.heartbeat_freq = Some(Duration::from_millis(50));
 
-    let client = Client::test_builder()
+    let client = Client::for_test()
         .options(options)
         .use_single_mongos()
         .min_heartbeat_freq(Duration::from_millis(50))
@@ -173,7 +173,7 @@ async fn hello_ok_true() {
         return;
     }
 
-    let setup_client = Client::test_builder()
+    let setup_client = Client::for_test()
         .options(setup_client_options.clone())
         .await;
     if !VersionReq::parse(">= 4.4.5")
@@ -226,7 +226,7 @@ async fn hello_ok_true() {
 
 #[tokio::test]
 async fn repl_set_name_mismatch() -> crate::error::Result<()> {
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     if !client.is_replica_set() {
         log_uncaptured("skipping repl_set_name_mismatch due to non-replica set topology");
         return Ok(());

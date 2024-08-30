@@ -182,7 +182,7 @@ impl EventClient {
 
 #[tokio::test]
 async fn command_started_event_count() {
-    let client = Client::test_builder().monitor_events().await;
+    let client = Client::for_test().monitor_events().await;
     let coll = client.database("foo").collection("bar");
 
     for i in 0..10 {

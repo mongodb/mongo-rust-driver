@@ -40,7 +40,7 @@ async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<Collectio
 #[tokio::test]
 #[function_name::named]
 async fn list_collections() {
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let db = client.database(function_name!());
     db.drop().await.unwrap();
 
@@ -73,7 +73,7 @@ async fn list_collections() {
 #[tokio::test]
 #[function_name::named]
 async fn list_collections_filter() {
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let db = client.database(function_name!());
     db.drop().await.unwrap();
 
@@ -108,7 +108,7 @@ async fn list_collections_filter() {
 #[tokio::test]
 #[function_name::named]
 async fn list_collection_names() {
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let db = client.database(function_name!());
     db.drop().await.unwrap();
 
@@ -136,7 +136,7 @@ async fn list_collection_names() {
 #[tokio::test]
 #[function_name::named]
 async fn collection_management() {
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let db = client.database(function_name!());
     db.drop().await.unwrap();
 
@@ -220,7 +220,7 @@ async fn collection_management() {
 
 #[tokio::test]
 async fn db_aggregate() {
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
 
     if client.server_version_lt(4, 0) {
         log_uncaptured("skipping db_aggregate due to server version < 4.0");
@@ -262,7 +262,7 @@ async fn db_aggregate() {
 
 #[tokio::test]
 async fn db_aggregate_disk_use() {
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
 
     if client.server_version_lt(4, 0) {
         log_uncaptured("skipping db_aggregate_disk_use due to server version < 4.0");
@@ -319,7 +319,7 @@ async fn create_index_options_defaults_not_specified() {
 }
 
 async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name: &str) {
-    let client = Client::test_builder().monitor_events().await;
+    let client = Client::for_test().monitor_events().await;
     let db = client.database(name);
 
     db.create_collection(name)
@@ -352,7 +352,7 @@ fn deserialize_clustered_index_option_from_bool() {
 
 #[tokio::test]
 async fn clustered_index_list_collections() {
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let database = client.database("db");
 
     if client.server_version_lt(5, 3) {
@@ -386,7 +386,7 @@ async fn aggregate_with_generics() {
         str: String,
     }
 
-    let client = Client::test_builder().await;
+    let client = Client::for_test().await;
     let database = client.database("aggregate_with_generics");
 
     if client.server_version_lt(5, 1) {

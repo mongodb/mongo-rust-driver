@@ -97,7 +97,7 @@ struct FileContext {
 
 impl FileContext {
     async fn new(path: &std::path::Path) -> Self {
-        let internal_client = Client::test_builder().await;
+        let internal_client = Client::for_test().await;
         let is_csfle_test = path.to_string_lossy().contains("client-side-encryption");
 
         Self {
@@ -206,7 +206,7 @@ impl TestContext {
         if additional_options.heartbeat_freq.is_none() {
             additional_options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
         }
-        let builder = Client::test_builder()
+        let builder = Client::for_test()
             .options_for_multiple_mongoses(
                 additional_options,
                 test.use_multiple_mongoses.unwrap_or(false),

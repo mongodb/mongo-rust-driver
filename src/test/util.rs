@@ -58,7 +58,7 @@ impl std::ops::Deref for TestClient {
 }
 
 impl Client {
-    pub(crate) fn test_builder() -> TestClientBuilder {
+    pub(crate) fn for_test() -> TestClientBuilder {
         TestClientBuilder {
             options: None,
             min_heartbeat_freq: None,
