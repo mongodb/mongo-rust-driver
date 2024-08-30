@@ -37,7 +37,6 @@ async fn min_heartbeat_frequency() {
 
     let setup_client = Client::test_builder()
         .options(setup_client_options.clone())
-        .build()
         .await;
 
     if !setup_client.supports_fail_command_appname_initial_handshake() {
@@ -102,7 +101,6 @@ async fn sdam_pool_management() {
         .use_single_mongos()
         .min_heartbeat_freq(Duration::from_millis(50))
         .monitor_events()
-        .build()
         .await;
 
     let mut subscriber = client.events.stream_all();
@@ -177,7 +175,6 @@ async fn hello_ok_true() {
 
     let setup_client = Client::test_builder()
         .options(setup_client_options.clone())
-        .build()
         .await;
     if !VersionReq::parse(">= 4.4.5")
         .unwrap()
@@ -229,7 +226,7 @@ async fn hello_ok_true() {
 
 #[tokio::test]
 async fn repl_set_name_mismatch() -> crate::error::Result<()> {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     if !client.is_replica_set() {
         log_uncaptured("skipping repl_set_name_mismatch due to non-replica set topology");
         return Ok(());

@@ -127,10 +127,7 @@ async fn load_balancing_test() {
 
     setup_client_options.hosts.drain(1..);
     setup_client_options.direct_connection = Some(true);
-    let setup_client = Client::test_builder()
-        .options(setup_client_options)
-        .build()
-        .await;
+    let setup_client = Client::test_builder().options(setup_client_options).await;
 
     let version = VersionReq::parse(">= 4.2.9").unwrap();
     // blockConnection failpoint option only supported in 4.2.9+.
@@ -220,7 +217,6 @@ async fn load_balancing_test() {
         .options(options)
         .monitor_events()
         .retain_startup_events()
-        .build()
         .await;
 
     let mut subscriber = client.events.stream_all();

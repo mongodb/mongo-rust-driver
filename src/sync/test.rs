@@ -234,7 +234,7 @@ fn typed_collection() {
 #[function_name::named]
 fn transactions() {
     let should_skip = crate::sync::TOKIO_RUNTIME.block_on(async {
-        let test_client = AsyncClient::test_builder().build().await;
+        let test_client = AsyncClient::test_builder().await;
         !test_client.supports_transactions()
     });
     if should_skip {
@@ -428,7 +428,7 @@ fn mixed_sync_and_async() -> Result<()> {
 
     let sync_client = Client::with_options(CLIENT_OPTIONS.clone())?;
     let async_client =
-        crate::sync::TOKIO_RUNTIME.block_on(async { AsyncClient::test_builder().build().await });
+        crate::sync::TOKIO_RUNTIME.block_on(async { AsyncClient::test_builder().await });
     let sync_db = sync_client.database(DB_NAME);
     sync_db.drop().run()?;
     sync_db

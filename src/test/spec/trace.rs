@@ -77,7 +77,7 @@ fn tracing_truncation() {
 /// Prose test 1: Default truncation limit
 #[tokio::test]
 async fn command_logging_truncation_default_limit() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client.init_db_and_coll("tracing_test", "truncation").await;
 
     let _levels_guard = DEFAULT_GLOBAL_TRACING_HANDLER.set_levels(HashMap::from([(
@@ -120,7 +120,7 @@ async fn command_logging_truncation_default_limit() {
 async fn command_logging_truncation_explicit_limit() {
     let mut client_opts = get_client_options().await.clone();
     client_opts.tracing_max_document_length_bytes = Some(5);
-    let client = Client::test_builder().options(client_opts).build().await;
+    let client = Client::test_builder().options(client_opts).await;
 
     let _levels_guard = DEFAULT_GLOBAL_TRACING_HANDLER.set_levels(HashMap::from([(
         COMMAND_TRACING_EVENT_TARGET.to_string(),
@@ -156,7 +156,7 @@ async fn command_logging_truncation_explicit_limit() {
 async fn command_logging_truncation_mid_codepoint() {
     let mut client_opts = get_client_options().await.clone();
     client_opts.tracing_max_document_length_bytes = Some(215);
-    let client = Client::test_builder().options(client_opts).build().await;
+    let client = Client::test_builder().options(client_opts).await;
     // On non-standalone topologies the command includes a clusterTime and so gets truncated
     // differently.
     if !client.is_standalone() {

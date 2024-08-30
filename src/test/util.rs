@@ -24,11 +24,13 @@ use crate::{
     bson::{doc, Bson},
     client::options::ServerAddress,
     hello::{hello_command, HelloCommandResponse},
+    BoxFuture,
 };
 use bson::Document;
+use futures::FutureExt;
 use semver::{Version, VersionReq};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Debug, time::Duration};
+use std::{fmt::Debug, future::IntoFuture, time::Duration};
 
 use super::get_client_options;
 use crate::{
@@ -108,39 +110,48 @@ impl TestClientBuilder {
         self.min_heartbeat_freq = min_heartbeat_freq;
         self
     }
+}
 
-    pub(crate) async fn build(self) -> TestClient {
-        let mut options = match self.options {
-            Some(options) => options,
-            None => get_client_options().await.clone(),
-        };
+impl IntoFuture for TestClientBuilder {
+    type Output = TestClient;
 
-        if let Some(freq) = self.min_heartbeat_freq {
-            options.test_options_mut().min_heartbeat_freq = Some(freq);
-        }
+    type IntoFuture = BoxFuture<'static, Self::Output>;
 
-        if self.use_single_mongos {
-            let tmp = TestClient::from_client(
-                Client::with_options(get_client_options().await.clone()).unwrap(),
-            )
-            .await;
-            if tmp.is_sharded() {
-                options.hosts = options.hosts.iter().take(1).cloned().collect();
+    fn into_future(self) -> Self::IntoFuture {
+        async move {
+            let mut options = match self.options {
+                Some(options) => options,
+                None => get_client_options().await.clone(),
+            };
+
+            if let Some(freq) = self.min_heartbeat_freq {
+                options.test_options_mut().min_heartbeat_freq = Some(freq);
             }
+
+            if self.use_single_mongos {
+                let tmp = TestClient::from_client(
+                    Client::with_options(get_client_options().await.clone()).unwrap(),
+                )
+                .await;
+                if tmp.is_sharded() {
+                    options.hosts = options.hosts.iter().take(1).cloned().collect();
+                }
+            }
+
+            #[cfg(feature = "in-use-encryption")]
+            let client = match self.encrypted {
+                None => Client::with_options(options).unwrap(),
+                Some(aeo) => EncryptedClientBuilder::new(options, aeo)
+                    .build()
+                    .await
+                    .unwrap(),
+            };
+            #[cfg(not(feature = "in-use-encryption"))]
+            let client = Client::with_options(options).unwrap();
+
+            TestClient::from_client(client).await
         }
-
-        #[cfg(feature = "in-use-encryption")]
-        let client = match self.encrypted {
-            None => Client::with_options(options).unwrap(),
-            Some(aeo) => EncryptedClientBuilder::new(options, aeo)
-                .build()
-                .await
-                .unwrap(),
-        };
-        #[cfg(not(feature = "in-use-encryption"))]
-        let client = Client::with_options(options).unwrap();
-
-        TestClient::from_client(client).await
+        .boxed()
     }
 }
 

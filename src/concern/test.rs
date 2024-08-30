@@ -92,7 +92,7 @@ fn write_concern_deserialize() {
 #[tokio::test]
 #[function_name::named]
 async fn inconsistent_write_concern_rejected() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let db = client.database(function_name!());
 
     let coll = db.collection(function_name!());
@@ -112,7 +112,7 @@ async fn inconsistent_write_concern_rejected() {
 #[tokio::test]
 #[function_name::named]
 async fn unacknowledged_write_concern_rejected() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
     let wc = WriteConcern {
@@ -131,7 +131,7 @@ async fn unacknowledged_write_concern_rejected() {
 #[tokio::test]
 #[function_name::named]
 async fn snapshot_read_concern() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     // snapshot read concern was introduced in 4.0
     if client.server_version_lt(4, 0) {
         return;
@@ -186,7 +186,7 @@ async fn assert_event_contains_read_concern(client: &EventClient) {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_insert_one() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -227,7 +227,7 @@ async fn command_contains_write_concern_insert_one() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_insert_many() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -268,7 +268,7 @@ async fn command_contains_write_concern_insert_many() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_update_one() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -310,7 +310,7 @@ async fn command_contains_write_concern_update_one() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_update_many() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -354,7 +354,7 @@ async fn command_contains_write_concern_update_many() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_replace_one() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -396,7 +396,7 @@ async fn command_contains_write_concern_replace_one() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_delete_one() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -440,7 +440,7 @@ async fn command_contains_write_concern_delete_one() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_delete_many() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -487,7 +487,7 @@ async fn command_contains_write_concern_delete_many() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_delete() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -531,7 +531,7 @@ async fn command_contains_write_concern_find_one_and_delete() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_replace() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -575,7 +575,7 @@ async fn command_contains_write_concern_find_one_and_replace() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_find_one_and_update() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -619,7 +619,7 @@ async fn command_contains_write_concern_find_one_and_update() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_aggregate() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -669,7 +669,7 @@ async fn command_contains_write_concern_aggregate() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_drop() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop().await.unwrap();
@@ -715,7 +715,7 @@ async fn command_contains_write_concern_drop() {
 #[tokio::test]
 #[function_name::named]
 async fn command_contains_write_concern_create_collection() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let db = client.database("test");
     let coll: Collection<Document> = db.collection(function_name!());
 

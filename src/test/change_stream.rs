@@ -31,7 +31,7 @@ async fn init_stream(
         ChangeStream<ChangeStreamEvent<Document>>,
     )>,
 > {
-    let init_client = Client::test_builder().build().await;
+    let init_client = Client::test_builder().await;
     if !init_client.is_replica_set() && !init_client.is_sharded() {
         log_uncaptured("skipping change stream test on unsupported topology");
         return Ok(None);
@@ -50,7 +50,6 @@ async fn init_stream(
     let client = Client::test_builder()
         .options(options)
         .monitor_events()
-        .build()
         .await;
     let db = client.database("change_stream_tests");
     let coll = db.collection_with_options::<Document>(
@@ -587,7 +586,7 @@ async fn resume_uses_resume_after() -> Result<()> {
 
 #[tokio::test]
 async fn create_coll_pre_post() -> Result<()> {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     if !VersionReq::parse(">=6.0")
         .unwrap()
         .matches(&client.server_version)
@@ -611,7 +610,7 @@ async fn create_coll_pre_post() -> Result<()> {
 // Prose test 19: large event splitting
 #[tokio::test]
 async fn split_large_event() -> Result<()> {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     if !(client.server_version_matches(">= 6.0.9, < 6.1")
         || client.server_version_matches(">= 7.0"))
     {

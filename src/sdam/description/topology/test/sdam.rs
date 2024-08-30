@@ -592,7 +592,6 @@ async fn topology_closed_event_last() {
         .use_single_mongos()
         .min_heartbeat_freq(Duration::from_millis(50))
         .monitor_events()
-        .build()
         .await;
     let events = client.events.clone();
 
@@ -638,7 +637,6 @@ async fn heartbeat_events() {
         .use_single_mongos()
         .min_heartbeat_freq(Duration::from_millis(50))
         .monitor_events()
-        .build()
         .await;
 
     let mut subscriber = client.events.stream_all();
@@ -668,7 +666,7 @@ async fn heartbeat_events() {
 
     options.app_name = None;
     options.heartbeat_freq = None;
-    let fp_client = Client::test_builder().options(options).build().await;
+    let fp_client = Client::test_builder().options(options).await;
 
     let fail_point = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
@@ -689,7 +687,7 @@ async fn heartbeat_events() {
 #[tokio::test]
 #[function_name::named]
 async fn direct_connection() {
-    let test_client = Client::test_builder().build().await;
+    let test_client = Client::test_builder().await;
     if !test_client.is_replica_set() {
         log_uncaptured("Skipping direct_connection test due to non-replica set topology");
         return;

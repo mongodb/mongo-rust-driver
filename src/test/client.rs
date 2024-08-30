@@ -42,7 +42,7 @@ struct DriverMetadata {
 
 #[tokio::test]
 async fn metadata_sent_in_handshake() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
 
     // skip on other topologies due to different currentOp behavior
     if !client.is_standalone() || !client.is_replica_set() {
@@ -166,7 +166,7 @@ async fn list_databases() {
         format!("{}3", function_name!()),
     ];
 
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
 
     for name in expected_dbs {
         client.database(name).drop().await.unwrap();
@@ -205,7 +205,7 @@ async fn list_databases() {
 #[tokio::test]
 #[function_name::named]
 async fn list_database_names() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
 
     let expected_dbs = &[
         format!("{}1", function_name!()),
@@ -240,7 +240,7 @@ async fn list_database_names() {
 #[tokio::test]
 #[function_name::named]
 async fn list_authorized_databases() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
         log_uncaptured("skipping list_authorized_databases due to test configuration");
         return;
@@ -436,7 +436,7 @@ async fn scram_test(
 
 #[tokio::test]
 async fn scram_sha1() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     if !client.auth_enabled() {
         log_uncaptured("skipping scram_sha1 due to missing authentication");
         return;
@@ -457,7 +457,7 @@ async fn scram_sha1() {
 
 #[tokio::test]
 async fn scram_sha256() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
         log_uncaptured("skipping scram_sha256 due to test configuration");
         return;
@@ -477,7 +477,7 @@ async fn scram_sha256() {
 
 #[tokio::test]
 async fn scram_both() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
         log_uncaptured("skipping scram_both due to test configuration");
         return;
@@ -503,7 +503,7 @@ async fn scram_both() {
 
 #[tokio::test]
 async fn scram_missing_user_uri() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     if !client.auth_enabled() {
         log_uncaptured("skipping scram_missing_user_uri due to missing authentication");
         return;
@@ -513,7 +513,7 @@ async fn scram_missing_user_uri() {
 
 #[tokio::test]
 async fn scram_missing_user_options() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     if !client.auth_enabled() {
         log_uncaptured("skipping scram_missing_user_options due to missing authentication");
         return;
@@ -523,7 +523,7 @@ async fn scram_missing_user_options() {
 
 #[tokio::test]
 async fn saslprep() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
 
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
         log_uncaptured("skipping saslprep due to test configuration");
@@ -570,7 +570,7 @@ async fn x509_auth() {
         Err(_) => return,
     };
 
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let drop_user_result = client
         .database("$external")
         .run_command(doc! { "dropUser": &username })
@@ -601,7 +601,7 @@ async fn x509_auth() {
             .build(),
     );
 
-    let client = Client::test_builder().options(options).build().await;
+    let client = Client::test_builder().options(options).await;
     client
         .database(function_name!())
         .collection::<Document>(function_name!())
@@ -657,7 +657,7 @@ async fn plain_auth() {
 /// failure works.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_commit_txn_check_out() {
-    let setup_client = Client::test_builder().build().await;
+    let setup_client = Client::test_builder().await;
     if !setup_client.is_replica_set() {
         log_uncaptured("skipping retry_commit_txn_check_out due to non-replicaset topology");
         return;
@@ -786,14 +786,14 @@ async fn retry_commit_txn_check_out() {
 /// Verifies that `Client::shutdown` succeeds.
 #[tokio::test]
 async fn manual_shutdown_with_nothing() {
-    let client = Client::test_builder().build().await.into_client();
+    let client = Client::test_builder().await.into_client();
     client.shutdown().await;
 }
 
 /// Verifies that `Client::shutdown` succeeds when resources have been dropped.
 #[tokio::test]
 async fn manual_shutdown_with_resources() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping manual_shutdown_with_resources: no transaction support");
         return;
@@ -844,14 +844,14 @@ async fn manual_shutdown_with_resources() {
 /// Verifies that `Client::shutdown_immediate` succeeds.
 #[tokio::test]
 async fn manual_shutdown_immediate_with_nothing() {
-    let client = Client::test_builder().build().await.into_client();
+    let client = Client::test_builder().await.into_client();
     client.shutdown().immediate(true).await;
 }
 
 /// Verifies that `Client::shutdown_immediate` succeeds without waiting for resources.
 #[tokio::test]
 async fn manual_shutdown_immediate_with_resources() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping manual_shutdown_immediate_with_resources: no transaction support");
         return;
@@ -889,7 +889,7 @@ async fn manual_shutdown_immediate_with_resources() {
 
 #[tokio::test]
 async fn find_one_and_delete_serde_consistency() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
 
     let coll = client
         .database("find_one_and_delete_serde_consistency")
@@ -924,7 +924,6 @@ async fn warm_connection_pool() {
             opts.min_pool_size = Some(10);
             opts
         })
-        .build()
         .await;
 
     client.warm_connection_pool().await;

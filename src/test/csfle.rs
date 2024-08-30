@@ -73,7 +73,7 @@ use super::{get_client_options, log_uncaptured, EventClient, TestClient};
 type Result<T> = anyhow::Result<T>;
 
 async fn init_client() -> Result<(EventClient, Collection<Document>)> {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let datakeys = client
         .database("keyvault")
         .collection_with_options::<Document>(
@@ -999,7 +999,7 @@ async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
         .map(update_provider)
         .collect();
     Ok(ClientEncryption::new(
-        Client::test_builder().build().await.into_client(),
+        Client::test_builder().await.into_client(),
         KV_NAMESPACE.clone(),
         kms_providers,
     )?)
@@ -1539,7 +1539,7 @@ struct DeadlockTestCase {
 impl DeadlockTestCase {
     async fn run(&self) -> Result<()> {
         // Setup
-        let client_test = Client::test_builder().build().await;
+        let client_test = Client::test_builder().await;
         let client_keyvault = Client::test_builder()
             .options({
                 let mut opts = get_client_options().await.clone();
@@ -1547,7 +1547,6 @@ impl DeadlockTestCase {
                 opts
             })
             .monitor_events()
-            .build()
             .await;
 
         let mut keyvault_events = client_keyvault.events.stream();
@@ -1715,7 +1714,7 @@ async fn kms_tls() -> Result<()> {
 
 async fn run_kms_tls_test(endpoint: impl Into<String>) -> crate::error::Result<()> {
     // Setup
-    let kv_client = Client::test_builder().build().await;
+    let kv_client = Client::test_builder().await;
     let client_encryption = ClientEncryption::new(
         kv_client.clone().into_client(),
         KV_NAMESPACE.clone(),
@@ -1797,7 +1796,7 @@ async fn kms_tls_options() -> Result<()> {
         add_correct_credentials,
     );
     let client_encryption_no_client_cert = ClientEncryption::new(
-        Client::test_builder().build().await.into_client(),
+        Client::test_builder().await.into_client(),
         KV_NAMESPACE.clone(),
         providers_no_client_cert.clone(),
     )?;
@@ -1811,13 +1810,13 @@ async fn kms_tls_options() -> Result<()> {
         add_correct_credentials,
     );
     let client_encryption_with_tls = ClientEncryption::new(
-        Client::test_builder().build().await.into_client(),
+        Client::test_builder().await.into_client(),
         KV_NAMESPACE.clone(),
         providers_with_tls.clone(),
     )?;
 
     let client_encryption_expired = ClientEncryption::new(
-        Client::test_builder().build().await.into_client(),
+        Client::test_builder().await.into_client(),
         KV_NAMESPACE.clone(),
         update_providers(
             UNNAMED_KMS_PROVIDERS.clone(),
@@ -1827,7 +1826,7 @@ async fn kms_tls_options() -> Result<()> {
     )?;
 
     let client_encryption_invalid_hostname = ClientEncryption::new(
-        Client::test_builder().build().await.into_client(),
+        Client::test_builder().await.into_client(),
         KV_NAMESPACE.clone(),
         update_providers(
             UNNAMED_KMS_PROVIDERS.clone(),
@@ -1854,7 +1853,7 @@ async fn kms_tls_options() -> Result<()> {
         }
     }));
     let client_encryption_with_names = ClientEncryption::new(
-        Client::test_builder().build().await.into_client(),
+        Client::test_builder().await.into_client(),
         KV_NAMESPACE.clone(),
         named_providers,
     )?;
@@ -2072,7 +2071,7 @@ async fn kms_tls_options() -> Result<()> {
 }
 
 async fn fle2v2_ok(name: &str) -> bool {
-    let setup_client = Client::test_builder().build().await;
+    let setup_client = Client::test_builder().await;
     if setup_client.server_version_lt(7, 0) {
         log_uncaptured(format!("Skipping {}: not supported on server < 7.0", name));
         return false;
@@ -2337,7 +2336,7 @@ struct ExplicitEncryptionTestData {
 }
 
 async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData>> {
-    let key_vault_client = Client::test_builder().build().await;
+    let key_vault_client = Client::test_builder().await;
     if key_vault_client.server_version_lt(6, 0) {
         log_uncaptured("skipping explicit encryption test: server below 6.0");
         return Ok(None);
@@ -2489,7 +2488,7 @@ fn write_err_code(err: &crate::error::Error) -> Option<i32> {
 }
 
 async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let datakeys = client
         .database("keyvault")
         .collection::<Document>("datakeys");
@@ -2643,7 +2642,7 @@ struct DecryptionEventsTestdata {
 
 impl DecryptionEventsTestdata {
     async fn setup() -> Result<Option<Self>> {
-        let setup_client = Client::test_builder().build().await;
+        let setup_client = Client::test_builder().await;
         if !setup_client.is_standalone() {
             log_uncaptured("skipping decryption events test: requires standalone topology");
             return Ok(None);
@@ -2736,7 +2735,7 @@ async fn on_demand_aws_failure() -> Result<()> {
     }
 
     let ce = ClientEncryption::new(
-        Client::test_builder().build().await.into_client(),
+        Client::test_builder().await.into_client(),
         KV_NAMESPACE.clone(),
         [(KmsProvider::aws(), doc! {}, None)],
     )?;
@@ -2762,7 +2761,7 @@ async fn on_demand_aws_success() -> Result<()> {
     }
 
     let ce = ClientEncryption::new(
-        Client::test_builder().build().await.into_client(),
+        Client::test_builder().await.into_client(),
         KV_NAMESPACE.clone(),
         [(KmsProvider::aws(), doc! {}, None)],
     )?;
@@ -2783,7 +2782,7 @@ async fn on_demand_aws_success() -> Result<()> {
 #[cfg(feature = "gcp-kms")]
 #[tokio::test]
 async fn on_demand_gcp_credentials() -> Result<()> {
-    let util_client = Client::test_builder().build().await.into_client();
+    let util_client = Client::test_builder().await.into_client();
     let client_encryption = ClientEncryption::new(
         util_client,
         KV_NAMESPACE.clone(),
@@ -2894,7 +2893,7 @@ async fn azure_imds_integration_failure() -> Result<()> {
     }
 
     let c = ClientEncryption::new(
-        Client::test_builder().build().await.into_client(),
+        Client::test_builder().await.into_client(),
         KV_NAMESPACE.clone(),
         [(KmsProvider::azure(), doc! {}, None)],
     )?;
@@ -2988,7 +2987,7 @@ async fn auto_encryption_keys(master_key: impl Into<MasterKey>) -> Result<()> {
         return Ok(());
     }
 
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     if client.server_version_lt(6, 0) {
         log_uncaptured("Skipping auto_encryption_key test: server < 6.0");
         return Ok(());
@@ -3087,7 +3086,7 @@ async fn range_explicit_encryption() -> Result<()> {
     if !fle2v2_ok("range_explicit_encryption").await {
         return Ok(());
     }
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     if client.server_version_lt(8, 0) || client.is_standalone() {
         log_uncaptured("Skipping range_explicit_encryption due to unsupported topology");
         return Ok(());
@@ -3163,7 +3162,7 @@ async fn range_explicit_encryption_test(
     bson_type: &str,
     range_options: RangeOptions,
 ) -> Result<()> {
-    let util_client = Client::test_builder().build().await;
+    let util_client = Client::test_builder().await;
 
     let encrypted_fields =
         load_testdata(&format!("data/range-encryptedFields-{}.json", bson_type))?;
@@ -3202,7 +3201,7 @@ async fn range_explicit_encryption_test(
         .write_concern(WriteConcern::majority())
         .await?;
 
-    let key_vault_client = Client::test_builder().build().await;
+    let key_vault_client = Client::test_builder().await;
 
     let client_encryption = ClientEncryption::new(
         key_vault_client.into_client(),
@@ -3441,7 +3440,7 @@ async fn range_explicit_encryption_defaults() -> Result<()> {
     }
 
     // Setup
-    let key_vault_client = Client::test_builder().build().await;
+    let key_vault_client = Client::test_builder().await;
     let client_encryption = ClientEncryption::new(
         key_vault_client.into_client(),
         KV_NAMESPACE.clone(),
@@ -3501,7 +3500,7 @@ async fn fle2_example() -> Result<()> {
     }
 
     // FLE 2 is not supported on Standalone topology.
-    let test_client = Client::test_builder().build().await;
+    let test_client = Client::test_builder().await;
     if test_client.server_version_lt(7, 0) {
         log_uncaptured("skipping fle2 example: server below 7.0");
         return Ok(());

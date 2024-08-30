@@ -42,7 +42,7 @@ use crate::{
 #[tokio::test]
 #[function_name::named]
 async fn insert_err_details() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -97,7 +97,7 @@ async fn insert_err_details() {
 #[tokio::test]
 #[function_name::named]
 async fn count() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -118,7 +118,7 @@ async fn count() {
 #[tokio::test]
 #[function_name::named]
 async fn find() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -143,7 +143,7 @@ async fn find() {
 #[tokio::test]
 #[function_name::named]
 async fn update() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -180,7 +180,7 @@ async fn update() {
 #[tokio::test]
 #[function_name::named]
 async fn delete() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -203,7 +203,7 @@ async fn delete() {
 #[tokio::test]
 #[function_name::named]
 async fn aggregate_out() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
@@ -255,7 +255,7 @@ fn kill_cursors_sent(client: &EventClient) -> bool {
 #[tokio::test]
 #[function_name::named]
 async fn kill_cursors_on_drop() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
@@ -265,7 +265,7 @@ async fn kill_cursors_on_drop() {
         .await
         .unwrap();
 
-    let event_client = Client::test_builder().monitor_events().build().await;
+    let event_client = Client::test_builder().monitor_events().await;
     let coll = event_client
         .database(function_name!())
         .collection::<Document>(function_name!());
@@ -287,7 +287,7 @@ async fn kill_cursors_on_drop() {
 #[tokio::test]
 #[function_name::named]
 async fn no_kill_cursors_on_exhausted() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
@@ -297,7 +297,7 @@ async fn no_kill_cursors_on_exhausted() {
         .await
         .unwrap();
 
-    let event_client = Client::test_builder().monitor_events().build().await;
+    let event_client = Client::test_builder().monitor_events().await;
     let coll = event_client
         .database(function_name!())
         .collection::<Document>(function_name!());
@@ -376,7 +376,7 @@ async fn large_insert() {
 
     let docs = vec![LARGE_DOC.clone(); 35000];
 
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -419,7 +419,7 @@ async fn large_insert_unordered_with_errors() {
 
     let docs = multibatch_documents_with_duplicate_keys();
 
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -457,7 +457,7 @@ async fn large_insert_ordered_with_errors() {
 
     let docs = multibatch_documents_with_duplicate_keys();
 
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -490,7 +490,7 @@ async fn large_insert_ordered_with_errors() {
 #[tokio::test]
 #[function_name::named]
 async fn empty_insert() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .database(function_name!())
         .collection::<Document>(function_name!());
@@ -525,7 +525,7 @@ async fn find_allow_disk_use_not_specified() {
 
 #[function_name::named]
 async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>) {
-    let event_client = Client::test_builder().monitor_events().build().await;
+    let event_client = Client::test_builder().monitor_events().await;
     if event_client.server_version_lt(4, 3) {
         log_uncaptured("skipping allow_disk_use_test due to server version < 4.3");
         return;
@@ -545,14 +545,14 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
 #[tokio::test]
 #[function_name::named]
 async fn ns_not_found_suppression() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client.get_coll(function_name!(), function_name!());
     coll.drop().await.expect("drop should not fail");
     coll.drop().await.expect("drop should not fail");
 }
 
 async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll = client.database(name).collection::<Document>(name);
     let _: Result<DeleteResult> = coll
         .delete_many(doc! {})
@@ -595,7 +595,7 @@ async fn delete_hint_not_specified() {
 }
 
 async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>, name: &str) {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
 
     let req = VersionReq::parse(">= 4.2").unwrap();
     if options.is_some() && !req.matches(&client.server_version) {
@@ -648,7 +648,7 @@ async fn find_one_and_delete_hint_not_specified() {
 #[tokio::test]
 #[function_name::named]
 async fn find_one_and_delete_hint_server_version() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll = client
         .database(function_name!())
         .collection::<Document>("coll");
@@ -674,7 +674,7 @@ async fn find_one_and_delete_hint_server_version() {
 #[tokio::test]
 #[function_name::named]
 async fn no_read_preference_to_standalone() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
 
     if !client.is_standalone() {
         log_uncaptured("skipping no_read_preference_to_standalone due to test topology");
@@ -707,7 +707,7 @@ struct UserType {
 #[tokio::test]
 #[function_name::named]
 async fn typed_insert_one() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
 
     let coll = client
         .init_db_and_typed_coll(function_name!(), function_name!())
@@ -752,7 +752,7 @@ where
 #[tokio::test]
 #[function_name::named]
 async fn typed_insert_many() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_typed_coll(function_name!(), function_name!())
         .await;
@@ -783,7 +783,7 @@ async fn typed_insert_many() {
 #[tokio::test]
 #[function_name::named]
 async fn typed_find_one_and_replace() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_typed_coll(function_name!(), function_name!())
         .await;
@@ -812,7 +812,7 @@ async fn typed_find_one_and_replace() {
 #[tokio::test]
 #[function_name::named]
 async fn typed_replace_one() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_typed_coll(function_name!(), function_name!())
         .await;
@@ -837,7 +837,7 @@ async fn typed_replace_one() {
 #[tokio::test]
 #[function_name::named]
 async fn typed_returns() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_typed_coll(function_name!(), function_name!())
         .await;
@@ -879,7 +879,7 @@ async fn count_documents_with_wc() {
         .build()
         .into();
 
-    let client = Client::test_builder().options(options).build().await;
+    let client = Client::test_builder().options(options).await;
     let coll = client
         .database(function_name!())
         .collection(function_name!());
@@ -894,7 +894,7 @@ async fn count_documents_with_wc() {
 #[tokio::test]
 #[function_name::named]
 async fn collection_options_inherited() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
 
     let read_concern = ReadConcern::majority();
     let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Secondary {
@@ -932,7 +932,7 @@ async fn assert_options_inherited(client: &EventClient, command_name: &str) {
 #[tokio::test]
 #[function_name::named]
 async fn drop_skip_serializing_none() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll: Collection<Document> = client
         .database(function_name!())
         .collection(function_name!());
@@ -946,7 +946,7 @@ async fn collection_generic_bounds() {
     #[derive(Deserialize)]
     struct Foo;
 
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
 
     // ensure this code successfully compiles
     let coll: Collection<Foo> = client
@@ -968,7 +968,7 @@ async fn collection_generic_bounds() {
 /// iterates without errors.
 #[tokio::test]
 async fn cursor_batch_size() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll("cursor_batch_size", "cursor_batch_size")
         .await;
@@ -1013,7 +1013,7 @@ async fn cursor_batch_size() {
 /// messages. See SERVER-24007 and related tickets for details.
 #[tokio::test]
 async fn invalid_utf8_response() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll("invalid_uft8_handling", "invalid_uft8_handling")
         .await;
@@ -1143,7 +1143,7 @@ async fn configure_human_readable_serialization() {
         s: StringOrBytes,
     }
 
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
 
     let non_human_readable_collection: Collection<Data> =
         client.database("db").collection("nonhumanreadable");
@@ -1231,7 +1231,7 @@ async fn insert_many_document_sequences() {
         return;
     }
 
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
 
     let mut event_stream = client.events.stream();
 
@@ -1298,7 +1298,7 @@ async fn aggregate_with_generics() {
         len: i32,
     }
 
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let collection = client
         .database("aggregate_with_generics")
         .collection::<A>("aggregate_with_generics");

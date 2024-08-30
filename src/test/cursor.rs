@@ -21,7 +21,7 @@ async fn tailable_cursor() {
         return;
     }
 
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .create_fresh_collection(
             function_name!(),
@@ -83,7 +83,7 @@ async fn tailable_cursor() {
 #[tokio::test]
 #[function_name::named]
 async fn session_cursor_next() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let mut session = client.start_session().await.unwrap();
 
     let coll = client
@@ -112,7 +112,7 @@ async fn session_cursor_next() {
 
 #[tokio::test]
 async fn batch_exhaustion() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
 
     let coll = client
         .create_fresh_collection(
@@ -152,7 +152,7 @@ async fn batch_exhaustion() {
 
 #[tokio::test]
 async fn borrowed_deserialization() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct Doc<'a> {
@@ -227,7 +227,7 @@ async fn borrowed_deserialization() {
 
 #[tokio::test]
 async fn session_cursor_with_type() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
 
     let mut session = client.start_session().await.unwrap();
     let coll = client.database("db").collection("coll");
@@ -250,7 +250,7 @@ async fn session_cursor_with_type() {
 
 #[tokio::test]
 async fn cursor_final_batch() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .create_fresh_collection("test_cursor_final_batch", "test", None)
         .await;

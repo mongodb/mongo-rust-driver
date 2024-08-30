@@ -46,7 +46,7 @@ async fn deserialize_recovery_token() {
         _str: String,
     }
 
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     if !client.is_sharded() || client.server_version_lt(4, 2) {
         log_uncaptured("skipping deserialize_recovery_token due to test topology");
         return;
@@ -86,7 +86,7 @@ async fn deserialize_recovery_token() {
 
 #[tokio::test]
 async fn convenient_api_custom_error() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_custom_error: no transaction support.");
         return;
@@ -118,7 +118,7 @@ async fn convenient_api_custom_error() {
 
 #[tokio::test]
 async fn convenient_api_returned_value() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_returned_value: no transaction support.");
         return;
@@ -145,7 +145,7 @@ async fn convenient_api_returned_value() {
 
 #[tokio::test]
 async fn convenient_api_retry_timeout_callback() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     if !client.supports_transactions() {
         log_uncaptured("Skipping convenient_api_retry_timeout_callback: no transaction support.");
         return;
@@ -177,7 +177,7 @@ async fn convenient_api_retry_timeout_callback() {
 #[tokio::test(flavor = "multi_thread")]
 async fn convenient_api_retry_timeout_commit_unknown() {
     let mut options = get_client_options().await.clone();
-    if Client::test_builder().build().await.is_sharded() {
+    if Client::test_builder().await.is_sharded() {
         options.direct_connection = Some(true);
         options.hosts.drain(1..);
     }
@@ -185,7 +185,6 @@ async fn convenient_api_retry_timeout_commit_unknown() {
     let client = Client::test_builder()
         .options(options)
         .monitor_events()
-        .build()
         .await;
     if !client.supports_transactions() {
         log_uncaptured(
@@ -222,7 +221,7 @@ async fn convenient_api_retry_timeout_commit_unknown() {
 #[tokio::test(flavor = "multi_thread")]
 async fn convenient_api_retry_timeout_commit_transient() {
     let mut options = get_client_options().await.clone();
-    if Client::test_builder().build().await.is_sharded() {
+    if Client::test_builder().await.is_sharded() {
         options.direct_connection = Some(true);
         options.hosts.drain(1..);
     }
@@ -230,7 +229,6 @@ async fn convenient_api_retry_timeout_commit_transient() {
     let client = Client::test_builder()
         .options(options)
         .monitor_events()
-        .build()
         .await;
     if !client.supports_transactions() {
         log_uncaptured(

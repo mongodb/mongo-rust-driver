@@ -22,7 +22,6 @@ async fn run_test<F: Future>(
         .options(options)
         .use_single_mongos()
         .monitor_events()
-        .build()
         .await;
 
     if !client.is_replica_set() {

@@ -13,7 +13,7 @@ use crate::{
 #[tokio::test]
 #[function_name::named]
 async fn index_management_creates() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -59,7 +59,7 @@ async fn index_management_creates() {
 #[tokio::test]
 #[function_name::named]
 async fn index_management_handles_duplicates() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -98,7 +98,7 @@ async fn index_management_handles_duplicates() {
 #[tokio::test]
 #[function_name::named]
 async fn index_management_lists() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -159,7 +159,7 @@ async fn index_management_lists() {
 #[tokio::test]
 #[function_name::named]
 async fn index_management_drops() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -203,7 +203,7 @@ async fn index_management_drops() {
 #[tokio::test]
 #[function_name::named]
 async fn index_management_executes_commands() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -294,7 +294,7 @@ async fn index_management_executes_commands() {
 #[tokio::test]
 #[function_name::named]
 async fn commit_quorum_error() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
     if client.is_standalone() {
         log_uncaptured("skipping commit_quorum_error due to standalone topology");
         return;

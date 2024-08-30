@@ -40,7 +40,7 @@ impl PartialBulkWriteResult {
 // CRUD prose test 3
 #[tokio::test]
 async fn max_write_batch_size_batching() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping max_write_batch_size_batching: bulkWrite requires 8.0+");
@@ -79,7 +79,7 @@ async fn max_write_batch_size_batching() {
 // CRUD prose test 4
 #[tokio::test]
 async fn max_message_size_bytes_batching() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping max_message_size_bytes_batching: bulkWrite requires 8.0+");
@@ -123,13 +123,12 @@ async fn max_message_size_bytes_batching() {
 async fn write_concern_error_batches() {
     let mut options = get_client_options().await.clone();
     options.retry_writes = Some(false);
-    if Client::test_builder().build().await.is_sharded() {
+    if Client::test_builder().await.is_sharded() {
         options.hosts.drain(1..);
     }
     let client = Client::test_builder()
         .options(options)
         .monitor_events()
-        .build()
         .await;
 
     if client.server_version_lt(8, 0) {
@@ -171,7 +170,7 @@ async fn write_concern_error_batches() {
 // CRUD prose test 6
 #[tokio::test]
 async fn write_error_batches() {
-    let mut client = Client::test_builder().monitor_events().build().await;
+    let mut client = Client::test_builder().monitor_events().await;
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping write_error_batches: bulkWrite requires 8.0+");
@@ -228,7 +227,7 @@ async fn write_error_batches() {
 // CRUD prose test 7
 #[tokio::test]
 async fn successful_cursor_iteration() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping successful_cursor_iteration: bulkWrite requires 8.0+");
@@ -266,7 +265,7 @@ async fn successful_cursor_iteration() {
 // CRUD prose test 8
 #[tokio::test]
 async fn cursor_iteration_in_a_transaction() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
 
     if client.server_version_lt(8, 0) || client.is_standalone() {
         log_uncaptured(
@@ -316,13 +315,12 @@ async fn cursor_iteration_in_a_transaction() {
 #[tokio::test(flavor = "multi_thread")]
 async fn failed_cursor_iteration() {
     let mut options = get_client_options().await.clone();
-    if Client::test_builder().build().await.is_sharded() {
+    if Client::test_builder().await.is_sharded() {
         options.hosts.drain(1..);
     }
     let client = Client::test_builder()
         .options(options)
         .monitor_events()
-        .build()
         .await;
 
     if client.server_version_lt(8, 0) {
@@ -391,7 +389,7 @@ async fn failed_cursor_iteration() {
 async fn namespace_batch_splitting() {
     let first_namespace = Namespace::new("db", "coll");
 
-    let mut client = Client::test_builder().monitor_events().build().await;
+    let mut client = Client::test_builder().monitor_events().await;
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping namespace_batch_splitting: bulkWrite requires 8.0+");
         return;
@@ -499,7 +497,7 @@ async fn namespace_batch_splitting() {
 // CRUD prose test 12
 #[tokio::test]
 async fn too_large_client_error() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::test_builder().monitor_events().await;
     let max_message_size_bytes = client.server_info.max_message_size_bytes as usize;
 
     if client.server_version_lt(8, 0) {
@@ -544,7 +542,6 @@ async fn encryption_error() {
     let encrypted_options = AutoEncryptionOptions::new(Namespace::new("db", "coll"), kms_providers);
     let encrypted_client = Client::test_builder()
         .encrypted_options(encrypted_options)
-        .build()
         .await;
 
     let model = InsertOneModel::builder()
@@ -565,7 +562,7 @@ async fn encryption_error() {
 
 #[tokio::test]
 async fn unsupported_server_client_error() {
-    let client = Client::test_builder().build().await;
+    let client = Client::test_builder().await;
 
     if client.server_version_gte(8, 0) {
         return;

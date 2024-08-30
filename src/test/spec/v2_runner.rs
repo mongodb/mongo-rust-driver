@@ -97,7 +97,7 @@ struct FileContext {
 
 impl FileContext {
     async fn new(path: &std::path::Path) -> Self {
-        let internal_client = Client::test_builder().build().await;
+        let internal_client = Client::test_builder().await;
         let is_csfle_test = path.to_string_lossy().contains("client-side-encryption");
 
         Self {
@@ -216,7 +216,7 @@ impl TestContext {
         #[cfg(feature = "in-use-encryption")]
         let builder = csfle::set_auto_enc(builder, test);
 
-        let client = builder.monitor_events().build().await;
+        let client = builder.monitor_events().await;
 
         // TODO RUST-900: Remove this extraneous call.
         if internal_client.is_sharded()
