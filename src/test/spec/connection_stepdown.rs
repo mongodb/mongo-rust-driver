@@ -20,7 +20,7 @@ async fn run_test<F: Future>(
     options.retry_writes = Some(false);
     let client = crate::Client::test_builder()
         .options(options)
-        .sharded_use_first_host()
+        .use_single_mongos()
         .monitor_events()
         .build()
         .await;

@@ -331,7 +331,7 @@ impl crate::test::util::TestClientBuilder {
 
         self = self.options(options);
         if !use_multiple_mongoses {
-            self = self.sharded_use_first_host();
+            self = self.use_single_mongos();
         }
         self
     }

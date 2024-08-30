@@ -62,7 +62,7 @@ impl Client {
             min_heartbeat_freq: None,
             #[cfg(feature = "in-use-encryption")]
             encrypted: None,
-            sharded_use_first_host: false,
+            use_single_mongos: false,
         }
     }
 }
@@ -72,7 +72,7 @@ pub(crate) struct TestClientBuilder {
     min_heartbeat_freq: Option<Duration>,
     #[cfg(feature = "in-use-encryption")]
     encrypted: Option<crate::client::csfle::options::AutoEncryptionOptions>,
-    sharded_use_first_host: bool,
+    use_single_mongos: bool,
 }
 
 impl TestClientBuilder {
@@ -84,8 +84,8 @@ impl TestClientBuilder {
     }
 
     /// When running against a sharded topology, only use the first configured host.
-    pub(crate) fn sharded_use_first_host(mut self) -> Self {
-        self.sharded_use_first_host = true;
+    pub(crate) fn use_single_mongos(mut self) -> Self {
+        self.use_single_mongos = true;
         self
     }
 
@@ -119,7 +119,7 @@ impl TestClientBuilder {
             options.test_options_mut().min_heartbeat_freq = Some(freq);
         }
 
-        if self.sharded_use_first_host {
+        if self.use_single_mongos {
             let tmp = TestClient::from_client(
                 Client::with_options(get_client_options().await.clone()).unwrap(),
             )

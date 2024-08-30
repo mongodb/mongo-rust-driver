@@ -199,7 +199,7 @@ async fn label_not_added(retry_reads: bool) {
     options.retry_reads = Some(retry_reads);
     let client = Client::test_builder()
         .options(options)
-        .sharded_use_first_host()
+        .use_single_mongos()
         .build()
         .await;
 

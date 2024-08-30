@@ -99,7 +99,7 @@ async fn sdam_pool_management() {
 
     let client = Client::test_builder()
         .options(options)
-        .sharded_use_first_host()
+        .use_single_mongos()
         .min_heartbeat_freq(Duration::from_millis(50))
         .monitor_events()
         .build()
