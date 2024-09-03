@@ -24,23 +24,19 @@ use crate::{
     bson::{doc, Bson},
     client::options::ServerAddress,
     hello::{hello_command, HelloCommandResponse},
+    BoxFuture,
 };
 use bson::Document;
+use futures::FutureExt;
 use semver::{Version, VersionReq};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Debug, time::Duration};
+use std::{fmt::Debug, future::IntoFuture, time::Duration};
 
 use super::get_client_options;
 use crate::{
     error::Result,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
-    test::{
-        update_options_for_testing,
-        Topology,
-        LOAD_BALANCED_MULTIPLE_URI,
-        LOAD_BALANCED_SINGLE_URI,
-        SERVERLESS,
-    },
+    test::Topology,
     Client,
     Collection,
 };
@@ -62,12 +58,13 @@ impl std::ops::Deref for TestClient {
 }
 
 impl Client {
-    pub(crate) fn test_builder() -> TestClientBuilder {
+    pub(crate) fn for_test() -> TestClientBuilder {
         TestClientBuilder {
             options: None,
             min_heartbeat_freq: None,
             #[cfg(feature = "in-use-encryption")]
             encrypted: None,
+            use_single_mongos: false,
         }
     }
 }
@@ -77,6 +74,7 @@ pub(crate) struct TestClientBuilder {
     min_heartbeat_freq: Option<Duration>,
     #[cfg(feature = "in-use-encryption")]
     encrypted: Option<crate::client::csfle::options::AutoEncryptionOptions>,
+    use_single_mongos: bool,
 }
 
 impl TestClientBuilder {
@@ -87,17 +85,9 @@ impl TestClientBuilder {
         self
     }
 
-    /// Modify options via `TestClient::options_for_multiple_mongoses` before setting them.
-    // TODO RUST-1449 Simplify or remove this entirely.
-    pub(crate) async fn additional_options(
-        mut self,
-        options: impl Into<Option<ClientOptions>>,
-        use_multiple_mongoses: bool,
-    ) -> Self {
-        let options = options.into();
-        assert!(self.options.is_none() || options.is_none());
-        self.options =
-            Some(TestClient::options_for_multiple_mongoses(options, use_multiple_mongoses).await);
+    /// When running against a sharded topology, only use the first configured host.
+    pub(crate) fn use_single_mongos(mut self) -> Self {
+        self.use_single_mongos = true;
         self
     }
 
@@ -120,42 +110,52 @@ impl TestClientBuilder {
         self.min_heartbeat_freq = min_heartbeat_freq;
         self
     }
+}
 
-    pub(crate) async fn build(self) -> TestClient {
-        let mut options = match self.options {
-            Some(options) => options,
-            None => get_client_options().await.clone(),
-        };
+impl IntoFuture for TestClientBuilder {
+    type Output = TestClient;
 
-        if let Some(freq) = self.min_heartbeat_freq {
-            options.test_options_mut().min_heartbeat_freq = Some(freq);
+    type IntoFuture = BoxFuture<'static, Self::Output>;
+
+    fn into_future(self) -> Self::IntoFuture {
+        async move {
+            let mut options = match self.options {
+                Some(options) => options,
+                None => get_client_options().await.clone(),
+            };
+
+            if let Some(freq) = self.min_heartbeat_freq {
+                options.test_options_mut().min_heartbeat_freq = Some(freq);
+            }
+
+            if self.use_single_mongos {
+                let tmp = TestClient::from_client(
+                    Client::with_options(get_client_options().await.clone()).unwrap(),
+                )
+                .await;
+                if tmp.is_sharded() {
+                    options.hosts = options.hosts.iter().take(1).cloned().collect();
+                }
+            }
+
+            #[cfg(feature = "in-use-encryption")]
+            let client = match self.encrypted {
+                None => Client::with_options(options).unwrap(),
+                Some(aeo) => EncryptedClientBuilder::new(options, aeo)
+                    .build()
+                    .await
+                    .unwrap(),
+            };
+            #[cfg(not(feature = "in-use-encryption"))]
+            let client = Client::with_options(options).unwrap();
+
+            TestClient::from_client(client).await
         }
-
-        #[cfg(feature = "in-use-encryption")]
-        let client = match self.encrypted {
-            None => Client::with_options(options).unwrap(),
-            Some(aeo) => EncryptedClientBuilder::new(options, aeo)
-                .build()
-                .await
-                .unwrap(),
-        };
-        #[cfg(not(feature = "in-use-encryption"))]
-        let client = Client::with_options(options).unwrap();
-
-        TestClient::from_client(client).await
+        .boxed()
     }
 }
 
 impl TestClient {
-    // TODO RUST-1449 Remove uses of direct constructors in favor of `TestClientBuilder`.
-    pub(crate) async fn new() -> Self {
-        Self::with_options(None).await
-    }
-
-    pub(crate) async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
-        Client::test_builder().options(options).build().await
-    }
-
     async fn from_client(client: Client) -> Self {
         let hello = hello_command(
             client.options().server_api.as_ref(),
@@ -191,14 +191,6 @@ impl TestClient {
             server_version,
             server_parameters,
         }
-    }
-
-    pub(crate) async fn with_additional_options(options: Option<ClientOptions>) -> Self {
-        Client::test_builder()
-            .additional_options(options, false)
-            .await
-            .build()
-            .await
     }
 
     pub(crate) async fn create_user(
@@ -402,45 +394,6 @@ impl TestClient {
             .primary
             .as_ref()
             .map(|s| ServerAddress::parse(s).unwrap())
-    }
-
-    pub(crate) async fn options_for_multiple_mongoses(
-        options: Option<ClientOptions>,
-        use_multiple_mongoses: bool,
-    ) -> ClientOptions {
-        let is_load_balanced = options
-            .as_ref()
-            .and_then(|o| o.load_balanced)
-            .or(get_client_options().await.load_balanced)
-            .unwrap_or(false);
-        let default_options = if is_load_balanced {
-            // for serverless testing, ignore use_multiple_mongoses.
-            let uri = if use_multiple_mongoses && !*SERVERLESS {
-                LOAD_BALANCED_MULTIPLE_URI
-                    .as_ref()
-                    .expect("MULTI_MONGOS_LB_URI is required")
-            } else {
-                LOAD_BALANCED_SINGLE_URI
-                    .as_ref()
-                    .expect("SINGLE_MONGOS_LB_URI is required")
-            };
-            let mut o = ClientOptions::parse(uri).await.unwrap();
-            update_options_for_testing(&mut o);
-            o
-        } else {
-            get_client_options().await.clone()
-        };
-        let mut options = match options {
-            Some(mut options) => {
-                options.merge(default_options);
-                options
-            }
-            None => default_options,
-        };
-        if Self::new().await.is_sharded() && !use_multiple_mongoses {
-            options.hosts = options.hosts.iter().take(1).cloned().collect();
-        }
-        options
     }
 
     #[allow(dead_code)]

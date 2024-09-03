@@ -11,7 +11,6 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
-    options::ClientOptions,
     runtime,
     runtime::{spawn, AcknowledgedMessage, AsyncJoinHandle},
     test::{
@@ -36,7 +35,7 @@ async fn run_unified() {
 #[tokio::test]
 #[function_name::named]
 async fn transaction_ids_excluded() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
         log_uncaptured("skipping transaction_ids_excluded due to test topology");
@@ -85,7 +84,7 @@ async fn transaction_ids_excluded() {
 #[tokio::test]
 #[function_name::named]
 async fn transaction_ids_included() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
         log_uncaptured("skipping transaction_ids_included due to test topology");
@@ -146,7 +145,7 @@ async fn transaction_ids_included() {
 #[tokio::test]
 #[function_name::named]
 async fn mmapv1_error_raised() {
-    let client = TestClient::new().await;
+    let client = Client::for_test().await;
 
     let req = semver::VersionReq::parse("<=4.0").unwrap();
     if !req.matches(&client.server_version) || !client.is_replica_set() {
@@ -196,11 +195,12 @@ async fn label_not_added_second_read_error() {
 
 #[function_name::named]
 async fn label_not_added(retry_reads: bool) {
-    let options = ClientOptions::builder()
-        .hosts(vec![])
-        .retry_reads(retry_reads)
-        .build();
-    let client = TestClient::with_additional_options(Some(options)).await;
+    let mut options = get_client_options().await.clone();
+    options.retry_reads = Some(retry_reads);
+    let client = Client::for_test()
+        .options(options)
+        .use_single_mongos()
+        .await;
 
     // Configuring a failpoint is only supported on 4.0+ replica sets and 4.1.5+ sharded clusters.
     let req = VersionReq::parse(">=4.0").unwrap();
@@ -252,7 +252,7 @@ async fn retry_write_pool_cleared() {
         client_options.hosts.drain(1..);
     }
 
-    let client = TestClient::with_options(Some(client_options.clone())).await;
+    let client = Client::for_test().options(client_options.clone()).await;
     if !client.supports_block_connection() {
         log_uncaptured(
             "skipping retry_write_pool_cleared due to blockConnection not being supported",
@@ -385,7 +385,7 @@ async fn retry_write_retryable_write_error() {
         });
     }
     client_options.test_options_mut().async_event_listener = Some(event_tx);
-    let client = Client::test_builder().options(client_options).build().await;
+    let client = Client::for_test().options(client_options).await;
     *listener_client.lock().await = Some(client.clone());
 
     if !client.is_replica_set() || client.server_version_lt(6, 0) {
@@ -430,7 +430,7 @@ async fn retry_write_different_mongos() {
         let mut opts = client_options.clone();
         opts.hosts.remove(ix);
         opts.direct_connection = Some(true);
-        let client = Client::test_builder().options(opts).build().await;
+        let client = Client::for_test().options(opts).await;
         if !client.supports_fail_command() {
             log_uncaptured("skipping retry_write_different_mongos: requires failCommand");
             return;
@@ -443,10 +443,9 @@ async fn retry_write_different_mongos() {
         guards.push(client.enable_fail_point(fail_point).await.unwrap());
     }
 
-    let client = Client::test_builder()
+    let client = Client::for_test()
         .options(client_options)
         .monitor_events()
-        .build()
         .await;
     let result = client
         .database("test")
@@ -475,7 +474,7 @@ async fn retry_write_different_mongos() {
 // Retryable Reads Are Retried on the Same mongos if No Others are Available
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_same_mongos() {
-    let init_client = Client::test_builder().build().await;
+    let init_client = Client::for_test().await;
     if !init_client.supports_fail_command() {
         log_uncaptured("skipping retry_write_same_mongos: requires failCommand");
         return;
@@ -491,7 +490,7 @@ async fn retry_write_same_mongos() {
     let fp_guard = {
         let mut client_options = client_options.clone();
         client_options.direct_connection = Some(true);
-        let client = Client::test_builder().options(client_options).build().await;
+        let client = Client::for_test().options(client_options).await;
 
         let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
             .error_code(6)
@@ -500,10 +499,9 @@ async fn retry_write_same_mongos() {
         client.enable_fail_point(fail_point).await.unwrap()
     };
 
-    let client = Client::test_builder()
+    let client = Client::for_test()
         .options(client_options)
         .monitor_events()
-        .build()
         .await;
     let result = client
         .database("test")

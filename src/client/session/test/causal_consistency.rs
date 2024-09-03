@@ -118,7 +118,7 @@ fn all_session_ops() -> impl Iterator<Item = Operation> {
 /// Test 1 from the causal consistency specification.
 #[tokio::test]
 async fn new_session_operation_time_null() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
 
     if client.is_standalone() {
         log_uncaptured(
@@ -134,7 +134,7 @@ async fn new_session_operation_time_null() {
 /// Test 2 from the causal consistency specification.
 #[tokio::test]
 async fn first_read_no_after_cluser_time() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
 
     if client.is_standalone() {
         log_uncaptured(
@@ -172,7 +172,7 @@ async fn first_read_no_after_cluser_time() {
 /// Test 3 from the causal consistency specification.
 #[tokio::test]
 async fn first_op_update_op_time() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
 
     if client.is_standalone() {
         log_uncaptured("skipping first_op_update_op_time due to unsupported topology: standalone");
@@ -221,7 +221,7 @@ async fn first_op_update_op_time() {
 /// Test 4 from the causal consistency specification.
 #[tokio::test]
 async fn read_includes_after_cluster_time() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
 
     if client.is_standalone() {
         log_uncaptured(
@@ -262,7 +262,7 @@ async fn read_includes_after_cluster_time() {
 /// Test 5 from the causal consistency specification.
 #[tokio::test]
 async fn find_after_write_includes_after_cluster_time() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
 
     if client.is_standalone() {
         log_uncaptured(
@@ -306,7 +306,7 @@ async fn find_after_write_includes_after_cluster_time() {
 /// Test 6 from the causal consistency specification.
 #[tokio::test]
 async fn not_causally_consistent_omits_after_cluster_time() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
 
     if client.is_standalone() {
         log_uncaptured(
@@ -345,7 +345,7 @@ async fn not_causally_consistent_omits_after_cluster_time() {
 /// Test 7 from the causal consistency specification.
 #[tokio::test]
 async fn omit_after_cluster_time_standalone() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
 
     if !client.is_standalone() {
         log_uncaptured("skipping omit_after_cluster_time_standalone due to unsupported topology");
@@ -381,7 +381,7 @@ async fn omit_after_cluster_time_standalone() {
 /// Test 8 from the causal consistency specification.
 #[tokio::test]
 async fn omit_default_read_concern_level() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
 
     if client.is_standalone() {
         log_uncaptured(
@@ -421,7 +421,7 @@ async fn omit_default_read_concern_level() {
 /// Test 9 from the causal consistency specification.
 #[tokio::test]
 async fn test_causal_consistency_read_concern_merge() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
     if client.is_standalone() {
         log_uncaptured(
             "skipping test_causal_consistency_read_concern_merge due to unsupported topology: \
@@ -470,7 +470,7 @@ async fn test_causal_consistency_read_concern_merge() {
 /// Test 11 from the causal consistency specification.
 #[tokio::test]
 async fn omit_cluster_time_standalone() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
     if !client.is_standalone() {
         log_uncaptured("skipping omit_cluster_time_standalone due to unsupported topology");
         return;
@@ -489,7 +489,7 @@ async fn omit_cluster_time_standalone() {
 /// Test 12 from the causal consistency specification.
 #[tokio::test]
 async fn cluster_time_sent_in_commands() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
     if client.is_standalone() {
         log_uncaptured("skipping cluster_time_sent_in_commands due to unsupported topology");
         return;

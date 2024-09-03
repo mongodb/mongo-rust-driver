@@ -1,4 +1,7 @@
+use std::future::IntoFuture;
+
 use derive_more::From;
+use futures::{future::BoxFuture, FutureExt};
 use serde::Serialize;
 
 use super::{event_buffer::EventBuffer, TestClient, TestClientBuilder};
@@ -139,25 +142,34 @@ impl EventClientBuilder {
         self.retain_startup = true;
         self
     }
+}
 
-    pub(crate) async fn build(self) -> EventClient {
-        let mut inner = self.inner;
-        let mut options = match inner.options.take() {
-            Some(options) => options,
-            None => get_client_options().await.clone(),
-        };
-        let mut events = EventBuffer::new();
-        events.register(&mut options);
-        inner.options = Some(options);
+impl IntoFuture for EventClientBuilder {
+    type Output = EventClient;
 
-        let client = inner.build().await;
+    type IntoFuture = BoxFuture<'static, Self::Output>;
 
-        if !self.retain_startup {
-            // clear events from commands used to set up client.
-            events.retain(|ev| !matches!(ev, Event::Command(_)));
+    fn into_future(self) -> Self::IntoFuture {
+        async move {
+            let mut inner = self.inner;
+            let mut options = match inner.options.take() {
+                Some(options) => options,
+                None => get_client_options().await.clone(),
+            };
+            let mut events = EventBuffer::new();
+            events.register(&mut options);
+            inner.options = Some(options);
+
+            let client = inner.await;
+
+            if !self.retain_startup {
+                // clear events from commands used to set up client.
+                events.retain(|ev| !matches!(ev, Event::Command(_)));
+            }
+
+            EventClient { client, events }
         }
-
-        EventClient { client, events }
+        .boxed()
     }
 }
 
@@ -170,7 +182,7 @@ impl EventClient {
 
 #[tokio::test]
 async fn command_started_event_count() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
     let coll = client.database("foo").collection("bar");
 
     for i in 0..10 {

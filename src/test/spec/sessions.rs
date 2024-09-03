@@ -19,7 +19,6 @@ use crate::{
         spec::unified_runner::run_unified_tests,
         util::Event,
         EventClient,
-        TestClient,
     },
     Client,
 };
@@ -27,7 +26,7 @@ use crate::{
 #[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
     let mut skipped_files = vec![];
-    let client = TestClient::new().await;
+    let client = Client::for_test().await;
     if client.is_sharded() && client.server_version_gte(7, 0) {
         // TODO RUST-1666: unskip this file
         skipped_files.push("snapshot-sessions.json");
@@ -41,7 +40,7 @@ async fn run_unified() {
 // Sessions prose test 1
 #[tokio::test]
 async fn snapshot_and_causal_consistency_are_mutually_exclusive() {
-    let client = TestClient::new().await;
+    let client = Client::for_test().await;
     assert!(client
         .start_session()
         .snapshot(true)
@@ -53,8 +52,8 @@ async fn snapshot_and_causal_consistency_are_mutually_exclusive() {
 #[tokio::test(flavor = "multi_thread")]
 #[function_name::named]
 async fn explicit_session_created_on_same_client() {
-    let client0 = TestClient::new().await;
-    let client1 = TestClient::new().await;
+    let client0 = Client::for_test().await;
+    let client1 = Client::for_test().await;
 
     let mut session0 = client0.start_session().await.unwrap();
     let mut session1 = client1.start_session().await.unwrap();
@@ -200,7 +199,7 @@ async fn implicit_session_after_connection() {
 }
 
 async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
-    let util_client = TestClient::new().await;
+    let util_client = Client::for_test().await;
     if util_client.server_version_lt(4, 2) {
         log_uncaptured(format!(
             "Skipping {name}: cannot spawn mongocryptd due to server version < 4.2"
@@ -221,11 +220,7 @@ async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
     let options = ClientOptions::parse("mongodb://localhost:47017")
         .await
         .unwrap();
-    let client = Client::test_builder()
-        .options(options)
-        .monitor_events()
-        .build()
-        .await;
+    let client = Client::for_test().options(options).monitor_events().await;
     assert!(client.server_info.logical_session_timeout_minutes.is_none());
 
     Some((client, process))

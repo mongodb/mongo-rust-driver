@@ -8,7 +8,7 @@ use crate::{
 
 #[tokio::test]
 async fn details() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
 
     if client.server_version_lt(5, 0) {
         // SERVER-58399

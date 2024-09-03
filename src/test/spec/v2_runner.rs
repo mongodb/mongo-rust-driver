@@ -97,7 +97,7 @@ struct FileContext {
 
 impl FileContext {
     async fn new(path: &std::path::Path) -> Self {
-        let internal_client = TestClient::new().await;
+        let internal_client = Client::for_test().await;
         let is_csfle_test = path.to_string_lossy().contains("client-side-encryption");
 
         Self {
@@ -206,8 +206,8 @@ impl TestContext {
         if additional_options.heartbeat_freq.is_none() {
             additional_options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
         }
-        let builder = Client::test_builder()
-            .additional_options(
+        let builder = Client::for_test()
+            .options_for_multiple_mongoses(
                 additional_options,
                 test.use_multiple_mongoses.unwrap_or(false),
             )
@@ -216,7 +216,7 @@ impl TestContext {
         #[cfg(feature = "in-use-encryption")]
         let builder = csfle::set_auto_enc(builder, test);
 
-        let client = builder.monitor_events().build().await;
+        let client = builder.monitor_events().await;
 
         // TODO RUST-900: Remove this extraneous call.
         if internal_client.is_sharded()
@@ -296,6 +296,44 @@ impl TestContext {
         };
 
         runner.run_operation(operation, sessions).await
+    }
+}
+
+impl crate::test::util::TestClientBuilder {
+    async fn options_for_multiple_mongoses(
+        mut self,
+        mut options: ClientOptions,
+        use_multiple_mongoses: bool,
+    ) -> Self {
+        let is_load_balanced = options
+            .load_balanced
+            .or(get_client_options().await.load_balanced)
+            .unwrap_or(false);
+
+        let default_options = if is_load_balanced {
+            // for serverless testing, ignore use_multiple_mongoses.
+            let uri = if use_multiple_mongoses && !*SERVERLESS {
+                crate::test::LOAD_BALANCED_MULTIPLE_URI
+                    .as_ref()
+                    .expect("MULTI_MONGOS_LB_URI is required")
+            } else {
+                crate::test::LOAD_BALANCED_SINGLE_URI
+                    .as_ref()
+                    .expect("SINGLE_MONGOS_LB_URI is required")
+            };
+            let mut o = ClientOptions::parse(uri).await.unwrap();
+            crate::test::update_options_for_testing(&mut o);
+            o
+        } else {
+            get_client_options().await.clone()
+        };
+        options.merge(default_options);
+
+        self = self.options(options);
+        if !use_multiple_mongoses {
+            self = self.use_single_mongos();
+        }
+        self
     }
 }
 

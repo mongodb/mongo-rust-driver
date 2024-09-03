@@ -36,7 +36,7 @@ impl Drop for TempVars {
 async fn check_faas_handshake(vars: &[(&'static str, &str)]) -> Result<()> {
     let _tv = TempVars::set(vars);
 
-    let client = Client::test_builder().build().await;
+    let client = Client::for_test().await;
     client.list_database_names().await?;
 
     Ok(())

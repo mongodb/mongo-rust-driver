@@ -21,7 +21,6 @@ use crate::{
             fail_point::{FailPoint, FailPointMode},
         },
         Event,
-        TestClient,
     },
     Client,
 };
@@ -36,7 +35,9 @@ async fn min_heartbeat_frequency() {
     setup_client_options.hosts.drain(1..);
     setup_client_options.direct_connection = Some(true);
 
-    let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
+    let setup_client = Client::for_test()
+        .options(setup_client_options.clone())
+        .await;
 
     if !setup_client.supports_fail_command_appname_initial_handshake() {
         log_uncaptured(
@@ -95,12 +96,11 @@ async fn sdam_pool_management() {
     options.app_name = Some("SDAMPoolManagementTest".to_string());
     options.heartbeat_freq = Some(Duration::from_millis(50));
 
-    let client = Client::test_builder()
-        .additional_options(options, false)
-        .await
+    let client = Client::for_test()
+        .options(options)
+        .use_single_mongos()
         .min_heartbeat_freq(Duration::from_millis(50))
         .monitor_events()
-        .build()
         .await;
 
     let mut subscriber = client.events.stream_all();
@@ -173,7 +173,9 @@ async fn hello_ok_true() {
         return;
     }
 
-    let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
+    let setup_client = Client::for_test()
+        .options(setup_client_options.clone())
+        .await;
     if !VersionReq::parse(">= 4.4.5")
         .unwrap()
         .matches(&setup_client.server_version)
@@ -224,7 +226,7 @@ async fn hello_ok_true() {
 
 #[tokio::test]
 async fn repl_set_name_mismatch() -> crate::error::Result<()> {
-    let client = TestClient::new().await;
+    let client = Client::for_test().await;
     if !client.is_replica_set() {
         log_uncaptured("skipping repl_set_name_mismatch due to non-replica set topology");
         return Ok(());

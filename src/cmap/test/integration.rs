@@ -23,8 +23,8 @@ use crate::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
         },
-        TestClient,
     },
+    Client,
 };
 use semver::VersionReq;
 use std::time::Duration;
@@ -92,7 +92,7 @@ async fn concurrent_connections() {
     options.direct_connection = Some(true);
     options.hosts.drain(1..);
 
-    let client = TestClient::with_options(Some(options)).await;
+    let client = Client::for_test().options(options).await;
     let version = VersionReq::parse(">= 4.2.9").unwrap();
     // blockConnection failpoint option only supported in 4.2.9+.
     if !version.matches(&client.server_version) {
@@ -181,7 +181,7 @@ async fn connection_error_during_establishment() {
     client_options.direct_connection = Some(true);
     client_options.repl_set_name = None;
 
-    let client = TestClient::with_options(Some(client_options.clone())).await;
+    let client = Client::for_test().options(client_options.clone()).await;
     if !client.supports_fail_command() {
         log_uncaptured(format!(
             "skipping {} due to failCommand not being supported",
@@ -236,7 +236,7 @@ async fn connection_error_during_operation() {
     options.hosts.drain(1..);
     options.max_pool_size = Some(1);
 
-    let client = TestClient::with_options(options).await;
+    let client = Client::for_test().options(options).await;
     if !client.supports_fail_command() {
         log_uncaptured(format!(
             "skipping {} due to failCommand not being supported",

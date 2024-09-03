@@ -19,7 +19,6 @@ use crate::{
         util::event_buffer::EventBuffer,
         Event,
         EventClient,
-        TestClient,
     },
     Client,
     Collection,
@@ -196,7 +195,7 @@ macro_rules! for_each_op {
 /// This test also satisifies the `endSession` testing requirement of prose test 5.
 #[tokio::test]
 async fn pool_is_lifo() {
-    let client = TestClient::new().await;
+    let client = Client::for_test().await;
     // Wait for the implicit sessions created in TestClient::new to be returned to the pool.
     tokio::time::sleep(Duration::from_millis(500)).await;
 
@@ -229,7 +228,7 @@ async fn pool_is_lifo() {
 #[tokio::test]
 #[function_name::named]
 async fn cluster_time_in_commands() {
-    let test_client = TestClient::new().await;
+    let test_client = Client::for_test().await;
     if test_client.is_standalone() {
         log_uncaptured("skipping cluster_time_in_commands test due to standalone topology");
         return;
@@ -375,7 +374,7 @@ async fn cluster_time_in_commands() {
 #[tokio::test]
 #[function_name::named]
 async fn session_usage() {
-    let client = TestClient::new().await;
+    let client = Client::for_test().await;
     if client.is_standalone() {
         return;
     }
@@ -385,7 +384,7 @@ async fn session_usage() {
         F: Fn(EventClient) -> G,
         G: Future<Output = ()>,
     {
-        let client = Client::test_builder().monitor_events().build().await;
+        let client = Client::for_test().monitor_events().await;
         operation(client.clone()).await;
         let (command_started, _) = client.events.get_successful_command_execution(command_name);
         assert!(
@@ -402,7 +401,7 @@ async fn session_usage() {
 #[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_immediate_exhaust() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
     if client.is_standalone() {
         return;
     }
@@ -442,7 +441,7 @@ async fn implicit_session_returned_after_immediate_exhaust() {
 #[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_exhaust_by_get_more() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
     if client.is_standalone() {
         return;
     }
@@ -492,7 +491,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
 #[tokio::test]
 #[function_name::named]
 async fn find_and_getmore_share_session() {
-    let client = Client::test_builder().monitor_events().build().await;
+    let client = Client::for_test().monitor_events().await;
     if client.is_standalone() {
         log_uncaptured(
             "skipping find_and_getmore_share_session due to unsupported topology: Standalone",
