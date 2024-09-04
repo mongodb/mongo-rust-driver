@@ -44,7 +44,7 @@ features = ["sync"]
 | `zlib-compression`           | Enable support for compressing messages with [`zlib`](https://zlib.net/). |
 | `zstd-compression`           | Enable support for compressing messages with [`zstd`](http://facebook.github.io/zstd/). |
 | `snappy-compression`         | Enable support for compressing messages with [`snappy`](http://google.github.io/snappy/). |
-| `in-use-encryption`          | Enable support for client-side field level encryption and queryable encryption. |
+| `in-use-encryption`          | Enable support for client-side field level encryption and queryable encryption.  Note that re-exports from the `mongocrypt` crate may change in backwards-incompatible ways while that crate is below version 1.0. |
 | `tracing-unstable`           | Enable support for emitting [`tracing`](https://docs.rs/tracing/latest/tracing/) events. This API is unstable and may be subject to breaking changes in minor releases. |
 | `compat-3-0-0`               | Required for future compatibility if default features are disabled. |
 
