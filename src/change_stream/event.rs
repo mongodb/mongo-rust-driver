@@ -74,6 +74,14 @@ pub struct ChangeStreamEvent<T> {
     /// The new name for the `ns` collection.  Only included for `OperationType::Rename`.
     pub to: Option<ChangeNamespace>,
 
+    /// The identifier for the session associated with the transaction.
+    /// Only present if the operation is part of a multi-document transaction.
+    pub lsid: Option<Document>,
+
+    /// Together with the lsid, a number that helps uniquely identify a transaction.
+    /// Only present if the operation is part of a multi-document transaction.
+    pub txn_number: Option<i64>,
+
     /// A `Document` that contains the `_id` of the document created or modified by the `insert`,
     /// `replace`, `delete`, `update` operations (i.e. CRUD operations). For sharded collections,
     /// also displays the full shard key for the document. The `_id` field is not repeated if it is
@@ -126,6 +134,12 @@ pub struct UpdateDescription {
 
     /// Arrays that were truncated in the `Document`.
     pub truncated_arrays: Option<Vec<TruncatedArray>>,
+
+    /// When an update event reports changes involving ambiguous fields, the disambiguatedPaths
+    /// document provides the path key with an array listing each path component.
+    /// Note: The disambiguatedPaths field is only available on change streams started with the
+    /// showExpandedEvents option
+    pub disambiguated_paths: Option<Document>,
 }
 
 /// Describes an array that has been truncated.
