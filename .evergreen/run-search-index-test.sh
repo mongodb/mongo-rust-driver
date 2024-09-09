@@ -13,6 +13,6 @@ export INDEX_MANAGEMENT_TEST_PROSE=1
 
 set +o errexit
 
-cargo_test test::spec::index_management results.xml
+cargo_test test::spec::index_management
 
 exit ${CARGO_RESULT}

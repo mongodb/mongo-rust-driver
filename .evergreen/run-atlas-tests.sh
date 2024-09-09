@@ -12,6 +12,6 @@ source "${DRIVERS_TOOLS}/.evergreen/secrets_handling/setup-secrets.sh" drivers/a
 
 set +o errexit
 
-cargo_test atlas_connectivity results.xml
+cargo_test atlas_connectivity
 
 exit $CARGO_RESULT
