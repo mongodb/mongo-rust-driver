@@ -8,4 +8,5 @@ if [[ -z "$DRIVERS_TOOLS" ]]; then
 fi
 
 rm -rf $DRIVERS_TOOLS
-git clone https://github.com/mongodb-labs/drivers-evergreen-tools.git $DRIVERS_TOOLS
+#git clone https://github.com/mongodb-labs/drivers-evergreen-tools.git $DRIVERS_TOOLS
+git clone -b RUST-2024/serverless-csfle https://github.com/abr-egn/drivers-evergreen-tools.git $DRIVERS_TOOLS

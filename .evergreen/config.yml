@@ -270,7 +270,7 @@ buildvariants:
       - test-plain-auth
 
   - name: serverless
-    patchable: false
+    #patchable: false
     display_name: "Serverless"
     run_on:
       - rhel80-small
@@ -1571,16 +1571,23 @@ functions:
       params:
         working_dir: src
         shell: bash
-        add_expansions_to_env: true
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+          - MONGODB_URI
+          - MONGOCRYPT_LIB_DIR
+          - OPENSSL
+          - OS
+          - LD_LIBRARY_PATH
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - CSFLE_LOCAL_KEY
+          - CRYPT_SHARED_LIB_PATH
+          - DISABLE_CRYPT_SHARED
+          - AZURE_IMDS_MOCK_PORT
+          - SERVERLESS_ATLAS_USER
+          - SERVERLESS_ATLAS_PASSWORD
         script: |
-          ${PREPARE_SHELL}
-
-          # Exported without xtrace to avoid leaking credentials
-          set +o xtrace
-          export SERVERLESS_ATLAS_USER=${SERVERLESS_ATLAS_USER}
-          export SERVERLESS_ATLAS_PASSWORD=${SERVERLESS_ATLAS_PASSWORD}
-          set -o xtrace
-
           export SINGLE_MONGOS_LB_URI=${SERVERLESS_URI}
           . .evergreen/generate-uri.sh
           export SERVERLESS=serverless
