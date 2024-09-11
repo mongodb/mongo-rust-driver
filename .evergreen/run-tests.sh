@@ -31,7 +31,7 @@ echo "cargo test options: $(cargo_test_options)"
 
 set +o errexit
 
-cargo_test "" results.xml
+cargo_test ""
 
 # cargo-nextest doesn't support doc tests
 RUST_BACKTRACE=1 cargo test --doc $(cargo_test_options)

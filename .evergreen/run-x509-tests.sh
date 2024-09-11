@@ -17,6 +17,6 @@ export SUBJECT=$(echo "$SUBJECT" | awk '{$1=$1;print}')
 
 set +o errexit
 
-MONGO_X509_USER="$SUBJECT" cargo_test x509_auth results.xml
+MONGO_X509_USER="$SUBJECT" cargo_test x509_auth
 
 exit ${CARGO_RESULT}

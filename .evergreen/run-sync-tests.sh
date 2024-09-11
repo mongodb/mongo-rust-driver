@@ -12,6 +12,6 @@ echo "cargo test options: $(cargo_test_options)"
 
 set +o errexit
 
-cargo_test sync results.xml
+cargo_test sync
 
 exit $CARGO_RESULT

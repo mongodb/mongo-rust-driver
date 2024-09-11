@@ -18,12 +18,10 @@ FEATURE_FLAGS+=("aws-auth")
 
 set +o errexit
 
-cargo_test auth_aws auth_aws.xml
-cargo_test lambda_examples::auth::test_handler lambda_handler.xml
-cargo_test spec::auth spec.xml
-cargo_test uri_options uri_options.xml
-cargo_test connection_string connection_string.xml
-
-merge-junit -o results.xml auth_aws.xml lambda_handler.xml spec.xml uri_options.xml connection_string.xml
+cargo_test auth_aws
+cargo_test lambda_examples::auth::test_handler
+cargo_test spec::auth
+cargo_test uri_options
+cargo_test connection_string
 
 exit $CARGO_RESULT
