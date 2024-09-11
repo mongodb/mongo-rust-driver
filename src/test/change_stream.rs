@@ -668,7 +668,17 @@ async fn transaction_fields() -> Result<()> {
             None => return Ok(()),
         };
     if client.is_sharded() {
-        log_uncaptured("skipping change stream test on unsupported topology");
+        log_uncaptured("skipping change stream test transaction_fields on unsupported topology");
+        return Ok(());
+    }
+    if !VersionReq::parse(">=5.0")
+        .unwrap()
+        .matches(&client.server_version)
+    {
+        log_uncaptured(format!(
+            "skipping change stream test transaction_fields on unsupported version {:?}",
+            client.server_version
+        ));
         return Ok(());
     }
     if !client.supports_transactions() {
