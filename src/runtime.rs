@@ -54,6 +54,7 @@ pub(crate) use tls::TlsConfig;
 ///
 /// This must be called from an async block
 /// or function running on a runtime.
+#[track_caller]
 pub(crate) fn spawn<F, O>(fut: F) -> AsyncJoinHandle<O>
 where
     F: Future<Output = O> + Send + 'static,
