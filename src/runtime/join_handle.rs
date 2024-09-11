@@ -9,6 +9,7 @@ use std::{
 pub(crate) struct AsyncJoinHandle<T>(tokio::task::JoinHandle<T>);
 
 impl<T> AsyncJoinHandle<T> {
+    #[track_caller]
     pub(crate) fn spawn<F>(fut: F) -> Self
     where
         F: Future<Output = T> + Send + 'static,
