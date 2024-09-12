@@ -6,8 +6,6 @@ async fn run_unified() {
         .skip_files(&[
             // TODO RUST-1281: unskip this file
             "change-streams-showExpandedEvents.json",
-            // TODO RUST-1423: unskip this file
-            "change-streams-disambiguatedPaths.json",
         ])
         .skip_tests(&[
             // TODO RUST-1658: unskip these tests
