@@ -659,6 +659,58 @@ async fn split_large_event() -> Result<()> {
     Ok(())
 }
 
+/// Test that transaction fields are parsed correctly
+#[tokio::test]
+async fn transaction_fields() -> Result<()> {
+    let (client, coll, mut stream) =
+        match init_stream("chang_stream_transaction_fields", true).await? {
+            Some(t) => t,
+            None => return Ok(()),
+        };
+    if client.is_sharded() {
+        log_uncaptured("skipping change stream test transaction_fields on unsupported topology");
+        return Ok(());
+    }
+    if !VersionReq::parse(">=5.0")
+        .unwrap()
+        .matches(&client.server_version)
+    {
+        log_uncaptured(format!(
+            "skipping change stream test transaction_fields on unsupported version {:?}",
+            client.server_version
+        ));
+        return Ok(());
+    }
+    if !client.supports_transactions() {
+        log_uncaptured(
+            "skipping change stream transaction_fields test due to lack of transaction support",
+        );
+        return Ok(());
+    }
+
+    let mut session = client.start_session().await.unwrap();
+    let session_id = session.id().get("id").cloned();
+    assert!(session_id.is_some());
+    session.start_transaction().await.unwrap();
+    coll.insert_one(doc! {"_id": 1})
+        .session(&mut session)
+        .await?;
+    session.commit_transaction().await.unwrap();
+
+    let next_event = stream.next().await.transpose()?;
+    assert!(matches!(next_event,
+        Some(ChangeStreamEvent {
+            operation_type: OperationType::Insert,
+            document_key: Some(key),
+            lsid: Some(lsid),
+            txn_number: Some(1),
+            ..
+        }) if key == doc! { "_id": 1 } && lsid.get("id") == session_id.as_ref()
+    ));
+
+    Ok(())
+}
+
 // Regression test: `Collection::watch` uses the type parameter.  This is not flagged as a test to
 // run because it's just asserting that this compiles.
 #[allow(unreachable_code, unused_variables, clippy::diverging_sub_expression)]
