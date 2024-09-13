@@ -235,6 +235,7 @@ impl<'a, S> Watch<'a, S> {
         collation: Collation,
         read_concern: ReadConcern,
         selection_criteria: SelectionCriteria,
+        show_expanded_events: bool,
         comment: Bson,
     );
 }

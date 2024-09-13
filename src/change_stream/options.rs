@@ -86,6 +86,9 @@ pub struct ChangeStreamOptions {
     #[serde(skip_serializing)]
     pub selection_criteria: Option<SelectionCriteria>,
 
+    /// Enables the server to send the 'expanded' list of change stream events.
+    pub show_expanded_events: Option<bool>,
+
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
     ///
