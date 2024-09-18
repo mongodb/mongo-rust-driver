@@ -24,6 +24,9 @@ fi
 
 . ./secrets-export.sh
 
+# Add mongodb binaries to path for mongocryptd
+PATH=${PATH}:${DRIVERS_TOOLS}/mongodb/bin
+
 set +o errexit
 
 cargo_test test::csfle
