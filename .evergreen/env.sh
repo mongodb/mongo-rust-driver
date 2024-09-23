@@ -24,11 +24,12 @@ if [[ "$OSTYPE" == "cygwin" ]]; then
   export NVM_SYMLINK
   NVM_ARTIFACTS_PATH=$(cygpath -w "$NODE_ARTIFACTS_PATH/bin")
   export NVM_ARTIFACTS_PATH
-  export OPENSSL_DIR="C:\\openssl"
-  OPENSSL_LIB_PATH=$(cygpath $OPENSSL_DIR/lib)
   PATH=$(cygpath $NVM_SYMLINK):$(cygpath $NVM_HOME):$PATH
   export PATH
   echo "updated path on windows PATH=$PATH"
+
+  export OPENSSL_INCLUDE_DIR="C:\\Program Files\\OpenSSL-Win64\\include"
+  export OPENSSL_LIB_DIR="C:\\Program Files\\OpenSSL-Win64\\lib\\VC\\x64\\MD"
 else
   # Turn off tracing for the very-spammy nvm script.
   set +o xtrace
