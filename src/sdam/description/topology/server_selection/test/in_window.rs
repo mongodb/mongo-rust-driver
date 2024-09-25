@@ -22,7 +22,6 @@ use crate::{
         EventClient,
     },
     Client,
-    ServerInfo,
 };
 
 use super::TestTopologyDescription;
@@ -148,6 +147,14 @@ async fn load_balancing_test() {
         return;
     }
 
+    // clear the collection so subsequent test runs don't increase linearly in time
+    setup_client
+        .database("load_balancing_test")
+        .collection::<Document>("load_balancing_test")
+        .drop()
+        .await
+        .unwrap();
+
     // seed the collection with a document so the find commands do some work
     setup_client
         .database("load_balancing_test")
@@ -210,7 +217,6 @@ async fn load_balancing_test() {
 
     let mut options = get_client_options().await.clone();
     let max_pool_size = DEFAULT_MAX_POOL_SIZE;
-    let hosts = options.hosts.clone();
     options.local_threshold = Duration::from_secs(30).into();
     options.min_pool_size = Some(max_pool_size);
     let client = Client::for_test()
@@ -222,22 +228,7 @@ async fn load_balancing_test() {
     let mut subscriber = client.events.stream_all();
 
     // wait for both servers pools to be saturated.
-    for address in hosts {
-        let selector = Arc::new(move |sd: &ServerInfo| sd.address() == &address);
-        for _ in 0..max_pool_size {
-            let client = client.clone();
-            let selector = selector.clone();
-            runtime::spawn(async move {
-                client
-                    .database("load_balancing_test")
-                    .collection::<Document>("load_balancing_test")
-                    .find(doc! { "$where": "sleep(500) && true" })
-                    .selection_criteria(SelectionCriteria::Predicate(selector))
-                    .await
-                    .unwrap();
-            });
-        }
-    }
+    client.warm_connection_pool().await;
     let mut conns = 0;
     while conns < max_pool_size * 2 {
         subscriber
@@ -259,7 +250,8 @@ async fn load_balancing_test() {
     let guard = setup_client.enable_fail_point(fail_point).await.unwrap();
 
     // verify that the lesser picked server (slower one) was picked less than 25% of the time.
-    do_test(&client, 0.05, 0.25, 10).await;
+    const FLUFF: f64 = 0.02; // See RUST-2044.
+    do_test(&client, 0.05, 0.25 + FLUFF, 10).await;
 
     // disable failpoint and rerun, should be back to even split
     drop(guard);
