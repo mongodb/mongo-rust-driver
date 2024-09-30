@@ -202,7 +202,18 @@ impl TestRunner {
             log_uncaptured(format!("Executing {:?}", &test_case.description));
 
             if let Some(ref initial_data) = test_file.initial_data {
-                let mut session = self.internal_client.start_session().await.unwrap();
+                // If a test:
+                // * set `useMultipleMongoses: false`
+                // * and used `readConcern: { level: snapshot }`
+                // * and ran on a load-balanced replica set
+                // it was possible for the internal client to write data to a different
+                // mongos than the test execution client; the snapshot read concern would
+                // then pick a timestamp before the write, causing the data to not be
+                // visible to the test, causing very confusing flakes.  Using a single-mongos client
+                // to do initial data population guarantees it'll have written the initial data
+                // to the same mongos as the test client in that particular configuration.
+                let data_client = Client::for_test().use_single_mongos().await;
+                let mut session = data_client.start_session().await.unwrap();
                 for data in initial_data {
                     self.insert_initial_data(data, &mut session).await;
                 }
@@ -403,26 +414,25 @@ impl TestRunner {
         data: &CollectionData,
         session: &mut ClientSession,
     ) {
+        let client = session.client();
         if !data.documents.is_empty() {
             let collection_options = CollectionOptions::builder()
                 .write_concern(WriteConcern::majority())
                 .build();
-            let coll = self.internal_client.get_coll_with_options(
-                &data.database_name,
-                &data.collection_name,
-                collection_options,
-            );
+            let coll = client
+                .database(&data.database_name)
+                .collection_with_options(&data.collection_name, collection_options);
             coll.drop().session(&mut *session).await.unwrap();
             coll.insert_many(data.documents.clone())
                 .session(session)
                 .await
                 .unwrap();
         } else {
-            let coll = self
-                .internal_client
-                .get_coll(&data.database_name, &data.collection_name);
+            let coll = client
+                .database(&data.database_name)
+                .collection::<Document>(&data.collection_name);
             coll.drop().session(&mut *session).await.unwrap();
-            self.internal_client
+            client
                 .database(&data.database_name)
                 .create_collection(&data.collection_name)
                 .session(&mut *session)
