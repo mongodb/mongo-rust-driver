@@ -1459,6 +1459,7 @@ impl ConnectionString {
                         "a port cannot be specified with 'mongodb+srv'",
                     ));
                 }
+                #[cfg(unix)]
                 [ServerAddress::Unix { .. }] => {
                     return Err(Error::invalid_argument(
                         "unix sockets cannot be used with 'mongodb+srv'",
