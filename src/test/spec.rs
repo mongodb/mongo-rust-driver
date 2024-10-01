@@ -13,7 +13,6 @@ mod index_management;
 #[cfg(feature = "dns-resolver")]
 mod initial_dns_seedlist_discovery;
 mod load_balancers;
-mod ocsp;
 mod oidc;
 mod read_write_concern;
 mod retryable_reads;
