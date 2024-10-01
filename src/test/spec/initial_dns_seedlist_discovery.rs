@@ -5,7 +5,8 @@ use serde::Deserialize;
 use crate::{
     bson::doc,
     client::Client,
-    options::{ClientOptions, ResolverConfig},
+    options::{ClientOptions, ResolverConfig, ServerAddress},
+    srv::{DomainMismatch, LookupHosts},
     test::{get_client_options, log_uncaptured, run_spec_test},
 };
 
@@ -254,4 +255,45 @@ async fn sharded() {
         return;
     }
     run_spec_test(&["initial-dns-seedlist-discovery", "sharded"], run_test).await;
+}
+
+fn validate_srv(original: &str, resolved: &str) -> crate::error::Result<()> {
+    let mut lh = LookupHosts {
+        hosts: vec![ServerAddress::Tcp {
+            host: resolved.to_string(),
+            port: Some(42),
+        }],
+        min_ttl: Duration::from_secs(1),
+    };
+    lh.validate(original, DomainMismatch::Error)
+}
+
+// Prose test 1. Allow SRVs with fewer than 3 `.` separated parts
+#[test]
+fn short_srv_domains_valid() {
+    validate_srv("localhost", "test.localhost").unwrap();
+    validate_srv("mongo.local", "test.mongo.local").unwrap();
+}
+
+// Prose test 2. Throw when return address does not end with SRV domain
+#[test]
+fn short_srv_domains_invalid_end() {
+    assert!(validate_srv("localhost", "localhost.mongodb").is_err());
+    assert!(validate_srv("mongo.local", "test_1.evil.local").is_err());
+    assert!(validate_srv("blogs.mongodb.com", "blogs.evil.com").is_err());
+}
+
+// Prose test 3. Throw when return address is identical to SRV hostname
+#[test]
+fn short_srv_domains_invalid_identical() {
+    assert!(validate_srv("localhost", "localhost").is_err());
+    assert!(validate_srv("mongo.local", "mongo.local").is_err());
+}
+
+// Prose test 4. Throw when return address does not contain `.` separating shared part of domain
+#[test]
+fn short_srv_domains_invalid_no_dot() {
+    assert!(validate_srv("localhost", "test_1.cluster_1localhost").is_err());
+    assert!(validate_srv("mongo.local", "test_1.my_hostmongo.local").is_err());
+    assert!(validate_srv("blogs.mongodb.com", "cluster.testmongodb.com").is_err());
 }

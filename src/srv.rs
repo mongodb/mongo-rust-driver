@@ -20,7 +20,7 @@ pub(crate) struct LookupHosts {
 }
 
 impl LookupHosts {
-    fn validate(&mut self, original_hostname: &str, dm: DomainMismatch) -> Result<()> {
+    pub(crate) fn validate(&mut self, original_hostname: &str, dm: DomainMismatch) -> Result<()> {
         let original_hostname_parts: Vec<_> = original_hostname.split('.').collect();
         let (original_domain_name, min_len) = if original_hostname_parts.len() >= 3 {
             (&original_hostname_parts[1..], 3)
