@@ -136,6 +136,12 @@ where
             .into()),
         }
     }
+
+    fn ordered(&self) -> bool {
+        self.options
+            .and_then(|options| options.ordered)
+            .unwrap_or(true)
+    }
 }
 
 /// A helper struct for tracking namespace information.
@@ -314,8 +320,19 @@ where
             {
                 Ok(result)
             } else {
-                // The partial result should only be populated if one or more operations succeeded.
-                if n_errors < self.n_attempted {
+                // The partial result should only be populated if the response indicates that at
+                // least one write succeeded.
+                let write_succeeded = if self.ordered() {
+                    error
+                        .write_errors
+                        .iter()
+                        .next()
+                        .map(|(index, _)| *index != self.offset)
+                        .unwrap_or(true)
+                } else {
+                    n_errors < self.n_attempted
+                };
+                if write_succeeded {
                     error.partial_result = Some(result.into_partial_result());
                 }
 
