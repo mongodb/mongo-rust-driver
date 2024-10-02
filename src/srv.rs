@@ -20,7 +20,7 @@ pub(crate) struct LookupHosts {
 }
 
 impl LookupHosts {
-    pub(crate) fn validate(&mut self, original_hostname: &str, dm: DomainMismatch) -> Result<()> {
+    pub(crate) fn validate(mut self, original_hostname: &str, dm: DomainMismatch) -> Result<Self> {
         let original_hostname_parts: Vec<_> = original_hostname.split('.').collect();
         let original_domain_name = if original_hostname_parts.len() >= 3 {
             &original_hostname_parts[1..]
@@ -71,7 +71,7 @@ impl LookupHosts {
             .into());
         }
 
-        Ok(())
+        Ok(self)
     }
 }
 
@@ -150,9 +150,9 @@ impl SrvResolver {
         dm: DomainMismatch,
     ) -> Result<LookupHosts> {
         let lookup_hostname = format!("_mongodb._tcp.{}", original_hostname);
-        let mut lookup_hosts = self.get_srv_hosts_unvalidated(&lookup_hostname).await?;
-        lookup_hosts.validate(original_hostname, dm)?;
-        Ok(lookup_hosts)
+        self.get_srv_hosts_unvalidated(&lookup_hostname)
+            .await?
+            .validate(original_hostname, dm)
     }
 
     async fn get_txt_options(

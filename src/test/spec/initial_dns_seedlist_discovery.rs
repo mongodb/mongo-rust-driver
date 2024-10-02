@@ -258,14 +258,15 @@ async fn sharded() {
 }
 
 fn validate_srv(original: &str, resolved: &str) -> crate::error::Result<()> {
-    let mut lh = LookupHosts {
+    LookupHosts {
         hosts: vec![ServerAddress::Tcp {
             host: resolved.to_string(),
             port: Some(42),
         }],
         min_ttl: Duration::from_secs(1),
-    };
-    lh.validate(original, DomainMismatch::Error)
+    }
+    .validate(original, DomainMismatch::Error)
+    .map(|_| ())
 }
 
 // Prose test 1. Allow SRVs with fewer than 3 `.` separated parts
