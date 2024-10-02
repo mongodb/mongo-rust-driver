@@ -22,22 +22,17 @@ pub(crate) struct LookupHosts {
 impl LookupHosts {
     pub(crate) fn validate(&mut self, original_hostname: &str, dm: DomainMismatch) -> Result<()> {
         let original_hostname_parts: Vec<_> = original_hostname.split('.').collect();
-        let (original_domain_name, min_len) = if original_hostname_parts.len() >= 3 {
-            (&original_hostname_parts[1..], 3)
+        let original_domain_name = if original_hostname_parts.len() >= 3 {
+            &original_hostname_parts[1..]
         } else {
-            (
-                &original_hostname_parts[..],
-                original_hostname_parts.len() + 1,
-            )
+            &original_hostname_parts[..]
         };
 
         let mut ok_hosts = vec![];
         for addr in self.hosts.drain(..) {
             let host = addr.host();
             let hostname_parts: Vec<_> = host.split('.').collect();
-            let hostname_matches = hostname_parts.ends_with(original_domain_name);
-            let length_ok = hostname_parts.len() >= min_len;
-            if hostname_matches && length_ok {
+            if hostname_parts[1..].ends_with(original_domain_name) {
                 ok_hosts.push(addr);
             } else {
                 let message = format!(
