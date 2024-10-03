@@ -174,7 +174,6 @@ impl IntoFuture for EventClientBuilder {
 }
 
 impl EventClient {
-    #[allow(dead_code)]
     pub(crate) fn into_client(self) -> crate::Client {
         self.client.into_client()
     }

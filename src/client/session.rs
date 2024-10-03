@@ -401,7 +401,7 @@ impl Drop for ClientSession {
 #[derive(Clone, Debug)]
 pub(crate) struct ServerSession {
     /// The id of the server session to which this corresponds.
-    id: Document,
+    pub(crate) id: Document,
 
     /// The last time an operation was executed with this session.
     last_use: std::time::Instant,

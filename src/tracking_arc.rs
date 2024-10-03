@@ -61,6 +61,10 @@ impl<T> TrackingArc<T> {
         Arc::ptr_eq(&this.inner, &other.inner)
     }
 
+    pub(crate) fn strong_count(this: &Self) -> usize {
+        Arc::strong_count(&this.inner)
+    }
+
     #[cfg(all(test, mongodb_internal_tracking_arc))]
     #[allow(unused)]
     pub(crate) fn print_live(tracked: &Self) {
