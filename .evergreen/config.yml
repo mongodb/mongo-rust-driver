@@ -364,7 +364,7 @@ buildvariants:
 
   - name: search-index
     display_name: "Search Index Helpers"
-    #patchable: false
+    patchable: false
     run_on:
       - rhel87-small
     tasks:
@@ -591,19 +591,23 @@ task_groups:
       - func: "make files executable"
       - func: "install rust"
       - func: "install cargo-lambda"
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
       - command: subprocess.exec
         params:
           working_dir: src
           binary: bash
           include_expansions_in_env:
-            - DRIVERS_ATLAS_PUBLIC_API_KEY
-            - DRIVERS_ATLAS_PRIVATE_API_KEY
-            - DRIVERS_ATLAS_GROUP_ID
-            - DRIVERS_ATLAS_LAMBDA_USER
-            - DRIVERS_ATLAS_LAMBDA_PASSWORD
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+            - DRIVERS_TOOLS
             - LAMBDA_STACK_NAME
             - MONGODB_VERSION
           args:
+            - .evergreen/with-secrets.sh
+            - drivers/atlas-dev
             - ${DRIVERS_TOOLS}/.evergreen/atlas/setup-atlas-cluster.sh
       - command: expansions.update
         params:
@@ -614,11 +618,10 @@ task_groups:
           working_dir: src
           binary: bash
           include_expansions_in_env:
-            - DRIVERS_ATLAS_PUBLIC_API_KEY
-            - DRIVERS_ATLAS_PRIVATE_API_KEY
-            - DRIVERS_ATLAS_GROUP_ID
             - CLUSTER_NAME
           args:
+            - .evergreen/with-secrets.sh
+            - drivers/atlas-dev
             - ${DRIVERS_TOOLS}/.evergreen/atlas/teardown-atlas-cluster.sh
     setup_group_can_fail_task: true
     setup_group_timeout_secs: 1800
