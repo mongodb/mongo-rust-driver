@@ -2182,7 +2182,13 @@ impl TestOperation for Close {
                 Entity::Client(_) => {
                     let client = entities.get_mut(id).unwrap().as_mut_client();
                     let closed_client_topology_id = client.topology_id;
-                    client.client.take().unwrap().shutdown().immediate(true).await;
+                    client
+                        .client
+                        .take()
+                        .unwrap()
+                        .shutdown()
+                        .immediate(true)
+                        .await;
 
                     let mut entities_to_remove = vec![];
                     for (key, value) in entities.iter() {
