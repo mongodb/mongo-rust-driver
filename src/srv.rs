@@ -19,6 +19,62 @@ pub(crate) struct LookupHosts {
     pub(crate) min_ttl: Duration,
 }
 
+impl LookupHosts {
+    pub(crate) fn validate(mut self, original_hostname: &str, dm: DomainMismatch) -> Result<Self> {
+        let original_hostname_parts: Vec<_> = original_hostname.split('.').collect();
+        let original_domain_name = if original_hostname_parts.len() >= 3 {
+            &original_hostname_parts[1..]
+        } else {
+            &original_hostname_parts[..]
+        };
+
+        let mut ok_hosts = vec![];
+        for addr in self.hosts.drain(..) {
+            let host = addr.host();
+            let hostname_parts: Vec<_> = host.split('.').collect();
+            if hostname_parts[1..].ends_with(original_domain_name) {
+                ok_hosts.push(addr);
+            } else {
+                let message = format!(
+                    "SRV lookup for {} returned result {}, which does not match domain name {}",
+                    original_hostname,
+                    host,
+                    original_domain_name.join(".")
+                );
+                match dm {
+                    DomainMismatch::Error => return Err(ErrorKind::DnsResolve { message }.into()),
+                    DomainMismatch::Skip => {
+                        #[cfg(feature = "tracing-unstable")]
+                        {
+                            use crate::trace::SERVER_SELECTION_TRACING_EVENT_TARGET;
+                            if crate::trace::trace_or_log_enabled!(
+                                target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+                                crate::trace::TracingOrLogLevel::Warn
+                            ) {
+                                tracing::warn!(
+                                    target: SERVER_SELECTION_TRACING_EVENT_TARGET,
+                                    message,
+                                );
+                            }
+                        }
+                        continue;
+                    }
+                }
+            }
+        }
+        self.hosts = ok_hosts;
+
+        if self.hosts.is_empty() {
+            return Err(ErrorKind::DnsResolve {
+                message: format!("SRV lookup for {} returned no records", original_hostname),
+            }
+            .into());
+        }
+
+        Ok(self)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct OriginalSrvInfo {
     pub(crate) hostname: String,
@@ -62,101 +118,41 @@ impl SrvResolver {
         Ok(config)
     }
 
-    pub(crate) async fn get_srv_hosts(
-        &self,
-        original_hostname: &str,
-        dm: DomainMismatch,
-    ) -> Result<LookupHosts> {
+    async fn get_srv_hosts_unvalidated(&self, lookup_hostname: &str) -> Result<LookupHosts> {
         use hickory_proto::rr::RData;
 
-        let hostname_parts: Vec<_> = original_hostname.split('.').collect();
-
-        if hostname_parts.len() < 3 {
-            return Err(ErrorKind::InvalidArgument {
-                message: "a 'mongodb+srv' hostname must have at least three '.'-delimited parts"
-                    .into(),
-            }
-            .into());
-        }
-
-        let lookup_hostname = format!("_mongodb._tcp.{}", original_hostname);
-
-        let srv_lookup = self.resolver.srv_lookup(lookup_hostname.as_str()).await?;
-        let mut srv_addresses: Vec<ServerAddress> = Vec::new();
+        let srv_lookup = self.resolver.srv_lookup(lookup_hostname).await?;
+        let mut hosts = vec![];
         let mut min_ttl = u32::MAX;
-
         for record in srv_lookup.as_lookup().record_iter() {
             let srv = match record.data() {
                 Some(RData::SRV(s)) => s,
                 _ => continue,
             };
-
-            let hostname = srv.target().to_utf8();
+            let mut host = srv.target().to_utf8();
+            // Remove the trailing '.'
+            if host.ends_with('.') {
+                host.pop();
+            }
             let port = Some(srv.port());
-            let mut address = ServerAddress::Tcp {
-                host: hostname,
-                port,
-            };
-
-            let domain_name = &hostname_parts[1..];
-
-            let host = address.host();
-            let mut hostname_parts: Vec<_> = host.split('.').collect();
-
-            // Remove empty final section, which indicates a trailing dot.
-            if hostname_parts.last().map(|s| s.is_empty()).unwrap_or(false) {
-                hostname_parts.pop();
-            }
-
-            if !&hostname_parts[1..].ends_with(domain_name) {
-                let message = format!(
-                    "SRV lookup for {} returned result {}, which does not match domain name {}",
-                    original_hostname,
-                    address,
-                    domain_name.join(".")
-                );
-                if matches!(dm, DomainMismatch::Error) {
-                    return Err(ErrorKind::DnsResolve { message }.into());
-                } else {
-                    #[cfg(feature = "tracing-unstable")]
-                    {
-                        use crate::trace::SERVER_SELECTION_TRACING_EVENT_TARGET;
-                        if crate::trace::trace_or_log_enabled!(
-                            target: SERVER_SELECTION_TRACING_EVENT_TARGET,
-                            crate::trace::TracingOrLogLevel::Warn
-                        ) {
-                            tracing::warn!(
-                                target: SERVER_SELECTION_TRACING_EVENT_TARGET,
-                                message,
-                            );
-                        }
-                    }
-                }
-                continue;
-            }
-
-            // The spec tests list the seeds without the trailing '.', so we remove it by
-            // joining the parts we split rather than manipulating the string.
-            address = ServerAddress::Tcp {
-                host: hostname_parts.join("."),
-                port: address.port(),
-            };
-
+            hosts.push(ServerAddress::Tcp { host, port });
             min_ttl = std::cmp::min(min_ttl, record.ttl());
-            srv_addresses.push(address);
         }
-
-        if srv_addresses.is_empty() {
-            return Err(ErrorKind::DnsResolve {
-                message: format!("SRV lookup for {} returned no records", original_hostname),
-            }
-            .into());
-        }
-
         Ok(LookupHosts {
-            hosts: srv_addresses,
+            hosts,
             min_ttl: Duration::from_secs(min_ttl.into()),
         })
+    }
+
+    pub(crate) async fn get_srv_hosts(
+        &self,
+        original_hostname: &str,
+        dm: DomainMismatch,
+    ) -> Result<LookupHosts> {
+        let lookup_hostname = format!("_mongodb._tcp.{}", original_hostname);
+        self.get_srv_hosts_unvalidated(&lookup_hostname)
+            .await?
+            .validate(original_hostname, dm)
     }
 
     async fn get_txt_options(

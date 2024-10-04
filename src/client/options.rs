@@ -265,15 +265,6 @@ impl ServerAddress {
             Self::Unix { path } => path.to_string_lossy(),
         }
     }
-
-    #[cfg(feature = "dns-resolver")]
-    pub(crate) fn port(&self) -> Option<u16> {
-        match self {
-            Self::Tcp { port, .. } => *port,
-            #[cfg(unix)]
-            Self::Unix { .. } => None,
-        }
-    }
 }
 
 impl fmt::Display for ServerAddress {
@@ -1455,39 +1446,35 @@ impl ConnectionString {
             host_list.push(address);
         }
 
-        let hosts = if srv {
-            if host_list.len() != 1 {
-                return Err(ErrorKind::InvalidArgument {
-                    message: "exactly one host must be specified with 'mongodb+srv'".into(),
-                }
-                .into());
-            }
-
-            // Unwrap safety: the `len` check above guarantees this can't fail.
-            match host_list.into_iter().next().unwrap() {
-                ServerAddress::Tcp { host, port } => {
-                    if port.is_some() {
-                        return Err(ErrorKind::InvalidArgument {
-                            message: "a port cannot be specified with 'mongodb+srv'".into(),
-                        }
-                        .into());
-                    }
-                    HostInfo::DnsRecord(host)
+        let host_info = if !srv {
+            HostInfo::HostIdentifiers(host_list)
+        } else {
+            match &host_list[..] {
+                [ServerAddress::Tcp { host, port: None }] => HostInfo::DnsRecord(host.clone()),
+                [ServerAddress::Tcp {
+                    host: _,
+                    port: Some(_),
+                }] => {
+                    return Err(Error::invalid_argument(
+                        "a port cannot be specified with 'mongodb+srv'",
+                    ));
                 }
                 #[cfg(unix)]
-                ServerAddress::Unix { .. } => {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "unix sockets cannot be used with 'mongodb+srv'".into(),
-                    }
-                    .into());
+                [ServerAddress::Unix { .. }] => {
+                    return Err(Error::invalid_argument(
+                        "unix sockets cannot be used with 'mongodb+srv'",
+                    ));
+                }
+                _ => {
+                    return Err(Error::invalid_argument(
+                        "exactly one host must be specified with 'mongodb+srv'",
+                    ))
                 }
             }
-        } else {
-            HostInfo::HostIdentifiers(host_list)
         };
 
         let mut conn_str = ConnectionString {
-            host_info: hosts,
+            host_info,
             #[cfg(test)]
             original_uri: s.into(),
             ..Default::default()
