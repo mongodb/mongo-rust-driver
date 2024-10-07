@@ -634,7 +634,7 @@ impl Client {
                 .selection_criteria(selection_criteria.clone())
                 .await;
             debug_assert!(result
-                .map(|document| document.get_i64("ok") == Ok(1))
+                .map(|document| document.get_f64("ok") == Ok(1.0))
                 .unwrap_or(false));
         }
     }
