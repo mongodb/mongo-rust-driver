@@ -633,7 +633,9 @@ impl Client {
                 .run_command(end_sessions)
                 .selection_criteria(selection_criteria.clone())
                 .await;
-            debug_assert!(result.is_ok());
+            debug_assert!(result
+                .map(|document| document.get_i64("ok") == Ok(1))
+                .unwrap_or(false));
         }
     }
 }
