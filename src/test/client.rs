@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bson::{doc, Bson},
     error::{CommandError, Error, ErrorKind},
-    event::{cmap::CmapEvent, command::CommandEvent, sdam::SdamEvent},
+    event::{cmap::CmapEvent, sdam::SdamEvent},
     hello::LEGACY_HELLO_COMMAND_NAME,
     options::{AuthMechanism, ClientOptions, Credential, ServerAddress},
     runtime,
@@ -932,13 +932,9 @@ async fn warm_connection_pool() {
 }
 
 async fn get_end_session_event_count<'a>(event_stream: &mut EventStream<'a, Event>) -> usize {
+    // Use collect_successful_command_execution to assert that the call to endSessions succeeded.
     event_stream
-        .collect(Duration::from_millis(500), |event| match event {
-            Event::Command(CommandEvent::Started(command_started_event)) => {
-                command_started_event.command_name == "endSessions"
-            }
-            _ => false,
-        })
+        .collect_successful_command_execution(Duration::from_millis(500), "endSessions")
         .await
         .len()
 }

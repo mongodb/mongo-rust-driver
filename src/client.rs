@@ -628,14 +628,11 @@ impl Client {
             let end_sessions = doc! {
                 "endSessions": chunk,
             };
-            let result = self
+            let _ = self
                 .database("admin")
                 .run_command(end_sessions)
                 .selection_criteria(selection_criteria.clone())
                 .await;
-            debug_assert!(result
-                .map(|document| document.get_f64("ok") == Ok(1.0))
-                .unwrap_or(false));
         }
     }
 }
