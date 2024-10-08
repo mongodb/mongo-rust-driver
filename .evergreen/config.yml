@@ -233,6 +233,7 @@ buildvariants:
       LIBMONGOCRYPT_OS: "debian11"
     tasks:
       - name: azure-kms-task-group
+    # Limit the test to only schedule every 14 days to reduce external resource usage.
     batchtime: 20160
 
   - name: gcp-kms
@@ -245,6 +246,7 @@ buildvariants:
       LIBMONGOCRYPT_OS: "debian11"
     tasks:
       - name: gcp-kms-task-group
+    # Limit the test to only schedule every 14 days to reduce external resource usage.
     batchtime: 20160
 
   - name: x509-auth
