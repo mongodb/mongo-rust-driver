@@ -3,7 +3,6 @@ use std::{collections::VecDeque, time::Duration};
 use tokio::sync::Mutex;
 
 use super::ServerSession;
-#[cfg(test)]
 use crate::bson::Document;
 
 #[derive(Debug)]
@@ -67,5 +66,11 @@ impl ServerSessionPool {
     #[cfg(test)]
     pub(crate) async fn contains(&self, id: &Document) -> bool {
         self.pool.lock().await.iter().any(|s| &s.id == id)
+    }
+
+    /// Returns a list of the IDs of the sessions contained in the pool.
+    pub(crate) async fn get_session_ids(&self) -> Vec<Document> {
+        let sessions = self.pool.lock().await;
+        sessions.iter().map(|session| session.id.clone()).collect()
     }
 }

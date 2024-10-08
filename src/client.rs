@@ -7,7 +7,10 @@ pub mod options;
 pub mod session;
 
 use std::{
-    sync::{atomic::AtomicBool, Mutex as SyncMutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex as SyncMutex,
+    },
     time::{Duration, Instant},
 };
 
@@ -26,13 +29,18 @@ use crate::trace::{
     COMMAND_TRACING_EVENT_TARGET,
 };
 use crate::{
+    bson::doc,
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{Error, ErrorKind, Result},
     event::command::CommandEvent,
     id_set::IdSet,
     options::{ClientOptions, DatabaseOptions, ReadPreference, SelectionCriteria, ServerAddress},
-    sdam::{server_selection, SelectedServer, Topology},
+    sdam::{
+        server_selection::{self, attempt_to_select_server},
+        SelectedServer,
+        Topology,
+    },
     tracking_arc::TrackingArc,
     BoxFuture,
     ClientSession,
@@ -123,6 +131,7 @@ struct ClientInner {
     options: ClientOptions,
     session_pool: ServerSessionPool,
     shutdown: Shutdown,
+    dropped: AtomicBool,
     #[cfg(feature = "in-use-encryption")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
     #[cfg(test)]
@@ -159,6 +168,7 @@ impl Client {
                 pending_drops: SyncMutex::new(IdSet::new()),
                 executed: AtomicBool::new(false),
             },
+            dropped: AtomicBool::new(false),
             #[cfg(feature = "in-use-encryption")]
             csfle: Default::default(),
             #[cfg(test)]
@@ -591,6 +601,40 @@ impl Client {
     pub(crate) fn options(&self) -> &ClientOptions {
         &self.inner.options
     }
+
+    /// Ends all sessions contained in this client's session pool on the server.
+    pub(crate) async fn end_all_sessions(&self) {
+        // The maximum number of session IDs that should be sent in a single endSessions command.
+        const MAX_END_SESSIONS_BATCH_SIZE: usize = 10_000;
+
+        let mut watcher = self.inner.topology.watch();
+        let selection_criteria =
+            SelectionCriteria::from(ReadPreference::PrimaryPreferred { options: None });
+
+        let session_ids = self.inner.session_pool.get_session_ids().await;
+        for chunk in session_ids.chunks(MAX_END_SESSIONS_BATCH_SIZE) {
+            let state = watcher.observe_latest();
+            let Ok(Some(_)) = attempt_to_select_server(
+                &selection_criteria,
+                &state.description,
+                &state.servers(),
+                None,
+            ) else {
+                // If a suitable server is not available, do not proceed with the operation to avoid
+                // spinning for server_selection_timeout.
+                return;
+            };
+
+            let end_sessions = doc! {
+                "endSessions": chunk,
+            };
+            let _ = self
+                .database("admin")
+                .run_command(end_sessions)
+                .selection_criteria(selection_criteria.clone())
+                .await;
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -623,5 +667,26 @@ impl AsyncDropToken {
 
     pub(crate) fn take(&mut self) -> Self {
         Self { tx: self.tx.take() }
+    }
+}
+
+impl Drop for Client {
+    fn drop(&mut self) {
+        if !self.inner.shutdown.executed.load(Ordering::SeqCst)
+            && !self.inner.dropped.load(Ordering::SeqCst)
+            && TrackingArc::strong_count(&self.inner) == 1
+        {
+            // We need an owned copy of the client to move into the spawned future. However, if this
+            // call to drop completes before the spawned future completes, the number of strong
+            // references to the inner client will again be 1 when the cloned client drops, and thus
+            // end_all_sessions will be called continuously until the runtime shuts down. Storing a
+            // flag indicating whether end_all_sessions has already been called breaks
+            // this cycle.
+            self.inner.dropped.store(true, Ordering::SeqCst);
+            let client = self.clone();
+            crate::runtime::spawn(async move {
+                client.end_all_sessions().await;
+            });
+        }
     }
 }

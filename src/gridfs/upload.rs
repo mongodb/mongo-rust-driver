@@ -261,7 +261,6 @@ impl GridFsUploadStream {
 }
 
 impl Drop for GridFsUploadStream {
-    // TODO RUST-1493: pre-create this task
     fn drop(&mut self) {
         if !matches!(self.state, State::Closed) {
             let chunks = self.bucket.chunks().clone();

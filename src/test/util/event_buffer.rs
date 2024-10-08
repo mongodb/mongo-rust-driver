@@ -420,4 +420,23 @@ impl<'a> EventStream<'a, Event> {
         .await
         .ok()
     }
+
+    pub(crate) async fn collect_successful_command_execution(
+        &mut self,
+        timeout: Duration,
+        command_name: impl AsRef<str>,
+    ) -> Vec<(CommandStartedEvent, CommandSucceededEvent)> {
+        let mut event_pairs = Vec::new();
+        let command_name = command_name.as_ref();
+        let _ = runtime::timeout(timeout, async {
+            while let Some(next_pair) = self
+                .next_successful_command_execution(timeout, command_name)
+                .await
+            {
+                event_pairs.push(next_pair);
+            }
+        })
+        .await;
+        event_pairs
+    }
 }

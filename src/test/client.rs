@@ -15,7 +15,7 @@ use crate::{
         get_client_options,
         log_uncaptured,
         util::{
-            event_buffer::EventBuffer,
+            event_buffer::{EventBuffer, EventStream},
             fail_point::{FailPoint, FailPointMode},
             TestClient,
         },
@@ -929,4 +929,56 @@ async fn warm_connection_pool() {
     client.warm_connection_pool().await;
     // Validate that a command executes.
     client.list_database_names().await.unwrap();
+}
+
+async fn get_end_session_event_count<'a>(event_stream: &mut EventStream<'a, Event>) -> usize {
+    // Use collect_successful_command_execution to assert that the call to endSessions succeeded.
+    event_stream
+        .collect_successful_command_execution(Duration::from_millis(500), "endSessions")
+        .await
+        .len()
+}
+
+#[tokio::test]
+async fn end_sessions_on_drop() {
+    let client1 = Client::for_test().monitor_events().await;
+    let client2 = client1.clone();
+    let events = client1.events.clone();
+    let mut event_stream = events.stream();
+
+    // Run an operation to populate the session pool.
+    client1
+        .database("db")
+        .collection::<Document>("coll")
+        .find(doc! {})
+        .await
+        .unwrap();
+
+    drop(client1);
+    assert_eq!(get_end_session_event_count(&mut event_stream).await, 0);
+
+    drop(client2);
+    assert_eq!(get_end_session_event_count(&mut event_stream).await, 1);
+}
+
+#[tokio::test]
+async fn end_sessions_on_shutdown() {
+    let client1 = Client::for_test().monitor_events().await;
+    let client2 = client1.clone();
+    let events = client1.events.clone();
+    let mut event_stream = events.stream();
+
+    // Run an operation to populate the session pool.
+    client1
+        .database("db")
+        .collection::<Document>("coll")
+        .find(doc! {})
+        .await
+        .unwrap();
+
+    client1.into_client().shutdown().await;
+    assert_eq!(get_end_session_event_count(&mut event_stream).await, 1);
+
+    client2.into_client().shutdown().await;
+    assert_eq!(get_end_session_event_count(&mut event_stream).await, 0);
 }
