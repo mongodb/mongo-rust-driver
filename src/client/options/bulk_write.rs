@@ -124,6 +124,10 @@ pub struct UpdateOneModel {
     ///
     /// Defaults to false.
     pub upsert: Option<bool>,
+
+    /// Specify which document the operation updates if the query matches multiple
+    /// documents. The first document matched by the sort order will be updated.
+    pub sort: Option<Document>,
 }
 
 impl From<UpdateOneModel> for WriteModel {
@@ -168,6 +172,10 @@ pub struct UpdateManyModel {
     ///
     /// Defaults to false.
     pub upsert: Option<bool>,
+
+    /// Specify which document the operation updates if the query matches multiple
+    /// documents. The first document matched by the sort order will be updated.
+    pub sort: Option<Document>,
 }
 
 impl From<UpdateManyModel> for WriteModel {

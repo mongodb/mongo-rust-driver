@@ -96,6 +96,7 @@ impl<'a> Delete<'a> {
         hint: Hint,
         let_vars: Document,
         comment: Bson,
+        sort: Document,
     );
 
     /// Use the provided session when running the operation.
