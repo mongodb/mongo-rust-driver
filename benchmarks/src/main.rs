@@ -563,7 +563,8 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         ids.insert(BenchmarkId::LdJsonMultiFileImport);
         ids.insert(BenchmarkId::LdJsonMultiFileExport);
         ids.insert(BenchmarkId::GridFsMultiDownload);
-        ids.insert(BenchmarkId::GridFsMultiUpload);
+        // TODO RUST-2010 Re-enable this benchmark
+        //ids.insert(BenchmarkId::GridFsMultiUpload);
     }
     if matches.is_present("bson") {
         ids.insert(BenchmarkId::BsonFlatDocumentDecode);
@@ -589,13 +590,16 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         ids.insert(BenchmarkId::GridFsDownload);
         ids.insert(BenchmarkId::GridFsUpload);
         ids.insert(BenchmarkId::GridFsMultiDownload);
-        ids.insert(BenchmarkId::GridFsMultiUpload);
+        // TODO RUST-2010 Re-enable this benchmark
+        //ids.insert(BenchmarkId::GridFsMultiUpload);
     }
 
     // if none were enabled, that means no arguments were provided and all should be enabled.
     if ids.is_empty() {
         ids = (1..=MAX_ID)
             .map(|id| BenchmarkId::try_from(id as u8).unwrap())
+            // TODO RUST-2010 Re-enable this benchmark
+            .filter(|id| *id != BenchmarkId::GridFsMultiUpload)
             .collect()
     }
 
