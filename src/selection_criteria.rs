@@ -21,12 +21,12 @@ pub enum SelectionCriteria {
     /// staleness, and server tags.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/core/read-preference/) for more details.
-    #[display(fmt = "ReadPreference {}", _0)]
+    #[display("ReadPreference {}", _0)]
     ReadPreference(ReadPreference),
 
     /// A predicate used to filter servers that are considered suitable. A `server` will be
     /// considered suitable by a `predicate` if `predicate(server)` returns true.
-    #[display(fmt = "Custom predicate")]
+    #[display("Custom predicate")]
     Predicate(#[derivative(Debug = "ignore")] Predicate),
 }
 
