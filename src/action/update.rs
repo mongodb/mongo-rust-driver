@@ -122,6 +122,7 @@ impl<'a> Update<'a> {
         write_concern: WriteConcern,
         let_vars: Document,
         comment: Bson,
+        sort: Document,
     );
 
     /// Use the provided session when running the operation.

@@ -239,6 +239,12 @@ pub struct UpdateOptions {
     ///
     /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
+
+    /// Specify which document the operation updates if the query matches multiple
+    /// documents. The first document matched by the sort order will be updated.
+    ///
+    /// Only available in MongoDB 8.0+.
+    pub sort: Option<Document>,
 }
 
 impl UpdateOptions {
@@ -251,6 +257,7 @@ impl UpdateOptions {
             collation: options.collation,
             let_vars: options.let_vars,
             comment: options.comment,
+            sort: options.sort,
             ..Default::default()
         }
     }
@@ -298,6 +305,12 @@ pub struct ReplaceOptions {
     ///
     /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
+
+    /// Specify which document the operation replaces if the query matches multiple
+    /// documents. The first document matched by the sort order will be replaced.
+    ///
+    /// Only available in MongoDB 8.0+.
+    pub sort: Option<Document>,
 }
 
 /// Specifies the options to a
