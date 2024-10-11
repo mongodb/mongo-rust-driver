@@ -140,6 +140,10 @@ impl OperationWithDefaults for Update {
             if let Some(ref comment) = options.comment {
                 body.append("comment", RawBson::try_from(comment.clone())?);
             }
+
+            if let Some(ref sort) = options.sort {
+                update.append("sort", RawDocumentBuf::from_document(sort)?);
+            }
         };
 
         if let Some(multi) = self.multi {

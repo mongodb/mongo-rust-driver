@@ -348,12 +348,6 @@ pub struct DeleteOptions {
     ///
     /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
-
-    /// Specify which document the operation deletes if the query matches multiple
-    /// documents. The first document matched by the sort order will be deleted.
-    ///
-    /// Only available in MongoDB 8.0+.
-    pub sort: Option<Document>,
 }
 
 /// Specifies the options to a
