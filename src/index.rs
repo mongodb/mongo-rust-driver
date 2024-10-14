@@ -32,11 +32,14 @@ impl IndexModel {
             .and_then(|o| o.name.as_ref())
             .is_none()
         {
-            let key_names: Vec<String> = self
-                .keys
-                .iter()
-                .map(|(k, v)| format!("{}_{}", k, v))
-                .collect();
+            fn format_kv(kv: (&String, &bson::Bson)) -> String {
+                if let bson::Bson::String(s) = kv.1 {
+                    format!("{}_{}", kv.0, s)
+                } else {
+                    format!("{}_{}", kv.0, kv.1)
+                }
+            }
+            let key_names: Vec<String> = self.keys.iter().map(format_kv).collect();
             self.options.get_or_insert(IndexOptions::default()).name = Some(key_names.join("_"));
         }
     }
