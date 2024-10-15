@@ -55,6 +55,20 @@ async fn index_management_creates() {
     assert_eq!(names, vec!["_id_", "a_1_b_-1", "c_1", "customname"]);
 }
 
+// Test that creating indexes with string field types produces correct names.
+#[tokio::test]
+async fn index_management_string_names() {
+    let client = Client::for_test().await;
+    let coll = client
+        .init_db_and_coll("index_management", "string_names")
+        .await;
+    let result = coll
+        .create_index(IndexModel::builder().keys(doc! { "field": "2d" }).build())
+        .await
+        .expect("Test failed to create index");
+    assert_eq!(result.index_name, "field_2d");
+}
+
 // Test that creating a duplicate index works as expected.
 #[tokio::test]
 #[function_name::named]
