@@ -26,43 +26,43 @@ const RUNTIME_NAME: &str = "tokio";
 #[cfg(feature = "sync")]
 const RUNTIME_NAME: &str = "sync (with tokio)";
 
-#[derive(Clone, Debug)]
-struct ClientMetadata {
-    application: Option<AppMetadata>,
-    driver: DriverMetadata,
-    os: OsMetadata,
-    platform: String,
-    env: Option<RuntimeEnvironment>,
-}
-
-#[derive(Clone, Debug)]
-struct AppMetadata {
-    name: String,
-}
-
-#[derive(Clone, Debug)]
-struct DriverMetadata {
-    name: String,
-    version: String,
-}
-
-#[derive(Clone, Debug)]
-struct OsMetadata {
-    os_type: String,
-    name: Option<String>,
-    architecture: Option<String>,
-    version: Option<String>,
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ClientMetadata {
+    pub(crate) application: Option<AppMetadata>,
+    pub(crate) driver: DriverMetadata,
+    pub(crate) os: OsMetadata,
+    pub(crate) platform: String,
+    pub(crate) env: Option<RuntimeEnvironment>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct RuntimeEnvironment {
-    name: Option<FaasEnvironmentName>,
-    runtime: Option<String>,
-    timeout_sec: Option<i32>,
-    memory_mb: Option<i32>,
-    region: Option<String>,
-    url: Option<String>,
-    container: Option<RawDocumentBuf>,
+pub(crate) struct AppMetadata {
+    pub(crate) name: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct DriverMetadata {
+    pub(crate) name: String,
+    pub(crate) version: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct OsMetadata {
+    pub(crate) os_type: String,
+    pub(crate) name: Option<String>,
+    pub(crate) architecture: Option<String>,
+    pub(crate) version: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct RuntimeEnvironment {
+    pub(crate) name: Option<FaasEnvironmentName>,
+    pub(crate) runtime: Option<String>,
+    pub(crate) timeout_sec: Option<i32>,
+    pub(crate) memory_mb: Option<i32>,
+    pub(crate) region: Option<String>,
+    pub(crate) url: Option<String>,
+    pub(crate) container: Option<RawDocumentBuf>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -158,7 +158,7 @@ impl From<&RuntimeEnvironment> for RawBson {
 }
 
 impl RuntimeEnvironment {
-    const UNSET: Self = RuntimeEnvironment {
+    pub(crate) const UNSET: Self = RuntimeEnvironment {
         name: None,
         runtime: None,
         timeout_sec: None,
@@ -262,7 +262,7 @@ impl FaasEnvironmentName {
 /// Contains the basic handshake information that can be statically determined. This document
 /// (potentially with additional fields added) can be cloned and put in the `client` field of
 /// the `hello` or legacy hello command.
-static BASE_CLIENT_METADATA: Lazy<ClientMetadata> = Lazy::new(|| ClientMetadata {
+pub(crate) static BASE_CLIENT_METADATA: Lazy<ClientMetadata> = Lazy::new(|| ClientMetadata {
     application: None,
     driver: DriverMetadata {
         name: "mongo-rust-driver".into(),
@@ -334,6 +334,9 @@ pub(crate) struct Handshaker {
     #[cfg(feature = "aws-auth")]
     http_client: crate::runtime::HttpClient,
 }
+
+#[cfg(test)]
+pub(crate) static METADATA: std::sync::OnceLock<ClientMetadata> = std::sync::OnceLock::new();
 
 impl Handshaker {
     /// Creates a new Handshaker.
@@ -427,6 +430,8 @@ impl Handshaker {
             trunc_fn(&mut metadata);
             meta_doc = (&metadata).into();
         }
+        #[cfg(test)]
+        let _ = METADATA.set(metadata);
         body.append("client", meta_doc);
 
         Ok((command, client_first))
