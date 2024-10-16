@@ -47,7 +47,14 @@ impl AsyncStream {
     ) -> Result<Self> {
         match &address {
             ServerAddress::Tcp { host, .. } => {
-                let inner = tcp_connect(&address).await?;
+                let resolved: Vec<_> = runtime::resolve_address(&address).await?.collect();
+                if resolved.is_empty() {
+                    return Err(ErrorKind::DnsResolve {
+                        message: format!("No DNS results for domain {}", address),
+                    }
+                    .into());
+                }
+                let inner = tcp_connect(resolved).await?;
 
                 // If there are TLS options, wrap the inner stream in an AsyncTlsStream.
                 match tls_cfg {
@@ -77,20 +84,13 @@ async fn tcp_try_connect(address: &SocketAddr) -> Result<TcpStream> {
     Ok(TcpStream::from_std(std_stream)?)
 }
 
-async fn tcp_connect(address: &ServerAddress) -> Result<TcpStream> {
+pub(crate) async fn tcp_connect(resolved: Vec<SocketAddr>) -> Result<TcpStream> {
     // "Happy Eyeballs": try addresses in parallel, interleaving IPv6 and IPv4, preferring IPv6.
     // Based on the implementation in https://codeberg.org/KMK/happy-eyeballs.
-    let (addrs_v6, addrs_v4): (Vec<_>, Vec<_>) = runtime::resolve_address(address)
-        .await?
+    let (addrs_v6, addrs_v4): (Vec<_>, Vec<_>) = resolved
+        .into_iter()
         .partition(|a| matches!(a, SocketAddr::V6(_)));
     let socket_addrs = interleave(addrs_v6, addrs_v4);
-
-    if socket_addrs.is_empty() {
-        return Err(ErrorKind::DnsResolve {
-            message: format!("No DNS results for domain {}", address),
-        }
-        .into());
-    }
 
     fn handle_join(
         result: std::result::Result<Result<TcpStream>, tokio::task::JoinError>,
