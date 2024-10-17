@@ -49,7 +49,10 @@ async fn check_faas_handshake(
 
     let client = Client::for_test().await;
     client.list_database_names().await?;
-    let metadata = crate::cmap::establish::handshake::METADATA.get().unwrap();
+    #[allow(clippy::incompatible_msrv)]
+    let metadata = crate::cmap::establish::handshake::TEST_METADATA
+        .get()
+        .unwrap();
     assert_eq!(expected, metadata);
 
     Ok(())

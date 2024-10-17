@@ -336,7 +336,8 @@ pub(crate) struct Handshaker {
 }
 
 #[cfg(test)]
-pub(crate) static METADATA: std::sync::OnceLock<ClientMetadata> = std::sync::OnceLock::new();
+#[allow(clippy::incompatible_msrv)]
+pub(crate) static TEST_METADATA: std::sync::OnceLock<ClientMetadata> = std::sync::OnceLock::new();
 
 impl Handshaker {
     /// Creates a new Handshaker.
@@ -431,7 +432,8 @@ impl Handshaker {
             meta_doc = (&metadata).into();
         }
         #[cfg(test)]
-        let _ = METADATA.set(metadata);
+        #[allow(clippy::incompatible_msrv)]
+        let _ = TEST_METADATA.set(metadata);
         body.append("client", meta_doc);
 
         Ok((command, client_first))
