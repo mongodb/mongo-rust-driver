@@ -1,4 +1,4 @@
-pub(super) mod handshake;
+pub(crate) mod handshake;
 
 use std::time::Duration;
 
