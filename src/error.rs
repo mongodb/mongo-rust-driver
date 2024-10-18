@@ -885,16 +885,6 @@ pub struct InsertManyError {
     pub(crate) inserted_ids: HashMap<usize, Bson>,
 }
 
-impl InsertManyError {
-    pub(crate) fn new() -> Self {
-        InsertManyError {
-            write_errors: None,
-            write_concern_error: None,
-            inserted_ids: Default::default(),
-        }
-    }
-}
-
 /// An error that occurred when trying to execute a write operation.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[non_exhaustive]
