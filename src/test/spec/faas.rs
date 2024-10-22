@@ -1,5 +1,7 @@
 use std::env;
 
+use bson::rawdoc;
+
 use crate::{
     cmap::establish::handshake::{
         ClientMetadata,
@@ -191,4 +193,28 @@ async fn invalid_wrong_type() -> Result<()> {
 #[tokio::test]
 async fn invalid_aws_not_lambda() -> Result<()> {
     check_faas_handshake(&[("AWS_EXECUTION_ENV", "EC2")], &BASE_CLIENT_METADATA).await
+}
+
+#[tokio::test]
+async fn valid_container_and_faas() -> Result<()> {
+    check_faas_handshake(
+        &[
+            ("AWS_EXECUTION_ENV", "AWS_Lambda_java8"),
+            ("AWS_REGION", "us-east-2"),
+            ("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", "1024"),
+            ("KUBERNETES_SERVICE_HOST", "1"),
+        ],
+        &ClientMetadata {
+            env: Some(RuntimeEnvironment {
+                name: Some(FaasEnvironmentName::AwsLambda),
+                runtime: Some("AWS_Lambda_java8".to_string()),
+                region: Some("us-east-2".to_string()),
+                memory_mb: Some(1024),
+                container: Some(rawdoc! { "orchestrator": "kubernetes"}),
+                ..RuntimeEnvironment::UNSET
+            }),
+            ..BASE_CLIENT_METADATA.clone()
+        },
+    )
+    .await
 }
