@@ -25,10 +25,10 @@ use crate::{
     },
     cmap::{
         conn::{
+            pooled::PooledConnection,
             wire::{next_request_id, Message},
             PinnedConnectionHandle,
         },
-        Connection,
         ConnectionPool,
         RawCommandResponse,
     },
@@ -193,7 +193,7 @@ impl Client {
     pub(crate) fn pin_connection_for_cursor(
         &self,
         spec: &CursorSpecification,
-        conn: &mut Connection,
+        conn: &mut PooledConnection,
     ) -> Result<Option<PinnedConnectionHandle>> {
         if self.is_load_balanced() && spec.info.id != 0 {
             Ok(Some(conn.pin()?))
@@ -205,7 +205,7 @@ impl Client {
     fn pin_connection_for_session(
         &self,
         spec: &CursorSpecification,
-        conn: &mut Connection,
+        conn: &mut PooledConnection,
         session: &mut ClientSession,
     ) -> Result<Option<PinnedConnectionHandle>> {
         if let Some(handle) = session.transaction.pinned_connection() {
@@ -489,7 +489,7 @@ impl Client {
     async fn execute_operation_on_connection<T: Operation>(
         &self,
         op: &mut T,
-        connection: &mut Connection,
+        connection: &mut PooledConnection,
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
         retryability: Retryability,
@@ -904,7 +904,7 @@ impl Client {
     /// Returns the retryability level for the execution of this operation on this connection.
     fn get_retryability<T: Operation>(
         &self,
-        conn: &Connection,
+        conn: &PooledConnection,
         op: &T,
         session: &Option<&mut ClientSession>,
     ) -> Result<Retryability> {
@@ -945,7 +945,7 @@ async fn get_connection<T: Operation>(
     session: &Option<&mut ClientSession>,
     op: &T,
     pool: &ConnectionPool,
-) -> Result<Connection> {
+) -> Result<PooledConnection> {
     let session_pinned = session
         .as_ref()
         .and_then(|s| s.transaction.pinned_connection());
@@ -995,7 +995,7 @@ impl Error {
     /// ClientSession should be unpinned.
     fn add_labels_and_update_pin(
         &mut self,
-        conn: Option<&Connection>,
+        conn: Option<&PooledConnection>,
         session: &mut Option<&mut ClientSession>,
         retryability: Option<Retryability>,
     ) -> Result<()> {
@@ -1060,7 +1060,7 @@ impl Error {
 
 struct ExecutionDetails<T: Operation> {
     output: T::O,
-    connection: Connection,
+    connection: PooledConnection,
     implicit_session: Option<ClientSession>,
 }
 

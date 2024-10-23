@@ -11,7 +11,6 @@ use self::file::{Operation, TestFile, ThreadedOperation};
 use crate::{
     cmap::{
         establish::{ConnectionEstablisher, EstablisherOptions},
-        Connection,
         ConnectionPool,
         ConnectionPoolOptions,
     },
@@ -32,6 +31,8 @@ use crate::{
     },
 };
 use bson::doc;
+
+use super::conn::pooled::PooledConnection;
 
 const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
     "must destroy checked in connection if pool has been closed",
@@ -67,8 +68,8 @@ struct Executor {
 #[derive(Debug)]
 struct State {
     events: EventBuffer<CmapEvent>,
-    connections: RwLock<HashMap<String, Connection>>,
-    unlabeled_connections: Mutex<Vec<Connection>>,
+    connections: RwLock<HashMap<String, PooledConnection>>,
+    unlabeled_connections: Mutex<Vec<PooledConnection>>,
     threads: RwLock<HashMap<String, CmapThread>>,
 
     // In order to drop the pool when performing a `close` operation, we use an `Option` so that we

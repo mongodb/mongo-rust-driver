@@ -1,10 +1,15 @@
 pub(crate) mod handshake;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use self::handshake::{Handshaker, HandshakerOptions};
 use super::{
-    conn::{ConnectionGeneration, LoadBalancedGeneration, PendingConnection},
+    conn::{
+        pooled::PooledConnection,
+        ConnectionGeneration,
+        LoadBalancedGeneration,
+        PendingConnection,
+    },
     Connection,
     PoolGeneration,
 };
@@ -105,7 +110,7 @@ impl ConnectionEstablisher {
         &self,
         pending_connection: PendingConnection,
         credential: Option<&Credential>,
-    ) -> std::result::Result<Connection, EstablishError> {
+    ) -> std::result::Result<PooledConnection, EstablishError> {
         let pool_gen = pending_connection.generation.clone();
         let address = pending_connection.address.clone();
 
@@ -114,7 +119,7 @@ impl ConnectionEstablisher {
             .await
             .map_err(|e| EstablishError::pre_hello(e, pool_gen.clone()))?;
 
-        let mut connection = Connection::new_pooled(pending_connection, stream);
+        let mut connection = PooledConnection::new(pending_connection, stream);
         #[allow(unused_mut)]
         let mut handshake_result = self.handshaker.handshake(&mut connection, credential).await;
         #[cfg(test)]
@@ -152,7 +157,7 @@ impl ConnectionEstablisher {
         }
 
         handshake_result.map_err(|e| {
-            if connection.stream_description.is_none() {
+            if connection.stream_description().is_err() {
                 EstablishError::pre_hello(e, pool_gen)
             } else {
                 EstablishError::post_hello(e, connection.generation)
@@ -169,7 +174,7 @@ impl ConnectionEstablisher {
         id: u32,
     ) -> Result<(Connection, HelloReply)> {
         let stream = self.make_stream(address.clone()).await?;
-        let mut connection = Connection::new_monitoring(address, stream, id);
+        let mut connection = Connection::new(address, stream, id, Instant::now());
 
         let hello_reply = self.handshaker.handshake(&mut connection, None).await?;
 

@@ -1,11 +1,10 @@
 mod command;
+mod monitoring;
+pub(crate) mod pooled;
 mod stream_description;
 pub(crate) mod wire;
 
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{sync::Arc, time::Instant};
 
 use derive_where::derive_where;
 use serde::Serialize;
@@ -14,33 +13,25 @@ use tokio::{
     sync::{mpsc, Mutex},
 };
 
+use self::wire::{Message, MessageFlags};
+use super::{conn::pooled::PooledConnection, manager::PoolManager};
+use crate::{
+    bson::oid::ObjectId,
+    cmap::PoolGeneration,
+    error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
+    event::cmap::{CmapEventEmitter, ConnectionCreatedEvent},
+    options::ServerAddress,
+    runtime::AsyncStream,
+};
+pub(crate) use command::{Command, RawCommandResponse};
+pub(crate) use stream_description::StreamDescription;
+
 #[cfg(any(
     feature = "zstd-compression",
     feature = "zlib-compression",
     feature = "snappy-compression"
 ))]
 use crate::options::Compressor;
-
-use self::wire::{Message, MessageFlags};
-use super::manager::PoolManager;
-use crate::{
-    bson::oid::ObjectId,
-    cmap::PoolGeneration,
-    error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
-    event::cmap::{
-        CmapEventEmitter,
-        ConnectionCheckedInEvent,
-        ConnectionCheckedOutEvent,
-        ConnectionClosedEvent,
-        ConnectionClosedReason,
-        ConnectionCreatedEvent,
-        ConnectionReadyEvent,
-    },
-    options::ServerAddress,
-    runtime::AsyncStream,
-};
-pub(crate) use command::{Command, RawCommandResponse};
-pub(crate) use stream_description::StreamDescription;
 
 /// User-facing information about a connection to the database.
 #[derive(Clone, Debug, Serialize)]
@@ -61,28 +52,23 @@ pub struct ConnectionInfo {
 /// A wrapper around Stream that contains all the CMAP information needed to maintain a connection.
 #[derive_where(Debug)]
 pub(crate) struct Connection {
+    /// The stream this connection reads from and writes to.
+    stream: BufStream<AsyncStream>,
+
+    /// The cached stream description from the connection's handshake.
+    pub(crate) stream_description: Option<StreamDescription>,
+
     /// Driver-generated ID for the connection.
     pub(crate) id: u32,
 
-    /// Server-generated ID for the connection.
+    /// The server-side ID for this connection. Only set on server versions 4.2+.
     pub(crate) server_id: Option<i64>,
 
+    /// The address of the server to which this connection connects.
     pub(crate) address: ServerAddress,
 
-    pub(crate) generation: ConnectionGeneration,
-
+    /// The time at which this connection was created.
     pub(crate) time_created: Instant,
-
-    /// The cached StreamDescription from the connection's handshake.
-    pub(super) stream_description: Option<StreamDescription>,
-
-    /// Marks the time when the connection was last checked into the pool. This is used
-    /// to detect if the connection is idle.
-    ready_and_available_time: Option<Instant>,
-
-    /// PoolManager used to check this connection back in when dropped.
-    /// None when checked into the pool.
-    pub(super) pool_manager: Option<PoolManager>,
 
     /// Whether or not a command is currently being run on this connection. This is set to `true`
     /// right before sending bytes to the server and set back to `false` once a full response has
@@ -100,184 +86,90 @@ pub(crate) struct Connection {
     /// will remain true until a server response does not include the moreToComeFlag.
     more_to_come: bool,
 
-    stream: BufStream<AsyncStream>,
+    /// The token callback for OIDC authentication.
+    #[derive_where(skip)]
+    pub(crate) oidc_token_gen_id: tokio::sync::Mutex<u32>,
 
-    /// Compressor to use to compress outgoing messages. This compressor is not used to decompress
-    /// incoming messages from the server.
+    /// The compressor to use to compress outgoing messages.
     #[cfg(any(
         feature = "zstd-compression",
         feature = "zlib-compression",
         feature = "snappy-compression"
     ))]
-    pub(super) compressor: Option<Compressor>,
-
-    /// If the connection is pinned to a cursor or transaction, the channel sender to return this
-    /// connection to the pin holder.
-    pinned_sender: Option<mpsc::Sender<Connection>>,
-
-    /// Type responsible for emitting events related to this connection. This is None for
-    /// monitoring connections as we do not emit events for those.
-    #[derive_where(skip)]
-    event_emitter: Option<CmapEventEmitter>,
-
-    /// The token callback for OIDC authentication.
-    #[derive_where(skip)]
-    pub(crate) oidc_token_gen_id: tokio::sync::Mutex<u32>,
+    pub(crate) compressor: Option<Compressor>,
 }
 
 impl Connection {
-    fn new(
+    /// Create a new connection.
+    pub(crate) fn new(
         address: ServerAddress,
         stream: AsyncStream,
         id: u32,
-        generation: ConnectionGeneration,
         time_created: Instant,
     ) -> Self {
         Self {
+            stream: BufStream::new(stream),
+            stream_description: None,
+            address,
             id,
             server_id: None,
-            generation,
             time_created,
-            pool_manager: None,
             command_executing: false,
-            ready_and_available_time: None,
-            stream: BufStream::new(stream),
-            address,
-            event_emitter: None,
-            stream_description: None,
             error: None,
-            pinned_sender: None,
+            more_to_come: false,
+            oidc_token_gen_id: tokio::sync::Mutex::new(0),
             #[cfg(any(
                 feature = "zstd-compression",
                 feature = "zlib-compression",
                 feature = "snappy-compression"
             ))]
             compressor: None,
-            more_to_come: false,
-            oidc_token_gen_id: tokio::sync::Mutex::new(0),
         }
     }
 
-    /// Create a connection intended to be stored in a connection pool for operation execution.
-    /// TODO: RUST-1454 Remove this from `Connection`, instead wrap a `Connection` type in a
-    /// separate type specific to pool.
-    pub(crate) fn new_pooled(pending_connection: PendingConnection, stream: AsyncStream) -> Self {
-        let generation = match pending_connection.generation {
-            PoolGeneration::Normal(gen) => ConnectionGeneration::Normal(gen),
-            PoolGeneration::LoadBalanced(_) => ConnectionGeneration::LoadBalanced(None),
-        };
-        let mut conn = Self::new(
-            pending_connection.address,
-            stream,
-            pending_connection.id,
-            generation,
-            pending_connection.time_created,
-        );
-        conn.event_emitter = Some(pending_connection.event_emitter);
-        conn
-    }
-
-    /// Create a connection intended for monitoring purposes.
-    /// TODO: RUST-1454 Rename this to just `new`, drop the pooling-specific data.
-    pub(crate) fn new_monitoring(address: ServerAddress, stream: AsyncStream, id: u32) -> Self {
-        Self::new(
-            address,
-            stream,
-            id,
-            ConnectionGeneration::Monitoring,
-            Instant::now(),
-        )
-    }
-
-    pub(crate) fn info(&self) -> ConnectionInfo {
-        ConnectionInfo {
+    pub(crate) fn take(&mut self) -> Self {
+        Self {
+            stream: std::mem::replace(&mut self.stream, BufStream::new(AsyncStream::Null)),
+            stream_description: self.stream_description.take(),
+            address: self.address.clone(),
             id: self.id,
             server_id: self.server_id,
-            address: self.address.clone(),
+            time_created: self.time_created,
+            command_executing: self.command_executing,
+            error: self.error.take(),
+            more_to_come: false,
+            oidc_token_gen_id: tokio::sync::Mutex::new(0),
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
+            compressor: self.compressor.clone(),
         }
-    }
-
-    pub(crate) fn service_id(&self) -> Option<ObjectId> {
-        self.stream_description
-            .as_ref()
-            .and_then(|sd| sd.service_id)
     }
 
     pub(crate) fn address(&self) -> &ServerAddress {
         &self.address
     }
 
-    /// Helper to mark the time that the connection was checked into the pool for the purpose of
-    /// detecting when it becomes idle.
-    pub(super) fn mark_as_available(&mut self) {
-        self.pool_manager.take();
-        self.ready_and_available_time = Some(Instant::now());
+    /// Gets the connection's StreamDescription.
+    pub(crate) fn stream_description(&self) -> Result<&StreamDescription> {
+        self.stream_description.as_ref().ok_or_else(|| {
+            ErrorKind::Internal {
+                message: "Stream checked out but not handshaked".to_string(),
+            }
+            .into()
+        })
     }
 
-    /// Helper to mark that the connection has been checked out of the pool. This ensures that the
-    /// connection is not marked as idle based on the time that it's checked out and that it has a
-    /// reference to the pool.
-    pub(super) fn mark_as_in_use(&mut self, manager: PoolManager) {
-        self.pool_manager = Some(manager);
-        self.ready_and_available_time.take();
-    }
-
-    /// Checks if the connection is idle.
-    pub(super) fn is_idle(&self, max_idle_time: Option<Duration>) -> bool {
-        self.ready_and_available_time
-            .and_then(|ready_and_available_time| {
-                max_idle_time.map(|max_idle_time| {
-                    Instant::now().duration_since(ready_and_available_time) >= max_idle_time
-                })
-            })
-            .unwrap_or(false)
-    }
-
-    /// Checks if the connection is currently executing an operation.
+    /// Whether the connection is currently executing an operation.
     pub(super) fn is_executing(&self) -> bool {
         self.command_executing
     }
 
-    /// Checks if the connection experienced a network error and should be closed.
+    /// Whether an error has been encountered on this connection.
     pub(super) fn has_errored(&self) -> bool {
         self.error.is_some()
-    }
-
-    /// Helper to create a `ConnectionCheckedOutEvent` for the connection.
-    pub(super) fn checked_out_event(&self, time_started: Instant) -> ConnectionCheckedOutEvent {
-        ConnectionCheckedOutEvent {
-            address: self.address.clone(),
-            connection_id: self.id,
-            duration: Instant::now() - time_started,
-        }
-    }
-
-    /// Helper to create a `ConnectionCheckedInEvent` for the connection.
-    pub(super) fn checked_in_event(&self) -> ConnectionCheckedInEvent {
-        ConnectionCheckedInEvent {
-            address: self.address.clone(),
-            connection_id: self.id,
-        }
-    }
-
-    /// Helper to create a `ConnectionReadyEvent` for the connection.
-    pub(super) fn ready_event(&self) -> ConnectionReadyEvent {
-        ConnectionReadyEvent {
-            address: self.address.clone(),
-            connection_id: self.id,
-            duration: Instant::now() - self.time_created,
-        }
-    }
-
-    /// Helper to create a `ConnectionClosedEvent` for the connection.
-    pub(super) fn closed_event(&self, reason: ConnectionClosedReason) -> ConnectionClosedEvent {
-        ConnectionClosedEvent {
-            address: self.address.clone(),
-            connection_id: self.id,
-            reason,
-            #[cfg(feature = "tracing-unstable")]
-            error: self.error.clone(),
-        }
     }
 
     pub(crate) async fn send_message(
@@ -389,147 +281,10 @@ impl Connection {
         ))
     }
 
-    /// Gets the connection's StreamDescription.
-    pub(crate) fn stream_description(&self) -> Result<&StreamDescription> {
-        self.stream_description.as_ref().ok_or_else(|| {
-            ErrorKind::Internal {
-                message: "Stream checked out but not handshaked".to_string(),
-            }
-            .into()
-        })
-    }
-
-    /// Pin the connection, removing it from the normal connection pool.
-    pub(crate) fn pin(&mut self) -> Result<PinnedConnectionHandle> {
-        if self.pinned_sender.is_some() {
-            return Err(Error::internal(format!(
-                "cannot pin an already-pinned connection (id = {})",
-                self.id
-            )));
-        }
-        if self.pool_manager.is_none() {
-            return Err(Error::internal(format!(
-                "cannot pin a checked-in connection (id = {})",
-                self.id
-            )));
-        }
-        let (tx, rx) = mpsc::channel(1);
-        self.pinned_sender = Some(tx);
-        Ok(PinnedConnectionHandle {
-            id: self.id,
-            receiver: Arc::new(Mutex::new(rx)),
-        })
-    }
-
-    /// Close this connection, emitting a `ConnectionClosedEvent` with the supplied reason.
-    pub(super) fn close_and_drop(mut self, reason: ConnectionClosedReason) {
-        self.close(reason);
-    }
-
-    /// Close this connection, emitting a `ConnectionClosedEvent` with the supplied reason.
-    fn close(&mut self, reason: ConnectionClosedReason) {
-        self.pool_manager.take();
-        if let Some(ref event_emitter) = self.event_emitter {
-            event_emitter.emit_event(|| self.closed_event(reason).into());
-        }
-    }
-
-    /// Nullify the inner state and return it in a new `Connection` for checking back in to
-    /// the pool.
-    fn take(&mut self) -> Connection {
-        Connection {
-            id: self.id,
-            server_id: self.server_id,
-            address: self.address.clone(),
-            generation: self.generation,
-            time_created: self.time_created,
-            stream: std::mem::replace(&mut self.stream, BufStream::new(AsyncStream::Null)),
-            event_emitter: self.event_emitter.take(),
-            stream_description: self.stream_description.take(),
-            command_executing: self.command_executing,
-            error: self.error.take(),
-            pool_manager: None,
-            ready_and_available_time: None,
-            pinned_sender: self.pinned_sender.clone(),
-            #[cfg(any(
-                feature = "zstd-compression",
-                feature = "zlib-compression",
-                feature = "snappy-compression"
-            ))]
-            compressor: self.compressor.clone(),
-            more_to_come: false,
-            oidc_token_gen_id: tokio::sync::Mutex::new(0),
-        }
-    }
-
     /// Whether or not the previous command response indicated that the server may send
     /// more responses without another request.
     pub(crate) fn is_streaming(&self) -> bool {
         self.more_to_come
-    }
-
-    /// Whether the connection supports sessions.
-    pub(crate) fn supports_sessions(&self) -> bool {
-        self.stream_description
-            .as_ref()
-            .and_then(|sd| sd.logical_session_timeout)
-            .is_some()
-    }
-}
-
-impl Drop for Connection {
-    fn drop(&mut self) {
-        // If the connection has a pool manager, that means that the connection is
-        // being dropped when it's checked out. If the pool is still alive, it
-        // should check itself back in. Otherwise, the connection should close
-        // itself and emit a ConnectionClosed event (because the `close_and_drop`
-        // helper was not called explicitly).
-        //
-        // If the connection does not have a pool manager, then the connection is
-        // being dropped while it's not checked out. This means that the pool called
-        // the `close_and_drop` helper explicitly, so we don't add it back to the
-        // pool or emit any events.
-        if let Some(pool_manager) = self.pool_manager.take() {
-            let mut dropped_connection = self.take();
-            let result = if let Some(sender) = self.pinned_sender.as_mut() {
-                // Preserve the pool manager and timestamp for pinned connections.
-                dropped_connection.pool_manager = Some(pool_manager.clone());
-                dropped_connection.ready_and_available_time = self.ready_and_available_time;
-                match sender.try_send(dropped_connection) {
-                    Ok(()) => Ok(()),
-                    // The connection has been unpinned and should be checked back in.
-                    Err(mpsc::error::TrySendError::Closed(mut conn)) => {
-                        conn.pinned_sender = None;
-                        conn.ready_and_available_time = None;
-                        pool_manager.check_in(conn)
-                    }
-                    // The connection is being returned to the pin holder while another connection
-                    // is in the pin buffer; this should never happen.  Only possible action is to
-                    // check the connection back in.
-                    Err(mpsc::error::TrySendError::Full(mut conn)) => {
-                        // Panic in debug mode
-                        if cfg!(debug_assertions) {
-                            panic!(
-                                "buffer full when attempting to return a pinned connection (id = \
-                                 {})",
-                                conn.id
-                            );
-                        }
-                        // TODO RUST-230 log an error in non-debug mode.
-                        conn.pinned_sender = None;
-                        conn.ready_and_available_time = None;
-                        pool_manager.check_in(conn)
-                    }
-                }
-            } else {
-                pool_manager.check_in(dropped_connection)
-            };
-            if let Err(mut conn) = result {
-                // the check in failed because the pool has been dropped, so we emit the event
-                // here and drop the connection.
-                conn.close(ConnectionClosedReason::PoolClosed);
-            }
-        }
     }
 }
 
@@ -538,7 +293,7 @@ impl Drop for Connection {
 #[derive(Debug)]
 pub(crate) struct PinnedConnectionHandle {
     id: u32,
-    receiver: Arc<Mutex<mpsc::Receiver<Connection>>>,
+    receiver: Arc<Mutex<mpsc::Receiver<PooledConnection>>>,
 }
 
 impl PinnedConnectionHandle {
@@ -554,7 +309,7 @@ impl PinnedConnectionHandle {
 
     /// Retrieve the pinned connection, blocking until it's available for use.  Will fail if the
     /// connection has been unpinned.
-    pub(crate) async fn take_connection(&self) -> Result<Connection> {
+    pub(crate) async fn take_connection(&self) -> Result<PooledConnection> {
         let mut receiver = self.receiver.lock().await;
         receiver.recv().await.ok_or_else(|| {
             Error::internal(format!(
@@ -575,11 +330,8 @@ pub(crate) struct LoadBalancedGeneration {
     pub(crate) service_id: ObjectId,
 }
 
-/// TODO: RUST-1454 Once we have separate types for pooled and non-pooled connections, the
-/// monitoring case and the Option<> wrapper can be dropped from this.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ConnectionGeneration {
-    Monitoring,
     Normal(u32),
     LoadBalanced(Option<LoadBalancedGeneration>),
 }

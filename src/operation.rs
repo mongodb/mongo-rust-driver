@@ -36,9 +36,8 @@ use crate::{
     bson_util::{self, extend_raw_document_buf},
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     cmap::{
-        conn::PinnedConnectionHandle,
+        conn::{pooled::PooledConnection, PinnedConnectionHandle},
         Command,
-        Connection,
         RawCommandResponse,
         StreamDescription,
     },
@@ -87,7 +86,7 @@ const OP_MSG_OVERHEAD_BYTES: usize = 1_000;
 
 /// Context about the execution of the operation.
 pub(crate) struct ExecutionContext<'a> {
-    pub(crate) connection: &'a mut Connection,
+    pub(crate) connection: &'a mut PooledConnection,
     pub(crate) session: Option<&'a mut ClientSession>,
 }
 

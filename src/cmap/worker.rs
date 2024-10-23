@@ -1,7 +1,7 @@
 #[cfg(test)]
 use super::options::BackgroundThreadInterval;
 use super::{
-    conn::PendingConnection,
+    conn::{pooled::PooledConnection, PendingConnection},
     connection_requester,
     connection_requester::{
         ConnectionRequest,
@@ -16,7 +16,6 @@ use super::{
     options::ConnectionPoolOptions,
     status,
     status::{PoolGenerationPublisher, PoolGenerationSubscriber},
-    Connection,
     DEFAULT_MAX_POOL_SIZE,
 };
 use crate::{
@@ -73,7 +72,7 @@ pub(crate) struct ConnectionPoolWorker {
 
     /// The established connections that are currently checked into the pool and awaiting usage in
     /// future operations.
-    available_connections: VecDeque<Connection>,
+    available_connections: VecDeque<PooledConnection>,
 
     /// Contains the logic for "establishing" a connection. This includes handshaking and
     /// authenticating a connection when it's first created.
@@ -497,7 +496,7 @@ impl ConnectionPoolWorker {
         }
     }
 
-    fn check_in(&mut self, mut conn: Connection) {
+    fn check_in(&mut self, mut conn: PooledConnection) {
         self.event_emitter
             .emit_event(|| conn.checked_in_event().into());
 
@@ -567,7 +566,7 @@ impl ConnectionPoolWorker {
     /// Close a connection, emit the event for it being closed, and decrement the
     /// total connection count.
     #[allow(clippy::single_match)]
-    fn close_connection(&mut self, connection: Connection, reason: ConnectionClosedReason) {
+    fn close_connection(&mut self, connection: PooledConnection, reason: ConnectionClosedReason) {
         match (&mut self.generation, connection.generation.service_id()) {
             (PoolGeneration::LoadBalanced(gen_map), Some(sid)) => {
                 match self.service_connection_count.get_mut(&sid) {
@@ -659,7 +658,7 @@ async fn establish_connection(
     manager: &PoolManager,
     credential: Option<Credential>,
     event_emitter: CmapEventEmitter,
-) -> Result<Connection> {
+) -> Result<PooledConnection> {
     let connection_id = pending_connection.id;
     let address = pending_connection.address.clone();
 
