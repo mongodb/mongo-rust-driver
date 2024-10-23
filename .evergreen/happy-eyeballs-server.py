@@ -15,12 +15,14 @@ args = parser.parse_args()
 PREFIX='happy eyeballs server'
 
 async def main():
-    srv = await asyncio.start_server(on_control_connected, 'localhost', args.control)
+    shutdown = asyncio.Event()
+    srv = await asyncio.start_server(lambda reader, writer: on_control_connected(reader, writer, shutdown), 'localhost', args.control)
     print(f'{PREFIX}: listening for control connections on {args.control}', file=sys.stderr)
     async with srv:
-        await srv.serve_forever()
+        await shutdown.wait()
+    print(f'{PREFIX}: all done', file=sys.stderr)
 
-async def on_control_connected(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+async def on_control_connected(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, shutdown: asyncio.Event):
     data = await reader.readexactly(1)
     if data == b'\x04':
         print(f'{PREFIX}: ========================', file=sys.stderr)
@@ -28,8 +30,14 @@ async def on_control_connected(reader: asyncio.StreamReader, writer: asyncio.Str
     elif data == b'\x06':
         print(f'{PREFIX}: ========================', file=sys.stderr)
         print(f'{PREFIX}: request for delayed IPv6', file=sys.stderr)
+    elif data == b'\xFF':
+        print(f'{PREFIX}: shutting down', file=sys.stderr)
+        writer.close()
+        await writer.wait_closed()
+        shutdown.set()
+        return
     else:
-        raise Exception(f'Expecting 4 or 6 for control byte, got {data}')
+        raise Exception(f'Unexpected control byte: {data}')
     
     connected = asyncio.Event()
     on_ipv4_connected = lambda reader, writer: on_connected('IPv4', writer, b'\x04', connected)
@@ -41,6 +49,8 @@ async def on_control_connected(reader: asyncio.StreamReader, writer: asyncio.Str
 
     writer.write(b'\x01')
     await writer.drain()
+    writer.close()
+    await writer.wait_closed()
 
     async with asyncio.TaskGroup() as tg:
         tg.create_task(listen('IPv4', srv4, data == b'\x04', connected))
