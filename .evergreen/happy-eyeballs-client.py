@@ -21,29 +21,22 @@ async def main():
     if data != b'\x01':
         raise Exception(f'Expected byte 1, got {data}')
     async with asyncio.TaskGroup() as tg:
-        tg.create_task(connect_4())
-        tg.create_task(connect_6())
+        tg.create_task(connect('IPv4', args.ipv4, socket.AF_INET, b'\x04'))
+        tg.create_task(connect('IPv6', args.ipv6, socket.AF_INET6, b'\x06'))
 
-async def connect_4():
-    print('ipv4: connecting')
-    reader, writer = await asyncio.open_connection('localhost', args.ipv4, family=socket.AF_INET)
-    print('ipv4: connected')
+async def connect(name: str, port: int, family: socket.AddressFamily, payload: bytes):
+    print(f'{name}: connecting')
+    try:
+        reader, writer = await asyncio.open_connection('localhost', port, family=family)
+    except Exception as e:
+        print(f'{name}: failed ({e})')
+        return
+    print(f'{name}: connected')
     data = await reader.readexactly(1)
-    if data != b'\x04':
-        raise Exception(f'Expected byte 4, got {data}')
+    if data != payload:
+        raise Exception(f'Expected {payload}, got {data}')
     writer.close()
     await writer.wait_closed()
-    print('ipv4: done')
-
-async def connect_6():
-    print('ipv6: connecting')
-    reader, writer = await asyncio.open_connection('localhost', args.ipv6, family=socket.AF_INET6)
-    print('ipv6: connected')
-    data = await reader.readexactly(1)
-    if data != b'\x06':
-        raise Exception(f'Expected byte 6, got {data}')
-    writer.close()
-    await writer.wait_closed()
-    print('ipv6: done')
+    print(f'{name}: done')
 
 asyncio.run(main())
