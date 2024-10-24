@@ -1,11 +1,15 @@
-use serde::Deserialize;
-use crate::client::session::TransactionState;
-use crate::test::spec::unified_runner::operation::TestOperation;
-use crate::test::spec::unified_runner::{Entity, TestRunner};
+use crate::{
+    client::session::TransactionState,
+    error::Result,
+    test::spec::unified_runner::{
+        operation::{with_mut_session, TestOperation},
+        Entity,
+        TestRunner,
+    },
+};
 use futures::future::BoxFuture;
-use crate::test::spec::unified_runner::operation::with_mut_session;
-use crate::error::Result;
 use futures_util::FutureExt;
+use serde::Deserialize;
 use std::time::Duration;
 
 #[derive(Debug, Deserialize)]

@@ -1,14 +1,17 @@
+use crate::{
+    error::Result,
+    options::{DropIndexOptions, IndexOptions, ListIndexesOptions},
+    test::spec::unified_runner::{
+        operation::{with_mut_session, with_opt_session, TestOperation},
+        Entity,
+        TestRunner,
+    },
+    IndexModel,
+};
 use bson::{Bson, Document};
-use futures::TryStreamExt;
-use serde::Deserialize;
-use crate::options::{DropIndexOptions, IndexOptions, ListIndexesOptions};
-use crate::test::spec::unified_runner::operation::TestOperation;
-use crate::test::spec::unified_runner::{Entity, TestRunner};
-use crate::IndexModel;
-use futures::future::BoxFuture;
-use crate::test::spec::unified_runner::operation::{with_opt_session, with_mut_session};
-use crate::error::Result;
+use futures::{future::BoxFuture, TryStreamExt};
 use futures_util::FutureExt;
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]

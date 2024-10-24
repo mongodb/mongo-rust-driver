@@ -1,12 +1,16 @@
+use crate::{
+    error::Result,
+    options::{CreateCollectionOptions, DropCollectionOptions},
+    test::spec::unified_runner::{
+        operation::{with_mut_session, with_opt_session, TestOperation},
+        Entity,
+        TestRunner,
+    },
+};
 use bson::{doc, Document};
-use serde::Deserialize;
-use crate::options::{CreateCollectionOptions, DropCollectionOptions};
-use crate::test::spec::unified_runner::operation::TestOperation;
-use crate::test::spec::unified_runner::{Entity, TestRunner};
 use futures::future::BoxFuture;
-use crate::test::spec::unified_runner::operation::{with_opt_session, with_mut_session};
-use crate::error::Result;
 use futures_util::FutureExt;
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

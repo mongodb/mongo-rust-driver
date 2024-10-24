@@ -1,10 +1,14 @@
-use serde::Deserialize;
-use crate::test::spec::unified_runner::operation::TestOperation;
-use crate::test::spec::unified_runner::{Entity, TestRunner};
-use crate::test::util::fail_point::FailPoint;
+use crate::test::{
+    spec::unified_runner::{
+        operation::{with_mut_session, TestOperation},
+        Entity,
+        TestRunner,
+    },
+    util::fail_point::FailPoint,
+};
 use futures::future::BoxFuture;
-use crate::test::spec::unified_runner::operation::with_mut_session;
 use futures_util::FutureExt;
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

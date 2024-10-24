@@ -1,12 +1,16 @@
+use crate::{
+    error::Result,
+    options::DeleteOptions,
+    test::spec::unified_runner::{
+        operation::{with_mut_session, with_opt_session, TestOperation},
+        Entity,
+        TestRunner,
+    },
+};
 use bson::{to_bson, Document};
-use serde::Deserialize;
-use crate::test::spec::unified_runner::operation::TestOperation;
-use crate::options::DeleteOptions;
-use crate::test::spec::unified_runner::{Entity, TestRunner};
 use futures::future::BoxFuture;
-use crate::test::spec::unified_runner::operation::{with_opt_session, with_mut_session};
-use crate::error::Result;
 use futures_util::FutureExt;
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -71,4 +75,3 @@ impl TestOperation for DeleteOne {
         .boxed()
     }
 }
-

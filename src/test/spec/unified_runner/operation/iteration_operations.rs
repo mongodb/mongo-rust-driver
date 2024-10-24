@@ -1,11 +1,11 @@
+use crate::{
+    error::Result,
+    test::spec::unified_runner::{operation::TestOperation, Entity, TestCursor, TestRunner},
+};
 use bson::Bson;
-use futures::StreamExt;
-use serde::Deserialize;
-use crate::test::spec::unified_runner::operation::TestOperation;
-use crate::test::spec::unified_runner::{Entity, TestCursor, TestRunner};
-use futures::future::BoxFuture;
-use crate::error::Result;
+use futures::{future::BoxFuture, StreamExt};
 use futures_util::FutureExt;
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -103,4 +103,3 @@ impl TestOperation for IterateUntilDocumentOrError {
         true
     }
 }
-

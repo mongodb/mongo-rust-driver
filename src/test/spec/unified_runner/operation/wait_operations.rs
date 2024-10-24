@@ -1,11 +1,13 @@
 use std::time::Duration;
 
-use serde::Deserialize;
-use crate::{runtime, ServerType};
-use crate::test::spec::unified_runner::operation::TestOperation;
-use crate::test::spec::unified_runner::{ExpectedEvent, TestRunner};
+use crate::{
+    runtime,
+    test::spec::unified_runner::{operation::TestOperation, ExpectedEvent, TestRunner},
+    ServerType,
+};
 use futures::future::BoxFuture;
 use futures_util::FutureExt;
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -88,4 +90,3 @@ impl TestOperation for Wait {
         tokio::time::sleep(Duration::from_millis(self.ms)).boxed()
     }
 }
-

@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use serde::Deserialize;
-use crate::test::spec::unified_runner::operation::TestOperation;
-use crate::test::spec::unified_runner::TestRunner;
-use crate::test::spec::unified_runner::Operation;
+use crate::test::spec::unified_runner::{operation::TestOperation, Operation, TestRunner};
 use futures::future::BoxFuture;
 use futures_util::FutureExt;
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

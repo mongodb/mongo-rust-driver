@@ -1,15 +1,19 @@
 use std::collections::HashMap;
 
-use bson::{to_bson, Document, Bson, doc};
+use bson::{doc, to_bson, Bson, Document};
 use serde::Deserialize;
 
-use crate::options::{InsertManyOptions, InsertOneOptions};
-use crate::test::spec::unified_runner::operation::TestOperation;
-use crate::test::spec::unified_runner::{Entity, TestRunner};
+use crate::{
+    error::Result,
+    options::{InsertManyOptions, InsertOneOptions},
+    test::spec::unified_runner::{
+        operation::{with_mut_session, with_opt_session, TestOperation},
+        Entity,
+        TestRunner,
+    },
+};
 use futures::future::BoxFuture;
-use crate::error::Result;
 use futures_util::FutureExt;
-use crate::test::spec::unified_runner::operation::{with_opt_session, with_mut_session};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

@@ -1,15 +1,19 @@
+use crate::{
+    action::Action,
+    error::Result,
+    options::{RunCursorCommandOptions, SelectionCriteria},
+    test::spec::unified_runner::{
+        operation::{with_mut_session, with_opt_session, TestOperation},
+        Entity,
+        TestCursor,
+        TestRunner,
+    },
+};
 use bson::{to_bson, Document};
-use futures::TryStreamExt;
+use futures::{future::BoxFuture, TryStreamExt};
+use futures_util::FutureExt;
 use serde::Deserialize;
 use tokio::sync::Mutex;
-use crate::action::Action;
-use crate::test::spec::unified_runner::operation::TestOperation;
-use crate::options::{RunCursorCommandOptions, SelectionCriteria};
-use crate::test::spec::unified_runner::{Entity, TestCursor, TestRunner};
-use futures::future::BoxFuture;
-use crate::test::spec::unified_runner::operation::{with_opt_session, with_mut_session};
-use crate::error::Result;
-use futures_util::FutureExt;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

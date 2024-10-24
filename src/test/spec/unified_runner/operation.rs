@@ -1,25 +1,25 @@
 mod bulk_write;
-#[cfg(feature = "in-use-encryption")]
-mod csfle;
-mod search_index;
-mod insert_operations;
-mod delete_operations;
-mod find_operations;
-mod failpoint_operations;
-mod update_operations;
-mod list_operations;
 mod collection_operations;
-mod session_operations;
-mod index_operations;
-mod transaction_operations;
-mod upload_download_operations;
-mod count_operations;
 mod command_operations;
 mod connection_operations;
-mod thread_operations;
-mod wait_operations;
-mod topology_operations;
+mod count_operations;
+#[cfg(feature = "in-use-encryption")]
+mod csfle;
+mod delete_operations;
+mod failpoint_operations;
+mod find_operations;
+mod index_operations;
+mod insert_operations;
 mod iteration_operations;
+mod list_operations;
+mod search_index;
+mod session_operations;
+mod thread_operations;
+mod topology_operations;
+mod transaction_operations;
+mod update_operations;
+mod upload_download_operations;
+mod wait_operations;
 
 use std::{
     fmt::Debug,
@@ -31,18 +31,41 @@ use std::{
     },
 };
 
-use collection_operations::{AssertCollectionExists, AssertCollectionNotExists, CreateCollection, DropCollection, RenameCollection};
+use collection_operations::{
+    AssertCollectionExists,
+    AssertCollectionNotExists,
+    CreateCollection,
+    DropCollection,
+    RenameCollection,
+};
 use command_operations::{CreateCommandCursor, RunCommand, RunCursorCommand};
 use connection_operations::{AssertNumberConnectionsCheckedOut, Close};
-use count_operations::{Aggregate, AssertEventCount, CountDocuments, Distinct, EstimatedDocumentCount};
+use count_operations::{
+    Aggregate,
+    AssertEventCount,
+    CountDocuments,
+    Distinct,
+    EstimatedDocumentCount,
+};
 use delete_operations::{DeleteMany, DeleteOne};
 use failpoint_operations::{FailPointCommand, TargetedFailPoint};
-use find_operations::{CreateFindCursor, Find, FindOne, FindOneAndDelete, FindOneAndReplace, FindOneAndUpdate};
-use futures::{
-    future::BoxFuture,
-    FutureExt,
+use find_operations::{
+    CreateFindCursor,
+    Find,
+    FindOne,
+    FindOneAndDelete,
+    FindOneAndReplace,
+    FindOneAndUpdate,
 };
-use index_operations::{AssertIndexExists, AssertIndexNotExists, CreateIndex, DropIndex, ListIndexNames, ListIndexes};
+use futures::{future::BoxFuture, FutureExt};
+use index_operations::{
+    AssertIndexExists,
+    AssertIndexNotExists,
+    CreateIndex,
+    DropIndex,
+    ListIndexNames,
+    ListIndexes,
+};
 use insert_operations::{InsertMany, InsertOne};
 use iteration_operations::{IterateOnce, IterateUntilDocumentOrError};
 use list_operations::{ListCollectionNames, ListCollections, ListDatabaseNames, ListDatabases};
@@ -50,12 +73,26 @@ use serde::{
     de::{DeserializeOwned, Deserializer},
     Deserialize,
 };
-use session_operations::{AssertDifferentLsidOnLastTwoCommands, AssertSameLsidOnLastTwoCommands, AssertSessionDirty, AssertSessionNotDirty, AssertSessionPinned, AssertSessionTransactionState, AssertSessionUnpinned, EndSession};
+use session_operations::{
+    AssertDifferentLsidOnLastTwoCommands,
+    AssertSameLsidOnLastTwoCommands,
+    AssertSessionDirty,
+    AssertSessionNotDirty,
+    AssertSessionPinned,
+    AssertSessionTransactionState,
+    AssertSessionUnpinned,
+    EndSession,
+};
 use thread_operations::{RunOnThread, WaitForThread};
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
 use topology_operations::{AssertTopologyType, RecordTopologyDescription};
-use transaction_operations::{AbortTransaction, CommitTransaction, StartTransaction, WithTransaction};
+use transaction_operations::{
+    AbortTransaction,
+    CommitTransaction,
+    StartTransaction,
+    WithTransaction,
+};
 use update_operations::{ReplaceOne, UpdateMany, UpdateOne};
 use upload_download_operations::{Delete, Download, DownloadByName, Upload};
 use wait_operations::{Wait, WaitForEvent, WaitForPrimaryChange};
@@ -80,7 +117,6 @@ use bulk_write::*;
 #[cfg(feature = "in-use-encryption")]
 use csfle::*;
 use search_index::*;
-
 
 pub(crate) trait TestOperation: Debug + Send + Sync {
     fn execute_test_runner_operation<'a>(

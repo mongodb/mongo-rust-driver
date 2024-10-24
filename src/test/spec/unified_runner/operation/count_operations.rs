@@ -1,14 +1,19 @@
+use crate::{
+    error::Result,
+    options::{AggregateOptions, CountOptions, DistinctOptions, EstimatedDocumentCountOptions},
+    test::spec::unified_runner::{
+        operation::{with_mut_session, with_opt_session, TestOperation},
+        Entity,
+        ExpectedEvent,
+        TestRunner,
+    },
+    Collection,
+    Database,
+};
 use bson::{Bson, Document};
-use futures::TryStreamExt;
-use serde::Deserialize;
-use crate::options::{AggregateOptions, CountOptions, DistinctOptions, EstimatedDocumentCountOptions};
-use crate::test::spec::unified_runner::operation::TestOperation;
-use crate::test::spec::unified_runner::{Entity, ExpectedEvent, TestRunner};
-use crate::{Collection, Database};
-use futures::future::BoxFuture;
-use crate::test::spec::unified_runner::operation::{with_opt_session, with_mut_session};
-use crate::error::Result;
+use futures::{future::BoxFuture, TryStreamExt};
 use futures_util::FutureExt;
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub(super) struct Aggregate {
