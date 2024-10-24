@@ -10,11 +10,20 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-c', '--control', default=10036, type=int, metavar='PORT', help='control port')
 parser.add_argument('-v4', '--ipv4', default=10037, type=int, metavar='PORT', help='IPv4 port')
 parser.add_argument('-v6', '--ipv6', default=10038, type=int, metavar='PORT', help='IPv6 port')
+parser.add_argument('--stop', action='store_true', help='stop a currently-running server')
 args = parser.parse_args()
 
 PREFIX='happy eyeballs server'
 
 async def main():
+    if args.stop:
+        control_r, control_w = await asyncio.open_connection('localhost', args.control)
+        control_w.write(b'\xFF')
+        await control_w.drain()
+        control_w.close()
+        await control_w.wait_closed()
+        return
+    
     shutdown = asyncio.Event()
     srv = await asyncio.start_server(lambda reader, writer: on_control_connected(reader, writer, shutdown), 'localhost', args.control)
     print(f'{PREFIX}: listening for control connections on {args.control}', file=sys.stderr)
