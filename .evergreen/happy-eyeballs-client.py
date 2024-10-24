@@ -7,8 +7,6 @@ parser = argparse.ArgumentParser(
     description='client for testing the happy eyeballs test server',
 )
 parser.add_argument('-c', '--control', default=10036, type=int, metavar='PORT', help='control port')
-parser.add_argument('-v4', '--ipv4', default=10037, type=int, metavar='PORT', help='IPv4 port')
-parser.add_argument('-v6', '--ipv6', default=10038, type=int, metavar='PORT', help='IPv6 port')
 parser.add_argument('-d', '--delay', default=4, type=int)
 args = parser.parse_args()
 
@@ -20,9 +18,11 @@ async def main():
     data = await control_r.read(1)
     if data != b'\x01':
         raise Exception(f'Expected byte 1, got {data}')
+    ipv4_port = int.from_bytes(await control_r.read(2))
+    ipv6_port = int.from_bytes(await control_r.read(2))
     async with asyncio.TaskGroup() as tg:
-        tg.create_task(connect('IPv4', args.ipv4, socket.AF_INET, b'\x04'))
-        tg.create_task(connect('IPv6', args.ipv6, socket.AF_INET6, b'\x06'))
+        tg.create_task(connect('IPv4', ipv4_port, socket.AF_INET, b'\x04'))
+        tg.create_task(connect('IPv6', ipv6_port, socket.AF_INET6, b'\x06'))
 
 async def connect(name: str, port: int, family: socket.AddressFamily, payload: bytes):
     print(f'{name}: connecting')

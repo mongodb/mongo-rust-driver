@@ -8,8 +8,6 @@ parser = argparse.ArgumentParser(
     description='Fake server for testing happy eyeballs',
 )
 parser.add_argument('-c', '--control', default=10036, type=int, metavar='PORT', help='control port')
-parser.add_argument('-v4', '--ipv4', default=10037, type=int, metavar='PORT', help='IPv4 port')
-parser.add_argument('-v6', '--ipv6', default=10038, type=int, metavar='PORT', help='IPv6 port')
 parser.add_argument('--stop', action='store_true', help='stop a currently-running server')
 args = parser.parse_args()
 
@@ -51,12 +49,16 @@ async def on_control_connected(reader: asyncio.StreamReader, writer: asyncio.Str
     connected = asyncio.Event()
     on_ipv4_connected = lambda reader, writer: on_connected('IPv4', writer, b'\x04', connected)
     on_ipv6_connected = lambda reader, writer: on_connected('IPv6', writer, b'\x06', connected)
-    srv4 = await asyncio.start_server(on_ipv4_connected, 'localhost', args.ipv4, family=socket.AF_INET, start_serving=False)
-    srv6 = await asyncio.start_server(on_ipv6_connected, 'localhost', args.ipv6, family=socket.AF_INET6, start_serving=False)
-    print(f'{PREFIX}: open for IPv4 on {args.ipv4}', file=sys.stderr)
-    print(f'{PREFIX}: open for IPv6 on {args.ipv6}', file=sys.stderr)
+    srv4 = await asyncio.start_server(on_ipv4_connected, 'localhost', family=socket.AF_INET, start_serving=False)
+    srv6 = await asyncio.start_server(on_ipv6_connected, 'localhost', family=socket.AF_INET6, start_serving=False)
+    ipv4_port = srv4.sockets[0].getsockname()[1]
+    ipv6_port = srv6.sockets[0].getsockname()[1]
+    print(f'{PREFIX}: open for IPv4 on {ipv4_port}', file=sys.stderr)
+    print(f'{PREFIX}: open for IPv6 on {ipv6_port}', file=sys.stderr)
 
     writer.write(b'\x01')
+    writer.write(ipv4_port.to_bytes(2))
+    writer.write(ipv6_port.to_bytes(2))
     await writer.drain()
     writer.close()
     await writer.wait_closed()
