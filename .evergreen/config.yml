@@ -30,6 +30,7 @@ pre:
 
 # Functions to run after all tasks (except those in task groups).
 post:
+  - func: "stop happy eyeballs server"
   - func: "stop csfle servers"
   - func: "stop load balancer"
   - func: "stop mongo orchestration"
@@ -1378,6 +1379,17 @@ functions:
         binary: bash
         args:
           - .evergreen/fetch-drivers-tools.sh
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+        binary: bash
+        args:
+          - .evergreen/find-python3.sh
+    - command: expansions.update
+      params:
+        file: src/python3.yml
 
     - command: shell.exec
       params:
@@ -1453,6 +1465,13 @@ functions:
 
   "run driver test suite":
     - command: subprocess.exec
+      params:
+        working_dir: src
+        background: true
+        binary: ${PYTHON3}
+        args:
+          - .evergreen/happy-eyeballs-server.py
+    - command: subprocess.exec
       type: test
       params:
         working_dir: src
@@ -1468,6 +1487,15 @@ functions:
           - ZSTD
           - ZLIB
           - SNAPPY
+
+  "stop happy eyeballs server":
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: ${PYTHON3}
+        args:
+          - .evergreen/happy-eyeballs-server.py
+          - --stop
 
   "run sync tests":
     - command: subprocess.exec
