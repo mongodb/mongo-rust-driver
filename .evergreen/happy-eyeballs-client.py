@@ -20,10 +20,11 @@ async def main():
         raise Exception(f'Expected byte 1, got {data}')
     ipv4_port = int.from_bytes(await control_r.read(2), 'big')
     ipv6_port = int.from_bytes(await control_r.read(2), 'big')
-    await asyncio.wait([
+    connect_tasks = [
         asyncio.create_task(connect('IPv4', ipv4_port, socket.AF_INET, b'\x04')),
         asyncio.create_task(connect('IPv6', ipv6_port, socket.AF_INET6, b'\x06')),
-    ])
+    ]
+    await asyncio.wait(connect_tasks)
 
 async def connect(name: str, port: int, family: socket.AddressFamily, payload: bytes):
     print(f'{name}: connecting')
