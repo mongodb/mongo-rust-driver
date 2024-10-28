@@ -10,7 +10,7 @@ const SLOW_V4: u8 = 4;
 const SLOW_V6: u8 = 6;
 
 async fn happy_request(payload: u8) -> Result<(SocketAddr, SocketAddr)> {
-    let mut control = tcp_connect(vec![CONTROL.clone()]).await?;
+    let mut control = tcp_connect(vec![CONTROL]).await?;
     control.write_u8(payload).await?;
     let resp = control.read_u8().await?;
     assert_eq!(resp, 1);
