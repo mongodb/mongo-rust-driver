@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import os
 import socket
 import sys
 
@@ -9,21 +10,12 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument('-c', '--control', default=10036, type=int, metavar='PORT', help='control port')
 parser.add_argument('--stop', action='store_true', help='stop a currently-running server')
+parser.add_argument('--wait', action='store_true', help='wait for a server to be ready')
 args = parser.parse_args()
 
 PREFIX='happy eyeballs server'
 
-async def main():
-    # Stop a running server
-    if args.stop:
-        control_r, control_w = await asyncio.open_connection('localhost', args.control)
-        control_w.write(b'\xFF')
-        await control_w.drain()
-        control_w.close()
-        await control_w.wait_closed()
-        return
-    
-    # Start the control server
+async def control_server():
     shutdown = asyncio.Event()
     srv = await asyncio.start_server(lambda reader, writer: on_control_connected(reader, writer, shutdown), 'localhost', args.control)
     print(f'{PREFIX}: listening for control connections on {args.control}', file=sys.stderr)
@@ -40,6 +32,12 @@ async def on_control_connected(reader: asyncio.StreamReader, writer: asyncio.Str
     elif data == b'\x06':
         print(f'{PREFIX}: ========================', file=sys.stderr)
         print(f'{PREFIX}: request for delayed IPv6', file=sys.stderr)
+    elif data == b'\xF0':
+        writer.write(b'\x01')
+        await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+        return
     elif data == b'\xFF':
         print(f'{PREFIX}: shutting down', file=sys.stderr)
         writer.close()
@@ -47,12 +45,13 @@ async def on_control_connected(reader: asyncio.StreamReader, writer: asyncio.Str
         shutdown.set()
         return
     else:
-        raise Exception(f'Unexpected control byte: {data}')
+        print(f'Unexpected control byte: {data}', file=sys.stderr)
+        exit(1)
     
     # Create the test servers but do not yet start accepting connections
     connected = asyncio.Event()
-    on_ipv4_connected = lambda reader, writer: on_connected('IPv4', writer, b'\x04', connected)
-    on_ipv6_connected = lambda reader, writer: on_connected('IPv6', writer, b'\x06', connected)
+    on_ipv4_connected = lambda reader, writer: on_test_connected('IPv4', writer, b'\x04', connected)
+    on_ipv6_connected = lambda reader, writer: on_test_connected('IPv6', writer, b'\x06', connected)
     srv4 = await asyncio.start_server(on_ipv4_connected, 'localhost', family=socket.AF_INET, start_serving=False)
     srv6 = await asyncio.start_server(on_ipv6_connected, 'localhost', family=socket.AF_INET6, start_serving=False)
     ipv4_port = srv4.sockets[0].getsockname()[1]
@@ -62,28 +61,30 @@ async def on_control_connected(reader: asyncio.StreamReader, writer: asyncio.Str
 
     # Reply to control request with success byte and test server ports
     writer.write(b'\x01')
-    writer.write(ipv4_port.to_bytes(2))
-    writer.write(ipv6_port.to_bytes(2))
+    writer.write(ipv4_port.to_bytes(2, 'big'))
+    writer.write(ipv6_port.to_bytes(2, 'big'))
     await writer.drain()
     writer.close()
     await writer.wait_closed()
 
-    # Start test servers listening in parallel, one with a delay
-    async with asyncio.TaskGroup() as tg:
-        tg.create_task(listen('IPv4', srv4, data == b'\x04', connected))
-        tg.create_task(listen('IPv6', srv6, data == b'\x06', connected))
+    # Start test servers listening in parallel
+    await asyncio.wait([
+        asyncio.create_task(test_listen('IPv4', srv4, data == b'\x04', connected)),
+        asyncio.create_task(test_listen('IPv6', srv6, data == b'\x06', connected)),
+    ])
 
     # Wait for the test servers to shut down
     srv4.close()
     srv6.close()
-    async with asyncio.TaskGroup() as tg:
-        tg.create_task(srv4.wait_closed())
-        tg.create_task(srv6.wait_closed())
+    await asyncio.wait([
+        asyncio.create_task(srv4.wait_closed()),
+        asyncio.create_task(srv6.wait_closed()),
+    ])
     
     print(f'{PREFIX}: connection complete, test ports closed', file=sys.stderr)
     print(f'{PREFIX}: ========================', file=sys.stderr)
 
-async def listen(name: str, srv: asyncio.Server, delay: bool, connected: asyncio.Event):
+async def test_listen(name: str, srv, delay: bool, connected: asyncio.Event):
     if delay:
         print(f'{PREFIX}: delaying {name} connections', file=sys.stderr)
         await asyncio.sleep(1.0)
@@ -93,12 +94,42 @@ async def listen(name: str, srv: asyncio.Server, delay: bool, connected: asyncio
         # Terminate this test server when either test server has handled a request
         await connected.wait()
 
-async def on_connected(name: str, writer: asyncio.StreamWriter, payload: bytes, connected: asyncio.Event):
-    print(f'{PREFIX}: connected on {name}')
+async def on_test_connected(name: str, writer: asyncio.StreamWriter, payload: bytes, connected: asyncio.Event):
+    print(f'{PREFIX}: connected on {name}', file=sys.stderr)
     writer.write(payload)
     await writer.drain()
     writer.close()
     await writer.wait_closed()
     connected.set()
 
-asyncio.run(main())
+async def stop_server():
+    control_r, control_w = await asyncio.open_connection('localhost', args.control)
+    control_w.write(b'\xFF')
+    await control_w.drain()
+    control_w.close()
+    await control_w.wait_closed()
+
+async def wait_for_server():
+    while True:
+        try:
+            control_r, control_w = await asyncio.open_connection('localhost', args.control)
+        except OSError as e:
+            print(f'{PREFIX}: failed ({e}), will retry', file=sys.stderr)
+            await asyncio.sleep(1)
+            continue
+        break
+    control_w.write(b'\xF0')
+    await control_w.drain()
+    data = await control_r.read(1)
+    if data != b'\x01':
+        print(f'{PREFIX}: expected byte 1, got {data}', file=sys.stderr)
+        exit(1)
+    print(f'{PREFIX}: happy eyeballs server ready on port {args.control}', file=sys.stderr)
+
+
+if args.stop:
+    asyncio.run(stop_server())
+elif args.wait:
+    asyncio.run(wait_for_server())
+else:
+    asyncio.run(control_server())

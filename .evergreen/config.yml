@@ -1390,7 +1390,6 @@ functions:
     - command: expansions.update
       params:
         file: src/python3.yml
-
     - command: shell.exec
       params:
         script: |
@@ -1471,6 +1470,13 @@ functions:
         binary: ${PYTHON3}
         args:
           - .evergreen/happy-eyeballs-server.py
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: ${PYTHON3}
+        args:
+          - .evergreen/happy-eyeballs-server.py
+          - --wait
     - command: subprocess.exec
       type: test
       params:
