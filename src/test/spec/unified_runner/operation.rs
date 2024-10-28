@@ -1,25 +1,25 @@
 mod bulk_write;
-mod collection_operations;
-mod command_operations;
-mod connection_operations;
-mod count_operations;
+mod collection;
+mod command;
+mod connection;
+mod count;
 #[cfg(feature = "in-use-encryption")]
 mod csfle;
-mod delete_operations;
-mod failpoint_operations;
-mod find_operations;
-mod index_operations;
-mod insert_operations;
-mod iteration_operations;
-mod list_operations;
+mod delete;
+mod failpoint;
+mod find;
+mod gridfs;
+mod index;
+mod insert;
+mod iteration;
+mod list;
 mod search_index;
-mod session_operations;
-mod thread_operations;
-mod topology_operations;
-mod transaction_operations;
-mod update_operations;
-mod upload_download_operations;
-mod wait_operations;
+mod session;
+mod thread;
+mod topology;
+mod transaction;
+mod update;
+mod wait;
 
 use std::{
     fmt::Debug,
@@ -31,25 +31,20 @@ use std::{
     },
 };
 
-use collection_operations::{
+use collection::{
+    Aggregate,
     AssertCollectionExists,
     AssertCollectionNotExists,
     CreateCollection,
     DropCollection,
     RenameCollection,
 };
-use command_operations::{CreateCommandCursor, RunCommand, RunCursorCommand};
-use connection_operations::{AssertNumberConnectionsCheckedOut, Close};
-use count_operations::{
-    Aggregate,
-    AssertEventCount,
-    CountDocuments,
-    Distinct,
-    EstimatedDocumentCount,
-};
-use delete_operations::{DeleteMany, DeleteOne};
-use failpoint_operations::{FailPointCommand, TargetedFailPoint};
-use find_operations::{
+use command::{CreateCommandCursor, RunCommand, RunCursorCommand};
+use connection::{AssertNumberConnectionsCheckedOut, Close};
+use count::{AssertEventCount, CountDocuments, Distinct, EstimatedDocumentCount};
+use delete::{DeleteMany, DeleteOne};
+use failpoint::{FailPointCommand, TargetedFailPoint};
+use find::{
     CreateFindCursor,
     Find,
     FindOne,
@@ -58,7 +53,8 @@ use find_operations::{
     FindOneAndUpdate,
 };
 use futures::{future::BoxFuture, FutureExt};
-use index_operations::{
+use gridfs::{Delete, Download, DownloadByName, Upload};
+use index::{
     AssertIndexExists,
     AssertIndexNotExists,
     CreateIndex,
@@ -66,14 +62,14 @@ use index_operations::{
     ListIndexNames,
     ListIndexes,
 };
-use insert_operations::{InsertMany, InsertOne};
-use iteration_operations::{IterateOnce, IterateUntilDocumentOrError};
-use list_operations::{ListCollectionNames, ListCollections, ListDatabaseNames, ListDatabases};
+use insert::{InsertMany, InsertOne};
+use iteration::{IterateOnce, IterateUntilDocumentOrError};
+use list::{ListCollectionNames, ListCollections, ListDatabaseNames, ListDatabases};
 use serde::{
     de::{DeserializeOwned, Deserializer},
     Deserialize,
 };
-use session_operations::{
+use session::{
     AssertDifferentLsidOnLastTwoCommands,
     AssertSameLsidOnLastTwoCommands,
     AssertSessionDirty,
@@ -83,19 +79,13 @@ use session_operations::{
     AssertSessionUnpinned,
     EndSession,
 };
-use thread_operations::{RunOnThread, WaitForThread};
+use thread::{RunOnThread, WaitForThread};
 use time::OffsetDateTime;
 use tokio::sync::Mutex;
-use topology_operations::{AssertTopologyType, RecordTopologyDescription};
-use transaction_operations::{
-    AbortTransaction,
-    CommitTransaction,
-    StartTransaction,
-    WithTransaction,
-};
-use update_operations::{ReplaceOne, UpdateMany, UpdateOne};
-use upload_download_operations::{Delete, Download, DownloadByName, Upload};
-use wait_operations::{Wait, WaitForEvent, WaitForPrimaryChange};
+use topology::{AssertTopologyType, RecordTopologyDescription};
+use transaction::{AbortTransaction, CommitTransaction, StartTransaction, WithTransaction};
+use update::{ReplaceOne, UpdateMany, UpdateOne};
+use wait::{Wait, WaitForEvent, WaitForPrimaryChange};
 
 use super::{
     results_match,
