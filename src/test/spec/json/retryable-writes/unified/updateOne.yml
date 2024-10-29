@@ -12,6 +12,7 @@ createEntities:
     client:
       id: &client0 client0
       useMultipleMongoses: false
+      observeEvents: [ commandStartedEvent ]
   -
     database:
       id: &database0 database0
@@ -60,6 +61,17 @@ tests:
         documents:
           - { _id: 1, x: 12 }
           - { _id: 2, x: 22 }
+    expectEvents:
+      - client: client0
+        events:
+          - commandStartedEvent:
+              commandName: update
+              command:
+                txnNumber: { $$exists: true }
+          - commandStartedEvent:
+              commandName: update
+              command:
+                txnNumber: { $$exists: true }
   -
     description: 'UpdateOne is not committed on first attempt'
     operations:

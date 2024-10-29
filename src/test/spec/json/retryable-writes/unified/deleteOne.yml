@@ -12,6 +12,7 @@ createEntities:
     client:
       id: &client0 client0
       useMultipleMongoses: false
+      observeEvents: [ commandStartedEvent ]
   -
     database:
       id: &database0 database0
@@ -56,6 +57,17 @@ tests:
         databaseName: *database_name
         documents:
           - { _id: 2, x: 22 }
+    expectEvents:
+      - client: client0
+        events:
+          - commandStartedEvent:
+              commandName: delete
+              command:
+                txnNumber: { $$exists: true }
+          - commandStartedEvent:
+              commandName: delete
+              command:
+                txnNumber: { $$exists: true }
   -
     description: 'DeleteOne is not committed on first attempt'
     operations:

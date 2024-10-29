@@ -12,6 +12,7 @@ createEntities:
     client:
       id: &client0 client0
       useMultipleMongoses: true
+      observeEvents: [ commandStartedEvent ]
   -
     database:
       id: &database0 database0
@@ -47,3 +48,10 @@ tests:
         collectionName: *collection_name
         databaseName: *database_name
         documents: []
+    expectEvents:
+      - client: client0
+        events:
+          - commandStartedEvent:
+              commandName: delete
+              command:
+                txnNumber: { $$exists: false }

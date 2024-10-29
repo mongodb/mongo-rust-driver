@@ -12,6 +12,7 @@ createEntities:
     client:
       id: &client0 client0
       useMultipleMongoses: false
+      observeEvents: [ commandStartedEvent ]
   -
     database:
       id: &database0 database0
@@ -58,6 +59,17 @@ tests:
           - { _id: 1, x: 11 }
           - { _id: 2, x: 22 }
           - { _id: 3, x: 33 }
+    expectEvents:
+      - client: client0
+        events:
+          - commandStartedEvent:
+              commandName: insert
+              command:
+                txnNumber: { $$exists: true }
+          - commandStartedEvent:
+              commandName: insert
+              command:
+                txnNumber: { $$exists: true }
   -
     description: 'InsertOne is not committed on first attempt'
     operations:

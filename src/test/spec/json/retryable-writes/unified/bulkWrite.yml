@@ -12,6 +12,7 @@ createEntities:
     client:
       id: &client0 client0
       useMultipleMongoses: false
+      observeEvents: [ commandStartedEvent ]
   -
     database:
       id: &database0 database0
@@ -72,6 +73,21 @@ tests:
         databaseName: *database_name
         documents:
           - { _id: 2, x: 23 }
+    expectEvents:
+      - client: client0
+        events:
+          - commandStartedEvent:
+              commandName: insert
+              command:
+                txnNumber: { $$exists: true }
+          - commandStartedEvent:
+              commandName: update
+              command:
+                txnNumber: { $$exists: true }
+          - commandStartedEvent:
+              commandName: delete
+              command:
+                txnNumber: { $$exists: true }
   -
     # Write operations in this ordered batch are intentionally sequenced so that
     # each write command consists of a single statement, which will fail on the
@@ -266,6 +282,13 @@ tests:
           - { _id: 1, x: 11 }
           - { _id: 2, x: 22 }
           - { _id: 3, x: 33 }
+    expectEvents:
+      - client: client0
+        events:
+          - commandStartedEvent:
+              commandName: insert
+              command:
+                txnNumber: { $$exists: true }
   -
     description: 'First insertOne is never committed'
     operations:
@@ -493,3 +516,25 @@ tests:
         documents:
           - { _id: 1, x: 12 }
           - { _id: 2, x: 22 }
+  - description: "collection bulkWrite with updateMany and deleteMany does not set txnNumber"
+    operations:
+      - object: *collection0
+        name: bulkWrite
+        arguments:
+          requests:
+            updateMany:
+              filter: {}
+              update: { $set: { x: 1 } }
+            deleteMany:
+              filter: {}
+    expectEvents:
+      - client: client0
+        events:
+          - commandStartedEvent:
+              commandName: update
+              command:
+                txnNumber: { $$exists: false }
+          - commandStartedEvent:
+              commandName: delete
+              command:
+                txnNumber: { $$exists: false }
