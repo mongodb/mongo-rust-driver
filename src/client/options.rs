@@ -1497,9 +1497,9 @@ impl ConnectionString {
         };
 
         if conn_str.srv_service_name.is_some() && !srv {
-                return Err(Error::invalid_argument(
-                    "srvServiceName cannot be specified with a non-SRV URI",
-                ));
+            return Err(Error::invalid_argument(
+                "srvServiceName cannot be specified with a non-SRV URI",
+            ));
         }
 
         if let Some(srv_max_hosts) = conn_str.srv_max_hosts {
