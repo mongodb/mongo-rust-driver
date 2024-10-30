@@ -2,7 +2,11 @@ use std::time::Duration;
 
 #[cfg(feature = "dns-resolver")]
 use crate::error::ErrorKind;
-use crate::{client::options::ResolverConfig, error::Result, options::ServerAddress};
+use crate::{
+    client::options::ResolverConfig,
+    error::Result,
+    options::{ClientOptions, ServerAddress},
+};
 
 #[derive(Debug)]
 pub(crate) struct ResolvedConfig {
@@ -90,14 +94,21 @@ pub(crate) enum DomainMismatch {
 #[cfg(feature = "dns-resolver")]
 pub(crate) struct SrvResolver {
     resolver: crate::runtime::AsyncResolver,
+    client_options: Option<ClientOptions>,
 }
 
 #[cfg(feature = "dns-resolver")]
 impl SrvResolver {
-    pub(crate) async fn new(config: Option<ResolverConfig>) -> Result<Self> {
+    pub(crate) async fn new(
+        config: Option<ResolverConfig>,
+        client_options: Option<ClientOptions>,
+    ) -> Result<Self> {
         let resolver = crate::runtime::AsyncResolver::new(config.map(|c| c.inner)).await?;
 
-        Ok(Self { resolver })
+        Ok(Self {
+            resolver,
+            client_options,
+        })
     }
 
     pub(crate) async fn resolve_client_options(
@@ -149,7 +160,15 @@ impl SrvResolver {
         original_hostname: &str,
         dm: DomainMismatch,
     ) -> Result<LookupHosts> {
-        let lookup_hostname = format!("_mongodb._tcp.{}", original_hostname);
+        let default_service_name = "mongodb".to_string();
+        let service_name = match &self.client_options {
+            None => default_service_name,
+            Some(opts) => opts
+                .srv_service_name
+                .clone()
+                .unwrap_or(default_service_name),
+        };
+        let lookup_hostname = format!("_{}._tcp.{}", service_name, original_hostname);
         self.get_srv_hosts_unvalidated(&lookup_hostname)
             .await?
             .validate(original_hostname, dm)
