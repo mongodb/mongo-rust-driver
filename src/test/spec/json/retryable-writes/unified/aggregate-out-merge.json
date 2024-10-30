@@ -35,6 +35,13 @@
       }
     }
   ],
+  "initialData": [
+    {
+      "collectionName": "mergeCollection",
+      "databaseName": "retryable-writes-tests",
+      "documents": []
+    }
+  ],
   "tests": [
     {
       "description": "aggregate with $out does not set txnNumber",
@@ -57,7 +64,7 @@
                 }
               },
               {
-                "$out": "other_test_collection"
+                "$out": "outCollection"
               }
             ]
           }
@@ -90,13 +97,6 @@
       ],
       "operations": [
         {
-          "object": "database0",
-          "name": "createCollection",
-          "arguments": {
-            "collection": "outputCollection"
-          }
-        },
-        {
           "object": "collection0",
           "name": "aggregate",
           "arguments": {
@@ -115,7 +115,7 @@
               },
               {
                 "$merge": {
-                  "into": "outputCollection"
+                  "into": "mergeCollection"
                 }
               }
             ]
@@ -126,11 +126,6 @@
         {
           "client": "client0",
           "events": [
-            {
-              "commandStartedEvent": {
-                "commandName": "create"
-              }
-            },
             {
               "commandStartedEvent": {
                 "commandName": "aggregate",

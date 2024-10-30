@@ -20,7 +20,13 @@ createEntities:
   - collection:
       id: &collection0 collection0
       database: *database0
-      collectionName: &collection0Name coll0  
+      collectionName: &collection0Name coll0
+
+initialData:
+  # The output collection must already exist for $merge on a sharded cluster
+  - collectionName: &mergeCollection mergeCollection
+    databaseName: *database0Name
+    documents: []
   
 tests:
   - description: "aggregate with $out does not set txnNumber"
@@ -31,7 +37,7 @@ tests:
           pipeline:
             - { $sort: { x: 1 } }
             - { $match: { _id: { $gt: 1 } } }
-            - { $out: other_test_collection }
+            - { $out: outCollection }
     expectEvents:
       - client: client0
         events:
@@ -43,23 +49,16 @@ tests:
     runOnRequirements:
       - minServerVersion: "4.1.11"
     operations:
-      # The output collection must already exist for $merge on a sharded cluster
-      - object: *database0
-        name: createCollection
-        arguments:
-          collection: &outputCollection outputCollection
       - object: *collection0
         name: aggregate
         arguments:
           pipeline:
             - { $sort: { x: 1 } }
             - { $match: { _id: { $gt: 1 } } }
-            - { $merge: { into: *outputCollection } }
+            - { $merge: { into: *mergeCollection } }
     expectEvents:
       - client: client0
         events:
-          - commandStartedEvent:
-              commandName: create
           - commandStartedEvent:
               commandName: aggregate
               command:
