@@ -1,11 +1,9 @@
 {
   "description": "aggregate with $out/$merge does not set txnNumber",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.3",
   "runOnRequirements": [
     {
-      "minServerVersion": "3.6"
-    },
-    {
+      "minServerVersion": "3.6",
       "topologies": [
         "replicaset",
         "sharded",
@@ -85,7 +83,19 @@
     },
     {
       "description": "aggregate with $merge does not set txnNumber",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "4.1.11"
+        }
+      ],
       "operations": [
+        {
+          "object": "database0",
+          "name": "createCollection",
+          "arguments": {
+            "collection": "outputCollection"
+          }
+        },
         {
           "object": "collection0",
           "name": "aggregate",
@@ -105,7 +115,7 @@
               },
               {
                 "$merge": {
-                  "into": "other_test_collection"
+                  "into": "outputCollection"
                 }
               }
             ]
@@ -116,6 +126,11 @@
         {
           "client": "client0",
           "events": [
+            {
+              "commandStartedEvent": {
+                "commandName": "create"
+              }
+            },
             {
               "commandStartedEvent": {
                 "commandName": "aggregate",
