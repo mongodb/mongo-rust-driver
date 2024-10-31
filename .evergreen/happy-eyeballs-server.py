@@ -1,6 +1,5 @@
 import argparse
 import asyncio
-import os
 import socket
 import sys
 
@@ -50,19 +49,17 @@ async def on_control_connected(reader: asyncio.StreamReader, writer: asyncio.Str
         print(f'Unexpected control byte: {data}', file=sys.stderr)
         exit(1)
     
-    # Create the test servers but do not yet start accepting connections
+    # Bind the test ports but do not yet start accepting connections
     connected = asyncio.Event()
     on_ipv4_connected = lambda reader, writer: on_test_connected('IPv4', writer, b'\x04', connected, slow)
     on_ipv6_connected = lambda reader, writer: on_test_connected('IPv6', writer, b'\x06', connected, slow)
-    srv4 = await asyncio.start_server(on_ipv4_connected, 'localhost', family=socket.AF_INET, start_serving=False)
-    srv6 = await asyncio.start_server(on_ipv6_connected, 'localhost', family=socket.AF_INET6, start_serving=False)
+    # port 0: pick random unused port
+    srv4 = await asyncio.start_server(on_ipv4_connected, 'localhost', 0, family=socket.AF_INET, start_serving=False)
+    srv6 = await asyncio.start_server(on_ipv6_connected, 'localhost', 0, family=socket.AF_INET6, start_serving=False)
     ipv4_port = srv4.sockets[0].getsockname()[1]
     ipv6_port = srv6.sockets[0].getsockname()[1]
     print(f'{PREFIX}: [slow {slow}] open for IPv4 on {ipv4_port}', file=sys.stderr)
     print(f'{PREFIX}: [slow {slow}] open for IPv6 on {ipv6_port}', file=sys.stderr)
-
-    # Sleep before replying to give the test server ports time to *actually* be open
-    await asyncio.sleep(0.5)
 
     # Reply to control request with success byte and test server ports
     writer.write(b'\x01')
@@ -93,12 +90,17 @@ async def on_control_connected(reader: asyncio.StreamReader, writer: asyncio.Str
     print(f'{PREFIX}: ========================', file=sys.stderr)
 
 async def test_listen(name: str, srv, delay: bool, connected: asyncio.Event, slow: str):
+    # Both connections are delayed; the slow one is delayed by more than the fast one; this
+    # ensures that the client is comparing timing and not simply choosing an immediate success
+    # over a connection denied.
     if delay:
         print(f'{PREFIX}: [slow {slow}] delaying {name} connections', file=sys.stderr)
+        await asyncio.sleep(2.0)
+    else:
         await asyncio.sleep(1.0)
-    print(f'{PREFIX}: [slow {slow}] accepting {name} connections', file=sys.stderr)
     async with srv:
         await srv.start_serving()
+        print(f'{PREFIX}: [slow {slow}] accepting {name} connections', file=sys.stderr)
         # Terminate this test server when either test server has handled a request
         await connected.wait()
 

@@ -30,7 +30,6 @@ pre:
 
 # Functions to run after all tasks (except those in task groups).
 post:
-  - func: "stop happy eyeballs server"
   - func: "stop csfle servers"
   - func: "stop load balancer"
   - func: "stop mongo orchestration"
@@ -381,6 +380,20 @@ buildvariants:
     tasks:
       - name: test-aws-lambda-task-group
 
+  - name: happy-eyeballs-macos
+    display_name: "Happy Eyeballs (MacOS)"
+    run_on:
+      - macos-1100
+    tasks:
+      - happy-eyeballs-task-group
+
+  - name: happy-eyeballs-windows
+    display_name: "Happy Eyeballs (Windows)"
+    run_on:
+      - windows-64-vs2017-small
+    tasks:
+      - happy-eyeballs-task-group
+
 ###############
 # Task Groups #
 ###############
@@ -711,6 +724,26 @@ task_groups:
     setup_group_timeout_secs: 1800
     tasks:
       - oidc-auth-test-gcp-latest
+
+  - name: happy-eyeballs-task-group
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800
+    setup_group:
+      - func: "fetch source"
+      - func: "create expansions"
+      - func: "prepare resources"
+      - func: "windows fix"
+      - func: "fix absolute paths"
+      - func: "init test-results"
+      - func: "make files executable"
+      - func: "install rust"
+      - func: "install junit dependencies"
+      - func: "start happy eyeballs server"
+    tasks:
+      - test-happy-eyeballs
+    teardown_task:
+      - func: "stop happy eyeballs server"
+      - func: "upload test results"
 
 #########
 # Tasks #
@@ -1185,6 +1218,18 @@ tasks:
           export GCPOIDC_TEST_CMD="ls -la && PROJECT_DIRECTORY='.' OIDC_ENV=gcp OIDC=oidc TEST_FILE=./$TEST_FILE ./.evergreen/run-mongodb-oidc-test.sh"
           bash $DRIVERS_TOOLS/.evergreen/auth_oidc/gcp/run-driver-test.sh
 
+  - name: "test-happy-eyeballs"
+    commands:
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/run-happy-eyeballs-tests.sh
+        include_expansions_in_env:
+          - PROJECT_DIRECTORY
+
 #############
 # Functions #
 #############
@@ -1464,20 +1509,6 @@ functions:
 
   "run driver test suite":
     - command: subprocess.exec
-      params:
-        working_dir: src
-        background: true
-        binary: ${PYTHON3}
-        args:
-          - .evergreen/happy-eyeballs-server.py
-    - command: subprocess.exec
-      params:
-        working_dir: src
-        binary: ${PYTHON3}
-        args:
-          - .evergreen/happy-eyeballs-server.py
-          - --wait
-    - command: subprocess.exec
       type: test
       params:
         working_dir: src
@@ -1493,15 +1524,6 @@ functions:
           - ZSTD
           - ZLIB
           - SNAPPY
-
-  "stop happy eyeballs server":
-    - command: subprocess.exec
-      params:
-        working_dir: src
-        binary: ${PYTHON3}
-        args:
-          - .evergreen/happy-eyeballs-server.py
-          - --stop
 
   "run sync tests":
     - command: subprocess.exec
@@ -1706,6 +1728,31 @@ functions:
           ${PREPARE_SHELL}
           export OIDC="oidc"
           .evergreen/run-mongodb-oidc-test.sh
+
+  "start happy eyeballs server":
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        background: true
+        binary: ${PYTHON3}
+        args:
+          - .evergreen/happy-eyeballs-server.py
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: ${PYTHON3}
+        args:
+          - .evergreen/happy-eyeballs-server.py
+          - --wait
+
+  "stop happy eyeballs server":
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: ${PYTHON3}
+        args:
+          - .evergreen/happy-eyeballs-server.py
+          - --stop
 
   "compile only":
     - command: shell.exec

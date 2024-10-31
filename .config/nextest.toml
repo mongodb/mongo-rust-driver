@@ -6,7 +6,7 @@ default-filter = 'not test(test::happy_eyeballs)'
 failure-output = "final"
 test-threads = 1
 fail-fast = false
-default-filter = 'all()'
+default-filter = 'not test(test::happy_eyeballs)'
 
 [profile.ci.junit]
 path = "junit.xml"
