@@ -62,24 +62,6 @@ struct ParsedOptions {
 }
 
 async fn run_test(mut test_file: TestFile) {
-    if let Some(ref options) = test_file.options {
-        // TODO RUST-933: Remove this skip.
-        let skip = if options.srv_service_name.is_some() {
-            Some("srvServiceName")
-        } else {
-            None
-        };
-
-        if let Some(skip) = skip {
-            log_uncaptured(format!(
-                "skipping initial_dns_seedlist_discovery test case due to unsupported connection \
-                 string option: {}",
-                skip,
-            ));
-            return;
-        }
-    }
-
     // "encoded-userinfo-and-db.json" specifies a database name with a question mark which is
     // disallowed on Windows. See
     // <https://www.mongodb.com/docs/manual/reference/limits/#restrictions-on-db-names>

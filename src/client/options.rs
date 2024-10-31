@@ -910,11 +910,16 @@ impl Default for HostInfo {
 }
 
 impl HostInfo {
-    async fn resolve(self, resolver_config: Option<ResolverConfig>) -> Result<ResolvedHostInfo> {
+    async fn resolve(
+        self,
+        resolver_config: Option<ResolverConfig>,
+        srv_service_name: Option<String>,
+    ) -> Result<ResolvedHostInfo> {
         Ok(match self {
             Self::HostIdentifiers(hosts) => ResolvedHostInfo::HostIdentifiers(hosts),
             Self::DnsRecord(hostname) => {
-                let mut resolver = SrvResolver::new(resolver_config.clone(), None).await?;
+                let mut resolver =
+                    SrvResolver::new(resolver_config.clone(), srv_service_name).await?;
                 let config = resolver.resolve_client_options(&hostname).await?;
                 ResolvedHostInfo::DnsRecord { hostname, config }
             }

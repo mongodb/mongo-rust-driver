@@ -24,7 +24,9 @@ impl Action for ParseConnectionString {
             options.resolver_config.clone_from(&self.resolver_config);
         }
 
-        let resolved = host_info.resolve(self.resolver_config).await?;
+        let resolved = host_info
+            .resolve(self.resolver_config, options.srv_service_name.clone())
+            .await?;
         options.hosts = match resolved {
             ResolvedHostInfo::HostIdentifiers(hosts) => hosts,
             ResolvedHostInfo::DnsRecord {

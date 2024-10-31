@@ -186,3 +186,30 @@ async fn srv_max_hosts_random() {
     assert_eq!(2, actual.len());
     assert!(actual.contains(&localhost_test_build_10gen(27017)));
 }
+
+#[tokio::test]
+async fn srv_service_name() {
+    if get_client_options().await.srv_service_name.is_none() {
+        log_uncaptured("skipping srv_service_name due to no custom srvServiceName");
+        return;
+    }
+    let mut options = ClientOptions::new_srv();
+    let hosts = vec![
+        localhost_test_build_10gen(27019),
+        localhost_test_build_10gen(27020),
+    ];
+    let rescan_interval = options.original_srv_info.as_ref().cloned().unwrap().min_ttl;
+    options.hosts.clone_from(&hosts);
+    options.srv_service_name = Some("customname".to_string());
+    options.test_options_mut().mock_lookup_hosts = Some(make_lookup_hosts(vec![
+        localhost_test_build_10gen(27019),
+        localhost_test_build_10gen(27020),
+    ]));
+    let mut topology = Topology::new(options).unwrap();
+    topology.watch().wait_until_initialized().await;
+    tokio::time::sleep(rescan_interval * 2).await;
+    assert_eq!(
+        hosts.into_iter().collect::<HashSet<_>>(),
+        topology.server_addresses()
+    );
+}
