@@ -42,7 +42,7 @@ async fn run_test_srv(
 async fn run_test_extra(
     max_hosts: Option<u32>,
     new_hosts: Result<Vec<ServerAddress>>,
-    srv_service_name: Option<String>
+    srv_service_name: Option<String>,
 ) -> HashSet<ServerAddress> {
     let mut options = ClientOptions::new_srv();
     options.hosts.clone_from(&DEFAULT_HOSTS);
@@ -159,8 +159,20 @@ async fn srv_max_hosts_zero() {
         localhost_test_build_10gen(27020),
     ];
 
-    run_test_srv(None, Ok(hosts.clone()), hosts.clone().into_iter().collect(), None).await;
-    run_test_srv(Some(0), Ok(hosts.clone()), hosts.into_iter().collect(), None).await;
+    run_test_srv(
+        None,
+        Ok(hosts.clone()),
+        hosts.clone().into_iter().collect(),
+        None,
+    )
+    .await;
+    run_test_srv(
+        Some(0),
+        Ok(hosts.clone()),
+        hosts.into_iter().collect(),
+        None,
+    )
+    .await;
 }
 
 // SRV polling with srvMaxHosts MongoClient option: All DNS records are selected (srvMaxHosts >=
@@ -172,7 +184,13 @@ async fn srv_max_hosts_gt_actual() {
         localhost_test_build_10gen(27020),
     ];
 
-    run_test_srv(Some(2), Ok(hosts.clone()), hosts.into_iter().collect(), None).await;
+    run_test_srv(
+        Some(2),
+        Ok(hosts.clone()),
+        hosts.into_iter().collect(),
+        None,
+    )
+    .await;
 }
 
 // SRV polling with srvMaxHosts MongoClient option: New DNS records are randomly selected
@@ -196,5 +214,11 @@ async fn srv_service_name() {
         localhost_test_build_10gen(27019),
         localhost_test_build_10gen(27020),
     ];
-    run_test_srv(None, Ok(hosts.clone()), hosts.into_iter().collect(), Some("customname".to_string())).await;
+    run_test_srv(
+        None,
+        Ok(hosts.clone()),
+        hosts.into_iter().collect(),
+        Some("customname".to_string()),
+    )
+    .await;
 }
