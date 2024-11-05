@@ -26,26 +26,29 @@ static DEFAULT_HOSTS: Lazy<Vec<ServerAddress>> = Lazy::new(|| {
 });
 
 async fn run_test(new_hosts: Result<Vec<ServerAddress>>, expected_hosts: HashSet<ServerAddress>) {
-    run_test_srv(None, new_hosts, expected_hosts).await
+    run_test_srv(None, new_hosts, expected_hosts, None).await
 }
 
 async fn run_test_srv(
     max_hosts: Option<u32>,
     new_hosts: Result<Vec<ServerAddress>>,
     expected_hosts: HashSet<ServerAddress>,
+    srv_service_name: Option<String>,
 ) {
-    let actual = run_test_extra(max_hosts, new_hosts).await;
+    let actual = run_test_extra(max_hosts, new_hosts, srv_service_name).await;
     assert_eq!(expected_hosts, actual);
 }
 
 async fn run_test_extra(
     max_hosts: Option<u32>,
     new_hosts: Result<Vec<ServerAddress>>,
+    srv_service_name: Option<String>
 ) -> HashSet<ServerAddress> {
     let mut options = ClientOptions::new_srv();
     options.hosts.clone_from(&DEFAULT_HOSTS);
     options.test_options_mut().disable_monitoring_threads = true;
     options.srv_max_hosts = max_hosts;
+    options.srv_service_name = srv_service_name;
     let mut topology = Topology::new(options.clone()).unwrap();
     topology.watch().wait_until_initialized().await;
     let mut monitor =
@@ -156,8 +159,8 @@ async fn srv_max_hosts_zero() {
         localhost_test_build_10gen(27020),
     ];
 
-    run_test_srv(None, Ok(hosts.clone()), hosts.clone().into_iter().collect()).await;
-    run_test_srv(Some(0), Ok(hosts.clone()), hosts.into_iter().collect()).await;
+    run_test_srv(None, Ok(hosts.clone()), hosts.clone().into_iter().collect(), None).await;
+    run_test_srv(Some(0), Ok(hosts.clone()), hosts.into_iter().collect(), None).await;
 }
 
 // SRV polling with srvMaxHosts MongoClient option: All DNS records are selected (srvMaxHosts >=
@@ -169,7 +172,7 @@ async fn srv_max_hosts_gt_actual() {
         localhost_test_build_10gen(27020),
     ];
 
-    run_test_srv(Some(2), Ok(hosts.clone()), hosts.into_iter().collect()).await;
+    run_test_srv(Some(2), Ok(hosts.clone()), hosts.into_iter().collect(), None).await;
 }
 
 // SRV polling with srvMaxHosts MongoClient option: New DNS records are randomly selected
@@ -182,34 +185,16 @@ async fn srv_max_hosts_random() {
         localhost_test_build_10gen(27020),
     ];
 
-    let actual = run_test_extra(Some(2), Ok(hosts)).await;
+    let actual = run_test_extra(Some(2), Ok(hosts), None).await;
     assert_eq!(2, actual.len());
     assert!(actual.contains(&localhost_test_build_10gen(27017)));
 }
 
 #[tokio::test]
 async fn srv_service_name() {
-    if get_client_options().await.srv_service_name.is_none() {
-        log_uncaptured("skipping srv_service_name due to no custom srvServiceName");
-        return;
-    }
-    let mut options = ClientOptions::new_srv();
     let hosts = vec![
         localhost_test_build_10gen(27019),
         localhost_test_build_10gen(27020),
     ];
-    let rescan_interval = options.original_srv_info.as_ref().cloned().unwrap().min_ttl;
-    options.hosts.clone_from(&hosts);
-    options.srv_service_name = Some("customname".to_string());
-    options.test_options_mut().mock_lookup_hosts = Some(make_lookup_hosts(vec![
-        localhost_test_build_10gen(27019),
-        localhost_test_build_10gen(27020),
-    ]));
-    let mut topology = Topology::new(options).unwrap();
-    topology.watch().wait_until_initialized().await;
-    tokio::time::sleep(rescan_interval * 2).await;
-    assert_eq!(
-        hosts.into_iter().collect::<HashSet<_>>(),
-        topology.server_addresses()
-    );
+    run_test_srv(None, Ok(hosts.clone()), hosts.into_iter().collect(), Some("customname".to_string())).await;
 }
