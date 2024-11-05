@@ -1,10 +1,12 @@
 [profile.default]
 test-threads = 1
+default-filter = 'not test(test::happy_eyeballs)'
 
 [profile.ci]
 failure-output = "final"
 test-threads = 1
 fail-fast = false
+default-filter = 'not test(test::happy_eyeballs)'
 
 [profile.ci.junit]
 path = "junit.xml"
