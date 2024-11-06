@@ -158,9 +158,7 @@ impl SrvResolver {
     ) -> Result<LookupHosts> {
         let lookup_hostname = format!(
             "_{}._tcp.{}",
-            self.srv_service_name
-                .clone()
-                .unwrap_or("mongodb".to_string()),
+            self.srv_service_name.as_deref().unwrap_or("mongodb"),
             original_hostname
         );
         self.get_srv_hosts_unvalidated(&lookup_hostname)
