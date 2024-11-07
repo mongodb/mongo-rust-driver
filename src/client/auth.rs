@@ -94,8 +94,7 @@ pub enum AuthMechanism {
     #[cfg(feature = "aws-auth")]
     MongoDbAws,
 
-    /// MONGODB-OIDC authenticates using [OpenID Connect](https://openid.net/developers/specs/) access tokens.  NOTE: this is not supported by the Rust driver.
-    // TODO RUST-1497: remove the NOTE.
+    /// MONGODB-OIDC authenticates using [OpenID Connect](https://openid.net/developers/specs/) access tokens.
     MongoDbOidc,
 }
 
