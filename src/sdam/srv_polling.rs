@@ -62,7 +62,11 @@ impl SrvPollingMonitor {
     }
 
     fn rescan_interval(&self) -> Duration {
-        std::cmp::max(self.rescan_interval, MIN_RESCAN_SRV_INTERVAL)
+        if cfg!(test) {
+            self.rescan_interval
+        } else {
+            std::cmp::max(self.rescan_interval, MIN_RESCAN_SRV_INTERVAL)
+        }
     }
 
     async fn execute(mut self) {
