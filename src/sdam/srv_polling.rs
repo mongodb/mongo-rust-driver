@@ -62,7 +62,11 @@ impl SrvPollingMonitor {
     }
 
     fn rescan_interval(&self) -> Duration {
-        std::cmp::max(self.rescan_interval, MIN_RESCAN_SRV_INTERVAL)
+        if cfg!(test) {
+            self.rescan_interval
+        } else {
+            std::cmp::max(self.rescan_interval, MIN_RESCAN_SRV_INTERVAL)
+        }
     }
 
     async fn execute(mut self) {
@@ -130,7 +134,11 @@ impl SrvPollingMonitor {
             return Ok(resolver);
         }
 
-        let resolver = SrvResolver::new(self.client_options.resolver_config().cloned()).await?;
+        let resolver = SrvResolver::new(
+            self.client_options.resolver_config().cloned(),
+            self.client_options.srv_service_name.clone(),
+        )
+        .await?;
 
         // Since the connection was not `Some` above, this will always insert the new connection and
         // return a reference to it.

@@ -90,14 +90,21 @@ pub(crate) enum DomainMismatch {
 #[cfg(feature = "dns-resolver")]
 pub(crate) struct SrvResolver {
     resolver: crate::runtime::AsyncResolver,
+    srv_service_name: Option<String>,
 }
 
 #[cfg(feature = "dns-resolver")]
 impl SrvResolver {
-    pub(crate) async fn new(config: Option<ResolverConfig>) -> Result<Self> {
+    pub(crate) async fn new(
+        config: Option<ResolverConfig>,
+        srv_service_name: Option<String>,
+    ) -> Result<Self> {
         let resolver = crate::runtime::AsyncResolver::new(config.map(|c| c.inner)).await?;
 
-        Ok(Self { resolver })
+        Ok(Self {
+            resolver,
+            srv_service_name,
+        })
     }
 
     pub(crate) async fn resolve_client_options(
@@ -149,7 +156,11 @@ impl SrvResolver {
         original_hostname: &str,
         dm: DomainMismatch,
     ) -> Result<LookupHosts> {
-        let lookup_hostname = format!("_mongodb._tcp.{}", original_hostname);
+        let lookup_hostname = format!(
+            "_{}._tcp.{}",
+            self.srv_service_name.as_deref().unwrap_or("mongodb"),
+            original_hostname
+        );
         self.get_srv_hosts_unvalidated(&lookup_hostname)
             .await?
             .validate(original_hostname, dm)

@@ -186,3 +186,27 @@ async fn srv_max_hosts_random() {
     assert_eq!(2, actual.len());
     assert!(actual.contains(&localhost_test_build_10gen(27017)));
 }
+
+#[tokio::test]
+async fn srv_service_name() {
+    let rescan_interval = Duration::from_secs(1);
+    let new_hosts = vec![
+        ServerAddress::Tcp {
+            host: "localhost.test.build.10gen.cc".to_string(),
+            port: Some(27019),
+        },
+        ServerAddress::Tcp {
+            host: "localhost.test.build.10gen.cc".to_string(),
+            port: Some(27020),
+        },
+    ];
+    let uri = "mongodb+srv://test22.test.build.10gen.cc/?srvServiceName=customname";
+    let mut options = ClientOptions::parse(uri).await.unwrap();
+    // override the min_ttl to speed up lookup interval
+    options.original_srv_info.as_mut().unwrap().min_ttl = rescan_interval;
+    options.test_options_mut().mock_lookup_hosts = Some(make_lookup_hosts(new_hosts.clone()));
+    let mut topology = Topology::new(options).unwrap();
+    topology.watch().wait_until_initialized().await;
+    tokio::time::sleep(rescan_interval * 2).await;
+    assert_eq!(topology.server_addresses(), new_hosts.into_iter().collect());
+}

@@ -22,8 +22,6 @@ static SKIPPED_TESTS: Lazy<Vec<&'static str>> = Lazy::new(|| {
         "maxPoolSize=0 does not error",
         // TODO RUST-226: unskip this test
         "Valid tlsCertificateKeyFilePassword is parsed correctly",
-        // TODO RUST-911: unskip this test
-        "SRV URI with custom srvServiceName",
         // TODO RUST-229: unskip the following tests
         "Single IP literal host without port",
         "Single IP literal host with port",

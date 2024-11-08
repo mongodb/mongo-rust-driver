@@ -89,6 +89,7 @@ const URI_OPTIONS: &[&str] = &[
     "waitqueuetimeoutms",
     "wtimeoutms",
     "zlibcompressionlevel",
+    "srvservicename",
 ];
 
 /// Reserved characters as defined by [Section 2.2 of RFC-3986](https://tools.ietf.org/html/rfc3986#section-2.2).
@@ -521,6 +522,9 @@ pub struct ClientOptions {
     /// By default, no default database is specified.
     pub default_database: Option<String>,
 
+    /// Overrides the default "mongodb" service name for SRV lookup in both discovery and polling
+    pub srv_service_name: Option<String>,
+
     #[builder(setter(skip))]
     #[derivative(Debug = "ignore")]
     pub(crate) socket_timeout: Option<Duration>,
@@ -676,6 +680,8 @@ impl Serialize for ClientOptions {
             loadbalanced: &'a Option<bool>,
 
             srvmaxhosts: Option<i32>,
+
+            srvservicename: &'a Option<String>,
         }
 
         let client_options = ClientOptionsHelper {
@@ -709,6 +715,7 @@ impl Serialize for ClientOptions {
                 .map(|v| v.try_into())
                 .transpose()
                 .map_err(serde::ser::Error::custom)?,
+            srvservicename: &self.srv_service_name,
         };
 
         client_options.serialize(serializer)
@@ -865,6 +872,9 @@ pub struct ConnectionString {
     /// Limit on the number of mongos connections that may be created for sharded topologies.
     pub srv_max_hosts: Option<u32>,
 
+    /// Overrides the default "mongodb" service name for SRV lookup in both discovery and polling
+    pub srv_service_name: Option<String>,
+
     wait_queue_timeout: Option<Duration>,
     tls_insecure: Option<bool>,
 
@@ -900,11 +910,16 @@ impl Default for HostInfo {
 }
 
 impl HostInfo {
-    async fn resolve(self, resolver_config: Option<ResolverConfig>) -> Result<ResolvedHostInfo> {
+    async fn resolve(
+        self,
+        resolver_config: Option<ResolverConfig>,
+        srv_service_name: Option<String>,
+    ) -> Result<ResolvedHostInfo> {
         Ok(match self {
             Self::HostIdentifiers(hosts) => ResolvedHostInfo::HostIdentifiers(hosts),
             Self::DnsRecord(hostname) => {
-                let mut resolver = SrvResolver::new(resolver_config.clone()).await?;
+                let mut resolver =
+                    SrvResolver::new(resolver_config.clone(), srv_service_name).await?;
                 let config = resolver.resolve_client_options(&hostname).await?;
                 ResolvedHostInfo::DnsRecord { hostname, config }
             }
@@ -1486,6 +1501,12 @@ impl ConnectionString {
             ConnectionStringParts::default()
         };
 
+        if conn_str.srv_service_name.is_some() && !srv {
+            return Err(Error::invalid_argument(
+                "srvServiceName cannot be specified with a non-SRV URI",
+            ));
+        }
+
         if let Some(srv_max_hosts) = conn_str.srv_max_hosts {
             if !srv {
                 return Err(Error::invalid_argument(
@@ -1975,6 +1996,9 @@ impl ConnectionString {
             }
             k @ "srvmaxhosts" => {
                 self.srv_max_hosts = Some(get_u32!(value, k));
+            }
+            "srvservicename" => {
+                self.srv_service_name = Some(value.to_string());
             }
             k @ "tls" | k @ "ssl" => {
                 let tls = get_bool!(value, k);
