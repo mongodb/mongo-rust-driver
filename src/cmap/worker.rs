@@ -399,14 +399,14 @@ impl ConnectionPoolWorker {
                     continue;
                 }
 
-                conn.mark_as_in_use(self.manager.clone());
+                conn.mark_checked_out(self.manager.clone());
                 if let Err(request) =
                     request.fulfill(ConnectionRequestResult::Pooled(Box::new(conn)))
                 {
                     // checking out thread stopped listening, indicating it hit the WaitQueue
                     // timeout, so we put connection back into pool.
                     let mut connection = request.unwrap_pooled_connection();
-                    connection.mark_as_available();
+                    connection.mark_checked_in();
                     self.available_connections.push_back(connection);
                 }
 
@@ -435,7 +435,7 @@ impl ConnectionPoolWorker {
                 .await;
 
                 if let Ok(ref mut c) = establish_result {
-                    c.mark_as_in_use(manager.clone());
+                    c.mark_checked_out(manager.clone());
                     manager.handle_connection_succeeded(ConnectionSucceeded::Used {
                         service_id: c.generation.service_id(),
                     });
@@ -491,7 +491,7 @@ impl ConnectionPoolWorker {
         }
         if let ConnectionSucceeded::ForPool(connection) = connection {
             let mut connection = *connection;
-            connection.mark_as_available();
+            connection.mark_checked_in();
             self.available_connections.push_back(connection);
         }
     }
@@ -500,7 +500,7 @@ impl ConnectionPoolWorker {
         self.event_emitter
             .emit_event(|| conn.checked_in_event().into());
 
-        conn.mark_as_available();
+        conn.mark_checked_in();
 
         if conn.has_errored() {
             self.close_connection(conn, ConnectionClosedReason::Error);

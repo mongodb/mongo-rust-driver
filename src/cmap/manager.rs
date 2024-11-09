@@ -54,8 +54,9 @@ impl PoolManager {
         }
     }
 
-    /// Check in the given connection to the pool.
-    /// This returns an error containing the connection if the pool has been dropped already.
+    /// Check in the given connection to the pool. This returns an error containing the connection
+    /// if the pool has been dropped. The connection's state will be transitioned to checked-in upon
+    /// success.
     pub(crate) fn check_in(
         &self,
         connection: PooledConnection,

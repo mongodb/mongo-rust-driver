@@ -40,20 +40,46 @@ pub(crate) struct PooledConnection {
     /// The connection pool generation from which this connection was checked out.
     pub(crate) generation: ConnectionGeneration,
 
-    /// Marks the time when the connection was last checked into the pool. This value can be used
-    /// to determine whether this connection is idle.
-    ready_and_available_time: Option<Instant>,
-
-    /// The manager used to check this connection back into the pool when dropped. This value is
-    /// unset when the connection is checked into the pool.
-    pool_manager: Option<PoolManager>,
-
-    /// A sender to return this connection to its pinner.
-    pinned_sender: Option<mpsc::Sender<PooledConnection>>,
-
     /// Emitter for events related to this connection.
     #[derive_where(skip)]
     event_emitter: CmapEventEmitter,
+
+    /// The state of this connection.
+    state: PooledConnectionState,
+}
+
+/// The state of a pooled connection.
+#[derive(Clone, Debug)]
+enum PooledConnectionState {
+    /// The state associated with a connection checked into the connection pool.
+    CheckedIn { available_time: Instant },
+
+    /// The state associated with a connection checked out of the connection pool.
+    CheckedOut {
+        /// The manager used to check this connection back into the pool.
+        pool_manager: PoolManager,
+    },
+
+    /// The state associated with a pinned connection.
+    Pinned {
+        /// The state of the pinned connection.
+        pinned_state: PinnedState,
+
+        /// The manager used to check this connection back into the pool.
+        pool_manager: PoolManager,
+    },
+}
+
+/// The state of a pinned connection.
+#[derive(Clone, Debug)]
+enum PinnedState {
+    /// The state associated with a pinned connection that is currently in use.
+    InUse {
+        pinned_sender: mpsc::Sender<PooledConnection>,
+    },
+
+    /// The state associated with a pinned connection that is currently idle.
+    Returned { returned_time: Instant },
 }
 
 impl Deref for PooledConnection {
@@ -71,6 +97,7 @@ impl DerefMut for PooledConnection {
 }
 
 impl PooledConnection {
+    /// Creates a new pooled connection in the checked-in state.
     pub(crate) fn new(pending_connection: PendingConnection, stream: AsyncStream) -> Self {
         let connection = Connection::new(
             pending_connection.address,
@@ -85,10 +112,10 @@ impl PooledConnection {
         Self {
             connection,
             generation,
-            ready_and_available_time: None,
-            pool_manager: None,
-            pinned_sender: None,
             event_emitter: pending_connection.event_emitter,
+            state: PooledConnectionState::CheckedIn {
+                available_time: Instant::now(),
+            },
         }
     }
 
@@ -109,57 +136,89 @@ impl PooledConnection {
     }
 
     /// Updates the state of the connection to indicate that it is checked into the pool.
-    pub(crate) fn mark_as_available(&mut self) {
-        self.pool_manager.take();
-        self.ready_and_available_time = Some(Instant::now());
+    pub(crate) fn mark_checked_in(&mut self) {
+        if !matches!(self.state, PooledConnectionState::CheckedIn { .. }) {
+            let available_time = match self.state {
+                PooledConnectionState::Pinned {
+                    pinned_state: PinnedState::Returned { returned_time },
+                    ..
+                } => returned_time,
+                _ => Instant::now(),
+            };
+            self.state = PooledConnectionState::CheckedIn { available_time };
+        }
     }
 
     /// Updates the state of the connection to indicate that it is checked out of the pool.
-    pub(crate) fn mark_as_in_use(&mut self, manager: PoolManager) {
-        self.pool_manager = Some(manager);
-        self.ready_and_available_time.take();
+    pub(crate) fn mark_checked_out(&mut self, pool_manager: PoolManager) {
+        self.state = PooledConnectionState::CheckedOut { pool_manager };
     }
 
     /// Whether this connection is idle.
     pub(crate) fn is_idle(&self, max_idle_time: Option<Duration>) -> bool {
-        self.ready_and_available_time
-            .and_then(|ready_and_available_time| {
-                max_idle_time.map(|max_idle_time| {
+        match self.state {
+            PooledConnectionState::CheckedIn {
+                available_time: ready_and_available_time,
+            } => {
+                if let Some(max_idle_time) = max_idle_time {
                     Instant::now().duration_since(ready_and_available_time) >= max_idle_time
-                })
-            })
-            .unwrap_or(false)
+                } else {
+                    false
+                }
+            }
+            // isabeltodo time?
+            PooledConnectionState::CheckedOut { .. } | PooledConnectionState::Pinned { .. } => {
+                false
+            }
+        }
     }
 
-    /// Nullify the inner state and return it in a new [`Connection`] for checking back in to
-    /// the pool.
-    fn take(&mut self) -> Self {
+    /// Nullifies the internal state of this connection and returns it in a new [PooledConnection].
+    /// If a state is provided, then the new connection will contain that state; otherwise, this
+    /// connection's state will be cloned.
+    fn take(&mut self, state: impl Into<Option<PooledConnectionState>>) -> Self {
         Self {
             connection: self.connection.take(),
             generation: self.generation,
             event_emitter: self.event_emitter.clone(),
-            pool_manager: None,
-            ready_and_available_time: None,
-            pinned_sender: self.pinned_sender.clone(),
+            state: state.into().unwrap_or_else(|| self.state.clone()),
         }
     }
 
-    /// Pin the connection, removing it from the normal connection pool.
+    /// Pin the connection and return a handle to the pinned connection.
     pub(crate) fn pin(&mut self) -> Result<PinnedConnectionHandle> {
-        if self.pinned_sender.is_some() {
-            return Err(Error::internal(format!(
-                "cannot pin an already-pinned connection (id = {})",
-                self.id
-            )));
-        }
-        if self.pool_manager.is_none() {
-            return Err(Error::internal(format!(
-                "cannot pin a checked-in connection (id = {})",
-                self.id
-            )));
-        }
-        let (tx, rx) = mpsc::channel(1);
-        self.pinned_sender = Some(tx);
+        let rx = match &mut self.state {
+            PooledConnectionState::CheckedIn { .. } => {
+                return Err(Error::internal(format!(
+                    "cannot pin a checked-in connection (id = {})",
+                    self.id
+                )))
+            }
+            PooledConnectionState::CheckedOut { ref pool_manager } => {
+                let (tx, rx) = mpsc::channel(1);
+                self.state = PooledConnectionState::Pinned {
+                    // Mark the connection as in-use while the operation currently using the
+                    // connection finishes. Once that operation drops the connection, it will be
+                    // sent back to the pinner.
+                    pinned_state: PinnedState::InUse { pinned_sender: tx },
+                    pool_manager: pool_manager.clone(),
+                };
+                rx
+            }
+            PooledConnectionState::Pinned { pinned_state, .. } => match pinned_state {
+                PinnedState::InUse { .. } => {
+                    return Err(Error::internal(format!(
+                        "cannot pin an already-pinned connection (id = {})",
+                        self.id
+                    )))
+                }
+                PinnedState::Returned { .. } => {
+                    let (tx, rx) = mpsc::channel(1);
+                    *pinned_state = PinnedState::InUse { pinned_sender: tx };
+                    rx
+                }
+            },
+        };
         Ok(PinnedConnectionHandle {
             id: self.id,
             receiver: Arc::new(Mutex::new(rx)),
@@ -173,7 +232,10 @@ impl PooledConnection {
 
     /// Close this connection, emitting a [`ConnectionClosedEvent`] with the supplied reason.
     fn close(&mut self, reason: ConnectionClosedReason) {
-        self.pool_manager.take();
+        // isabeltodo add closed state?
+        self.state = PooledConnectionState::CheckedIn {
+            available_time: Instant::now(),
+        };
         self.event_emitter
             .emit_event(|| self.closed_event(reason).into());
     }
@@ -227,56 +289,73 @@ impl PooledConnection {
 
 impl Drop for PooledConnection {
     fn drop(&mut self) {
-        // If the connection has a pool manager, that means that the connection is
-        // being dropped when it's checked out. If the pool is still alive, it
-        // should check itself back in. Otherwise, the connection should close
-        // itself and emit a ConnectionClosed event (because the `close_and_drop`
-        // helper was not called explicitly).
-        //
-        // If the connection does not have a pool manager, then the connection is
-        // being dropped while it's not checked out. This means that the pool called
-        // the `close_and_drop` helper explicitly, so we don't add it back to the
-        // pool or emit any events.
-        if let Some(pool_manager) = self.pool_manager.take() {
-            let mut dropped_connection = self.take();
-            let result = if let Some(sender) = self.pinned_sender.as_mut() {
-                // Preserve the pool manager and timestamp for pinned connections.
-                dropped_connection.pool_manager = Some(pool_manager.clone());
-                dropped_connection.ready_and_available_time = self.ready_and_available_time;
-                match sender.try_send(dropped_connection) {
-                    Ok(()) => Ok(()),
-                    // The connection has been unpinned and should be checked back in.
-                    Err(mpsc::error::TrySendError::Closed(mut conn)) => {
-                        conn.pinned_sender = None;
-                        conn.ready_and_available_time = None;
-                        pool_manager.check_in(conn)
-                    }
-                    // The connection is being returned to the pin holder while another connection
-                    // is in the pin buffer; this should never happen.  Only possible action is to
-                    // check the connection back in.
-                    Err(mpsc::error::TrySendError::Full(mut conn)) => {
-                        // Panic in debug mode
-                        if cfg!(debug_assertions) {
-                            panic!(
-                                "buffer full when attempting to return a pinned connection (id = \
-                                 {})",
-                                conn.id
-                            );
-                        }
-                        // TODO RUST-230 log an error in non-debug mode.
-                        conn.pinned_sender = None;
-                        conn.ready_and_available_time = None;
-                        pool_manager.check_in(conn)
-                    }
-                }
-            } else {
+        let result = match &self.state {
+            // Nothing needs to be done when a checked-in connection is dropped.
+            PooledConnectionState::CheckedIn { .. } => Ok(()),
+            // A checked-out connection should be sent back to the connection pool.
+            PooledConnectionState::CheckedOut { pool_manager } => {
+                let pool_manager = pool_manager.clone();
+                let mut dropped_connection = self.take(None);
+                dropped_connection.mark_checked_in();
                 pool_manager.check_in(dropped_connection)
-            };
-            if let Err(mut conn) = result {
-                // the check in failed because the pool has been dropped, so we emit the event
-                // here and drop the connection.
-                conn.close(ConnectionClosedReason::PoolClosed);
             }
+            // A pinned connection should be returned to its pinner or to the connection pool.
+            PooledConnectionState::Pinned {
+                pinned_state,
+                pool_manager,
+            } => {
+                let pool_manager = pool_manager.clone();
+                match pinned_state {
+                    // If the pinned connection is in use, it is being dropped at the end of an
+                    // operation and should be sent back to its pinner.
+                    PinnedState::InUse { pinned_sender } => {
+                        let pinned_sender = pinned_sender.clone();
+
+                        let dropped_connection = self.take(PooledConnectionState::Pinned {
+                            pinned_state: PinnedState::Returned {
+                                returned_time: Instant::now(),
+                            },
+                            pool_manager: pool_manager.clone(),
+                        });
+
+                        if let Err(send_error) = pinned_sender.try_send(dropped_connection) {
+                            use mpsc::error::TrySendError;
+                            let returned_connection = match send_error {
+                                // The connection is being returned to the pin holder while another
+                                // connection is in the pin buffer; this should never happen. Panic
+                                // in debug mode and send the connection back to the pool.
+                                TrySendError::Full(returned_connection) => {
+                                    if cfg!(debug_assertions) {
+                                        panic!(
+                                            "buffer full when attempting to return pinned \
+                                             connection to its pinner (id: {})",
+                                            self.id
+                                        );
+                                    }
+                                    returned_connection
+                                }
+                                // The pinner has dropped, so the connection should be returned to
+                                // the pool.
+                                TrySendError::Closed(returned_connection) => returned_connection,
+                            };
+
+                            pool_manager.check_in(returned_connection)
+                        } else {
+                            Ok(())
+                        }
+                    }
+                    // The pinner of this connection has been dropped while the connection was
+                    // sitting in its channel, so the connection should be returned to the pool.
+                    PinnedState::Returned { .. } => pool_manager.check_in(self.take(None)),
+                }
+            }
+        };
+
+        // Checking in the connection failed because the pool has closed, so emit an event.
+        if let Err(mut returned_connection) = result {
+            // Mark as checked in to prevent a drop cycle.
+            returned_connection.mark_checked_in();
+            returned_connection.event_emitter.emit_event(|| self.closed_event(ConnectionClosedReason::PoolClosed).into());
         }
     }
 }
