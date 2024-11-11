@@ -161,21 +161,18 @@ impl PooledConnection {
 
     /// Whether this connection is idle.
     pub(crate) fn is_idle(&self, max_idle_time: Option<Duration>) -> bool {
-        match self.state {
-            PooledConnectionState::CheckedIn {
-                available_time: ready_and_available_time,
-            } => {
-                if let Some(max_idle_time) = max_idle_time {
-                    Instant::now().duration_since(ready_and_available_time) >= max_idle_time
-                } else {
-                    false
-                }
-            }
-            // isabeltodo time?
-            PooledConnectionState::CheckedOut { .. } | PooledConnectionState::Pinned { .. } => {
-                false
-            }
-        }
+        let Some(max_idle_time) = max_idle_time else {
+            return false;
+        };
+        let available_time = match self.state {
+            PooledConnectionState::CheckedIn { available_time } => available_time,
+            PooledConnectionState::Pinned {
+                pinned_state: PinnedState::Returned { returned_time },
+                ..
+            } => returned_time,
+            _ => return false,
+        };
+        Instant::now().duration_since(available_time) >= max_idle_time
     }
 
     /// Nullifies the internal state of this connection and returns it in a new [PooledConnection].
@@ -230,17 +227,8 @@ impl PooledConnection {
         })
     }
 
-    /// Close this connection, emitting a [`ConnectionClosedEvent`] with the supplied reason.
-    pub(crate) fn close_and_drop(mut self, reason: ConnectionClosedReason) {
-        self.close(reason);
-    }
-
-    /// Close this connection, emitting a [`ConnectionClosedEvent`] with the supplied reason.
-    fn close(&mut self, reason: ConnectionClosedReason) {
-        // isabeltodo add closed state?
-        self.state = PooledConnectionState::CheckedIn {
-            available_time: Instant::now(),
-        };
+    /// Emit a [`ConnectionClosedEvent`] for this connection with the supplied reason.
+    pub(crate) fn emit_closed_event(&self, reason: ConnectionClosedReason) {
         self.event_emitter
             .emit_event(|| self.closed_event(reason).into());
     }
@@ -360,9 +348,7 @@ impl Drop for PooledConnection {
         if let Err(mut returned_connection) = result {
             // Mark as checked in to prevent a drop cycle.
             returned_connection.mark_checked_in();
-            returned_connection
-                .event_emitter
-                .emit_event(|| self.closed_event(ConnectionClosedReason::PoolClosed).into());
+            returned_connection.emit_closed_event(ConnectionClosedReason::PoolClosed);
         }
     }
 }

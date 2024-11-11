@@ -348,7 +348,7 @@ impl ConnectionPoolWorker {
         }
 
         while let Some(connection) = self.available_connections.pop_front() {
-            connection.close_and_drop(ConnectionClosedReason::PoolClosed);
+            connection.emit_closed_event(ConnectionClosedReason::PoolClosed);
         }
 
         self.event_emitter.emit_event(|| {
@@ -583,7 +583,7 @@ impl ConnectionPoolWorker {
             (PoolGeneration::Normal(_), None) => {}
             _ => load_balanced_mode_mismatch!(),
         }
-        connection.close_and_drop(reason);
+        connection.emit_closed_event(reason);
         self.total_connection_count -= 1;
     }
 
