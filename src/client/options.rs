@@ -212,10 +212,19 @@ impl ServerAddress {
         #[cfg(unix)]
         {
             if address.ends_with(".sock") {
-                let address = percent_decode(address, "unix domain sockets must be URL-encoded")?;
-                return Ok(Self::Unix {
-                    path: PathBuf::from(address),
-                });
+                #[cfg(unix)]
+                {
+                    let address =
+                        percent_decode(address, "unix domain sockets must be URL-encoded")?;
+                    return Ok(Self::Unix {
+                        path: PathBuf::from(address),
+                    });
+                }
+                #[cfg(not(unix))]
+                return Err(ErrorKind::InvalidArgument {
+                    message: "unix domain sockets are not supported on this platform",
+                }
+                .into());
             }
         }
 
