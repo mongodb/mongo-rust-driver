@@ -35,6 +35,7 @@ use crate::{
 /// directly from this one.
 #[derive_where(Debug)]
 pub(crate) struct PooledConnection {
+    /// The connection this pooled connection wraps.
     connection: Connection,
 
     /// The connection pool generation from which this connection was checked out.
@@ -75,11 +76,15 @@ enum PooledConnectionState {
 enum PinnedState {
     /// The state associated with a pinned connection that is currently in use.
     InUse {
+        /// The sender that can be used to return the connection to its pinner.
         pinned_sender: mpsc::Sender<PooledConnection>,
     },
 
-    /// The state associated with a pinned connection that is currently idle.
-    Returned { returned_time: Instant },
+    /// The state associated with a pinned connection that has been returned to its pinner.
+    Returned {
+        /// The time at which the connection was returned to its pinner.
+        returned_time: Instant,
+    },
 }
 
 impl Deref for PooledConnection {
@@ -355,7 +360,9 @@ impl Drop for PooledConnection {
         if let Err(mut returned_connection) = result {
             // Mark as checked in to prevent a drop cycle.
             returned_connection.mark_checked_in();
-            returned_connection.event_emitter.emit_event(|| self.closed_event(ConnectionClosedReason::PoolClosed).into());
+            returned_connection
+                .event_emitter
+                .emit_event(|| self.closed_event(ConnectionClosedReason::PoolClosed).into());
         }
     }
 }
