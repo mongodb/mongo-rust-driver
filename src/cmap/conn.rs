@@ -1,5 +1,4 @@
 mod command;
-mod monitoring;
 pub(crate) mod pooled;
 mod stream_description;
 pub(crate) mod wire;
