@@ -1,4 +1,4 @@
-use derivative::Derivative;
+use derive_where::derive_where;
 use serde::{Deserialize, Serialize};
 
 use crate::bson::{Document, Timestamp};
@@ -7,13 +7,13 @@ use crate::bson::{Document, Timestamp};
 ///
 /// See [the MongoDB documentation](https://www.mongodb.com/docs/manual/core/read-isolation-consistency-recency/)
 /// for more information.
-#[derive(Debug, Deserialize, Clone, Serialize, Derivative)]
-#[derivative(PartialEq, Eq)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
+#[derive_where(PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ClusterTime {
     pub(crate) cluster_time: Timestamp,
 
-    #[derivative(PartialEq = "ignore")]
+    #[derive_where(skip)]
     pub(crate) signature: Document,
 }
 
