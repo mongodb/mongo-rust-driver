@@ -349,3 +349,15 @@ fn invalid_ipv6() {
     let message = error.message().unwrap();
     assert!(message.contains("the port must be an integer"), "{message}");
 }
+
+#[cfg(not(unix))]
+#[test]
+fn unix_domain_socket_not_allowed() {
+    let address = "address.sock";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(
+        message.contains("not supported on this platform"),
+        "{message}"
+    );
+}

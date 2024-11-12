@@ -210,23 +210,19 @@ impl ServerAddress {
     pub fn parse(address: impl AsRef<str>) -> Result<Self> {
         let address = address.as_ref();
 
-        #[cfg(unix)]
-        {
-            if address.ends_with(".sock") {
-                #[cfg(unix)]
-                {
-                    let address =
-                        percent_decode(address, "unix domain sockets must be URL-encoded")?;
-                    return Ok(Self::Unix {
-                        path: PathBuf::from(address),
-                    });
-                }
-                #[cfg(not(unix))]
-                return Err(ErrorKind::InvalidArgument {
-                    message: "unix domain sockets are not supported on this platform",
-                }
-                .into());
+        if address.ends_with(".sock") {
+            #[cfg(unix)]
+            {
+                let address = percent_decode(address, "unix domain sockets must be URL-encoded")?;
+                return Ok(Self::Unix {
+                    path: PathBuf::from(address),
+                });
             }
+            #[cfg(not(unix))]
+            return Err(ErrorKind::InvalidArgument {
+                message: "unix domain sockets are not supported on this platform",
+            }
+            .into());
         }
 
         let (hostname, port) = if let Some(ip_literal) = address.strip_prefix("[") {
