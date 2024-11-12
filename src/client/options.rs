@@ -220,7 +220,7 @@ impl ServerAddress {
             }
             #[cfg(not(unix))]
             return Err(ErrorKind::InvalidArgument {
-                message: "unix domain sockets are not supported on this platform",
+                message: "unix domain sockets are not supported on this platform".to_string(),
             }
             .into());
         }
@@ -1207,6 +1207,7 @@ impl ClientOptions {
                     .iter()
                     .filter_map(|addr| match addr {
                         ServerAddress::Tcp { host, .. } => Some(host.to_ascii_lowercase()),
+                        #[cfg(unix)]
                         _ => None,
                     })
                     .collect()
