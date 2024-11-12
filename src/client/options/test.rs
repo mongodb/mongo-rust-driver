@@ -319,3 +319,33 @@ async fn options_enforce_min_heartbeat_frequency() {
 
     Client::with_options(options).unwrap_err();
 }
+
+#[test]
+fn invalid_ipv6() {
+    // invalid hostname for ipv6
+    let address = "[localhost]:27017";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(message.contains("invalid IPv6 address syntax"), "{message}");
+
+    // invalid character after hostname
+    let address = "[::1]a";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(
+        message.contains("the hostname can only be followed by a port"),
+        "{message}"
+    );
+
+    // missing bracket
+    let address = "[::1:27017";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(message.contains("missing closing ']'"), "{message}");
+
+    // extraneous bracket
+    let address = "[::1]:27017]";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(message.contains("the port must be an integer"), "{message}");
+}

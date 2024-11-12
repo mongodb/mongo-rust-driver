@@ -11,6 +11,7 @@ use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter, Write},
     hash::{Hash, Hasher},
+    net::Ipv6Addr,
     path::PathBuf,
     str::FromStr,
     time::Duration,
@@ -205,7 +206,7 @@ impl FromStr for ServerAddress {
 }
 
 impl ServerAddress {
-    /// Parses an address string into a [ServerAddress].
+    /// Parses an address string into a [`ServerAddress`].
     pub fn parse(address: impl AsRef<str>) -> Result<Self> {
         let address = address.as_ref();
 
@@ -238,6 +239,13 @@ impl ServerAddress {
                 }
                 .into());
             };
+
+            if let Err(parse_error) = Ipv6Addr::from_str(hostname) {
+                return Err(ErrorKind::InvalidArgument {
+                    message: format!("invalid server address {}: {}", address, parse_error),
+                }
+                .into());
+            }
 
             let port = if port.is_empty() {
                 None
