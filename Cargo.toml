@@ -75,8 +75,8 @@ chrono = { version = "0.4.7", default-features = false, features = [
     "clock",
     "std",
 ] }
-derivative = "2.1.1"
 derive_more = "0.99.17"
+derive-where = "1.2.7"
 flate2 = { version = "1.0", optional = true }
 futures-io = "0.3.21"
 futures-core = "0.3.14"

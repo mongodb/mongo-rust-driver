@@ -12,6 +12,7 @@ use bson::RawDocument;
 
 #[cfg(test)]
 use bson::RawDocumentBuf;
+use derive_where::derive_where;
 use futures_core::Stream;
 use serde::{de::DeserializeOwned, Deserialize};
 #[cfg(test)]
@@ -98,7 +99,7 @@ pub(crate) use common::{
 /// If a [`Cursor`] is still open when it goes out of scope, it will automatically be closed via an
 /// asynchronous [killCursors](https://www.mongodb.com/docs/manual/reference/command/killCursors/) command executed
 /// from its [`Drop`](https://doc.rust-lang.org/std/ops/trait.Drop.html) implementation.
-#[derive(Debug)]
+#[derive_where(Debug)]
 pub struct Cursor<T> {
     client: Client,
     drop_token: AsyncDropToken,
@@ -108,6 +109,7 @@ pub struct Cursor<T> {
     drop_address: Option<ServerAddress>,
     #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
+    #[derive_where(skip)]
     _phantom: std::marker::PhantomData<fn() -> T>,
 }
 
