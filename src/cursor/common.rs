@@ -6,7 +6,7 @@ use std::{
 };
 
 use bson::{RawDocument, RawDocumentBuf};
-use derivative::Derivative;
+use derive_where::derive_where;
 use futures_core::{future::BoxFuture, Future};
 #[cfg(test)]
 use tokio::sync::oneshot;
@@ -35,10 +35,9 @@ pub(super) enum AdvanceResult {
 }
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive_where(Debug)]
 pub(super) struct GenericCursor<'s, S> {
-    #[derivative(Debug = "ignore")]
+    #[derive_where(skip)]
     provider: GetMoreProvider<'s, S>,
     client: Client,
     info: CursorInformation,

@@ -15,7 +15,7 @@ mod x509;
 use std::{borrow::Cow, fmt::Debug, str::FromStr};
 
 use bson::RawDocumentBuf;
-use derivative::Derivative;
+use derive_where::derive_where;
 use hmac::{digest::KeyInit, Mac};
 use rand::Rng;
 use serde::Deserialize;
@@ -458,8 +458,8 @@ impl FromStr for AuthMechanism {
 ///
 /// Some fields (mechanism and source) may be omitted and will either be negotiated or assigned a
 /// default value, depending on the values of other fields in the credential.
-#[derive(Clone, Default, Deserialize, TypedBuilder, Derivative)]
-#[derivative(PartialEq)]
+#[derive(Clone, Default, Deserialize, TypedBuilder)]
+#[derive_where(PartialEq)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct Credential {
@@ -506,7 +506,7 @@ pub struct Credential {
     /// }
     /// ```
     #[serde(skip)]
-    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    #[derive_where(skip)]
     #[builder(default)]
     pub oidc_callback: oidc::Callback,
 }

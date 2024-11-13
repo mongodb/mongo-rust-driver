@@ -11,7 +11,7 @@ mod worker;
 
 use std::time::Instant;
 
-use derivative::Derivative;
+use derive_where::derive_where;
 
 pub use self::conn::ConnectionInfo;
 pub(crate) use self::{
@@ -51,15 +51,15 @@ pub(crate) const DEFAULT_MAX_POOL_SIZE: u32 = 10;
 /// A pool of connections implementing the CMAP spec.
 /// This type is actually a handle to task that manages the connections and is cheap to clone and
 /// pass around.
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone)]
+#[derive_where(Debug)]
 pub(crate) struct ConnectionPool {
     address: ServerAddress,
     manager: PoolManager,
     connection_requester: ConnectionRequester,
     generation_subscriber: PoolGenerationSubscriber,
 
-    #[derivative(Debug = "ignore")]
+    #[derive_where(skip)]
     event_emitter: CmapEventEmitter,
 }
 

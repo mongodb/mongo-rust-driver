@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use derivative::Derivative;
+use derive_where::derive_where;
 use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
 use typed_builder::TypedBuilder;
 
@@ -13,8 +13,8 @@ use crate::{
 };
 
 /// Describes which servers are suitable for a given operation.
-#[derive(Clone, Derivative, derive_more::Display)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Display)]
+#[derive_where(Debug)]
 #[non_exhaustive]
 pub enum SelectionCriteria {
     /// A read preference that describes the suitable servers based on the server type, max
@@ -27,7 +27,7 @@ pub enum SelectionCriteria {
     /// A predicate used to filter servers that are considered suitable. A `server` will be
     /// considered suitable by a `predicate` if `predicate(server)` returns true.
     #[display(fmt = "Custom predicate")]
-    Predicate(#[derivative(Debug = "ignore")] Predicate),
+    Predicate(#[derive_where(skip)] Predicate),
 }
 
 impl PartialEq for SelectionCriteria {

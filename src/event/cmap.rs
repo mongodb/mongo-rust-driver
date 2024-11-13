@@ -6,8 +6,9 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::{bson::oid::ObjectId, options::ServerAddress, serde_util};
-use derivative::Derivative;
 use derive_more::From;
+#[cfg(feature = "tracing-unstable")]
+use derive_where::derive_where;
 
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
@@ -144,8 +145,9 @@ pub struct ConnectionReadyEvent {
 }
 
 /// Event emitted when a connection is closed.
-#[derive(Clone, Debug, Deserialize, Derivative, Serialize)]
-#[derivative(PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "tracing-unstable", derive_where(PartialEq))]
+#[cfg_attr(not(feature = "tracing-unstable"), derive(PartialEq))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionClosedEvent {
@@ -167,7 +169,7 @@ pub struct ConnectionClosedEvent {
     /// in future work we may add this to public API on the event itself. TODO: DRIVERS-2495
     #[cfg(feature = "tracing-unstable")]
     #[serde(skip)]
-    #[derivative(PartialEq = "ignore")]
+    #[derive_where(skip)]
     pub(crate) error: Option<crate::error::Error>,
 }
 
@@ -203,8 +205,9 @@ pub struct ConnectionCheckoutStartedEvent {
 }
 
 /// Event emitted when a thread is unable to check out a connection.
-#[derive(Clone, Debug, Deserialize, Derivative, Serialize)]
-#[derivative(PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "tracing-unstable", derive_where(PartialEq))]
+#[cfg_attr(not(feature = "tracing-unstable"), derive(PartialEq))]
 #[non_exhaustive]
 pub struct ConnectionCheckoutFailedEvent {
     /// The address of the server that the connection would have connected to.
@@ -220,7 +223,7 @@ pub struct ConnectionCheckoutFailedEvent {
     /// in future work we may add this to public API on the event itself. TODO: DRIVERS-2495
     #[cfg(feature = "tracing-unstable")]
     #[serde(skip)]
-    #[derivative(PartialEq = "ignore")]
+    #[derive_where(skip)]
     pub(crate) error: Option<crate::error::Error>,
 
     /// See [ConnectionCheckedOutEvent::duration].
