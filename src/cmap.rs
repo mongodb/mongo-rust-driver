@@ -14,15 +14,16 @@ use std::time::Instant;
 use derive_where::derive_where;
 
 pub use self::conn::ConnectionInfo;
+use self::{
+    conn::pooled::PooledConnection,
+    connection_requester::ConnectionRequestResult,
+    establish::ConnectionEstablisher,
+    options::ConnectionPoolOptions,
+};
 pub(crate) use self::{
     conn::{Command, Connection, RawCommandResponse, StreamDescription},
     status::PoolGenerationSubscriber,
     worker::PoolGeneration,
-};
-use self::{
-    connection_requester::ConnectionRequestResult,
-    establish::ConnectionEstablisher,
-    options::ConnectionPoolOptions,
 };
 use crate::{
     bson::oid::ObjectId,
@@ -120,7 +121,7 @@ impl ConnectionPool {
     /// Checks out a connection from the pool. This method will yield until this thread is at the
     /// front of the wait queue, and then will block again if no available connections are in the
     /// pool and the total number of connections is not less than the max pool size.
-    pub(crate) async fn check_out(&self) -> Result<Connection> {
+    pub(crate) async fn check_out(&self) -> Result<PooledConnection> {
         let time_started = Instant::now();
         self.event_emitter.emit_event(|| {
             ConnectionCheckoutStartedEvent {

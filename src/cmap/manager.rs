@@ -1,6 +1,6 @@
 use tokio::sync::mpsc;
 
-use super::Connection;
+use super::conn::pooled::PooledConnection;
 use crate::{
     bson::oid::ObjectId,
     error::Error,
@@ -19,7 +19,7 @@ pub(super) fn channel() -> (PoolManager, ManagementRequestReceiver) {
 /// Struct used to make management requests to the pool (e.g. checking in a connection).
 /// A PoolManager will NOT keep a pool from going out of scope and closing.
 #[derive(Clone, Debug)]
-pub(super) struct PoolManager {
+pub(crate) struct PoolManager {
     sender: mpsc::UnboundedSender<PoolManagementRequest>,
 }
 
@@ -54,9 +54,13 @@ impl PoolManager {
         }
     }
 
-    /// Check in the given connection to the pool.
-    /// This returns an error containing the connection if the pool has been dropped already.
-    pub(crate) fn check_in(&self, connection: Connection) -> std::result::Result<(), Connection> {
+    /// Check in the given connection to the pool. This returns an error containing the connection
+    /// if the pool has been dropped. The connection's state will be transitioned to checked-in upon
+    /// success.
+    pub(crate) fn check_in(
+        &self,
+        connection: PooledConnection,
+    ) -> std::result::Result<(), PooledConnection> {
         if let Err(request) = self
             .sender
             .send(PoolManagementRequest::CheckIn(Box::new(connection)))
@@ -114,7 +118,7 @@ pub(super) enum PoolManagementRequest {
     },
 
     /// Check in the given connection.
-    CheckIn(Box<Connection>),
+    CheckIn(Box<PooledConnection>),
 
     /// Update the pool based on the given establishment error.
     HandleConnectionFailed,
@@ -128,7 +132,7 @@ pub(super) enum PoolManagementRequest {
 }
 
 impl PoolManagementRequest {
-    fn unwrap_check_in(self) -> Connection {
+    fn unwrap_check_in(self) -> PooledConnection {
         match self {
             PoolManagementRequest::CheckIn(conn) => *conn,
             _ => panic!("tried to unwrap checkin but got {:?}", self),
@@ -138,7 +142,7 @@ impl PoolManagementRequest {
 
 #[derive(Debug)]
 pub(super) enum ConnectionSucceeded {
-    ForPool(Box<Connection>),
+    ForPool(Box<PooledConnection>),
     Used { service_id: Option<ObjectId> },
 }
 

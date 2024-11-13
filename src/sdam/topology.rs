@@ -18,10 +18,9 @@ use tokio::sync::{
 use crate::{
     client::options::{ClientOptions, ServerAddress},
     cmap::{
-        conn::ConnectionGeneration,
+        conn::{pooled::PooledConnection, ConnectionGeneration},
         establish::{ConnectionEstablisher, EstablisherOptions},
         Command,
-        Connection,
         PoolGeneration,
     },
     error::{load_balanced_mode_mismatch, Error, Result},
@@ -1106,7 +1105,7 @@ pub(crate) enum HandshakePhase {
 }
 
 impl HandshakePhase {
-    pub(crate) fn after_completion(handshaked_connection: &Connection) -> Self {
+    pub(crate) fn after_completion(handshaked_connection: &PooledConnection) -> Self {
         Self::AfterCompletion {
             generation: handshaked_connection.generation,
             // given that this is a handshaked connection, the stream description should

@@ -1,6 +1,6 @@
 use tokio::sync::{mpsc, oneshot};
 
-use super::Connection;
+use super::conn::pooled::PooledConnection;
 use crate::{
     error::{Error, Result},
     runtime::{AsyncJoinHandle, WorkerHandle},
@@ -114,11 +114,11 @@ impl ConnectionRequest {
 #[derive(Debug)]
 pub(super) enum ConnectionRequestResult {
     /// A connection that was already established and was simply checked out of the pool.
-    Pooled(Box<Connection>),
+    Pooled(Box<PooledConnection>),
 
     /// A new connection in the process of being established.
     /// The handle can be awaited upon to receive the established connection.
-    Establishing(AsyncJoinHandle<Result<Connection>>),
+    Establishing(AsyncJoinHandle<Result<PooledConnection>>),
 
     /// The request was rejected because the pool was cleared before it could
     /// be fulfilled. The error that caused the pool to be cleared is returned.
@@ -129,7 +129,7 @@ pub(super) enum ConnectionRequestResult {
 }
 
 impl ConnectionRequestResult {
-    pub(super) fn unwrap_pooled_connection(self) -> Connection {
+    pub(super) fn unwrap_pooled_connection(self) -> PooledConnection {
         match self {
             ConnectionRequestResult::Pooled(c) => *c,
             _ => panic!("attempted to unwrap pooled connection when was establishing"),

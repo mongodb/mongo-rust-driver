@@ -1,7 +1,7 @@
 #[cfg(test)]
 use super::options::BackgroundThreadInterval;
 use super::{
-    conn::PendingConnection,
+    conn::{pooled::PooledConnection, PendingConnection},
     connection_requester,
     connection_requester::{
         ConnectionRequest,
@@ -16,7 +16,6 @@ use super::{
     options::ConnectionPoolOptions,
     status,
     status::{PoolGenerationPublisher, PoolGenerationSubscriber},
-    Connection,
     DEFAULT_MAX_POOL_SIZE,
 };
 use crate::{
@@ -73,7 +72,7 @@ pub(crate) struct ConnectionPoolWorker {
 
     /// The established connections that are currently checked into the pool and awaiting usage in
     /// future operations.
-    available_connections: VecDeque<Connection>,
+    available_connections: VecDeque<PooledConnection>,
 
     /// Contains the logic for "establishing" a connection. This includes handshaking and
     /// authenticating a connection when it's first created.
@@ -349,7 +348,7 @@ impl ConnectionPoolWorker {
         }
 
         while let Some(connection) = self.available_connections.pop_front() {
-            connection.close_and_drop(ConnectionClosedReason::PoolClosed);
+            connection.emit_closed_event(ConnectionClosedReason::PoolClosed);
         }
 
         self.event_emitter.emit_event(|| {
@@ -400,14 +399,14 @@ impl ConnectionPoolWorker {
                     continue;
                 }
 
-                conn.mark_as_in_use(self.manager.clone());
+                conn.mark_checked_out(self.manager.clone());
                 if let Err(request) =
                     request.fulfill(ConnectionRequestResult::Pooled(Box::new(conn)))
                 {
                     // checking out thread stopped listening, indicating it hit the WaitQueue
                     // timeout, so we put connection back into pool.
                     let mut connection = request.unwrap_pooled_connection();
-                    connection.mark_as_available();
+                    connection.mark_checked_in();
                     self.available_connections.push_back(connection);
                 }
 
@@ -436,7 +435,7 @@ impl ConnectionPoolWorker {
                 .await;
 
                 if let Ok(ref mut c) = establish_result {
-                    c.mark_as_in_use(manager.clone());
+                    c.mark_checked_out(manager.clone());
                     manager.handle_connection_succeeded(ConnectionSucceeded::Used {
                         service_id: c.generation.service_id(),
                     });
@@ -492,16 +491,16 @@ impl ConnectionPoolWorker {
         }
         if let ConnectionSucceeded::ForPool(connection) = connection {
             let mut connection = *connection;
-            connection.mark_as_available();
+            connection.mark_checked_in();
             self.available_connections.push_back(connection);
         }
     }
 
-    fn check_in(&mut self, mut conn: Connection) {
+    fn check_in(&mut self, mut conn: PooledConnection) {
         self.event_emitter
             .emit_event(|| conn.checked_in_event().into());
 
-        conn.mark_as_available();
+        conn.mark_checked_in();
 
         if conn.has_errored() {
             self.close_connection(conn, ConnectionClosedReason::Error);
@@ -567,7 +566,7 @@ impl ConnectionPoolWorker {
     /// Close a connection, emit the event for it being closed, and decrement the
     /// total connection count.
     #[allow(clippy::single_match)]
-    fn close_connection(&mut self, connection: Connection, reason: ConnectionClosedReason) {
+    fn close_connection(&mut self, connection: PooledConnection, reason: ConnectionClosedReason) {
         match (&mut self.generation, connection.generation.service_id()) {
             (PoolGeneration::LoadBalanced(gen_map), Some(sid)) => {
                 match self.service_connection_count.get_mut(&sid) {
@@ -584,7 +583,7 @@ impl ConnectionPoolWorker {
             (PoolGeneration::Normal(_), None) => {}
             _ => load_balanced_mode_mismatch!(),
         }
-        connection.close_and_drop(reason);
+        connection.emit_closed_event(reason);
         self.total_connection_count -= 1;
     }
 
@@ -659,7 +658,7 @@ async fn establish_connection(
     manager: &PoolManager,
     credential: Option<Credential>,
     event_emitter: CmapEventEmitter,
-) -> Result<Connection> {
+) -> Result<PooledConnection> {
     let connection_id = pending_connection.id;
     let address = pending_connection.address.clone();
 
