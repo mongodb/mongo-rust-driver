@@ -141,6 +141,16 @@
             },
             {
               "commandStartedEvent": {
+                "commandName": "insert",
+                "command": {
+                  "txnNumber": {
+                    "$$exists": true
+                  }
+                }
+              }
+            },
+            {
+              "commandStartedEvent": {
                 "commandName": "update",
                 "command": {
                   "txnNumber": {
@@ -555,6 +565,16 @@
         {
           "client": "client0",
           "events": [
+            {
+              "commandStartedEvent": {
+                "commandName": "insert",
+                "command": {
+                  "txnNumber": {
+                    "$$exists": true
+                  }
+                }
+              }
+            },
             {
               "commandStartedEvent": {
                 "commandName": "insert",
@@ -985,25 +1005,24 @@
       ]
     },
     {
-      "description": "collection bulkWrite with updateMany and deleteMany does not set txnNumber",
+      "description": "collection bulkWrite with updateMany does not set txnNumber",
       "operations": [
         {
           "object": "collection0",
           "name": "bulkWrite",
           "arguments": {
-            "requests": {
-              "updateMany": {
-                "filter": {},
-                "update": {
-                  "$set": {
-                    "x": 1
+            "requests": [
+              {
+                "updateMany": {
+                  "filter": {},
+                  "update": {
+                    "$set": {
+                      "x": 1
+                    }
                   }
                 }
-              },
-              "deleteMany": {
-                "filter": {}
               }
-            }
+            ]
           }
         }
       ],
@@ -1020,7 +1039,32 @@
                   }
                 }
               }
-            },
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "collection bulkWrite with deleteMany does not set txnNumber",
+      "operations": [
+        {
+          "object": "collection0",
+          "name": "bulkWrite",
+          "arguments": {
+            "requests": [
+              {
+                "deleteMany": {
+                  "filter": {}
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client0",
+          "events": [
             {
               "commandStartedEvent": {
                 "commandName": "delete",
