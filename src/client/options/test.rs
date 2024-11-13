@@ -6,12 +6,13 @@ use serde::Deserialize;
 
 use crate::{
     bson::{Bson, Document},
+    bson_util::get_int,
     client::options::{ClientOptions, ConnectionString, ServerAddress},
     error::ErrorKind,
-    options::Compressor,
-    test::run_spec_test,
+    test::spec::deserialize_spec_tests,
     Client,
 };
+
 #[derive(Debug, Deserialize)]
 struct TestFile {
     pub tests: Vec<TestCase>,
@@ -24,7 +25,7 @@ struct TestCase {
     uri: String,
     valid: bool,
     warning: Option<bool>,
-    hosts: Option<Vec<Document>>,
+    hosts: Option<Vec<ServerAddress>>,
     auth: Option<TestAuth>,
     options: Option<Document>,
 }
@@ -46,202 +47,168 @@ impl TestAuth {
     }
 }
 
-async fn run_test(test_file: TestFile) {
-    for mut test_case in test_file.tests {
-        if
-        // TODO: RUST-229: Implement IPv6 Support
-        test_case.description.contains("ipv6")
-            || test_case.description.contains("IP literal")
-            // TODO: RUST-226: Investigate whether tlsCertificateKeyFilePassword is supported in rustls
-            || test_case
-                .description
-                .contains("tlsCertificateKeyFilePassword")
-            // Not Implementing
-            || test_case.description.contains("tlsAllowInvalidHostnames")
-            || test_case.description.contains("single-threaded")
-            || test_case.description.contains("serverSelectionTryOnce")
-            || test_case.description.contains("relative path")
-            // Compression is implemented but will only pass the tests if all
-            // the appropriate feature flags are set.  That is because
-            // valid compressors are only parsed correctly if the corresponding feature flag is set.
-            // (otherwise they are treated as invalid, and hence ignored)
-            || (test_case.description.contains("compress") &&
-                    !cfg!(
-                        all(features = "zlib-compression",
-                            features = "zstd-compression",
-                            features = "snappy-compression"
-                        )
-                    )
-                )
-            // The Rust driver disallows `maxPoolSize=0`.
-            || test_case.description.contains("maxPoolSize=0 does not error")
-            // TODO RUST-933 implement custom srvServiceName support
-            || test_case.description.contains("custom srvServiceName")
-        {
-            continue;
-        }
+async fn run_tests(path: &[&str], skipped_files: &[&str]) {
+    let test_files = deserialize_spec_tests::<TestFile>(path, Some(skipped_files))
+        .into_iter()
+        .map(|(test_file, _)| test_file);
 
-        #[cfg(not(unix))]
-        if test_case.description.contains("Unix") {
-            continue;
-        }
+    for test_file in test_files {
+        for test_case in test_file.tests {
+            let mut skipped_tests = vec![
+                // TODO RUST-1309: unskip this test
+                "tlsInsecure is parsed correctly",
+                // The driver does not support maxPoolSize=0
+                "maxPoolSize=0 does not error",
+                // TODO RUST-226: unskip this test
+                "Valid tlsCertificateKeyFilePassword is parsed correctly",
+                "SRV URI with custom srvServiceName",
+            ];
 
-        let warning = test_case.warning.take().unwrap_or(false);
+            // TODO RUST-1896: unskip this test when openssl-tls is enabled
+            // if cfg!(not(feature = "openssl-tls"))
+            skipped_tests.push("tlsAllowInvalidHostnames is parsed correctly");
+            // }
 
-        if test_case.valid && !warning {
-            let mut is_unsupported_host_type = false;
-            // hosts
-            if let Some(mut json_hosts) = test_case.hosts.take() {
-                // skip over unsupported host types
-                #[cfg(not(unix))]
-                {
-                    is_unsupported_host_type = json_hosts.iter_mut().any(|h_json| {
-                        matches!(
-                            h_json.remove("type").as_ref().and_then(Bson::as_str),
-                            Some("ip_literal") | Some("unix")
-                        )
-                    });
-                }
-
-                #[cfg(unix)]
-                {
-                    is_unsupported_host_type = json_hosts.iter_mut().any(|h_json| {
-                        matches!(
-                            h_json.remove("type").as_ref().and_then(Bson::as_str),
-                            Some("ip_literal")
-                        )
-                    });
-                }
-
-                if !is_unsupported_host_type {
-                    let options = ClientOptions::parse(&test_case.uri).await.unwrap();
-                    let hosts: Vec<_> = options
-                        .hosts
-                        .into_iter()
-                        .map(ServerAddress::into_document)
-                        .collect();
-
-                    assert_eq!(hosts, json_hosts);
-                }
+            if cfg!(not(feature = "zlib-compression")) {
+                skipped_tests.push("Valid compression options are parsed correctly");
+                skipped_tests.push("Non-numeric zlibCompressionLevel causes a warning");
+                skipped_tests.push("Too low zlibCompressionLevel causes a warning");
+                skipped_tests.push("Too high zlibCompressionLevel causes a warning");
             }
-            if !is_unsupported_host_type {
-                // options
-                let options = ClientOptions::parse(&test_case.uri)
-                    .await
-                    .expect(&test_case.description);
-                let mut options_doc = bson::to_document(&options).unwrap_or_else(|_| {
-                    panic!(
-                        "{}: Failed to serialize ClientOptions",
-                        &test_case.description
-                    )
-                });
-                if let Some(json_options) = test_case.options {
-                    let mut json_options: Document = json_options
-                        .into_iter()
-                        .filter_map(|(k, v)| {
-                            if let Bson::Null = v {
-                                None
-                            } else {
-                                Some((k.to_lowercase(), v))
-                            }
+
+            if cfg!(not(all(
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))) {
+                skipped_tests.push("Multiple compressors are parsed correctly");
+            }
+
+            if skipped_tests.contains(&test_case.description.as_str()) {
+                continue;
+            }
+
+            let client_options_result = ClientOptions::parse(&test_case.uri).await;
+
+            // The driver does not log warnings for unsupported or incorrect connection string
+            // values, so expect an error when warning is set to true.
+            if test_case.valid && test_case.warning != Some(true) {
+                let client_options = client_options_result.expect(&test_case.description);
+
+                if let Some(ref expected_hosts) = test_case.hosts {
+                    assert_eq!(
+                        &client_options.hosts, expected_hosts,
+                        "{}",
+                        test_case.description
+                    );
+                }
+
+                let mut actual_options =
+                    bson::to_document(&client_options).expect(&test_case.description);
+
+                if let Some(mode) = actual_options.remove("mode") {
+                    actual_options.insert("readPreference", mode);
+                }
+
+                if let Some(tags) = actual_options.remove("tagSets") {
+                    actual_options.insert("readPreferenceTags", tags);
+                }
+
+                #[cfg(any(
+                    feature = "zstd-compression",
+                    feature = "zlib-compression",
+                    feature = "snappy-compression"
+                ))]
+                if let Some(ref compressors) = client_options.compressors {
+                    use crate::options::Compressor;
+
+                    actual_options.insert(
+                        "compressors",
+                        compressors
+                            .iter()
+                            .map(Compressor::name)
+                            .collect::<Vec<&str>>(),
+                    );
+
+                    #[cfg(feature = "zlib-compression")]
+                    if let Some(zlib_compression_level) = compressors
+                        .iter()
+                        .filter_map(|compressor| match compressor {
+                            Compressor::Zlib { level } => *level,
+                            _ => None,
                         })
-                        .collect();
+                        .next()
+                    {
+                        actual_options.insert("zlibcompressionlevel", zlib_compression_level);
+                    }
+                }
 
-                    // tlsallowinvalidcertificates and tlsinsecure must be inverse of each other
-                    if !json_options.contains_key("tlsallowinvalidcertificates") {
-                        if let Some(val) = json_options.remove("tlsinsecure") {
-                            json_options
-                                .insert("tlsallowinvalidcertificates", !val.as_bool().unwrap());
+                if let Some(ref expected_options) = test_case.options {
+                    for (expected_key, expected_value) in expected_options {
+                        if expected_value == &Bson::Null {
+                            continue;
+                        }
+
+                        let (_, actual_value) = actual_options
+                            .iter()
+                            .find(|(actual_key, _)| {
+                                actual_key.to_ascii_lowercase() == expected_key.to_ascii_lowercase()
+                            })
+                            .unwrap_or_else(|| {
+                                panic!(
+                                    "{}: parsed options missing {} key",
+                                    test_case.description, expected_key
+                                )
+                            });
+
+                        if let Some(expected_number) = get_int(expected_value) {
+                            let actual_number = get_int(actual_value).unwrap_or_else(|| {
+                                panic!(
+                                    "{}: {} should be a numeric value but got {}",
+                                    &test_case.description, expected_key, actual_value
+                                )
+                            });
+                            assert_eq!(actual_number, expected_number, "{}", test_case.description);
+                        } else {
+                            assert_eq!(actual_value, expected_value, "{}", test_case.description);
                         }
                     }
-
-                    // The default types parsed from the test file don't match those serialized
-                    // from the `ClientOptions` struct.
-                    if let Ok(min) = json_options.get_i32("minpoolsize") {
-                        json_options.insert("minpoolsize", Bson::Int64(min.into()));
-                    }
-                    if let Ok(max) = json_options.get_i32("maxpoolsize") {
-                        json_options.insert("maxpoolsize", Bson::Int64(max.into()));
-                    }
-                    if let Ok(max_connecting) = json_options.get_i32("maxconnecting") {
-                        json_options.insert("maxconnecting", Bson::Int64(max_connecting.into()));
-                    }
-
-                    options_doc = options_doc
-                        .into_iter()
-                        .filter(|(ref key, _)| json_options.contains_key(key))
-                        .collect();
-
-                    // This is required because compressor is not serialize, but the spec tests
-                    // still expect to see serialized compressors.
-                    // This hardcodes the compressors into the options.
-                    if let Some(compressors) = options.compressors {
-                        options_doc.insert(
-                            "compressors",
-                            compressors
-                                .iter()
-                                .map(Compressor::name)
-                                .collect::<Vec<&str>>(),
-                        );
-                        #[cfg(feature = "zlib-compression")]
-                        for compressor in compressors {
-                            if let Compressor::Zlib { level: Some(level) } = compressor {
-                                options_doc.insert("zlibcompressionlevel", level);
-                            }
-                        }
-                    }
-                    assert_eq!(options_doc, json_options, "{}", test_case.description)
                 }
 
                 if let Some(test_auth) = test_case.auth {
-                    let options = ClientOptions::parse(&test_case.uri).await.unwrap();
-                    assert!(test_auth.matches_client_options(&options));
+                    assert!(test_auth.matches_client_options(&client_options));
                 }
-            }
-        } else {
-            let expected_type = if warning { "warning" } else { "error" };
-
-            match ClientOptions::parse(&test_case.uri)
-                .await
-                .map_err(|e| *e.kind)
-            {
-                Ok(_) => panic!("expected {}", expected_type),
-                Err(ErrorKind::InvalidArgument { .. }) => {}
-                Err(e) => panic!("expected InvalidArgument, but got {:?}", e),
+            } else {
+                let error = client_options_result.expect_err(&test_case.description);
+                assert!(
+                    matches!(*error.kind, ErrorKind::InvalidArgument { .. }),
+                    "{}",
+                    &test_case.description
+                );
             }
         }
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn run_uri_options_spec_tests() {
-    run_spec_test(&["uri-options"], run_test).await;
+    let skipped_files = vec!["single-threaded-options.json", "sdam-options.json"];
+    run_tests(&["uri-options"], &skipped_files).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn run_connection_string_spec_tests() {
-    run_spec_test(&["connection-string"], run_test).await;
-}
-
-async fn parse_uri(option: &str, suggestion: Option<&str>) {
-    match ConnectionString::parse(format!("mongodb://host:27017/?{}=test", option))
-        .map_err(|e| *e.kind)
-    {
-        Ok(_) => panic!("expected error for option {}", option),
-        Err(ErrorKind::InvalidArgument { message, .. }) => {
-            match suggestion {
-                Some(s) => assert!(message.contains(s)),
-                None => assert!(!message.contains("similar")),
-            };
-        }
-        Err(e) => panic!("expected InvalidArgument, but got {:?}", e),
+    let mut skipped_files = Vec::new();
+    if cfg!(not(unix)) {
+        skipped_files.push("valid-unix_socket-absolute.json");
+        skipped_files.push("valid-unix_socket-relative.json");
+        // All the tests in this file use unix domain sockets
+        skipped_files.push("valid-db-with-dotted-name.json");
     }
+
+    run_tests(&["connection-string"], &skipped_files).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn uuid_representations() {
     let mut uuid_repr = parse_uri_with_uuid_representation("csharpLegacy")
         .await
@@ -269,7 +236,9 @@ async fn uuid_representations() {
     );
 }
 
-async fn parse_uri_with_uuid_representation(uuid_repr: &str) -> Result<UuidRepresentation, String> {
+async fn parse_uri_with_uuid_representation(
+    uuid_repr: &str,
+) -> std::result::Result<UuidRepresentation, String> {
     match ConnectionString::parse(format!(
         "mongodb://localhost:27017/?uuidRepresentation={}",
         uuid_repr
@@ -281,26 +250,34 @@ async fn parse_uri_with_uuid_representation(uuid_repr: &str) -> Result<UuidRepre
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn parse_unknown_options() {
-    parse_uri("invalidoption", None).await;
-    parse_uri("x", None).await;
-    parse_uri("max", None).await;
-    parse_uri("tlstimeout", None).await;
-    parse_uri("waitqueuetimeout", Some("waitqueuetimeoutms")).await;
-    parse_uri("retry_reads", Some("retryreads")).await;
-    parse_uri("poolsize", Some("maxpoolsize")).await;
-    parse_uri(
-        "tlspermitinvalidcertificates",
-        Some("tlsallowinvalidcertificates"),
-    )
-    .await;
-    parse_uri("maxstalenessms", Some("maxstalenessseconds")).await;
+#[test]
+fn parse_unknown_options() {
+    fn parse_uri(option: &str, suggestion: Option<&str>) {
+        match ConnectionString::parse(format!("mongodb://host:27017/?{}=test", option))
+            .map_err(|e| *e.kind)
+        {
+            Ok(_) => panic!("expected error for option {}", option),
+            Err(ErrorKind::InvalidArgument { message, .. }) => {
+                match suggestion {
+                    Some(s) => assert!(message.contains(s)),
+                    None => assert!(!message.contains("similar")),
+                };
+            }
+            Err(e) => panic!("expected InvalidArgument, but got {:?}", e),
+        }
+    }
+
+    parse_uri("invalidoption", None);
+    parse_uri("x", None);
+    parse_uri("max", None);
+    parse_uri("tlstimeout", None);
+    parse_uri("waitqueuetimeout", Some("waitqueuetimeoutms"));
+    parse_uri("retry_reads", Some("retryreads"));
+    parse_uri("poolsize", Some("maxpoolsize"));
+    parse_uri("maxstalenessms", Some("maxstalenessseconds"));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn parse_with_no_default_database() {
     let uri = "mongodb://localhost/";
 
@@ -318,8 +295,7 @@ async fn parse_with_no_default_database() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn options_debug_omits_uri() {
     let uri = "mongodb://username:password@localhost/";
     let options = ClientOptions::parse(uri).await.unwrap();
@@ -330,8 +306,7 @@ async fn options_debug_omits_uri() {
     assert!(!debug_output.contains("uri"));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[tokio::test]
 async fn options_enforce_min_heartbeat_frequency() {
     let options = ClientOptions::builder()
         .hosts(vec![ServerAddress::parse("a:123").unwrap()])
@@ -339,4 +314,46 @@ async fn options_enforce_min_heartbeat_frequency() {
         .build();
 
     Client::with_options(options).unwrap_err();
+}
+
+#[test]
+fn invalid_ipv6() {
+    // invalid hostname for ipv6
+    let address = "[localhost]:27017";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(message.contains("invalid IPv6 address syntax"), "{message}");
+
+    // invalid character after hostname
+    let address = "[::1]a";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(
+        message.contains("the hostname can only be followed by a port"),
+        "{message}"
+    );
+
+    // missing bracket
+    let address = "[::1:27017";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(message.contains("missing closing ']'"), "{message}");
+
+    // extraneous bracket
+    let address = "[::1]:27017]";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(message.contains("the port must be an integer"), "{message}");
+}
+
+#[cfg(not(unix))]
+#[test]
+fn unix_domain_socket_not_allowed() {
+    let address = "address.sock";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(
+        message.contains("not supported on this platform"),
+        "{message}"
+    );
 }
