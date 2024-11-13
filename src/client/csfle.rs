@@ -33,12 +33,15 @@ pub(super) struct ClientState {
     #[derive_where(skip)]
     crypt: Crypt,
     exec: CryptExecutor,
+    #[allow(dead_code)]
+    internal_client: Option<Client>,
     opts: AutoEncryptionOptions,
 }
 
 struct AuxClients {
     key_vault_client: WeakClient,
     metadata_client: Option<WeakClient>,
+    internal_client: Option<Client>,
 }
 
 impl ClientState {
@@ -73,7 +76,12 @@ impl ClientState {
         )
         .await?;
 
-        Ok(Self { crypt, exec, opts })
+        Ok(Self {
+            crypt,
+            exec,
+            internal_client: aux_clients.internal_client,
+            opts,
+        })
     }
 
     pub(super) fn crypt(&self) -> &Crypt {
@@ -189,6 +197,7 @@ impl ClientState {
         Ok(AuxClients {
             key_vault_client,
             metadata_client,
+            internal_client,
         })
     }
 }
