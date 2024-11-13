@@ -33,8 +33,7 @@ pub(super) struct ClientState {
     #[derive_where(skip)]
     crypt: Crypt,
     exec: CryptExecutor,
-    #[allow(dead_code)]
-    internal_client: Option<Client>,
+    _internal_client: Option<Client>,
     opts: AutoEncryptionOptions,
 }
 
@@ -79,7 +78,7 @@ impl ClientState {
         Ok(Self {
             crypt,
             exec,
-            internal_client: aux_clients.internal_client,
+            _internal_client: aux_clients.internal_client,
             opts,
         })
     }
