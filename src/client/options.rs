@@ -11,6 +11,7 @@ use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter, Write},
     hash::{Hash, Hasher},
+    net::Ipv6Addr,
     path::PathBuf,
     str::FromStr,
     time::Duration,
@@ -128,9 +129,29 @@ impl<'de> Deserialize<'de> for ServerAddress {
     where
         D: Deserializer<'de>,
     {
-        let s: String = Deserialize::deserialize(deserializer)?;
-        Self::parse(s.as_str())
-            .map_err(|e| <D::Error as serde::de::Error>::custom(format!("{}", e)))
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum ServerAddressHelper {
+            String(String),
+            Object { host: String, port: Option<u16> },
+        }
+
+        let helper = ServerAddressHelper::deserialize(deserializer)?;
+        match helper {
+            ServerAddressHelper::String(string) => {
+                Self::parse(string).map_err(serde::de::Error::custom)
+            }
+            ServerAddressHelper::Object { host, port } => {
+                #[cfg(unix)]
+                if host.ends_with("sock") {
+                    return Ok(Self::Unix {
+                        path: PathBuf::from(host),
+                    });
+                }
+
+                Ok(Self::Tcp { host, port })
+            }
+        }
     }
 }
 
@@ -185,74 +206,95 @@ impl FromStr for ServerAddress {
 }
 
 impl ServerAddress {
-    /// Parses an address string into a `ServerAddress`.
+    /// Parses an address string into a [`ServerAddress`].
     pub fn parse(address: impl AsRef<str>) -> Result<Self> {
         let address = address.as_ref();
-        // checks if the address is a unix domain socket
-        #[cfg(unix)]
-        {
-            if address.ends_with(".sock") {
-                return Ok(ServerAddress::Unix {
+
+        if address.ends_with(".sock") {
+            #[cfg(unix)]
+            {
+                let address = percent_decode(address, "unix domain sockets must be URL-encoded")?;
+                return Ok(Self::Unix {
                     path: PathBuf::from(address),
                 });
             }
+            #[cfg(not(unix))]
+            return Err(ErrorKind::InvalidArgument {
+                message: "unix domain sockets are not supported on this platform".to_string(),
+            }
+            .into());
         }
-        let mut parts = address.split(':');
-        let hostname = match parts.next() {
-            Some(part) => {
-                if part.is_empty() {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: format!(
-                            "invalid server address: \"{}\"; hostname cannot be empty",
-                            address
-                        ),
-                    }
-                    .into());
-                }
-                part
-            }
-            None => {
+
+        let (hostname, port) = if let Some(ip_literal) = address.strip_prefix("[") {
+            let Some((hostname, port)) = ip_literal.split_once("]") else {
                 return Err(ErrorKind::InvalidArgument {
-                    message: format!("invalid server address: \"{}\"", address),
-                }
-                .into())
-            }
-        };
-
-        let port = match parts.next() {
-            Some(part) => {
-                let port = u16::from_str(part).map_err(|_| ErrorKind::InvalidArgument {
                     message: format!(
-                        "port must be valid 16-bit unsigned integer, instead got: {}",
-                        part
+                        "invalid server address {}: missing closing ']' in IP literal hostname",
+                        address
                     ),
-                })?;
-
-                if port == 0 {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: format!(
-                            "invalid server address: \"{}\"; port must be non-zero",
-                            address
-                        ),
-                    }
-                    .into());
                 }
-                if parts.next().is_some() {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: format!(
-                            "address \"{}\" contains more than one unescaped ':'",
-                            address
-                        ),
-                    }
-                    .into());
-                }
+                .into());
+            };
 
-                Some(port)
+            if let Err(parse_error) = Ipv6Addr::from_str(hostname) {
+                return Err(ErrorKind::InvalidArgument {
+                    message: format!("invalid server address {}: {}", address, parse_error),
+                }
+                .into());
             }
-            None => None,
+
+            let port = if port.is_empty() {
+                None
+            } else if let Some(port) = port.strip_prefix(":") {
+                Some(port)
+            } else {
+                return Err(ErrorKind::InvalidArgument {
+                    message: format!(
+                        "invalid server address {}: the hostname can only be followed by a port \
+                         prefixed with ':', got {}",
+                        address, port
+                    ),
+                }
+                .into());
+            };
+
+            (hostname, port)
+        } else {
+            match address.split_once(":") {
+                Some((hostname, port)) => (hostname, Some(port)),
+                None => (address, None),
+            }
         };
 
-        Ok(ServerAddress::Tcp {
+        if hostname.is_empty() {
+            return Err(ErrorKind::InvalidArgument {
+                message: format!(
+                    "invalid server address {}: the hostname cannot be empty",
+                    address
+                ),
+            }
+            .into());
+        }
+
+        let port = if let Some(port) = port {
+            match u16::from_str(port) {
+                Ok(0) | Err(_) => {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: format!(
+                            "invalid server address {}: the port must be an integer between 1 and \
+                             65535, got {}",
+                            address, port
+                        ),
+                    }
+                    .into())
+                }
+                Ok(port) => Some(port),
+            }
+        } else {
+            None
+        };
+
+        Ok(Self::Tcp {
             host: hostname.to_lowercase(),
             port,
         })
@@ -1165,6 +1207,7 @@ impl ClientOptions {
                     .iter()
                     .filter_map(|addr| match addr {
                         ServerAddress::Tcp { host, .. } => Some(host.to_ascii_lowercase()),
+                        #[cfg(unix)]
                         _ => None,
                     })
                     .collect()
@@ -1440,31 +1483,15 @@ impl ConnectionString {
             None => (None, None),
         };
 
-        let mut host_list = Vec::with_capacity(hosts_section.len());
-        for host in hosts_section.split(',') {
-            let address = if host.ends_with(".sock") {
-                #[cfg(unix)]
-                {
-                    ServerAddress::parse(percent_decode(
-                        host,
-                        "Unix domain sockets must be URL-encoded",
-                    )?)
-                }
-                #[cfg(not(unix))]
-                return Err(ErrorKind::InvalidArgument {
-                    message: "Unix domain sockets are not supported on this platform".to_string(),
-                }
-                .into());
-            } else {
-                ServerAddress::parse(host)
-            }?;
-            host_list.push(address);
-        }
+        let hosts = hosts_section
+            .split(',')
+            .map(ServerAddress::parse)
+            .collect::<Result<Vec<ServerAddress>>>()?;
 
         let host_info = if !srv {
-            HostInfo::HostIdentifiers(host_list)
+            HostInfo::HostIdentifiers(hosts)
         } else {
-            match &host_list[..] {
+            match &hosts[..] {
                 [ServerAddress::Tcp { host, port: None }] => HostInfo::DnsRecord(host.clone()),
                 [ServerAddress::Tcp {
                     host: _,

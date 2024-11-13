@@ -9,7 +9,7 @@ use crate::{
     bson::{Bson, Document},
     bson_util::get_int,
     client::options::{ClientOptions, ConnectionString, ServerAddress},
-    error::{Error, ErrorKind, Result},
+    error::ErrorKind,
     test::spec::deserialize_spec_tests,
     Client,
 };
@@ -22,13 +22,6 @@ static SKIPPED_TESTS: Lazy<Vec<&'static str>> = Lazy::new(|| {
         "maxPoolSize=0 does not error",
         // TODO RUST-226: unskip this test
         "Valid tlsCertificateKeyFilePassword is parsed correctly",
-        // TODO RUST-229: unskip the following tests
-        "Single IP literal host without port",
-        "Single IP literal host with port",
-        "Multiple hosts (mixed formats)",
-        "User info for single IP literal host without database",
-        "User info for single IP literal host with database",
-        "User info for multiple hosts with database",
     ];
 
     // TODO RUST-1896: unskip this test when openssl-tls is enabled
@@ -65,41 +58,9 @@ struct TestCase {
     uri: String,
     valid: bool,
     warning: Option<bool>,
-    hosts: Option<Vec<TestServerAddress>>,
+    hosts: Option<Vec<ServerAddress>>,
     auth: Option<TestAuth>,
     options: Option<Document>,
-}
-
-// The connection string tests' representation of a server address. We use this indirection to avoid
-// deserialization failures when the tests specify an IPv6 address.
-//
-// TODO RUST-229: remove this struct and deserialize directly into ServerAddress
-#[derive(Debug, Deserialize)]
-struct TestServerAddress {
-    #[serde(rename = "type")]
-    host_type: String,
-    host: String,
-    port: Option<u16>,
-}
-
-impl TryFrom<&TestServerAddress> for ServerAddress {
-    type Error = Error;
-
-    fn try_from(test_server_address: &TestServerAddress) -> Result<Self> {
-        if test_server_address.host_type.as_str() == "ip_literal" {
-            return Err(ErrorKind::Internal {
-                message: "test using ip_literal host type should be skipped".to_string(),
-            }
-            .into());
-        }
-
-        let mut address = Self::parse(&test_server_address.host)?;
-        if let ServerAddress::Tcp { ref mut port, .. } = address {
-            *port = test_server_address.port;
-        }
-
-        Ok(address)
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -138,14 +99,8 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                 let client_options = client_options_result.expect(&test_case.description);
 
                 if let Some(ref expected_hosts) = test_case.hosts {
-                    let expected_hosts = expected_hosts
-                        .iter()
-                        .map(TryFrom::try_from)
-                        .collect::<Result<Vec<ServerAddress>>>()
-                        .expect(&test_case.description);
-
                     assert_eq!(
-                        client_options.hosts, expected_hosts,
+                        &client_options.hosts, expected_hosts,
                         "{}",
                         test_case.description
                     );
@@ -363,4 +318,46 @@ async fn options_enforce_min_heartbeat_frequency() {
         .build();
 
     Client::with_options(options).unwrap_err();
+}
+
+#[test]
+fn invalid_ipv6() {
+    // invalid hostname for ipv6
+    let address = "[localhost]:27017";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(message.contains("invalid IPv6 address syntax"), "{message}");
+
+    // invalid character after hostname
+    let address = "[::1]a";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(
+        message.contains("the hostname can only be followed by a port"),
+        "{message}"
+    );
+
+    // missing bracket
+    let address = "[::1:27017";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(message.contains("missing closing ']'"), "{message}");
+
+    // extraneous bracket
+    let address = "[::1]:27017]";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(message.contains("the port must be an integer"), "{message}");
+}
+
+#[cfg(not(unix))]
+#[test]
+fn unix_domain_socket_not_allowed() {
+    let address = "address.sock";
+    let error = ServerAddress::parse(address).unwrap_err();
+    let message = error.message().unwrap();
+    assert!(
+        message.contains("not supported on this platform"),
+        "{message}"
+    );
 }
