@@ -387,13 +387,6 @@ buildvariants:
     tasks:
       - happy-eyeballs-task-group
 
-  - name: happy-eyeballs-windows
-    display_name: "Happy Eyeballs (Windows)"
-    run_on:
-      - windows-64-vs2017-small
-    tasks:
-      - happy-eyeballs-task-group
-
 ###############
 # Task Groups #
 ###############
