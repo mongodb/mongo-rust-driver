@@ -1,10 +1,10 @@
 {
   "version": 1,
   "style": "integration",
-  "description": "custom maxConnecting is enforced",
+  "description": "clear with interruptInUseConnections = true closes pending connections",
   "runOn": [
     {
-      "minServerVersion": "4.4.0"
+      "minServerVersion": "4.9.0"
     }
   ],
   "failPoint": {
@@ -17,13 +17,11 @@
       ],
       "closeConnection": false,
       "blockConnection": true,
-      "blockTimeMS": 500
+      "blockTimeMS": 10000
     }
   },
   "poolOptions": {
-    "maxConnecting": 1,
-    "maxPoolSize": 2,
-    "waitQueueTimeoutMS": 5000
+    "minPoolSize": 0
   },
   "operations": [
     {
@@ -32,10 +30,6 @@
     {
       "name": "start",
       "target": "thread1"
-    },
-    {
-      "name": "start",
-      "target": "thread2"
     },
     {
       "name": "checkOut",
@@ -47,34 +41,36 @@
       "count": 1
     },
     {
-      "name": "checkOut",
-      "thread": "thread2"
+      "name": "clear",
+      "interruptInUseConnections": true
     },
     {
       "name": "waitForEvent",
-      "event": "ConnectionReady",
-      "count": 2
+      "event": "ConnectionCheckOutFailed",
+      "count": 1
     }
   ],
   "events": [
     {
-      "type": "ConnectionCreated"
-    },
-    {
-      "type": "ConnectionReady"
+      "type": "ConnectionCheckOutStarted"
     },
     {
       "type": "ConnectionCreated"
     },
     {
-      "type": "ConnectionReady"
+      "type": "ConnectionPoolCleared",
+      "interruptInUseConnections": true
+    },
+    {
+      "type": "ConnectionClosed"
+    },
+    {
+      "type": "ConnectionCheckOutFailed"
     }
   ],
   "ignore": [
-    "ConnectionCheckOutStarted",
     "ConnectionCheckedIn",
     "ConnectionCheckedOut",
-    "ConnectionClosed",
     "ConnectionPoolCreated",
     "ConnectionPoolReady"
   ]

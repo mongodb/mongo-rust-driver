@@ -83,7 +83,7 @@ async fn authenticate_stream_inner(
     );
     let client_first = sasl_start.into_command();
 
-    let server_first_response = conn.send_command(client_first, None).await?;
+    let server_first_response = conn.send_message(client_first).await?;
 
     let server_first = ServerFirst::parse(server_first_response.auth_response_body(MECH_NAME)?)?;
     server_first.validate(&nonce)?;
@@ -135,7 +135,7 @@ async fn authenticate_stream_inner(
 
     let client_second = sasl_continue.into_command();
 
-    let server_second_response = conn.send_command(client_second, None).await?;
+    let server_second_response = conn.send_message(client_second).await?;
     let server_second = SaslResponse::parse(
         MECH_NAME,
         server_second_response.auth_response_body(MECH_NAME)?,

@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use bson::{rawdoc, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
+use tokio::sync::broadcast;
 
 use crate::{
     bson::{doc, oid::ObjectId, DateTime, Document, Timestamp},
@@ -9,7 +10,7 @@ use crate::{
         options::{ServerAddress, ServerApi},
         ClusterTime,
     },
-    cmap::{Command, Connection},
+    cmap::{conn::wire::Message, Command, Connection},
     error::Result,
     sdam::{ServerType, TopologyVersion},
     selection_criteria::TagSet,
@@ -72,8 +73,19 @@ pub(crate) fn hello_command(
 }
 
 /// Execute a hello or legacy hello command.
-pub(crate) async fn run_hello(conn: &mut Connection, command: Command) -> Result<HelloReply> {
-    let response_result = conn.send_command(command, None).await;
+pub(crate) async fn run_hello(
+    conn: &mut Connection,
+    command: Command,
+    mut cancellation_receiver: Option<broadcast::Receiver<()>>,
+) -> Result<HelloReply> {
+    let message: Message = command.try_into()?;
+    let response_result = match cancellation_receiver {
+        Some(ref mut cancellation_receiver) => {
+            conn.send_message_with_cancellation(message, cancellation_receiver)
+                .await
+        }
+        None => conn.send_message(message).await,
+    };
     response_result.and_then(|raw_response| raw_response.into_hello_reply())
 }
 

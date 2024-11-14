@@ -5,6 +5,7 @@ use std::env;
 
 use bson::{rawdoc, RawBson, RawDocumentBuf};
 use once_cell::sync::Lazy;
+use tokio::sync::broadcast;
 
 #[cfg(any(
     feature = "zstd-compression",
@@ -444,9 +445,10 @@ impl Handshaker {
         &self,
         conn: &mut Connection,
         credential: Option<&Credential>,
+        cancellation_receiver: Option<broadcast::Receiver<()>>,
     ) -> Result<HelloReply> {
         let (command, client_first) = self.build_command(credential).await?;
-        let mut hello_reply = run_hello(conn, command).await?;
+        let mut hello_reply = run_hello(conn, command, cancellation_receiver).await?;
 
         conn.stream_description = Some(StreamDescription::from_hello_reply(&hello_reply));
 

@@ -3,12 +3,12 @@
 
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
-
-use crate::{bson::oid::ObjectId, options::ServerAddress, serde_util};
 use derive_more::From;
 #[cfg(feature = "tracing-unstable")]
 use derive_where::derive_where;
+use serde::{Deserialize, Serialize};
+
+use crate::{bson::oid::ObjectId, options::ServerAddress, serde_util};
 
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
@@ -95,6 +95,10 @@ pub struct PoolClearedEvent {
 
     /// If the connection is to a load balancer, the id of the selected backend.
     pub service_id: Option<ObjectId>,
+
+    /// Whether in-use connections were interrupted when the pool cleared.
+    #[serde(default)]
+    pub interrupt_in_use_connections: bool,
 }
 
 /// Event emitted when a connection pool is cleared.
@@ -140,7 +144,7 @@ pub struct ConnectionReadyEvent {
     pub connection_id: u32,
 
     /// The time it took to establish the connection.
-    #[serde(default = "Duration::default")]
+    #[serde(skip_deserializing)]
     pub duration: Duration,
 }
 
@@ -162,6 +166,7 @@ pub struct ConnectionClosedEvent {
     pub connection_id: u32,
 
     /// The reason that the connection was closed.
+    #[cfg_attr(test, serde(default = "unset_connection_closed_reason"))]
     pub reason: ConnectionClosedReason,
 
     /// If the `reason` connection checkout failed was `Error`,the associated
@@ -192,6 +197,14 @@ pub enum ConnectionClosedReason {
 
     /// The pool that the connection belongs to has been closed.
     PoolClosed,
+
+    #[cfg(test)]
+    Unset,
+}
+
+#[cfg(test)]
+fn unset_connection_closed_reason() -> ConnectionClosedReason {
+    ConnectionClosedReason::Unset
 }
 
 /// Event emitted when a thread begins checking out a connection to use for an operation.
@@ -216,6 +229,7 @@ pub struct ConnectionCheckoutFailedEvent {
     pub address: ServerAddress,
 
     /// The reason a connection was unable to be checked out.
+    #[cfg_attr(test, serde(default = "unset_connection_checkout_failed_reason"))]
     pub reason: ConnectionCheckoutFailedReason,
 
     /// If the `reason` connection checkout failed was `ConnectionError`,the associated
@@ -227,7 +241,7 @@ pub struct ConnectionCheckoutFailedEvent {
     pub(crate) error: Option<crate::error::Error>,
 
     /// See [ConnectionCheckedOutEvent::duration].
-    #[serde(default = "Duration::default")]
+    #[serde(skip_deserializing)]
     pub duration: Duration,
 }
 
@@ -242,6 +256,14 @@ pub enum ConnectionCheckoutFailedReason {
     /// An error occurred while trying to establish a connection (e.g. during the handshake or
     /// authentication).
     ConnectionError,
+
+    #[cfg(test)]
+    Unset,
+}
+
+#[cfg(test)]
+fn unset_connection_checkout_failed_reason() -> ConnectionCheckoutFailedReason {
+    ConnectionCheckoutFailedReason::Unset
 }
 
 /// Event emitted when a connection is successfully checked out.
@@ -260,7 +282,7 @@ pub struct ConnectionCheckedOutEvent {
     pub connection_id: u32,
 
     /// The time it took to check out the connection.
-    #[serde(default = "Duration::default")]
+    #[serde(skip_deserializing)]
     pub duration: Duration,
 }
 

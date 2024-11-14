@@ -614,13 +614,12 @@ impl Client {
         }
 
         let should_redact = cmd.should_redact();
-        let should_compress = cmd.should_compress();
 
         let cmd_name = cmd.name.clone();
         let target_db = cmd.target_db.clone();
 
-        #[allow(unused_mut)]
-        let mut message = Message::from_command(cmd, Some(request_id))?;
+        let mut message = Message::try_from(cmd)?;
+        message.request_id = Some(request_id);
         #[cfg(feature = "in-use-encryption")]
         {
             let guard = self.inner.csfle.read().await;
@@ -652,7 +651,7 @@ impl Client {
         .await;
 
         let start_time = Instant::now();
-        let command_result = match connection.send_message(message, should_compress).await {
+        let command_result = match connection.send_message(message).await {
             Ok(response) => {
                 async fn handle_response<T: Operation>(
                     client: &Client,

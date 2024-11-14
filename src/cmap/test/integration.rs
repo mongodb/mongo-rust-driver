@@ -65,7 +65,10 @@ async fn acquire_connection_and_send_command() {
         cmd.set_server_api(server_api);
     }
 
-    let response = connection.send_command(cmd, None).await.unwrap();
+    let response = connection
+        .send_message(cmd.try_into().unwrap())
+        .await
+        .unwrap();
     let doc_response: CommandResponse<Document> = response.body().unwrap();
 
     assert!(doc_response.is_success());

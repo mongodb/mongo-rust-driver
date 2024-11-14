@@ -154,7 +154,7 @@ where
 
 #[derive(Debug, Deserialize)]
 struct ConnectionCheckoutFailedHelper {
-    pub reason: CheckoutFailedReasonHelper,
+    reason: Option<CheckoutFailedReasonHelper>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -179,10 +179,12 @@ where
     // runner, we still need to be able to deserialize the "poolClosed" reason to avoid the test
     // harness panicking, so we arbitrarily map the "poolClosed" to "connectionError".
     let reason = match helper.reason {
-        CheckoutFailedReasonHelper::PoolClosed | CheckoutFailedReasonHelper::ConnectionError => {
+        Some(CheckoutFailedReasonHelper::PoolClosed)
+        | Some(CheckoutFailedReasonHelper::ConnectionError) => {
             ConnectionCheckoutFailedReason::ConnectionError
         }
-        CheckoutFailedReasonHelper::Timeout => ConnectionCheckoutFailedReason::Timeout,
+        Some(CheckoutFailedReasonHelper::Timeout) => ConnectionCheckoutFailedReason::Timeout,
+        None => ConnectionCheckoutFailedReason::Unset,
     };
 
     Ok(ConnectionCheckoutFailedEvent {

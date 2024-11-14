@@ -250,7 +250,7 @@ impl Monitor {
                             opts,
                         );
 
-                        run_hello(conn, command).await
+                        run_hello(conn, command, None).await
                     }
                 }
                 None => {
@@ -448,7 +448,7 @@ impl RttMonitor {
                             Some(conn.stream_description()?.hello_ok),
                             None,
                         );
-                        conn.send_command(command, None).await?;
+                        conn.send_message(command).await?;
                     }
                     None => {
                         let connection = self

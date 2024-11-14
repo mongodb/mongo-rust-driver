@@ -15,7 +15,12 @@ use crate::{
         ConnectionPoolOptions,
     },
     error::{Error, ErrorKind, Result},
-    event::cmap::{CmapEvent, ConnectionPoolOptions as EventOptions},
+    event::cmap::{
+        CmapEvent,
+        ConnectionCheckoutFailedReason,
+        ConnectionClosedReason,
+        ConnectionPoolOptions as EventOptions,
+    },
     options::TlsOptions,
     runtime::{self, AsyncJoinHandle},
     sdam::{TopologyUpdater, UpdateMessage},
@@ -30,7 +35,6 @@ use crate::{
         Matchable,
     },
 };
-use bson::doc;
 
 use super::conn::pooled::PooledConnection;
 
@@ -42,6 +46,8 @@ const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
     "waiting on maxConnecting is limited by WaitQueueTimeoutMS",
     // TODO DRIVERS-1785 remove this skip when test event order is fixed
     "error during minPoolSize population clears pool",
+    "Pool clear SHOULD schedule the next background thread run immediately \
+     (interruptInUseConnections = false)",
 ];
 
 /// Many different types of CMAP events are emitted from tasks spawned in the drop
@@ -288,16 +294,20 @@ impl Operation {
                         )
                     });
             }
-            Operation::Clear => {
+            Operation::Clear {
+                interrupt_in_use_connections,
+            } => {
+                let error = if interrupt_in_use_connections == Some(true) {
+                    Error::network_timeout()
+                } else {
+                    ErrorKind::Internal {
+                        message: "test error".to_string(),
+                    }
+                    .into()
+                };
+
                 if let Some(pool) = state.pool.read().await.as_ref() {
-                    pool.clear(
-                        ErrorKind::Internal {
-                            message: "test error".to_string(),
-                        }
-                        .into(),
-                        None,
-                    )
-                    .await;
+                    pool.clear(error, None).await;
                 }
             }
             Operation::Ready => {
@@ -386,11 +396,17 @@ impl Matchable for CmapEvent {
                 actual.connection_id.matches(&expected.connection_id)
             }
             (CmapEvent::ConnectionClosed(actual), CmapEvent::ConnectionClosed(ref expected)) => {
-                eq_matches("reason", &actual.reason, &expected.reason)?;
-                actual
-                    .connection_id
-                    .matches(&expected.connection_id)
-                    .prefix("connection_id")?;
+                if expected.reason != ConnectionClosedReason::Unset {
+                    eq_matches("reason", &actual.reason, &expected.reason)?;
+                }
+                // 0 is used as a placeholder for test events that do not specify a value; the
+                // driver will never actually generate a connection ID with this value.
+                if expected.connection_id != 0 {
+                    actual
+                        .connection_id
+                        .matches(&expected.connection_id)
+                        .prefix("connection_id")?;
+                }
                 Ok(())
             }
             (
@@ -405,14 +421,10 @@ impl Matchable for CmapEvent {
                 CmapEvent::ConnectionCheckoutFailed(actual),
                 CmapEvent::ConnectionCheckoutFailed(ref expected),
             ) => {
-                if actual.reason == expected.reason {
-                    Ok(())
-                } else {
-                    Err(format!(
-                        "expected reason {:?}, got {:?}",
-                        expected.reason, actual.reason
-                    ))
+                if expected.reason != ConnectionCheckoutFailedReason::Unset {
+                    eq_matches("reason", &actual.reason, &expected.reason)?;
                 }
+                Ok(())
             }
             (CmapEvent::ConnectionCheckoutStarted(_), CmapEvent::ConnectionCheckoutStarted(_)) => {
                 Ok(())
@@ -425,9 +437,9 @@ impl Matchable for CmapEvent {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn cmap_spec_tests() {
-    async fn run_cmap_spec_tests(test_file: TestFile) {
+    async fn run_cmap_spec_tests(mut test_file: TestFile) {
         if TEST_DESCRIPTIONS_TO_SKIP.contains(&test_file.description.as_str()) {
             return;
         }
@@ -451,28 +463,14 @@ async fn cmap_spec_tests() {
             }
         }
 
-        let should_disable_fp = test_file.fail_point.is_some();
-        if let Some(ref fail_point) = test_file.fail_point {
-            client
-                .database("admin")
-                .run_command(fail_point.clone())
-                .await
-                .unwrap();
-        }
+        let _guard = if let Some(fail_point) = test_file.fail_point.take() {
+            Some(client.enable_fail_point(fail_point).await.unwrap())
+        } else {
+            None
+        };
 
         let executor = Executor::new(test_file).await;
         executor.execute_test().await;
-
-        if should_disable_fp {
-            client
-                .database("admin")
-                .run_command(doc! {
-                    "configureFailPoint": "failCommand",
-                    "mode": "off"
-                })
-                .await
-                .unwrap();
-        }
     }
 
     run_spec_test(

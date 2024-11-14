@@ -43,7 +43,7 @@ pub(crate) async fn send_client_first(
 ) -> Result<RawCommandResponse> {
     let command = build_client_first(credential, server_api);
 
-    conn.send_command(command, None).await
+    conn.send_message(command).await
 }
 
 /// Performs X.509 authentication for a given stream.

@@ -32,6 +32,7 @@ async fn arbitrary_auth_mechanism() {
         generation: crate::cmap::PoolGeneration::normal(),
         event_emitter: CmapEventEmitter::new(None, ObjectId::new()),
         time_created: Instant::now(),
+        cancellation_receiver: None,
     };
     establisher
         .establish_connection(pending, None)
