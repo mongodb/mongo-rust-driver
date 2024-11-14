@@ -387,16 +387,6 @@ buildvariants:
     tasks:
       - happy-eyeballs-task-group
 
-#  Windows has a very short grace window before it starts refusing TCP handshakes, leading to flaky
-#  tests.
-#
-#  - name: happy-eyeballs-windows
-#    display_name: "Happy Eyeballs (Windows)"
-#    run_on:
-#      - windows-64-vs2017-small
-#    tasks:
-#      - happy-eyeballs-task-group
-
 ###############
 # Task Groups #
 ###############
