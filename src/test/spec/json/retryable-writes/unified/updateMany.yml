@@ -12,6 +12,7 @@ createEntities:
     client:
       id: &client0 client0
       useMultipleMongoses: true
+      observeEvents: [ commandStartedEvent ]
   -
     database:
       id: &database0 database0
@@ -52,3 +53,10 @@ tests:
         documents:
           - { _id: 1, x: 12 }
           - { _id: 2, x: 23 }
+    expectEvents:
+      - client: client0
+        events:
+          - commandStartedEvent:
+              commandName: update
+              command:
+                txnNumber: { $$exists: false }
