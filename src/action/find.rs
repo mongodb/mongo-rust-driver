@@ -1,6 +1,8 @@
 use std::time::Duration;
 
 use bson::{Bson, Document};
+use macro_magic::export_tokens;
+use mongodb_internal_macros::options_doc;
 use serde::de::DeserializeOwned;
 
 use crate::{
@@ -24,6 +26,7 @@ impl<T: Send + Sync> Collection<T> {
     /// `await` will return d[`Result<Cursor<T>>`] (or d[`Result<SessionCursor<T>>`] if a session is
     /// provided).
     #[deeplink]
+    #[options_doc(find_setters)]
     pub fn find(&self, filter: Document) -> Find<'_, T> {
         Find {
             coll: self,
@@ -81,6 +84,7 @@ pub struct Find<'a, T: Send + Sync, Session = ImplicitSession> {
     session: Session,
 }
 
+#[export_tokens(find_setters)]
 impl<'a, T: Send + Sync, Session> Find<'a, T, Session> {
     option_setters!(options: FindOptions;
         allow_disk_use: bool,

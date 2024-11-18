@@ -1,5 +1,6 @@
 extern crate proc_macro;
 
+use macro_magic::import_tokens_attr;
 use quote::{quote, ToTokens};
 use syn::{
     braced,
@@ -16,7 +17,9 @@ use syn::{
     GenericArgument,
     Generics,
     Ident,
+    ImplItem,
     ImplItemFn,
+    ItemImpl,
     Lifetime,
     Lit,
     Meta,
@@ -209,6 +212,65 @@ fn parse_name(input: ParseStream, name: &str) -> syn::Result<()> {
         ));
     }
     Ok(())
+}
+
+#[import_tokens_attr]
+#[proc_macro_attribute]
+pub fn options_doc(
+    attr: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let setters = parse_macro_input!(attr as ItemImpl);
+    let mut impl_fn = parse_macro_input!(item as ImplItemFn);
+
+    // Collect a list of names from the setters impl
+    let option_setters_path = parse_quote! { option_setters };
+    let mut setter_names = vec![];
+    for item in &setters.items {
+        match item {
+            // bare fn
+            ImplItem::Fn(item) => {
+                setter_names.push(item.sig.ident.to_token_stream().to_string());
+            }
+            // option_setters! call
+            ImplItem::Macro(item) if item.mac.path == option_setters_path => {
+                let tokens = item.mac.tokens.clone().into();
+                let list = parse_macro_input!(tokens as OptionSettersList);
+                if list.opt_field_name.is_some() {
+                    setter_names.push("with_options".to_owned());
+                }
+                for setter in &list.setters {
+                    setter_names.push(setter.name.to_token_stream().to_string());
+                }
+            }
+            _ => continue,
+        }
+    }
+
+    // Get the rustdoc path to the action type, i.e. the type with generic arguments stripped
+    let mut doc_path = match &*setters.self_ty {
+        Type::Path(p) => p.path.clone(),
+        _ => panic!("invalid options doc argument {:?}", setters),
+    };
+    for seg in &mut doc_path.segments {
+        seg.arguments = PathArguments::None;
+    }
+    let doc_path = doc_path.to_token_stream().to_string();
+
+    // Add the list of setters to the rustdoc for the fn
+    impl_fn.attrs.push(parse_quote! {
+        #[doc = ""]
+    });
+    impl_fn.attrs.push(parse_quote! {
+        #[doc = "These methods can be chained before calling `.await` to set options:"]
+    });
+    for name in setter_names {
+        let docstr = format!("  * [{0}]({1}::{0})", name, doc_path);
+        impl_fn.attrs.push(parse_quote! {
+            #[doc = #docstr]
+        });
+    }
+    impl_fn.into_token_stream().into()
 }
 
 /// Enables rustdoc links to types that link individually to each type
