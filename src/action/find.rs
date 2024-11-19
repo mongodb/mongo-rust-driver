@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::{Bson, Document};
 use macro_magic::export_tokens;
-use mongodb_internal_macros::options_doc;
+use mongodb_internal_macros::{option_setters_2, options_doc};
 use serde::de::DeserializeOwned;
 
 use crate::{
@@ -84,6 +84,7 @@ pub struct Find<'a, T: Send + Sync, Session = ImplicitSession> {
     session: Session,
 }
 
+#[option_setters_2]
 #[export_tokens(find_setters)]
 impl<'a, T: Send + Sync, Session> Find<'a, T, Session> {
     option_setters!(options: FindOptions;

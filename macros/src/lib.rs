@@ -250,7 +250,11 @@ pub fn options_doc(
     // Get the rustdoc path to the action type, i.e. the type with generic arguments stripped
     let mut doc_path = match &*setters.self_ty {
         Type::Path(p) => p.path.clone(),
-        _ => panic!("invalid options doc argument {:?}", setters),
+        t => {
+            return Error::new(t.span(), "invalid options doc argument")
+                .into_compile_error()
+                .into()
+        }
     };
     for seg in &mut doc_path.segments {
         seg.arguments = PathArguments::None;
@@ -519,4 +523,88 @@ impl Parse for OptionSetter {
         let type_ = input.parse()?;
         Ok(Self { attrs, name, type_ })
     }
+}
+
+#[proc_macro_attribute]
+pub fn option_setters_2(
+    _attr: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let mut impl_in = parse_macro_input!(item as ItemImpl);
+
+    // Strip and parse `option_setters!` calls from the input impl
+    let option_setters_path = parse_quote! { option_setters };
+    let mut new_items = vec![];
+    let mut setter_list = None;
+    for item in impl_in.items.drain(..) {
+        match item {
+            ImplItem::Macro(item) if item.mac.path == option_setters_path => {
+                let tokens = item.mac.tokens.clone().into();
+                if setter_list
+                    .replace(parse_macro_input!(tokens as OptionSettersList))
+                    .is_some()
+                {
+                    return Error::new(item.span(), "multiple option_setters! items")
+                        .into_compile_error()
+                        .into();
+                }
+            }
+            _ => new_items.push(item),
+        };
+    }
+
+    // Append setter fns to item list
+    let OptionSettersList {
+        opt_field_name,
+        opt_field_type,
+        setters,
+    } = if let Some(l) = setter_list {
+        l
+    } else {
+        return Error::new(impl_in.span(), "no option_setters! item")
+            .into_compile_error()
+            .into();
+    };
+    if let Some(name) = opt_field_name {
+        new_items.push(parse_quote! {
+            #[allow(unused)]
+            fn options(&mut self) -> &mut #opt_field_type {
+                self.#name.get_or_insert_with(<#opt_field_type>::default)
+            }
+        });
+        new_items.push(parse_quote! {
+            /// Set all options.  Note that this will replace all previous values set.
+            pub fn with_options(mut self, value: impl Into<Option<#opt_field_type>>) -> Self {
+                self.#name = value.into();
+                self
+            }
+        });
+    }
+    for OptionSetter { attrs, name, type_ } in setters {
+        let (accept, value) = if type_.is_ident("String")
+            || type_.is_ident("Bson")
+            || path_eq(&type_, &["bson", "Bson"])
+        {
+            (quote! { impl Into<#type_> }, quote! { value.into() })
+        } else if let Some(t) = vec_arg(&type_) {
+            (
+                quote! { impl IntoIterator<Item = #t> },
+                quote! { value.into_iter().collect() },
+            )
+        } else {
+            (quote! { #type_ }, quote! { value })
+        };
+        new_items.push(parse_quote! {
+            /// Next Generation
+            #(#attrs)*
+            pub fn #name(mut self, value: #accept) -> Self {
+                self.options().#name = Some(#value);
+                self
+            }
+        })
+    }
+
+    // Slot in the new list of items
+    impl_in.items = new_items;
+    impl_in.to_token_stream().into()
 }
