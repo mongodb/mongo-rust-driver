@@ -1,5 +1,7 @@
 extern crate proc_macro;
 
+use std::collections::HashMap;
+
 use macro_magic::import_tokens_attr;
 use quote::{quote, ToTokens};
 use syn::{
@@ -14,12 +16,14 @@ use syn::{
     Block,
     Error,
     Expr,
+    Fields,
     GenericArgument,
     Generics,
     Ident,
     ImplItem,
     ImplItemFn,
     ItemImpl,
+    ItemStruct,
     Lifetime,
     Lit,
     Meta,
@@ -224,24 +228,11 @@ pub fn options_doc(
     let mut impl_fn = parse_macro_input!(item as ImplItemFn);
 
     // Collect a list of names from the setters impl
-    let option_setters_path = parse_quote! { option_setters };
     let mut setter_names = vec![];
     for item in &setters.items {
         match item {
-            // bare fn
             ImplItem::Fn(item) => {
                 setter_names.push(item.sig.ident.to_token_stream().to_string());
-            }
-            // option_setters! call
-            ImplItem::Macro(item) if item.mac.path == option_setters_path => {
-                let tokens = item.mac.tokens.clone().into();
-                let list = parse_macro_input!(tokens as OptionSettersList);
-                if list.opt_field_name.is_some() {
-                    setter_names.push("with_options".to_owned());
-                }
-                for setter in &list.setters {
-                    setter_names.push(setter.name.to_token_stream().to_string());
-                }
             }
             _ => continue,
         }
@@ -525,20 +516,47 @@ impl Parse for OptionSetter {
     }
 }
 
+#[import_tokens_attr]
 #[proc_macro_attribute]
 pub fn option_setters_2(
-    _attr: proc_macro::TokenStream,
+    attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
+    let opt_struct = parse_macro_input!(attr as ItemStruct);
     let mut impl_in = parse_macro_input!(item as ItemImpl);
 
+    // Find the rustdocs for each option field
+    let mut opt_docs = HashMap::new();
+    let fields = match &opt_struct.fields {
+        Fields::Named(f) => &f.named,
+        _ => {
+            return Error::new(opt_struct.span(), "options struct must have named fields")
+                .into_compile_error()
+                .into()
+        }
+    };
+    for field in fields {
+        let ident = match &field.ident {
+            Some(f) => f.clone(),
+            None => continue,
+        };
+        let mut doc_attrs = vec![];
+        for attr in &field.attrs {
+            if attr.path().is_ident("doc") {
+                doc_attrs.push(attr.clone());
+            }
+        }
+        if !doc_attrs.is_empty() {
+            opt_docs.insert(ident, doc_attrs);
+        }
+    }
+
     // Strip and parse `option_setters!` calls from the input impl
-    let option_setters_path = parse_quote! { option_setters };
     let mut new_items = vec![];
     let mut setter_list = None;
     for item in impl_in.items.drain(..) {
         match item {
-            ImplItem::Macro(item) if item.mac.path == option_setters_path => {
+            ImplItem::Macro(item) if item.mac.path.is_ident("option_setters") => {
                 let tokens = item.mac.tokens.clone().into();
                 if setter_list
                     .replace(parse_macro_input!(tokens as OptionSettersList))
@@ -580,7 +598,12 @@ pub fn option_setters_2(
             }
         });
     }
-    for OptionSetter { attrs, name, type_ } in setters {
+    for OptionSetter {
+        mut attrs,
+        name,
+        type_,
+    } in setters
+    {
         let (accept, value) = if type_.is_ident("String")
             || type_.is_ident("Bson")
             || path_eq(&type_, &["bson", "Bson"])
@@ -594,8 +617,10 @@ pub fn option_setters_2(
         } else {
             (quote! { #type_ }, quote! { value })
         };
+        if let Some(mut docs) = opt_docs.remove(&name) {
+            attrs.append(&mut docs);
+        }
         new_items.push(parse_quote! {
-            /// Next Generation
             #(#attrs)*
             pub fn #name(mut self, value: #accept) -> Self {
                 self.options().#name = Some(#value);

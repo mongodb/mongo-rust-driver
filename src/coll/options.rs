@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use macro_magic::export_tokens;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -760,6 +761,7 @@ pub struct DistinctOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[export_tokens]
 pub struct FindOptions {
     /// Enables writing to temporary files by the server. When set to true, the find operation can
     /// write data to the _tmp subdirectory in the dbPath directory. Only supported in server

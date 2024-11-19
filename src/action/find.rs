@@ -84,7 +84,7 @@ pub struct Find<'a, T: Send + Sync, Session = ImplicitSession> {
     session: Session,
 }
 
-#[option_setters_2]
+#[option_setters_2(crate::coll::options::FindOptions)]
 #[export_tokens(find_setters)]
 impl<'a, T: Send + Sync, Session> Find<'a, T, Session> {
     option_setters!(options: FindOptions;
