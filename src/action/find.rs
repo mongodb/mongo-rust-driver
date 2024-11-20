@@ -87,31 +87,6 @@ pub struct Find<'a, T: Send + Sync, Session = ImplicitSession> {
 #[option_setters_2(crate::coll::options::FindOptions)]
 #[export_tokens(find_setters)]
 impl<'a, T: Send + Sync, Session> Find<'a, T, Session> {
-    option_setters!(options: FindOptions;
-        allow_disk_use: bool,
-        allow_partial_results: bool,
-        batch_size: u32,
-        comment: Bson,
-        cursor_type: CursorType,
-        hint: Hint,
-        limit: i64,
-        max: Document,
-        max_await_time: Duration,
-        max_scan: u64,
-        max_time: Duration,
-        min: Document,
-        no_cursor_timeout: bool,
-        projection: Document,
-        read_concern: ReadConcern,
-        return_key: bool,
-        selection_criteria: SelectionCriteria,
-        show_record_id: bool,
-        skip: u64,
-        sort: Document,
-        collation: Collation,
-        let_vars: Document,
-    );
-
     /// Use the provided session when running the operation.
     pub fn session<'s>(
         self,

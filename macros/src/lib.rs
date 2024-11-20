@@ -32,6 +32,7 @@ use syn::{
     PathSegment,
     Token,
     Type,
+    Visibility,
 };
 
 /// Generates:
@@ -218,6 +219,12 @@ fn parse_name(input: ParseStream, name: &str) -> syn::Result<()> {
     Ok(())
 }
 
+macro_rules! compile_error {
+    ($span:expr, $($message:tt)+) => {{
+        return Error::new($span, format!($($message)+)).into_compile_error().into();
+    }};
+}
+
 #[import_tokens_attr]
 #[proc_macro_attribute]
 pub fn options_doc(
@@ -241,11 +248,7 @@ pub fn options_doc(
     // Get the rustdoc path to the action type, i.e. the type with generic arguments stripped
     let mut doc_path = match &*setters.self_ty {
         Type::Path(p) => p.path.clone(),
-        t => {
-            return Error::new(t.span(), "invalid options doc argument")
-                .into_compile_error()
-                .into()
-        }
+        t => compile_error!(t.span(), "invalid options doc argument"),
     };
     for seg in &mut doc_path.segments {
         seg.arguments = PathArguments::None;
@@ -299,11 +302,7 @@ pub fn deeplink(
             let rest = &text[ix + 2..];
             let end = match rest.find(']') {
                 Some(v) => v,
-                None => {
-                    return Error::new(attr.span(), "unterminated d[")
-                        .into_compile_error()
-                        .into()
-                }
+                None => compile_error!(attr.span(), "unterminated d["),
             };
             let body = &rest[..end];
             let post = &rest[end + 1..];
@@ -405,7 +404,7 @@ pub fn option_setters(input: proc_macro::TokenStream) -> proc_macro::TokenStream
                 || path_eq(&type_, &["bson", "Bson"])
             {
                 (quote! { impl Into<#type_> }, quote! { value.into() })
-            } else if let Some(t) = vec_arg(&type_) {
+            } else if let Some(t) = inner_type(&type_, "Vec") {
                 (
                     quote! { impl IntoIterator<Item = #t> },
                     quote! { value.into_iter().collect() },
@@ -431,12 +430,12 @@ pub fn option_setters(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     .into()
 }
 
-fn vec_arg(path: &Path) -> Option<&Type> {
+fn inner_type<'a>(path: &'a Path, outer: &str) -> Option<&'a Type> {
     if path.segments.len() != 1 {
         return None;
     }
     let PathSegment { ident, arguments } = path.segments.first()?;
-    if ident != "Vec" {
+    if ident != outer {
         return None;
     }
     let args = if let PathArguments::AngleBracketed(angle) = arguments {
@@ -518,89 +517,68 @@ pub fn option_setters_2(
     let opt_struct = parse_macro_input!(attr as ItemStruct);
     let mut impl_in = parse_macro_input!(item as ItemImpl);
 
-    // Find the rustdocs for each option field
-    let mut opt_docs = HashMap::new();
+    // Gather information about each option struct field
+    struct OptInfo {
+        attrs: Vec<Attribute>,
+        type_: Path,
+    }
+    let mut opt_info = HashMap::new();
     let fields = match &opt_struct.fields {
         Fields::Named(f) => &f.named,
-        _ => {
-            return Error::new(opt_struct.span(), "options struct must have named fields")
-                .into_compile_error()
-                .into()
-        }
+        _ => compile_error!(opt_struct.span(), "options struct must have named fields"),
     };
     for field in fields {
+        if !matches!(field.vis, Visibility::Public(..)) {
+            continue;
+        }
+        // name
         let ident = match &field.ident {
             Some(f) => f.clone(),
             None => continue,
         };
-        let mut doc_attrs = vec![];
+        // doc and cfg attrs
+        let mut attrs = vec![];
         for attr in &field.attrs {
-            if attr.path().is_ident("doc") {
-                doc_attrs.push(attr.clone());
+            if attr.path().is_ident("doc") || attr.path().is_ident("cfg") {
+                attrs.push(attr.clone());
             }
         }
-        if !doc_attrs.is_empty() {
-            opt_docs.insert(ident, doc_attrs);
-        }
-    }
-
-    // Strip and parse `option_setters!` calls from the input impl
-    let mut new_items = vec![];
-    let mut setter_list = None;
-    for item in impl_in.items.drain(..) {
-        match item {
-            ImplItem::Macro(item) if item.mac.path.is_ident("option_setters") => {
-                let tokens = item.mac.tokens.clone().into();
-                if setter_list
-                    .replace(parse_macro_input!(tokens as OptionSettersList))
-                    .is_some()
-                {
-                    return Error::new(item.span(), "multiple option_setters! items")
-                        .into_compile_error()
-                        .into();
-                }
-            }
-            _ => new_items.push(item),
+        // type, unwrapped from `Option`
+        let outer = match &field.ty {
+            Type::Path(ty) => &ty.path,
+            _ => compile_error!(field.span(), "invalid type"),
         };
+        let type_ = match inner_type(outer, "Option") {
+            Some(Type::Path(ty)) => ty.path.clone(),
+            _ => compile_error!(field.span(), "invalid type"),
+        };
+
+        opt_info.insert(ident, OptInfo { attrs, type_ });
     }
 
-    // Append setter fns to item list
-    let OptionSettersList {
-        opt_field_name,
-        opt_field_type,
-        setters,
-    } = if let Some(l) = setter_list {
-        l
-    } else {
-        return Error::new(impl_in.span(), "no option_setters! item")
-            .into_compile_error()
-            .into();
-    };
-    new_items.push(parse_quote! {
+    // Append utility fns to `impl` block item list
+    let opt_field_type = &opt_struct.ident;
+    impl_in.items.push(parse_quote! {
         #[allow(unused)]
         fn options(&mut self) -> &mut #opt_field_type {
-            self.#opt_field_name.get_or_insert_with(<#opt_field_type>::default)
+            self.options.get_or_insert_with(<#opt_field_type>::default)
         }
     });
-    new_items.push(parse_quote! {
+    impl_in.items.push(parse_quote! {
         /// Set all options.  Note that this will replace all previous values set.
         pub fn with_options(mut self, value: impl Into<Option<#opt_field_type>>) -> Self {
-            self.#opt_field_name = value.into();
+            self.options = value.into();
             self
         }
     });
-    for OptionSetter {
-        mut attrs,
-        name,
-        type_,
-    } in setters
-    {
+    // Append setter fns to `impl` block item list
+    for (name, OptInfo { attrs, type_ }) in opt_info {
         let (accept, value) = if type_.is_ident("String")
             || type_.is_ident("Bson")
             || path_eq(&type_, &["bson", "Bson"])
         {
             (quote! { impl Into<#type_> }, quote! { value.into() })
-        } else if let Some(t) = vec_arg(&type_) {
+        } else if let Some(t) = inner_type(&type_, "Vec") {
             (
                 quote! { impl IntoIterator<Item = #t> },
                 quote! { value.into_iter().collect() },
@@ -608,10 +586,7 @@ pub fn option_setters_2(
         } else {
             (quote! { #type_ }, quote! { value })
         };
-        if let Some(mut docs) = opt_docs.remove(&name) {
-            attrs.append(&mut docs);
-        }
-        new_items.push(parse_quote! {
+        impl_in.items.push(parse_quote! {
             #(#attrs)*
             pub fn #name(mut self, value: #accept) -> Self {
                 self.options().#name = Some(#value);
@@ -620,7 +595,6 @@ pub fn option_setters_2(
         })
     }
 
-    // Slot in the new list of items
-    impl_in.items = new_items;
+    // All done.
     impl_in.to_token_stream().into()
 }
