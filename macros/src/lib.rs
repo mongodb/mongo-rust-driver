@@ -225,52 +225,6 @@ macro_rules! compile_error {
     }};
 }
 
-#[import_tokens_attr]
-#[proc_macro_attribute]
-pub fn options_doc(
-    attr: proc_macro::TokenStream,
-    item: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-    let setters = parse_macro_input!(attr as ItemImpl);
-    let mut impl_fn = parse_macro_input!(item as ImplItemFn);
-
-    // Collect a list of names from the setters impl
-    let mut setter_names = vec![];
-    for item in &setters.items {
-        match item {
-            ImplItem::Fn(item) => {
-                setter_names.push(item.sig.ident.to_token_stream().to_string());
-            }
-            _ => continue,
-        }
-    }
-
-    // Get the rustdoc path to the action type, i.e. the type with generic arguments stripped
-    let mut doc_path = match &*setters.self_ty {
-        Type::Path(p) => p.path.clone(),
-        t => compile_error!(t.span(), "invalid options doc argument"),
-    };
-    for seg in &mut doc_path.segments {
-        seg.arguments = PathArguments::None;
-    }
-    let doc_path = doc_path.to_token_stream().to_string();
-
-    // Add the list of setters to the rustdoc for the fn
-    impl_fn.attrs.push(parse_quote! {
-        #[doc = ""]
-    });
-    impl_fn.attrs.push(parse_quote! {
-        #[doc = "These methods can be chained before calling `.await` to set options:"]
-    });
-    for name in setter_names {
-        let docstr = format!("  * [{0}]({1}::{0})", name, doc_path);
-        impl_fn.attrs.push(parse_quote! {
-            #[doc = #docstr]
-        });
-    }
-    impl_fn.into_token_stream().into()
-}
-
 /// Enables rustdoc links to types that link individually to each type
 /// component.
 #[proc_macro_attribute]
@@ -597,4 +551,50 @@ pub fn option_setters_2(
 
     // All done.
     impl_in.to_token_stream().into()
+}
+
+#[import_tokens_attr]
+#[proc_macro_attribute]
+pub fn options_doc(
+    attr: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let setters = parse_macro_input!(attr as ItemImpl);
+    let mut impl_fn = parse_macro_input!(item as ImplItemFn);
+
+    // Collect a list of names from the setters impl
+    let mut setter_names = vec![];
+    for item in &setters.items {
+        match item {
+            ImplItem::Fn(item) if matches!(item.vis, Visibility::Public(..)) => {
+                setter_names.push(item.sig.ident.to_token_stream().to_string());
+            }
+            _ => continue,
+        }
+    }
+
+    // Get the rustdoc path to the action type, i.e. the type with generic arguments stripped
+    let mut doc_path = match &*setters.self_ty {
+        Type::Path(p) => p.path.clone(),
+        t => compile_error!(t.span(), "invalid options doc argument"),
+    };
+    for seg in &mut doc_path.segments {
+        seg.arguments = PathArguments::None;
+    }
+    let doc_path = doc_path.to_token_stream().to_string();
+
+    // Add the list of setters to the rustdoc for the fn
+    impl_fn.attrs.push(parse_quote! {
+        #[doc = ""]
+    });
+    impl_fn.attrs.push(parse_quote! {
+        #[doc = "These methods can be chained before calling `.await` to set options:"]
+    });
+    for name in setter_names {
+        let docstr = format!("  * [{0}]({1}::{0})", name, doc_path);
+        impl_fn.attrs.push(parse_quote! {
+            #[doc = #docstr]
+        });
+    }
+    impl_fn.into_token_stream().into()
 }
