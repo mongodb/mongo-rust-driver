@@ -379,20 +379,18 @@ pub fn option_setters(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         setters,
     } = parse_macro_input!(input as OptionSettersList);
 
-    let extras = opt_field_name.map(|name| {
-        quote! {
-            #[allow(unused)]
-            fn options(&mut self) -> &mut #opt_field_type {
-                self.#name.get_or_insert_with(<#opt_field_type>::default)
-            }
-
-            /// Set all options.  Note that this will replace all previous values set.
-            pub fn with_options(mut self, value: impl Into<Option<#opt_field_type>>) -> Self {
-                self.#name = value.into();
-                self
-            }
+    let extras = quote! {
+        #[allow(unused)]
+        fn options(&mut self) -> &mut #opt_field_type {
+            self.#opt_field_name.get_or_insert_with(<#opt_field_type>::default)
         }
-    });
+
+        /// Set all options.  Note that this will replace all previous values set.
+        pub fn with_options(mut self, value: impl Into<Option<#opt_field_type>>) -> Self {
+            self.#opt_field_name = value.into();
+            self
+        }
+    };
 
     let setters: Vec<_> = setters
         .into_iter()
@@ -472,20 +470,15 @@ fn path_eq(path: &Path, segments: &[&str]) -> bool {
 }
 
 struct OptionSettersList {
-    opt_field_name: Option<Ident>,
+    opt_field_name: Ident,
     opt_field_type: Type,
     setters: Vec<OptionSetter>,
 }
 
 impl Parse for OptionSettersList {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let opt_field_name = if input.peek2(Token![:]) {
-            let val = input.parse()?;
-            input.parse::<Token![:]>()?;
-            Some(val)
-        } else {
-            None
-        };
+        let opt_field_name = input.parse()?;
+        input.parse::<Token![:]>()?;
         let opt_field_type = input.parse()?;
         input.parse::<Token![;]>()?;
         let setters = input
@@ -583,21 +576,19 @@ pub fn option_setters_2(
             .into_compile_error()
             .into();
     };
-    if let Some(name) = opt_field_name {
-        new_items.push(parse_quote! {
-            #[allow(unused)]
-            fn options(&mut self) -> &mut #opt_field_type {
-                self.#name.get_or_insert_with(<#opt_field_type>::default)
-            }
-        });
-        new_items.push(parse_quote! {
-            /// Set all options.  Note that this will replace all previous values set.
-            pub fn with_options(mut self, value: impl Into<Option<#opt_field_type>>) -> Self {
-                self.#name = value.into();
-                self
-            }
-        });
-    }
+    new_items.push(parse_quote! {
+        #[allow(unused)]
+        fn options(&mut self) -> &mut #opt_field_type {
+            self.#opt_field_name.get_or_insert_with(<#opt_field_type>::default)
+        }
+    });
+    new_items.push(parse_quote! {
+        /// Set all options.  Note that this will replace all previous values set.
+        pub fn with_options(mut self, value: impl Into<Option<#opt_field_type>>) -> Self {
+            self.#opt_field_name = value.into();
+            self
+        }
+    });
     for OptionSetter {
         mut attrs,
         name,
