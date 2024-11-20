@@ -1,7 +1,5 @@
 extern crate proc_macro;
 
-use std::collections::HashMap;
-
 use macro_magic::import_tokens_attr;
 use quote::{quote, ToTokens};
 use syn::{
@@ -473,10 +471,11 @@ pub fn option_setters_2(
 
     // Gather information about each option struct field
     struct OptInfo {
+        name: Ident,
         attrs: Vec<Attribute>,
         type_: Path,
     }
-    let mut opt_info = HashMap::new();
+    let mut opt_info = vec![];
     let fields = match &opt_struct.fields {
         Fields::Named(f) => &f.named,
         _ => compile_error!(opt_struct.span(), "options struct must have named fields"),
@@ -486,7 +485,7 @@ pub fn option_setters_2(
             continue;
         }
         // name
-        let ident = match &field.ident {
+        let name = match &field.ident {
             Some(f) => f.clone(),
             None => continue,
         };
@@ -507,7 +506,7 @@ pub fn option_setters_2(
             _ => compile_error!(field.span(), "invalid type"),
         };
 
-        opt_info.insert(ident, OptInfo { attrs, type_ });
+        opt_info.push(OptInfo { name, attrs, type_ });
     }
 
     // Append utility fns to `impl` block item list
@@ -526,7 +525,7 @@ pub fn option_setters_2(
         }
     });
     // Append setter fns to `impl` block item list
-    for (name, OptInfo { attrs, type_ }) in opt_info {
+    for OptInfo { name, attrs, type_ } in opt_info {
         let (accept, value) = if type_.is_ident("String")
             || type_.is_ident("Bson")
             || path_eq(&type_, &["bson", "Bson"])
