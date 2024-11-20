@@ -146,7 +146,11 @@ impl PooledConnection {
             .and_then(|sd| sd.service_id)
     }
 
-    pub(crate) async fn send_message(&mut self, message: Message) -> Result<RawCommandResponse> {
+    /// Sends a message on this connection.
+    pub(crate) async fn send_message(
+        &mut self,
+        message: impl TryInto<Message, Error = impl Into<Error>>,
+    ) -> Result<RawCommandResponse> {
         match self.state {
             PooledConnectionState::CheckedOut {
                 cancellation_receiver: Some(ref mut cancellation_receiver),

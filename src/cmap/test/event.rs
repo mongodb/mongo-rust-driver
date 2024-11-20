@@ -173,18 +173,16 @@ where
 {
     let helper = ConnectionCheckoutFailedHelper::deserialize(deserializer)?;
 
-    // The driver doesn't have a concept of a "closed pool", instead having the pool closed when the
-    // pool is dropped. Because of this, the driver doesn't implement the "poolClosed" reason for a
-    // connection checkout failure. While we skip over the corresponding tests in our spec test
-    // runner, we still need to be able to deserialize the "poolClosed" reason to avoid the test
-    // harness panicking, so we arbitrarily map the "poolClosed" to "connectionError".
     let reason = match helper.reason {
-        Some(CheckoutFailedReasonHelper::PoolClosed)
-        | Some(CheckoutFailedReasonHelper::ConnectionError) => {
+        Some(CheckoutFailedReasonHelper::ConnectionError) => {
             ConnectionCheckoutFailedReason::ConnectionError
         }
         Some(CheckoutFailedReasonHelper::Timeout) => ConnectionCheckoutFailedReason::Timeout,
-        None => ConnectionCheckoutFailedReason::Unset,
+        // The driver does not implement the tests that use the PoolClosed reason, so we map the
+        // test value to unset to allow for deserialization.
+        Some(CheckoutFailedReasonHelper::PoolClosed) | None => {
+            ConnectionCheckoutFailedReason::Unset
+        }
     };
 
     Ok(ConnectionCheckoutFailedEvent {
