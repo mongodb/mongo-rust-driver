@@ -532,6 +532,13 @@ impl ConnectionPoolWorker {
     }
 
     fn clear(&mut self, cause: Error, service_id: Option<ObjectId>) {
+        let interrupt_in_use_connections = cause.is_network_timeout();
+        if interrupt_in_use_connections {
+            if let Some(ref cancellation_sender) = self.cancellation_sender {
+                let _ = cancellation_sender.send(());
+            }
+        }
+
         let was_ready = match (&mut self.generation, service_id) {
             (PoolGeneration::Normal(gen), None) => {
                 *gen += 1;
@@ -548,13 +555,6 @@ impl ConnectionPoolWorker {
         self.generation_publisher.publish(self.generation.clone());
 
         if was_ready {
-            let interrupt_in_use_connections = cause.is_network_timeout();
-            if interrupt_in_use_connections {
-                if let Some(ref cancellation_sender) = self.cancellation_sender {
-                    let _ = cancellation_sender.send(());
-                }
-            }
-
             self.event_emitter.emit_event(|| {
                 PoolClearedEvent {
                     address: self.address.clone(),
