@@ -1,6 +1,6 @@
 extern crate proc_macro;
 
-use macro_magic::import_tokens_attr;
+use macro_magic::{import_tokens_attr, mm_core::ForeignPath};
 use quote::{quote, ToTokens};
 use syn::{
     braced,
@@ -206,7 +206,7 @@ impl Parse for ActionImplAttrs {
 }
 
 /// Parse an identifier with a specific expected value.
-fn parse_name(input: ParseStream, name: &str) -> syn::Result<()> {
+fn parse_name(input: ParseStream, name: &str) -> syn::Result<Ident> {
     let ident = input.parse::<Ident>()?;
     if ident.to_string() != name {
         return Err(Error::new(
@@ -214,7 +214,7 @@ fn parse_name(input: ParseStream, name: &str) -> syn::Result<()> {
             format!("expected '{}', got '{}'", name, ident),
         ));
     }
-    Ok(())
+    Ok(ident)
 }
 
 macro_rules! compile_error {
@@ -553,6 +553,7 @@ pub fn option_setters_2(
 }
 
 #[import_tokens_attr]
+#[with_custom_parsing(OptionsDocArgs)]
 #[proc_macro_attribute]
 pub fn options_doc(
     attr: proc_macro::TokenStream,
@@ -560,6 +561,7 @@ pub fn options_doc(
 ) -> proc_macro::TokenStream {
     let setters = parse_macro_input!(attr as ItemImpl);
     let mut impl_fn = parse_macro_input!(item as ImplItemFn);
+    let args = parse_macro_input!(__custom_tokens as OptionsDocArgs);
 
     // Collect a list of names from the setters impl
     let mut setter_names = vec![];
@@ -586,8 +588,12 @@ pub fn options_doc(
     impl_fn.attrs.push(parse_quote! {
         #[doc = ""]
     });
+    let preamble = format!(
+        "These methods can be chained before calling `.{}` to set options:",
+        if args.is_async() { "await" } else { "run()" }
+    );
     impl_fn.attrs.push(parse_quote! {
-        #[doc = "These methods can be chained before calling `.await` to set options:"]
+        #[doc = #preamble]
     });
     for name in setter_names {
         let docstr = format!("  * [`{0}`]({1}::{0})", name, doc_path);
@@ -596,4 +602,44 @@ pub fn options_doc(
         });
     }
     impl_fn.into_token_stream().into()
+}
+
+struct OptionsDocArgs {
+    foreign_path: syn::Path,
+    sync: Option<(Token![,], Ident)>,
+}
+
+impl OptionsDocArgs {
+    fn is_async(&self) -> bool {
+        self.sync.is_none()
+    }
+}
+
+impl Parse for OptionsDocArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let foreign_path = input.parse()?;
+        let sync = if input.is_empty() {
+            None
+        } else {
+            Some((input.parse::<Token![,]>()?, parse_name(input, "sync")?))
+        };
+
+        Ok(Self { foreign_path, sync })
+    }
+}
+
+impl ToTokens for OptionsDocArgs {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        tokens.extend(self.foreign_path.to_token_stream());
+        if let Some((comma, ident)) = &self.sync {
+            tokens.extend(comma.to_token_stream());
+            tokens.extend(ident.to_token_stream());
+        }
+    }
+}
+
+impl ForeignPath for OptionsDocArgs {
+    fn foreign_path(&self) -> &syn::Path {
+        &self.foreign_path
+    }
 }
