@@ -35,7 +35,7 @@ use crate::{
 ///
 /// `ChangeStream`s are "resumable", meaning that they can be restarted at a given place in the
 /// stream of events. This is done automatically when the `ChangeStream` encounters certain
-/// ["resumable"](https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.rst#resumable-error)
+/// ["resumable"](https://specifications.readthedocs.io/en/latest/change-streams/change-streams/#resumable-error)
 /// errors, such as transient network failures. It can also be done manually by passing
 /// a [`ResumeToken`] retrieved from a past event into either the
 /// [`resume_after`](crate::action::Watch::resume_after) or

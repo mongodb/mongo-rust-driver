@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// A description of the most up-to-date information known about a topology. Further details can
-/// be found in the [Server Discovery and Monitoring specification](https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst).
+/// be found in the [Server Discovery and Monitoring specification](https://specifications.readthedocs.io/en/latest/server-discovery-and-monitoring/server-discovery-and-monitoring/).
 #[derive(Clone, derive_more::Display)]
 #[display(fmt = "{}", description)]
 pub struct TopologyDescription {

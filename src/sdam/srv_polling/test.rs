@@ -121,7 +121,7 @@ async fn no_results() {
 }
 
 // SRV polling is not done for load-balanced clusters (as per spec at
-// https://github.com/mongodb/specifications/blob/master/source/polling-srv-records-for-mongos-discovery/tests/README.rst#test-that-srv-polling-is-not-done-for-load-balalanced-clusters).
+// https://github.com/mongodb/specifications/tree/master/source/polling-srv-records-for-mongos-discovery/tests#9-test-that-srv-polling-is-not-done-for-load-balalanced-clusters).
 #[tokio::test]
 async fn load_balanced_no_srv_polling() {
     if get_client_options().await.load_balanced != Some(true) {

@@ -142,7 +142,7 @@ pub(crate) struct ServerDescription {
 }
 
 // Server description equality has a specific notion of what fields in a hello command response
-// should be compared (https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#serverdescription).
+// should be compared (https://specifications.readthedocs.io/en/latest/server-discovery-and-monitoring/server-discovery-and-monitoring/#server-description-equality).
 fn hello_command_eq(a: &HelloCommandResponse, b: &HelloCommandResponse) -> bool {
     a.server_type() == b.server_type()
         && a.min_wire_version == b.min_wire_version
