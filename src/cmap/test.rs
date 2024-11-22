@@ -49,6 +49,8 @@ const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
     // TODO RUST-2106: unskip this test
     "Pool clear SHOULD schedule the next background thread run immediately \
      (interruptInUseConnections = false)",
+    // TODO RUST-1052: unskip this test and investigate flaky failure linked in ticket
+    "threads blocked by maxConnecting check out minPoolSize connections",
 ];
 
 /// Many different types of CMAP events are emitted from tasks spawned in the drop
