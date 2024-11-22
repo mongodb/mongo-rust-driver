@@ -181,6 +181,8 @@ impl Connection {
         cancellation_receiver: &mut broadcast::Receiver<()>,
     ) -> Result<RawCommandResponse> {
         tokio::select! {
+            biased;
+
             // A lagged error indicates that more heartbeats failed than the channel's capacity
             // between checking out this connection and executing the operation. If this occurs,
             // then proceed with cancelling the operation. RecvError::Closed can be ignored, as
