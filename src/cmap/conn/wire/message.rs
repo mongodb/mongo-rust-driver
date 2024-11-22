@@ -28,14 +28,27 @@ use super::{
 /// Represents an OP_MSG wire protocol operation.
 #[derive(Debug)]
 pub(crate) struct Message {
-    // OP_MSG payload type 0
+    /// OP_MSG payload type 0.
     pub(crate) document_payload: RawDocumentBuf,
-    // OP_MSG payload type 1
+
+    /// OP_MSG payload type 1.
     pub(crate) document_sequences: Vec<DocumentSequence>,
+
     pub(crate) response_to: i32,
+
     pub(crate) flags: MessageFlags,
+
     pub(crate) checksum: Option<u32>,
+
     pub(crate) request_id: Option<i32>,
+
+    /// Whether the message should be compressed by the driver.
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
+    pub(crate) should_compress: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -44,11 +57,18 @@ pub(crate) struct DocumentSequence {
     pub(crate) documents: Vec<RawDocumentBuf>,
 }
 
-impl Message {
-    /// Creates a `Message` from a given `Command`. Note that the `response_to` field must be set
-    /// manually.
-    pub(crate) fn from_command(command: Command, request_id: Option<i32>) -> Result<Self> {
+/// Creates a Message from a Command. The response_to and request_id fields must be set manually.
+impl TryFrom<Command> for Message {
+    type Error = Error;
+
+    fn try_from(command: Command) -> Result<Self> {
         let document_payload = bson::to_raw_document_buf(&command)?;
+        #[cfg(any(
+            feature = "zstd-compression",
+            feature = "zlib-compression",
+            feature = "snappy-compression"
+        ))]
+        let should_compress = command.should_compress();
 
         let mut flags = MessageFlags::empty();
         if command.exhaust_allowed {
@@ -61,10 +81,18 @@ impl Message {
             response_to: 0,
             flags,
             checksum: None,
-            request_id,
+            request_id: None,
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
+            should_compress,
         })
     }
+}
 
+impl Message {
     /// Gets this message's command as a Document. If serialization fails, returns a document
     /// containing the error.
     pub(crate) fn get_command_document(&self) -> Document {
@@ -233,6 +261,12 @@ impl Message {
             document_sequences,
             checksum,
             request_id: None,
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
+            should_compress: false,
         })
     }
 

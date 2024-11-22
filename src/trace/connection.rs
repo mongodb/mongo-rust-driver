@@ -143,14 +143,16 @@ impl TracingRepresentation for ConnectionClosedReason {
 
     fn tracing_representation(&self) -> &'static str {
         match self {
-            ConnectionClosedReason::Stale => "Connection became stale because the pool was cleared",
-            ConnectionClosedReason::Idle => {
+            Self::Stale => "Connection became stale because the pool was cleared",
+            Self::Idle => {
                 "Connection has been available but unused for longer than the configured max idle \
                  time"
             }
-            ConnectionClosedReason::Error => "An error occurred while using the connection",
-            ConnectionClosedReason::Dropped => "Connection was dropped during an operation",
-            ConnectionClosedReason::PoolClosed => "Connection pool was closed",
+            Self::Error => "An error occurred while using the connection",
+            Self::Dropped => "Connection was dropped during an operation",
+            Self::PoolClosed => "Connection pool was closed",
+            #[cfg(test)]
+            Self::Unset => "Unset",
         }
     }
 }
@@ -160,12 +162,10 @@ impl TracingRepresentation for ConnectionCheckoutFailedReason {
 
     fn tracing_representation(&self) -> &'static str {
         match self {
-            ConnectionCheckoutFailedReason::Timeout => {
-                "Failed to establish a new connection within connectTimeoutMS"
-            }
-            ConnectionCheckoutFailedReason::ConnectionError => {
-                "An error occurred while trying to establish a new connection"
-            }
+            Self::Timeout => "Failed to establish a new connection within connectTimeoutMS",
+            Self::ConnectionError => "An error occurred while trying to establish a new connection",
+            #[cfg(test)]
+            Self::Unset => "Unset",
         }
     }
 }

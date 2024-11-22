@@ -310,6 +310,11 @@ impl Command {
         REDACTED_COMMANDS.contains(name.as_str()) || should_redact_body(&self.body)
     }
 
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
     pub(crate) fn should_compress(&self) -> bool {
         let name = self.name.to_lowercase();
         !REDACTED_COMMANDS.contains(name.as_str()) && !HELLO_COMMAND_NAMES.contains(name.as_str())

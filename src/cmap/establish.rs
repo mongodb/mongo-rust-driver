@@ -108,11 +108,12 @@ impl ConnectionEstablisher {
     /// Establishes a connection.
     pub(crate) async fn establish_connection(
         &self,
-        pending_connection: PendingConnection,
+        mut pending_connection: PendingConnection,
         credential: Option<&Credential>,
     ) -> std::result::Result<PooledConnection, EstablishError> {
         let pool_gen = pending_connection.generation.clone();
         let address = pending_connection.address.clone();
+        let cancellation_receiver = pending_connection.cancellation_receiver.take();
 
         let stream = self
             .make_stream(address)
@@ -121,7 +122,10 @@ impl ConnectionEstablisher {
 
         let mut connection = PooledConnection::new(pending_connection, stream);
         #[allow(unused_mut)]
-        let mut handshake_result = self.handshaker.handshake(&mut connection, credential).await;
+        let mut handshake_result = self
+            .handshaker
+            .handshake(&mut connection, credential, cancellation_receiver)
+            .await;
         #[cfg(test)]
         if let Some(patch) = self.test_patch_reply {
             patch(&mut handshake_result);
@@ -176,7 +180,10 @@ impl ConnectionEstablisher {
         let stream = self.make_stream(address.clone()).await?;
         let mut connection = Connection::new(address, stream, id, Instant::now());
 
-        let hello_reply = self.handshaker.handshake(&mut connection, None).await?;
+        let hello_reply = self
+            .handshaker
+            .handshake(&mut connection, None, None)
+            .await?;
 
         Ok((connection, hello_reply))
     }

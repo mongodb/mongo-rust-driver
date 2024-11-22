@@ -8,9 +8,8 @@ use crate::{
     error::Result,
     event::cmap::CmapEvent,
     serde_util,
-    test::RunOn,
+    test::{util::fail_point::FailPoint, RunOn},
 };
-use bson::Document;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -26,7 +25,7 @@ pub struct TestFile {
     pub(crate) events: Vec<CmapEvent>,
     #[serde(default)]
     pub ignore: Vec<String>,
-    pub fail_point: Option<Document>,
+    pub fail_point: Option<FailPoint>,
     pub(crate) run_on: Option<Vec<RunOn>>,
 }
 
@@ -85,7 +84,11 @@ pub enum Operation {
     CheckIn {
         connection: String,
     },
-    Clear,
+    #[serde(rename_all = "camelCase")]
+    Clear {
+        #[serde(default)]
+        interrupt_in_use_connections: Option<bool>,
+    },
     Close,
     Ready,
 }

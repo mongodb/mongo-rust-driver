@@ -1,3 +1,5 @@
+use tokio::sync::broadcast;
+
 #[cfg(test)]
 use super::options::BackgroundThreadInterval;
 use super::{
@@ -136,6 +138,9 @@ pub(crate) struct ConnectionPoolWorker {
 
     /// The maximum number of new connections that can be created concurrently.
     max_connecting: u32,
+
+    /// Sender used to broadcast cancellation notices to checked-out connections.
+    cancellation_sender: Option<broadcast::Sender<()>>,
 }
 
 impl ConnectionPoolWorker {
@@ -215,6 +220,16 @@ impl ConnectionPoolWorker {
 
         let credential = options.and_then(|o| o.credential);
 
+        let cancellation_sender = if !is_load_balanced {
+            // There's not necessarily an upper bound on the number of messages that could exist in
+            // this channel; however, connections use both successfully receiving a message in the
+            // channel and receiving a lagged error as an indication that cancellation should occur,
+            // so we use an artificial bound of one message.
+            Some(broadcast::channel(1).0)
+        } else {
+            None
+        };
+
         let worker = ConnectionPoolWorker {
             address,
             event_emitter,
@@ -240,6 +255,7 @@ impl ConnectionPoolWorker {
             maintenance_frequency,
             server_updater,
             max_connecting,
+            cancellation_sender,
         };
 
         runtime::spawn(async move {
@@ -399,7 +415,7 @@ impl ConnectionPoolWorker {
                     continue;
                 }
 
-                conn.mark_checked_out(self.manager.clone());
+                conn.mark_checked_out(self.manager.clone(), self.get_cancellation_receiver());
                 if let Err(request) =
                     request.fulfill(ConnectionRequestResult::Pooled(Box::new(conn)))
                 {
@@ -422,6 +438,7 @@ impl ConnectionPoolWorker {
             let manager = self.manager.clone();
             let server_updater = self.server_updater.clone();
             let credential = self.credential.clone();
+            let cancellation_receiver = self.get_cancellation_receiver();
 
             let handle = runtime::spawn(async move {
                 let mut establish_result = establish_connection(
@@ -435,7 +452,7 @@ impl ConnectionPoolWorker {
                 .await;
 
                 if let Ok(ref mut c) = establish_result {
-                    c.mark_checked_out(manager.clone());
+                    c.mark_checked_out(manager.clone(), cancellation_receiver);
                     manager.handle_connection_succeeded(ConnectionSucceeded::Used {
                         service_id: c.generation.service_id(),
                     });
@@ -465,6 +482,7 @@ impl ConnectionPoolWorker {
             generation: self.generation.clone(),
             event_emitter: self.event_emitter.clone(),
             time_created: Instant::now(),
+            cancellation_receiver: self.get_cancellation_receiver(),
         };
         self.next_connection_id += 1;
         self.event_emitter
@@ -514,6 +532,13 @@ impl ConnectionPoolWorker {
     }
 
     fn clear(&mut self, cause: Error, service_id: Option<ObjectId>) {
+        let interrupt_in_use_connections = cause.is_network_timeout();
+        if interrupt_in_use_connections {
+            if let Some(ref cancellation_sender) = self.cancellation_sender {
+                let _ = cancellation_sender.send(());
+            }
+        }
+
         let was_ready = match (&mut self.generation, service_id) {
             (PoolGeneration::Normal(gen), None) => {
                 *gen += 1;
@@ -534,6 +559,7 @@ impl ConnectionPoolWorker {
                 PoolClearedEvent {
                     address: self.address.clone(),
                     service_id,
+                    interrupt_in_use_connections,
                 }
                 .into()
             });
@@ -645,6 +671,14 @@ impl ConnectionPoolWorker {
                 });
             }
         }
+    }
+
+    /// Returns a receiver for the pool's cancellation sender if this pool is not in load-balanced
+    /// mode. The returned receiver will only receive messages sent after this method is called.
+    fn get_cancellation_receiver(&self) -> Option<broadcast::Receiver<()>> {
+        self.cancellation_sender
+            .as_ref()
+            .map(|sender| sender.subscribe())
     }
 }
 

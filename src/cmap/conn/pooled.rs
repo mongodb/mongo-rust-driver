@@ -5,16 +5,18 @@ use std::{
 };
 
 use derive_where::derive_where;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{broadcast, mpsc, Mutex};
 
 use super::{
     CmapEventEmitter,
     Connection,
     ConnectionGeneration,
     ConnectionInfo,
+    Message,
     PendingConnection,
     PinnedConnectionHandle,
     PoolManager,
+    RawCommandResponse,
 };
 use crate::{
     bson::oid::ObjectId,
@@ -50,7 +52,7 @@ pub(crate) struct PooledConnection {
 }
 
 /// The state of a pooled connection.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 enum PooledConnectionState {
     /// The state associated with a connection checked into the connection pool.
     CheckedIn { available_time: Instant },
@@ -59,6 +61,10 @@ enum PooledConnectionState {
     CheckedOut {
         /// The manager used to check this connection back into the pool.
         pool_manager: PoolManager,
+
+        /// The receiver to receive a cancellation notice. Only present on non-load-balanced
+        /// connections.
+        cancellation_receiver: Option<broadcast::Receiver<()>>,
     },
 
     /// The state associated with a pinned connection.
@@ -140,6 +146,24 @@ impl PooledConnection {
             .and_then(|sd| sd.service_id)
     }
 
+    /// Sends a message on this connection.
+    pub(crate) async fn send_message(
+        &mut self,
+        message: impl TryInto<Message, Error = impl Into<Error>>,
+    ) -> Result<RawCommandResponse> {
+        match self.state {
+            PooledConnectionState::CheckedOut {
+                cancellation_receiver: Some(ref mut cancellation_receiver),
+                ..
+            } => {
+                self.connection
+                    .send_message_with_cancellation(message, cancellation_receiver)
+                    .await
+            }
+            _ => self.connection.send_message(message).await,
+        }
+    }
+
     /// Updates the state of the connection to indicate that it is checked into the pool.
     pub(crate) fn mark_checked_in(&mut self) {
         if !matches!(self.state, PooledConnectionState::CheckedIn { .. }) {
@@ -155,8 +179,15 @@ impl PooledConnection {
     }
 
     /// Updates the state of the connection to indicate that it is checked out of the pool.
-    pub(crate) fn mark_checked_out(&mut self, pool_manager: PoolManager) {
-        self.state = PooledConnectionState::CheckedOut { pool_manager };
+    pub(crate) fn mark_checked_out(
+        &mut self,
+        pool_manager: PoolManager,
+        cancellation_receiver: Option<broadcast::Receiver<()>>,
+    ) {
+        self.state = PooledConnectionState::CheckedOut {
+            pool_manager,
+            cancellation_receiver,
+        };
     }
 
     /// Whether this connection is idle.
@@ -175,15 +206,14 @@ impl PooledConnection {
         Instant::now().duration_since(available_time) >= max_idle_time
     }
 
-    /// Nullifies the internal state of this connection and returns it in a new [PooledConnection].
-    /// If a state is provided, then the new connection will contain that state; otherwise, this
-    /// connection's state will be cloned.
-    fn take(&mut self, state: impl Into<Option<PooledConnectionState>>) -> Self {
+    /// Nullifies the internal state of this connection and returns it in a new [PooledConnection]
+    /// with the given state.
+    fn take(&mut self, new_state: PooledConnectionState) -> Self {
         Self {
             connection: self.connection.take(),
             generation: self.generation,
             event_emitter: self.event_emitter.clone(),
-            state: state.into().unwrap_or_else(|| self.state.clone()),
+            state: new_state,
         }
     }
 
@@ -196,7 +226,9 @@ impl PooledConnection {
                     self.id
                 )))
             }
-            PooledConnectionState::CheckedOut { ref pool_manager } => {
+            PooledConnectionState::CheckedOut {
+                ref pool_manager, ..
+            } => {
                 let (tx, rx) = mpsc::channel(1);
                 self.state = PooledConnectionState::Pinned {
                     // Mark the connection as in-use while the operation currently using the
@@ -286,10 +318,11 @@ impl Drop for PooledConnection {
             // Nothing needs to be done when a checked-in connection is dropped.
             PooledConnectionState::CheckedIn { .. } => Ok(()),
             // A checked-out connection should be sent back to the connection pool.
-            PooledConnectionState::CheckedOut { pool_manager } => {
+            PooledConnectionState::CheckedOut { pool_manager, .. } => {
                 let pool_manager = pool_manager.clone();
-                let mut dropped_connection = self.take(None);
-                dropped_connection.mark_checked_in();
+                let dropped_connection = self.take(PooledConnectionState::CheckedIn {
+                    available_time: Instant::now(),
+                });
                 pool_manager.check_in(dropped_connection)
             }
             // A pinned connection should be returned to its pinner or to the connection pool.
@@ -339,7 +372,11 @@ impl Drop for PooledConnection {
                     }
                     // The pinner of this connection has been dropped while the connection was
                     // sitting in its channel, so the connection should be returned to the pool.
-                    PinnedState::Returned { .. } => pool_manager.check_in(self.take(None)),
+                    PinnedState::Returned { .. } => {
+                        pool_manager.check_in(self.take(PooledConnectionState::CheckedIn {
+                            available_time: Instant::now(),
+                        }))
+                    }
                 }
             }
         };

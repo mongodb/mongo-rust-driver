@@ -880,7 +880,7 @@ async fn send_sasl_command(
     conn: &mut Connection,
     command: crate::cmap::Command,
 ) -> Result<SaslResponse> {
-    let response = conn.send_command(command, None).await?;
+    let response = conn.send_message(command).await?;
     SaslResponse::parse(
         MONGODB_OIDC_STR,
         response.auth_response_body(MONGODB_OIDC_STR)?,

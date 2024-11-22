@@ -9,7 +9,11 @@ use derive_where::derive_where;
 use serde::Serialize;
 use tokio::{
     io::BufStream,
-    sync::{mpsc, Mutex},
+    sync::{
+        broadcast::{self, error::RecvError},
+        mpsc,
+        Mutex,
+    },
 };
 
 use self::wire::{Message, MessageFlags};
@@ -171,12 +175,44 @@ impl Connection {
         self.error.is_some()
     }
 
+    pub(crate) async fn send_message_with_cancellation(
+        &mut self,
+        message: impl TryInto<Message, Error = impl Into<Error>>,
+        cancellation_receiver: &mut broadcast::Receiver<()>,
+    ) -> Result<RawCommandResponse> {
+        tokio::select! {
+            biased;
+
+            // A lagged error indicates that more heartbeats failed than the channel's capacity
+            // between checking out this connection and executing the operation. If this occurs,
+            // then proceed with cancelling the operation. RecvError::Closed can be ignored, as
+            // the sender (and by extension the connection pool) dropping does not indicate that
+            // the operation should be cancelled.
+            Ok(_) | Err(RecvError::Lagged(_)) = cancellation_receiver.recv() => {
+                let error: Error = ErrorKind::ConnectionPoolCleared {
+                    message: format!(
+                        "Connection to {} interrupted due to server monitor timeout",
+                        self.address,
+                    )
+                }.into();
+                self.error = Some(error.clone());
+                Err(error)
+            }
+            // This future is not cancellation safe because it contains calls to methods that are
+            // not cancellation safe (e.g. AsyncReadExt::read_exact). However, in the case that
+            // this future is cancelled because a cancellation message was received, this
+            // connection will be closed upon being returned to the pool, so any data loss on its
+            // underlying stream is not an issue.
+            result = self.send_message(message) => result,
+        }
+    }
+
     pub(crate) async fn send_message(
         &mut self,
-        message: Message,
-        // This value is only read if a compression feature flag is enabled.
-        #[allow(unused_variables)] can_compress: bool,
+        message: impl TryInto<Message, Error = impl Into<Error>>,
     ) -> Result<RawCommandResponse> {
+        let message = message.try_into().map_err(Into::into)?;
+
         if self.more_to_come {
             return Err(Error::internal(format!(
                 "attempted to send a new message to {} but moreToCome bit was set",
@@ -192,7 +228,7 @@ impl Connection {
             feature = "snappy-compression"
         ))]
         let write_result = match self.compressor {
-            Some(ref compressor) if can_compress => {
+            Some(ref compressor) if message.should_compress => {
                 message
                     .write_op_compressed_to(&mut self.stream, compressor)
                     .await
@@ -230,21 +266,6 @@ impl Connection {
             self.address.clone(),
             response_message,
         ))
-    }
-
-    /// Executes a `Command` and returns a `CommandResponse` containing the result from the server.
-    ///
-    /// An `Ok(...)` result simply means the server received the command and that the driver
-    /// driver received the response; it does not imply anything about the success of the command
-    /// itself.
-    pub(crate) async fn send_command(
-        &mut self,
-        command: Command,
-        request_id: impl Into<Option<i32>>,
-    ) -> Result<RawCommandResponse> {
-        let to_compress = command.should_compress();
-        let message = Message::from_command(command, request_id.into())?;
-        self.send_message(message, to_compress).await
     }
 
     /// Receive the next message from the connection.
@@ -378,6 +399,7 @@ pub(crate) struct PendingConnection {
     pub(crate) generation: PoolGeneration,
     pub(crate) event_emitter: CmapEventEmitter,
     pub(crate) time_created: Instant,
+    pub(crate) cancellation_receiver: Option<broadcast::Receiver<()>>,
 }
 
 impl PendingConnection {
