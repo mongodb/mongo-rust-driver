@@ -36,7 +36,6 @@ async fn run_unified() {
         .skip_files(&skipped_files)
         .skip_tests(&[
             // The driver does not support socketTimeoutMS.
-            "Reset server and pool after network timeout error during authentication",
             "Ignore network timeout error on find",
         ])
         .await;

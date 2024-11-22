@@ -36,6 +36,8 @@ pub(crate) struct ConnectionEstablisher {
 
     connect_timeout: Duration,
 
+    socket_timeout: Option<Duration>,
+
     #[cfg(test)]
     test_patch_reply: Option<fn(&mut Result<HelloReply>)>,
 }
@@ -44,6 +46,7 @@ pub(crate) struct EstablisherOptions {
     handshake_options: HandshakerOptions,
     tls_options: Option<TlsOptions>,
     connect_timeout: Option<Duration>,
+    socket_timeout: Option<Duration>,
     #[cfg(test)]
     pub(crate) test_patch_reply: Option<fn(&mut Result<HelloReply>)>,
 }
@@ -65,6 +68,7 @@ impl EstablisherOptions {
             },
             tls_options: opts.tls_options(),
             connect_timeout: opts.connect_timeout,
+            socket_timeout: opts.socket_timeout,
             #[cfg(test)]
             test_patch_reply: None,
         }
@@ -87,11 +91,13 @@ impl ConnectionEstablisher {
             Some(d) => d,
             None => DEFAULT_CONNECT_TIMEOUT,
         };
+        let socket_timeout = options.socket_timeout;
 
         Ok(Self {
             handshaker,
             tls_config,
             connect_timeout,
+            socket_timeout,
             #[cfg(test)]
             test_patch_reply: options.test_patch_reply,
         })
@@ -100,7 +106,7 @@ impl ConnectionEstablisher {
     async fn make_stream(&self, address: ServerAddress) -> Result<AsyncStream> {
         runtime::timeout(
             self.connect_timeout,
-            AsyncStream::connect(address, self.tls_config.as_ref()),
+            AsyncStream::connect(address, self.tls_config.as_ref(), self.socket_timeout),
         )
         .await?
     }

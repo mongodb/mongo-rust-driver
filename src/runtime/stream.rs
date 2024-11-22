@@ -1,9 +1,5 @@
 use std::{
-    net::SocketAddr,
-    ops::DerefMut,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
+    net::SocketAddr, ops::DerefMut, pin::Pin, task::{Context, Poll}, time::Duration
 };
 
 use tokio::{io::AsyncWrite, net::TcpStream};
@@ -44,6 +40,7 @@ impl AsyncStream {
     pub(crate) async fn connect(
         address: ServerAddress,
         tls_cfg: Option<&TlsConfig>,
+        socket_timeout: Option<Duration>,
     ) -> Result<Self> {
         match &address {
             ServerAddress::Tcp { host, .. } => {
@@ -54,7 +51,7 @@ impl AsyncStream {
                     }
                     .into());
                 }
-                let inner = tcp_connect(resolved).await?;
+                let inner = tcp_connect(resolved, socket_timeout).await?;
 
                 // If there are TLS options, wrap the inner stream in an AsyncTlsStream.
                 match tls_cfg {
@@ -70,7 +67,10 @@ impl AsyncStream {
     }
 }
 
-async fn tcp_try_connect(address: &SocketAddr) -> Result<TcpStream> {
+async fn tcp_try_connect(
+    address: &SocketAddr,
+    socket_timeout: Option<Duration>,
+) -> Result<TcpStream> {
     let stream = TcpStream::connect(address).await?;
     stream.set_nodelay(true)?;
 
@@ -80,11 +80,18 @@ async fn tcp_try_connect(address: &SocketAddr) -> Result<TcpStream> {
         let conf = socket2::TcpKeepalive::new().with_time(KEEPALIVE_TIME);
         socket.set_tcp_keepalive(&conf)?;
     }
+    socket.set_write_timeout(socket_timeout)?;
+    socket.set_read_timeout(socket_timeout)?;
+    println!("{:?}", socket.read_timeout()?.unwrap_or(Duration::from_secs(0)));
+    println!("{:?}", socket.write_timeout()?.unwrap_or(Duration::from_secs(0)));
     let std_stream = std::net::TcpStream::from(socket);
     Ok(TcpStream::from_std(std_stream)?)
 }
 
-pub(crate) async fn tcp_connect(resolved: Vec<SocketAddr>) -> Result<TcpStream> {
+pub(crate) async fn tcp_connect(
+    resolved: Vec<SocketAddr>,
+    socket_timeout: Option<Duration>,
+) -> Result<TcpStream> {
     // "Happy Eyeballs": try addresses in parallel, interleaving IPv6 and IPv4, preferring IPv6.
     // Based on the implementation in https://codeberg.org/KMK/happy-eyeballs.
     let (addrs_v6, addrs_v4): (Vec<_>, Vec<_>) = resolved
@@ -109,7 +116,7 @@ pub(crate) async fn tcp_connect(resolved: Vec<SocketAddr>) -> Result<TcpStream> 
     let mut attempts = tokio::task::JoinSet::new();
     let mut connect_error = None;
     'spawn: for a in socket_addrs {
-        attempts.spawn(async move { tcp_try_connect(&a).await });
+        attempts.spawn(async move { tcp_try_connect(&a, socket_timeout).await });
         let sleep = tokio::time::sleep(CONNECTION_ATTEMPT_DELAY);
         tokio::pin!(sleep); // required for select!
         while !attempts.is_empty() {

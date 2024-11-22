@@ -189,9 +189,12 @@ impl CryptExecutor {
                                 .and_then(|tls| tls.get(&provider))
                                 .cloned()
                                 .unwrap_or_default();
-                            let mut stream =
-                                AsyncStream::connect(addr, Some(&TlsConfig::new(tls_options)?))
-                                    .await?;
+                            let mut stream = AsyncStream::connect(
+                                addr,
+                                Some(&TlsConfig::new(tls_options)?),
+                                None,
+                            )
+                            .await?;
                             stream.write_all(kms_ctx.message()?).await?;
                             let mut buf = vec![0];
                             while kms_ctx.bytes_needed() > 0 {
