@@ -46,6 +46,7 @@ const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
     "waiting on maxConnecting is limited by WaitQueueTimeoutMS",
     // TODO DRIVERS-1785 remove this skip when test event order is fixed
     "error during minPoolSize population clears pool",
+    // TODO RUST-2106: unskip this test
     "Pool clear SHOULD schedule the next background thread run immediately \
      (interruptInUseConnections = false)",
 ];
