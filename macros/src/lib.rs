@@ -590,7 +590,7 @@ pub fn options_doc(
         #[doc = "These methods can be chained before calling `.await` to set options:"]
     });
     for name in setter_names {
-        let docstr = format!("  * [{0}]({1}::{0})", name, doc_path);
+        let docstr = format!("  * [`{0}`]({1}::{0})", name, doc_path);
         impl_fn.attrs.push(parse_quote! {
             #[doc = #docstr]
         });
