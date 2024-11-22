@@ -932,6 +932,7 @@ where
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct FindOneOptions {
     /// If true, partial results will be returned from a mongos rather than an error being
     /// returned if one or more shards is down.
