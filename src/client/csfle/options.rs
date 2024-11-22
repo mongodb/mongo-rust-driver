@@ -17,7 +17,7 @@ use crate::{
 /// collection. Automatic encryption is not supported for operations on a database or view, and
 /// operations that are not bypassed will result in error (see [libmongocrypt: Auto Encryption
 /// Allow-List](
-/// https://github.com/mongodb/specifications/blob/master/source/client-side-encryption/client-side-encryption.rst#libmongocrypt-auto-encryption-allow-list
+/// https://specifications.readthedocs.io/en/latest/client-side-encryption/client-side-encryption/#libmongocrypt-auto-encryption-allow-list
 /// )). To bypass automatic encryption for all operations, set bypassAutoEncryption=true in
 /// AutoEncryptionOpts.
 #[derive(Debug, Clone, Deserialize)]

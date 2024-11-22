@@ -1,6 +1,6 @@
 # Rust Driver Benchmark Suite
 
-This suite implements the benchmarks described in this (spec)[https://github.com/mongodb/specifications/blob/master/source/benchmarking/benchmarking.rst].
+This suite implements the benchmarks described in this (spec)[https://github.com/mongodb/specifications/blob/master/source/benchmarking/benchmarking.md].
 
 In order to run the microbenchmarks, first run `./download-data.sh`. (NOTE: the data for the deeply nested BSON encoding and decoding is
 currently broken, so these benchmarks will not be runnable until that's fixed).

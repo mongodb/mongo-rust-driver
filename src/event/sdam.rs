@@ -17,7 +17,7 @@ pub use crate::sdam::public::TopologyType;
 pub use topology_description::TopologyDescription;
 
 /// A description of the most up-to-date information known about a server. Further details can be
-/// found in the [Server Discovery and Monitoring specification](https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst).
+/// found in the [Server Discovery and Monitoring specification](https://specifications.readthedocs.io/en/latest/server-discovery-and-monitoring/server-discovery-and-monitoring/).
 pub type ServerDescription = crate::sdam::public::ServerInfo<'static>;
 
 /// Published when a server description changes.
