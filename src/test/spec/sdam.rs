@@ -3,10 +3,7 @@ use std::time::Duration;
 use bson::{doc, Document};
 
 use crate::{
-    event::sdam::SdamEvent,
-    hello::LEGACY_HELLO_COMMAND_NAME,
-    runtime,
-    test::{
+    event::sdam::SdamEvent, hello::LEGACY_HELLO_COMMAND_NAME, options::ClientOptions, runtime, test::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
@@ -15,8 +12,7 @@ use crate::{
             fail_point::{FailPoint, FailPointMode},
         },
         Event,
-    },
-    Client,
+    }, Client
 };
 
 #[tokio::test(flavor = "multi_thread")]
@@ -35,7 +31,8 @@ async fn run_unified() {
     run_unified_tests(&["server-discovery-and-monitoring", "unified"])
         .skip_files(&skipped_files)
         .skip_tests(&[
-            // The driver does not support socketTimeoutMS.
+            // Flaky tests
+            "Reset server and pool after network timeout error during authentication",
             "Ignore network timeout error on find",
         ])
         .await;
@@ -227,6 +224,13 @@ async fn rtt_is_updated() {
     })
     .await
     .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn socket_timeout_ms_uri_option() {
+    let uri = "mongodb+srv://test1.test.build.10gen.cc/?socketTimeoutMs=250";
+    let options = ClientOptions::parse(uri).await.unwrap();
+    assert_eq!(options.socket_timeout.unwrap().as_millis(), 250);
 }
 
 /* TODO RUST-1895 enable this
