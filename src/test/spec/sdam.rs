@@ -3,7 +3,11 @@ use std::time::Duration;
 use bson::{doc, Document};
 
 use crate::{
-    event::sdam::SdamEvent, hello::LEGACY_HELLO_COMMAND_NAME, options::ClientOptions, runtime, test::{
+    event::sdam::SdamEvent,
+    hello::LEGACY_HELLO_COMMAND_NAME,
+    options::ClientOptions,
+    runtime,
+    test::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
@@ -12,7 +16,8 @@ use crate::{
             fail_point::{FailPoint, FailPointMode},
         },
         Event,
-    }, Client
+    },
+    Client,
 };
 
 #[tokio::test(flavor = "multi_thread")]
@@ -234,7 +239,10 @@ async fn socket_timeout_ms_uri_option() {
 
     let client = Client::with_options(options.clone()).unwrap();
     let db = client.database("test");
-    let error = db.run_command(doc! {"ping": 1}).await.expect_err("should fail with socket timeout error");
+    let error = db
+        .run_command(doc! {"ping": 1})
+        .await
+        .expect_err("should fail with socket timeout error");
     let error_description = format!("{}", error);
     for host in options.hosts.iter() {
         assert!(error_description.contains(format!("{}", host).as_str()));

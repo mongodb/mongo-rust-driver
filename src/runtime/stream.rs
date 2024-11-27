@@ -1,5 +1,9 @@
 use std::{
-    net::SocketAddr, ops::DerefMut, pin::Pin, task::{Context, Poll}, time::Duration
+    net::SocketAddr,
+    ops::DerefMut,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
 };
 
 use tokio::{io::AsyncWrite, net::TcpStream};
