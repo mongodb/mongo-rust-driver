@@ -104,6 +104,9 @@
           "arguments": {
             "filter": {
               "_id": 1
+            },
+            "expectError": {
+              "isError": true
             }
           }
         },

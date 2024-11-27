@@ -228,9 +228,17 @@ async fn rtt_is_updated() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn socket_timeout_ms_uri_option() {
-    let uri = "mongodb+srv://test1.test.build.10gen.cc/?socketTimeoutMs=250";
+    let uri = "mongodb+srv://test1.test.build.10gen.cc/?socketTimeoutMs=1";
     let options = ClientOptions::parse(uri).await.unwrap();
-    assert_eq!(options.socket_timeout.unwrap().as_millis(), 250);
+    assert_eq!(options.socket_timeout.unwrap().as_millis(), 1);
+
+    let client = Client::with_options(options.clone()).unwrap();
+    let db = client.database("test");
+    let error = db.run_command(doc! {"ping": 1}).await.expect_err("should fail with socket timeout error");
+    let error_description = format!("{}", error);
+    for host in options.hosts.iter() {
+        assert!(error_description.contains(format!("{}", host).as_str()));
+    }
 }
 
 /* TODO RUST-1895 enable this

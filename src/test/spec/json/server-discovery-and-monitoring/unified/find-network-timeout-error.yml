@@ -68,6 +68,8 @@ tests:
         arguments:
           filter:
             _id: 1
+        expectError:
+          isError: true
       # Perform another operation to ensure the node is still usable.
       - name: insertOne
         object: *collection

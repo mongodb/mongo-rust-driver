@@ -82,8 +82,6 @@ async fn tcp_try_connect(
     }
     socket.set_write_timeout(socket_timeout)?;
     socket.set_read_timeout(socket_timeout)?;
-    println!("{:?}", socket.read_timeout()?.unwrap_or(Duration::from_secs(0)));
-    println!("{:?}", socket.write_timeout()?.unwrap_or(Duration::from_secs(0)));
     let std_stream = std::net::TcpStream::from(socket);
     Ok(TcpStream::from_std(std_stream)?)
 }
