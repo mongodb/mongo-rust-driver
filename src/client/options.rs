@@ -1048,8 +1048,7 @@ pub struct TlsOptions {
     #[cfg(feature = "openssl-tls")]
     pub allow_invalid_hostnames: Option<bool>,
 
-    /// If set, the key in `cert_key_file_path` must be encrypted with this password. Only
-    /// supported with `rustls`.
+    /// If set, the key in `cert_key_file_path` must be encrypted with this password.
     pub tls_certificate_key_file_password: Option<Vec<u8>>,
 }
 
