@@ -1,7 +1,7 @@
 use crate::error::{ErrorKind, Result};
 
 pub(crate) fn decrypt_private_key(pem_data: &[u8], password: &[u8]) -> Result<Vec<u8>> {
-    let pems = pem::parse_many(&pem_data).map_err(|error| ErrorKind::InvalidTlsConfig {
+    let pems = pem::parse_many(pem_data).map_err(|error| ErrorKind::InvalidTlsConfig {
         message: format!("Could not parse pemfile: {}", error),
     })?;
     let mut iter = pems
