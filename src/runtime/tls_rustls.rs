@@ -23,6 +23,8 @@ use crate::{
     error::{ErrorKind, Result},
 };
 
+use super::pem::decrypt_private_key;
+
 pub(super) type TlsStream = tokio_rustls::client::TlsStream<TcpStream>;
 
 /// Configuration required to use TLS. Creating this is expensive, so its best to cache this value
@@ -106,33 +108,7 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
         let key = if let Some(key_pw) = cfg.tls_certificate_key_file_password.as_deref() {
             let mut contents = vec![];
             file.read_to_end(&mut contents)?;
-            let pems = pem::parse_many(&contents).map_err(|error| ErrorKind::InvalidTlsConfig {
-                message: format!("Could not parse {}: {}", path.display(), error),
-            })?;
-            let mut iter = pems
-                .into_iter()
-                .filter(|pem| pem.tag() == "ENCRYPTED PRIVATE KEY");
-            match iter.next() {
-                Some(pem) => {
-                    let encrypted = pkcs8::EncryptedPrivateKeyInfo::try_from(pem.contents())
-                        .map_err(|error| ErrorKind::InvalidTlsConfig {
-                            message: format!("Invalid encrypted client certificate: {}", error),
-                        })?;
-                    let decrypted =
-                        encrypted
-                            .decrypt(key_pw)
-                            .map_err(|error| ErrorKind::InvalidTlsConfig {
-                                message: format!("Failed to decrypt client certificate: {}", error),
-                            })?;
-                    rustls::PrivateKey(decrypted.as_bytes().to_vec())
-                }
-                None => {
-                    return Err(ErrorKind::InvalidTlsConfig {
-                        message: format!("No PEM-encoded keys in {}", path.display()),
-                    }
-                    .into())
-                }
-            }
+            rustls::PrivateKey(decrypt_private_key(&contents, key_pw)?)
         } else {
             loop {
                 match read_one(&mut file) {
