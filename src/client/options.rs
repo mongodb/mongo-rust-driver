@@ -1047,6 +1047,9 @@ pub struct TlsOptions {
     /// The default value is to error on invalid hostnames.
     #[cfg(feature = "openssl-tls")]
     pub allow_invalid_hostnames: Option<bool>,
+
+    #[cfg(feature = "rustls-tls")]
+    pub tls_certificate_key_file_password: Option<Vec<u8>>,
 }
 
 impl TlsOptions {
@@ -2122,6 +2125,24 @@ impl ConnectionString {
                     self.tls = Some(Tls::Enabled(
                         TlsOptions::builder()
                             .cert_key_file_path(PathBuf::from(value))
+                            .build(),
+                    ))
+                }
+            },
+            "tlscertificatekeyfilepassword" => match &mut self.tls {
+                Some(Tls::Disabled) => {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: "'tlsCertificateKeyFilePassword' can't be set if tls=false".into(),
+                    }
+                    .into());
+                }
+                Some(Tls::Enabled(options)) => {
+                    options.tls_certificate_key_file_password = Some(value.as_bytes().to_vec());
+                }
+                None => {
+                    self.tls = Some(Tls::Enabled(
+                        TlsOptions::builder()
+                            .tls_certificate_key_file_password(value.as_bytes().to_vec())
                             .build(),
                     ))
                 }

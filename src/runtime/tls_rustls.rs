@@ -86,60 +86,70 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
         store.add_trust_anchors(trust_anchors);
     }
 
-    let mut config = if let Some(path) = cfg.cert_key_file_path {
-        let mut file = BufReader::new(File::open(&path)?);
-        let certs = match certs(&mut file) {
-            Ok(certs) => certs.into_iter().map(Certificate).collect(),
-            Err(error) => {
-                return Err(ErrorKind::InvalidTlsConfig {
-                    message: format!(
-                        "Unable to parse PEM-encoded client certificate from {}: {}",
-                        path.display(),
-                        error,
-                    ),
-                }
-                .into())
-            }
-        };
-
-        file.rewind()?;
-        let key = loop {
-            match read_one(&mut file) {
-                Ok(Some(Item::PKCS8Key(bytes))) | Ok(Some(Item::RSAKey(bytes))) => {
-                    break rustls::PrivateKey(bytes)
-                }
-                Ok(Some(_)) => continue,
-                Ok(None) => {
-                    return Err(ErrorKind::InvalidTlsConfig {
-                        message: format!("No PEM-encoded keys in {}", path.display()),
-                    }
-                    .into())
-                }
-                Err(_) => {
-                    return Err(ErrorKind::InvalidTlsConfig {
-                        message: format!(
-                            "Unable to parse PEM-encoded item from {}",
-                            path.display()
-                        ),
-                    }
-                    .into())
+    let mut config =
+        if let Some(path) = cfg.cert_key_file_path {
+            let mut file = BufReader::new(File::open(&path)?);
+            let mut raw_certs = certs(&mut file).map_err(|error| ErrorKind::InvalidTlsConfig {
+                message: format!(
+                    "Unable to parse PEM-encoded client certificate from {}: {}",
+                    path.display(),
+                    error,
+                ),
+            })?;
+            if let Some(cert_pw) = cfg.tls_certificate_key_file_password.as_deref() {
+                for cert in &mut raw_certs {
+                    let encrypted = pkcs8::EncryptedPrivateKeyInfo::try_from(cert.as_slice())
+                        .map_err(|error| ErrorKind::InvalidTlsConfig {
+                            message: format!("Invalid encrypted client certificate: {}", error),
+                        })?;
+                    let decrypted = encrypted.decrypt(cert_pw).map_err(|error| {
+                        ErrorKind::InvalidTlsConfig {
+                            message: format!("Failed to decrypt client certificate: {}", error),
+                        }
+                    })?;
+                    *cert = decrypted.as_bytes().to_vec();
                 }
             }
-        };
+            let certs = raw_certs.into_iter().map(Certificate).collect();
 
-        ClientConfig::builder()
-            .with_safe_defaults()
-            .with_root_certificates(store)
-            .with_client_auth_cert(certs, key)
-            .map_err(|error| ErrorKind::InvalidTlsConfig {
-                message: error.to_string(),
-            })?
-    } else {
-        ClientConfig::builder()
-            .with_safe_defaults()
-            .with_root_certificates(store)
-            .with_no_client_auth()
-    };
+            file.rewind()?;
+            let key = loop {
+                match read_one(&mut file) {
+                    Ok(Some(Item::PKCS8Key(bytes))) | Ok(Some(Item::RSAKey(bytes))) => {
+                        break rustls::PrivateKey(bytes)
+                    }
+                    Ok(Some(_)) => continue,
+                    Ok(None) => {
+                        return Err(ErrorKind::InvalidTlsConfig {
+                            message: format!("No PEM-encoded keys in {}", path.display()),
+                        }
+                        .into())
+                    }
+                    Err(_) => {
+                        return Err(ErrorKind::InvalidTlsConfig {
+                            message: format!(
+                                "Unable to parse PEM-encoded item from {}",
+                                path.display()
+                            ),
+                        }
+                        .into())
+                    }
+                }
+            };
+
+            ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(store)
+                .with_client_auth_cert(certs, key)
+                .map_err(|error| ErrorKind::InvalidTlsConfig {
+                    message: error.to_string(),
+                })?
+        } else {
+            ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(store)
+                .with_no_client_auth()
+        };
 
     if let Some(true) = cfg.allow_invalid_certificates {
         // nosemgrep: rustls-dangerous
