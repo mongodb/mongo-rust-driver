@@ -26,6 +26,13 @@ impl TlsConfig {
     /// Create a new `TlsConfig` from the provided options from the user.
     /// This operation is expensive, so the resultant `TlsConfig` should be cached.
     pub(crate) fn new(options: TlsOptions) -> Result<TlsConfig> {
+        if options.tls_certificate_key_file_password.is_some() {
+            return Err(ErrorKind::InvalidArgument {
+                message: "'tlsCertificateKeyFilePassword' can't be used with 'openssl-tls'".into(),
+            }
+            .into());
+        }
+
         let verify_hostname = match options.allow_invalid_hostnames {
             Some(b) => !b,
             None => true,
@@ -74,6 +81,7 @@ fn make_openssl_connector(cfg: TlsOptions) -> std::result::Result<SslConnector, 
         ca_file_path,
         cert_key_file_path,
         allow_invalid_hostnames: _,
+        tls_certificate_key_file_password: _,
     } = cfg;
 
     if let Some(true) = allow_invalid_certificates {

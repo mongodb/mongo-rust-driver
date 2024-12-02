@@ -1048,9 +1048,8 @@ pub struct TlsOptions {
     #[cfg(feature = "openssl-tls")]
     pub allow_invalid_hostnames: Option<bool>,
 
-    /// The password for encrypted certificates in the CA file.  If set, all certificates must be
-    /// encrypted.  Only supported with `rustls`.
-    #[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
+    /// If set, the key in `cert_key_file_path` must be encrypted with this password. Only
+    /// supported with `rustls`.
     pub tls_certificate_key_file_password: Option<Vec<u8>>,
 }
 
@@ -2131,7 +2130,6 @@ impl ConnectionString {
                     ))
                 }
             },
-            #[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
             "tlscertificatekeyfilepassword" => match &mut self.tls {
                 Some(Tls::Disabled) => {
                     return Err(ErrorKind::InvalidArgument {

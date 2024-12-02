@@ -1,7 +1,7 @@
 use std::{
     convert::TryFrom,
     fs::File,
-    io::{BufReader, Seek},
+    io::{BufReader, Read, Seek},
     sync::Arc,
     time::SystemTime,
 };
@@ -86,35 +86,55 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
         store.add_trust_anchors(trust_anchors);
     }
 
-    let mut config =
-        if let Some(path) = cfg.cert_key_file_path {
-            let mut file = BufReader::new(File::open(&path)?);
-            let mut raw_certs = certs(&mut file).map_err(|error| ErrorKind::InvalidTlsConfig {
-                message: format!(
-                    "Unable to parse PEM-encoded client certificate from {}: {}",
-                    path.display(),
-                    error,
-                ),
+    let mut config = if let Some(path) = cfg.cert_key_file_path {
+        let mut file = BufReader::new(File::open(&path)?);
+        let certs = match certs(&mut file) {
+            Ok(certs) => certs.into_iter().map(Certificate).collect(),
+            Err(error) => {
+                return Err(ErrorKind::InvalidTlsConfig {
+                    message: format!(
+                        "Unable to parse PEM-encoded client certificate from {}: {}",
+                        path.display(),
+                        error,
+                    ),
+                }
+                .into())
+            }
+        };
+
+        file.rewind()?;
+        let key = if let Some(key_pw) = cfg.tls_certificate_key_file_password.as_deref() {
+            let mut contents = vec![];
+            file.read_to_end(&mut contents)?;
+            let pems = pem::parse_many(&contents).map_err(|error| ErrorKind::InvalidTlsConfig {
+                message: format!("Could not parse {}: {}", path.display(), error),
             })?;
-            #[cfg(not(feature = "openssl-tls"))]
-            if let Some(cert_pw) = cfg.tls_certificate_key_file_password.as_deref() {
-                for cert in &mut raw_certs {
-                    let encrypted = pkcs8::EncryptedPrivateKeyInfo::try_from(cert.as_slice())
+            let mut iter = pems
+                .into_iter()
+                .filter(|pem| pem.tag() == "ENCRYPTED PRIVATE KEY");
+            match iter.next() {
+                Some(pem) => {
+                    let encrypted = pkcs8::EncryptedPrivateKeyInfo::try_from(pem.contents())
                         .map_err(|error| ErrorKind::InvalidTlsConfig {
                             message: format!("Invalid encrypted client certificate: {}", error),
                         })?;
-                    let decrypted = encrypted.decrypt(cert_pw).map_err(|error| {
-                        ErrorKind::InvalidTlsConfig {
-                            message: format!("Failed to decrypt client certificate: {}", error),
-                        }
-                    })?;
-                    *cert = decrypted.as_bytes().to_vec();
+                    let decrypted =
+                        encrypted
+                            .decrypt(key_pw)
+                            .map_err(|error| ErrorKind::InvalidTlsConfig {
+                                message: format!("Failed to decrypt client certificate: {}", error),
+                            })?;
+                    rustls::PrivateKey(decrypted.as_bytes().to_vec())
+                }
+                None => {
+                    return Err(ErrorKind::InvalidTlsConfig {
+                        message: format!("No PEM-encoded keys in {}", path.display()),
+                    }
+                    .into())
                 }
             }
-            let certs = raw_certs.into_iter().map(Certificate).collect();
-
-            file.rewind()?;
-            let key = loop {
+        } else {
+            loop {
                 match read_one(&mut file) {
                     Ok(Some(Item::PKCS8Key(bytes))) | Ok(Some(Item::RSAKey(bytes))) => {
                         break rustls::PrivateKey(bytes)
@@ -136,21 +156,22 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
                         .into())
                     }
                 }
-            };
-
-            ClientConfig::builder()
-                .with_safe_defaults()
-                .with_root_certificates(store)
-                .with_client_auth_cert(certs, key)
-                .map_err(|error| ErrorKind::InvalidTlsConfig {
-                    message: error.to_string(),
-                })?
-        } else {
-            ClientConfig::builder()
-                .with_safe_defaults()
-                .with_root_certificates(store)
-                .with_no_client_auth()
+            }
         };
+
+        ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(store)
+            .with_client_auth_cert(certs, key)
+            .map_err(|error| ErrorKind::InvalidTlsConfig {
+                message: error.to_string(),
+            })?
+    } else {
+        ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(store)
+            .with_no_client_auth()
+    };
 
     if let Some(true) = cfg.allow_invalid_certificates {
         // nosemgrep: rustls-dangerous
