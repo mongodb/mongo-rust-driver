@@ -96,6 +96,7 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
                     error,
                 ),
             })?;
+            #[cfg(not(feature = "openssl-tls"))]
             if let Some(cert_pw) = cfg.tls_certificate_key_file_password.as_deref() {
                 for cert in &mut raw_certs {
                     let encrypted = pkcs8::EncryptedPrivateKeyInfo::try_from(cert.as_slice())
