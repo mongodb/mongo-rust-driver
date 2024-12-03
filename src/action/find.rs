@@ -70,8 +70,9 @@ impl<T: Send + Sync> crate::sync::Collection<T> {
 impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     /// Finds a single document in the collection matching `filter`.
     ///
-    /// [`run`](Find::run) will return d[`Result<Option<T>>`].
+    /// [`run`](FindOne::run) will return d[`Result<Option<T>>`].
     #[deeplink]
+    #[options_doc(find_one_setters, sync)]
     pub fn find_one(&self, filter: Document) -> FindOne<'_, T> {
         self.async_collection.find_one(filter)
     }
