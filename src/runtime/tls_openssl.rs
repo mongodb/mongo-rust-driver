@@ -12,8 +12,6 @@ use crate::{
     error::{Error, ErrorKind, Result},
 };
 
-use super::pem::decrypt_private_key;
-
 pub(super) type TlsStream = SslStream<TcpStream>;
 
 /// Configuration required to use TLS. Creating this is expensive, so its best to cache this value
@@ -78,6 +76,7 @@ fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
         ca_file_path,
         cert_key_file_path,
         allow_invalid_hostnames: _,
+        #[cfg(feature = "cert-key-password")]
         tls_certificate_key_file_password,
     } = cfg;
 
@@ -91,16 +90,22 @@ fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
         builder
             .set_certificate_file(path.clone(), SslFiletype::PEM)
             .map_err(openssl_err)?;
-        if let Some(key_pw) = tls_certificate_key_file_password {
-            let contents = std::fs::read(&path)?;
-            let key_bytes = decrypt_private_key(&contents, &key_pw)?;
-            let key = openssl::pkey::PKey::private_key_from_der(&key_bytes).map_err(openssl_err)?;
-            builder.set_private_key(&key).map_err(openssl_err)?;
-        } else {
+        // Inner fn so the cert-key-password path can early return
+        let handle_private_key = || -> Result<()> {
+            #[cfg(feature = "cert-key-password")]
+            if let Some(key_pw) = tls_certificate_key_file_password {
+                let contents = std::fs::read(&path)?;
+                let key_bytes = super::pem::decrypt_private_key(&contents, &key_pw)?;
+                let key =
+                    openssl::pkey::PKey::private_key_from_der(&key_bytes).map_err(openssl_err)?;
+                builder.set_private_key(&key).map_err(openssl_err)?;
+                return Ok(());
+            }
             builder
                 .set_private_key_file(path, SslFiletype::PEM)
-                .map_err(openssl_err)?;
-        }
+                .map_err(openssl_err)
+        };
+        handle_private_key()?;
     }
 
     Ok(builder.build())

@@ -1049,6 +1049,7 @@ pub struct TlsOptions {
     pub allow_invalid_hostnames: Option<bool>,
 
     /// If set, the key in `cert_key_file_path` must be encrypted with this password.
+    #[cfg(feature = "cert-key-password")]
     pub tls_certificate_key_file_password: Option<Vec<u8>>,
 }
 
@@ -2129,6 +2130,7 @@ impl ConnectionString {
                     ))
                 }
             },
+            #[cfg(feature = "cert-key-password")]
             "tlscertificatekeyfilepassword" => match &mut self.tls {
                 Some(Tls::Disabled) => {
                     return Err(ErrorKind::InvalidArgument {

@@ -1,7 +1,7 @@
 use std::{
     convert::TryFrom,
     fs::File,
-    io::{BufReader, Read, Seek},
+    io::{BufReader, Seek},
     sync::Arc,
     time::SystemTime,
 };
@@ -22,8 +22,6 @@ use crate::{
     client::options::TlsOptions,
     error::{ErrorKind, Result},
 };
-
-use super::pem::decrypt_private_key;
 
 pub(super) type TlsStream = tokio_rustls::client::TlsStream<TcpStream>;
 
@@ -105,32 +103,33 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
         };
 
         file.rewind()?;
-        let key = if let Some(key_pw) = cfg.tls_certificate_key_file_password.as_deref() {
-            let mut contents = vec![];
-            file.read_to_end(&mut contents)?;
-            rustls::PrivateKey(decrypt_private_key(&contents, key_pw)?)
-        } else {
-            loop {
-                match read_one(&mut file) {
-                    Ok(Some(Item::PKCS8Key(bytes))) | Ok(Some(Item::RSAKey(bytes))) => {
-                        break rustls::PrivateKey(bytes)
+        let key = loop {
+            #[cfg(feature = "cert-key-password")]
+            if let Some(key_pw) = cfg.tls_certificate_key_file_password.as_deref() {
+                use std::io::Read;
+                let mut contents = vec![];
+                file.read_to_end(&mut contents)?;
+                break rustls::PrivateKey(super::pem::decrypt_private_key(&contents, key_pw)?);
+            }
+            match read_one(&mut file) {
+                Ok(Some(Item::PKCS8Key(bytes))) | Ok(Some(Item::RSAKey(bytes))) => {
+                    break rustls::PrivateKey(bytes)
+                }
+                Ok(Some(_)) => continue,
+                Ok(None) => {
+                    return Err(ErrorKind::InvalidTlsConfig {
+                        message: format!("No PEM-encoded keys in {}", path.display()),
                     }
-                    Ok(Some(_)) => continue,
-                    Ok(None) => {
-                        return Err(ErrorKind::InvalidTlsConfig {
-                            message: format!("No PEM-encoded keys in {}", path.display()),
-                        }
-                        .into())
+                    .into())
+                }
+                Err(_) => {
+                    return Err(ErrorKind::InvalidTlsConfig {
+                        message: format!(
+                            "Unable to parse PEM-encoded item from {}",
+                            path.display()
+                        ),
                     }
-                    Err(_) => {
-                        return Err(ErrorKind::InvalidTlsConfig {
-                            message: format!(
-                                "Unable to parse PEM-encoded item from {}",
-                                path.display()
-                            ),
-                        }
-                        .into())
-                    }
+                    .into())
                 }
             }
         };

@@ -8,6 +8,7 @@ mod acknowledged_message;
 ))]
 mod http;
 mod join_handle;
+#[cfg(feature = "cert-key-password")]
 mod pem;
 #[cfg(any(feature = "in-use-encryption", test))]
 pub(crate) mod process;
