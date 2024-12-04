@@ -1057,6 +1057,10 @@ pub struct TlsOptions {
     /// The default value is to error on invalid hostnames.
     #[cfg(feature = "openssl-tls")]
     pub allow_invalid_hostnames: Option<bool>,
+
+    /// If set, the key in `cert_key_file_path` must be encrypted with this password.
+    #[cfg(feature = "cert-key-password")]
+    pub tls_certificate_key_file_password: Option<Vec<u8>>,
 }
 
 impl TlsOptions {
@@ -1074,6 +1078,8 @@ impl TlsOptions {
             tlscafile: Option<&'a str>,
             tlscertificatekeyfile: Option<&'a str>,
             tlsallowinvalidcertificates: Option<bool>,
+            #[cfg(feature = "cert-key-password")]
+            tlscertificatekeyfilepassword: Option<&'a str>,
         }
 
         let state = TlsOptionsHelper {
@@ -1087,6 +1093,11 @@ impl TlsOptions {
                 .as_ref()
                 .map(|s| s.to_str().unwrap()),
             tlsallowinvalidcertificates: tls_options.allow_invalid_certificates,
+            #[cfg(feature = "cert-key-password")]
+            tlscertificatekeyfilepassword: tls_options
+                .tls_certificate_key_file_password
+                .as_deref()
+                .map(|b| std::str::from_utf8(b).unwrap()),
         };
         state.serialize(serializer)
     }
@@ -2324,6 +2335,25 @@ impl ConnectionString {
                     self.tls = Some(Tls::Enabled(
                         TlsOptions::builder()
                             .cert_key_file_path(PathBuf::from(value))
+                            .build(),
+                    ))
+                }
+            },
+            #[cfg(feature = "cert-key-password")]
+            "tlscertificatekeyfilepassword" => match &mut self.tls {
+                Some(Tls::Disabled) => {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: "'tlsCertificateKeyFilePassword' can't be set if tls=false".into(),
+                    }
+                    .into());
+                }
+                Some(Tls::Enabled(options)) => {
+                    options.tls_certificate_key_file_password = Some(value.as_bytes().to_vec());
+                }
+                None => {
+                    self.tls = Some(Tls::Enabled(
+                        TlsOptions::builder()
+                            .tls_certificate_key_file_password(value.as_bytes().to_vec())
                             .build(),
                     ))
                 }

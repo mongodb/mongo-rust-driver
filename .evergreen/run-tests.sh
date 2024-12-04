@@ -6,7 +6,7 @@ set -o pipefail
 source .evergreen/env.sh
 source .evergreen/cargo-test.sh
 
-FEATURE_FLAGS+=("tracing-unstable")
+FEATURE_FLAGS+=("tracing-unstable" "cert-key-password")
 
 if [ "$ASYNC_STD" = true ]; then
   CARGO_OPTIONS+=("--no-default-features")
