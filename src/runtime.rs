@@ -4,6 +4,8 @@ mod http;
 #[cfg(feature = "async-std-runtime")]
 mod interval;
 mod join_handle;
+#[cfg(feature = "cert-key-password")]
+mod pem;
 #[cfg(any(
     feature = "in-use-encryption-unstable",
     all(test, not(feature = "sync"), not(feature = "tokio-sync"))

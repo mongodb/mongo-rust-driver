@@ -40,11 +40,7 @@ impl TlsConfig {
             None => true,
         };
 
-        let connector = make_openssl_connector(options).map_err(|e| {
-            Error::from(ErrorKind::InvalidTlsConfig {
-                message: e.to_string(),
-            })
-        })?;
+        let connector = make_openssl_connector(options)?;
 
         Ok(TlsConfig {
             connector,
@@ -105,25 +101,50 @@ impl AsyncWrite for AsyncTlsStream {
     }
 }
 
-fn make_openssl_connector(cfg: TlsOptions) -> std::result::Result<SslConnector, ErrorStack> {
-    let mut builder = SslConnector::builder(SslMethod::tls_client())?;
+fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
+    let openssl_err = |e: ErrorStack| {
+        Error::from(ErrorKind::InvalidTlsConfig {
+            message: e.to_string(),
+        })
+    };
+
+    let mut builder = SslConnector::builder(SslMethod::tls_client()).map_err(openssl_err)?;
 
     let TlsOptions {
         allow_invalid_certificates,
         ca_file_path,
         cert_key_file_path,
         allow_invalid_hostnames: _,
+        #[cfg(feature = "cert-key-password")]
+        tls_certificate_key_file_password,
     } = cfg;
 
     if let Some(true) = allow_invalid_certificates {
         builder.set_verify(SslVerifyMode::NONE);
     }
     if let Some(path) = ca_file_path {
-        builder.set_ca_file(path)?;
+        builder.set_ca_file(path).map_err(openssl_err)?;
     }
     if let Some(path) = cert_key_file_path {
-        builder.set_certificate_file(path.clone(), SslFiletype::PEM)?;
-        builder.set_private_key_file(path, SslFiletype::PEM)?;
+        builder
+            .set_certificate_file(path.clone(), SslFiletype::PEM)
+            .map_err(openssl_err)?;
+        // Inner fn so the cert-key-password path can early return
+        let handle_private_key = || -> Result<()> {
+            #[cfg(feature = "cert-key-password")]
+            if let Some(key_pw) = tls_certificate_key_file_password {
+                let contents = std::fs::read(&path)?;
+                let key_bytes = super::pem::decrypt_private_key(&contents, &key_pw)?;
+                let key =
+                    openssl::pkey::PKey::private_key_from_der(&key_bytes).map_err(openssl_err)?;
+                builder.set_private_key(&key).map_err(openssl_err)?;
+                return Ok(());
+            }
+            builder
+                .set_private_key_file(path, SslFiletype::PEM)
+                .map_err(openssl_err)
+        };
+        handle_private_key()?;
     }
 
     Ok(builder.build())

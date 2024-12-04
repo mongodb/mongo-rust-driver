@@ -59,7 +59,7 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                 "tlsInsecure is parsed correctly",
                 // The driver does not support maxPoolSize=0
                 "maxPoolSize=0 does not error",
-                // TODO RUST-226: unskip this test
+                #[cfg(not(feature = "cert-key-password"))]
                 "Valid tlsCertificateKeyFilePassword is parsed correctly",
                 "SRV URI with custom srvServiceName",
             ];
