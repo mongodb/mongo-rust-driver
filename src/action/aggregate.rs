@@ -1,9 +1,12 @@
 use std::{marker::PhantomData, time::Duration};
 
-use bson::Document;
+use bson::{Bson, Document};
+use macro_magic::export_tokens;
+use mongodb_internal_macros::{option_setters_2, options_doc};
 
 use crate::{
-    coll::options::AggregateOptions,
+    coll::options::{AggregateOptions, Hint},
+    collation::Collation,
     error::Result,
     operation::aggregate::AggregateTarget,
     options::{ReadConcern, WriteConcern},
@@ -16,7 +19,7 @@ use crate::{
     SessionCursor,
 };
 
-use super::{action_impl, deeplink, option_setters, CollRef, ExplicitSession, ImplicitSession};
+use super::{action_impl, deeplink, CollRef, ExplicitSession, ImplicitSession};
 
 impl Database {
     /// Runs an aggregation operation.
@@ -28,6 +31,7 @@ impl Database {
     /// returned cursor will be a [`SessionCursor`]. If [`with_type`](Aggregate::with_type) was
     /// called, the returned cursor will be generic over the `T` specified.
     #[deeplink]
+    #[options_doc(aggregate_setters)]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
             target: AggregateTargetRef::Database(self),
@@ -111,22 +115,9 @@ pub struct Aggregate<'a, Session = ImplicitSession, T = Document> {
     _phantom: PhantomData<T>,
 }
 
-impl<Session, T> Aggregate<'_, Session, T> {
-    option_setters!(options: AggregateOptions;
-        allow_disk_use: bool,
-        batch_size: u32,
-        bypass_document_validation: bool,
-        collation: crate::collation::Collation,
-        comment: bson::Bson,
-        hint: crate::coll::options::Hint,
-        max_await_time: Duration,
-        max_time: Duration,
-        read_concern: ReadConcern,
-        selection_criteria: SelectionCriteria,
-        write_concern: WriteConcern,
-        let_vars: Document,
-    );
-}
+#[option_setters_2(crate::coll::options::AggregateOptions)]
+#[export_tokens(aggregate_setters)]
+impl<Session, T> Aggregate<'_, Session, T> {}
 
 impl<'a, T> Aggregate<'a, ImplicitSession, T> {
     /// Use the provided session when running the operation.
