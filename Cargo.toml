@@ -34,6 +34,7 @@ sync = []
 rustls-tls = ["dep:rustls", "dep:rustls-pemfile", "dep:tokio-rustls"]
 openssl-tls = ["dep:openssl", "dep:openssl-probe", "dep:tokio-openssl"]
 dns-resolver = ["dep:hickory-resolver", "dep:hickory-proto"]
+cert-key-password = ["dep:pem", "dep:pkcs8"]
 
 # Enable support for MONGODB-AWS authentication.
 # This can only be used with the tokio-runtime feature flag.
@@ -95,7 +96,9 @@ mongodb-internal-macros = { path = "macros", version = "3.1.0" }
 num_cpus = { version = "1.13.1", optional = true }
 openssl = { version = "0.10.38", optional = true }
 openssl-probe = { version = "0.1.5", optional = true }
+pem = { version = "3.0.4", optional = true }
 percent-encoding = "2.0.0"
+pkcs8 = { version = "0.10.2", features = ["encryption", "pkcs5"], optional = true }
 rand = { version = "0.8.3", features = ["small_rng"] }
 rayon = { version = "1.5.3", optional = true }
 rustc_version_runtime = "0.3.0"

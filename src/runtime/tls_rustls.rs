@@ -104,6 +104,13 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
 
         file.rewind()?;
         let key = loop {
+            #[cfg(feature = "cert-key-password")]
+            if let Some(key_pw) = cfg.tls_certificate_key_file_password.as_deref() {
+                use std::io::Read;
+                let mut contents = vec![];
+                file.read_to_end(&mut contents)?;
+                break rustls::PrivateKey(super::pem::decrypt_private_key(&contents, key_pw)?);
+            }
             match read_one(&mut file) {
                 Ok(Some(Item::PKCS8Key(bytes))) | Ok(Some(Item::RSAKey(bytes))) => {
                     break rustls::PrivateKey(bytes)
