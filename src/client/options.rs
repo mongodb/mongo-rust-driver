@@ -1068,6 +1068,8 @@ impl TlsOptions {
             tlscafile: Option<&'a str>,
             tlscertificatekeyfile: Option<&'a str>,
             tlsallowinvalidcertificates: Option<bool>,
+            #[cfg(feature = "cert-key-password")]
+            tlscertificatekeyfilepassword: Option<&'a str>,
         }
 
         let state = TlsOptionsHelper {
@@ -1081,6 +1083,11 @@ impl TlsOptions {
                 .as_ref()
                 .map(|s| s.to_str().unwrap()),
             tlsallowinvalidcertificates: tls_options.allow_invalid_certificates,
+            #[cfg(feature = "cert-key-password")]
+            tlscertificatekeyfilepassword: tls_options
+                .tls_certificate_key_file_password
+                .as_deref()
+                .map(|b| std::str::from_utf8(b).unwrap()),
         };
         state.serialize(serializer)
     }

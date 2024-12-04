@@ -20,7 +20,7 @@ static SKIPPED_TESTS: Lazy<Vec<&'static str>> = Lazy::new(|| {
         "tlsInsecure is parsed correctly",
         // The driver does not support maxPoolSize=0
         "maxPoolSize=0 does not error",
-        // TODO RUST-226: unskip this test
+        #[cfg(not(feature = "cert-key-password"))]
         "Valid tlsCertificateKeyFilePassword is parsed correctly",
     ];
 
