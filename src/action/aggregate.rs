@@ -114,7 +114,11 @@ pub struct Aggregate<'a, Session = ImplicitSession, T = Document> {
     _phantom: PhantomData<T>,
 }
 
-#[option_setters_2(source = crate::coll::options::AggregateOptions, doc_name = aggregate_setters)]
+#[option_setters_2(
+    source = crate::coll::options::AggregateOptions,
+    doc_name = aggregate_setters,
+    extra = [session, with_type]
+)]
 impl<Session, T> Aggregate<'_, Session, T> {}
 
 impl<'a, T> Aggregate<'a, ImplicitSession, T> {

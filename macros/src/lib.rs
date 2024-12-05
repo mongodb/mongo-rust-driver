@@ -1,15 +1,19 @@
 extern crate proc_macro;
 
 use macro_magic::{import_tokens_attr, mm_core::ForeignPath};
+use proc_macro2::extra;
 use quote::{quote, ToTokens};
 use syn::{
     braced,
+    bracketed,
     parenthesized,
     parse::{Parse, ParseStream},
     parse_macro_input,
     parse_quote,
     parse_quote_spanned,
+    punctuated::Punctuated,
     spanned::Spanned,
+    token::Bracket,
     Attribute,
     Block,
     Error,
@@ -547,14 +551,29 @@ pub fn option_setters_2(
                 self.options().#name = Some(#value);
                 self
             }
-        })
+        });
     }
 
-    // All done.
+    // Build rustdoc information.
     let doc_name = args.doc_name;
+    let mut doc_impl = impl_in.clone();
+    // Synthesize a fn entry for each extra listed so it'll get a rustdoc entry
+    if let Some((_, extra)) = args.extra {
+        dbg!("extra");
+        for name in &extra.names {
+            dbg!(name);
+            doc_impl.items.push(parse_quote! {
+                pub fn #name(&self) {}
+            });
+        }
+    }
+
+    // All done.  Export the tokens for doc use as their own distinct (uncompiled) item.
     quote! {
-        #[macro_magic::export_tokens(#doc_name)]
         #impl_in
+
+        #[macro_magic::export_tokens_no_emit(#doc_name)]
+        #doc_impl
     }
     .into()
 }
@@ -564,42 +583,91 @@ struct OptionSettersArgs {
     foreign_path: syn::Path,
     name_text: (Token![,], Ident, Token![=]), // , doc_name =
     doc_name: Ident,
+    extra: Option<(Token![,], OptionSettersArgsExtra)>,
+}
+
+#[derive(Debug)]
+struct OptionSettersArgsExtra {
+    extra_text: (Ident, Token![=]), // extra =
+    bracket: Bracket,
+    names: Punctuated<Ident, Token![,]>,
 }
 
 impl Parse for OptionSettersArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let source_text = (parse_name(input, "source")?, input.parse::<Token![=]>()?);
+        let source_text = (parse_name(input, "source")?, input.parse()?);
         let foreign_path = input.parse()?;
         let name_text = (
-            input.parse::<Token![,]>()?,
+            input.parse()?,
             parse_name(input, "doc_name")?,
-            input.parse::<Token![=]>()?,
+            input.parse()?,
         );
         let doc_name = input.parse()?;
+        let extra = if input.is_empty() {
+            None
+        } else {
+            Some((input.parse()?, input.parse()?))
+        };
         Ok(Self {
             source_text,
             foreign_path,
             name_text,
             doc_name,
+            extra,
         })
     }
 }
 
 impl ToTokens for OptionSettersArgs {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        tokens.extend(self.source_text.0.to_token_stream());
-        tokens.extend(self.source_text.1.to_token_stream());
-        tokens.extend(self.foreign_path.to_token_stream());
-        tokens.extend(self.name_text.0.to_token_stream());
-        tokens.extend(self.name_text.1.to_token_stream());
-        tokens.extend(self.name_text.2.to_token_stream());
-        tokens.extend(self.doc_name.to_token_stream());
+        let Self {
+            source_text,
+            foreign_path,
+            name_text,
+            doc_name,
+            extra,
+        } = &self;
+        tokens.extend(source_text.0.to_token_stream());
+        tokens.extend(source_text.1.to_token_stream());
+        tokens.extend(foreign_path.to_token_stream());
+        tokens.extend(name_text.0.to_token_stream());
+        tokens.extend(name_text.1.to_token_stream());
+        tokens.extend(name_text.2.to_token_stream());
+        tokens.extend(doc_name.to_token_stream());
+        if let Some(extra) = extra {
+            tokens.extend(extra.0.to_token_stream());
+            tokens.extend(extra.1.to_token_stream());
+        }
     }
 }
 
 impl ForeignPath for OptionSettersArgs {
     fn foreign_path(&self) -> &syn::Path {
         &self.foreign_path
+    }
+}
+
+impl Parse for OptionSettersArgsExtra {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let extra_text = (parse_name(input, "extra")?, input.parse::<Token![=]>()?);
+        let content;
+        let bracket = bracketed!(content in input);
+        let names = Punctuated::parse_separated_nonempty(&content)?;
+        Ok(Self {
+            extra_text,
+            bracket,
+            names,
+        })
+    }
+}
+
+impl ToTokens for OptionSettersArgsExtra {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        tokens.extend(self.extra_text.0.to_token_stream());
+        tokens.extend(self.extra_text.1.to_token_stream());
+        self.bracket.surround(tokens, |content| {
+            content.extend(self.names.to_token_stream());
+        });
     }
 }
 
@@ -672,7 +740,7 @@ impl Parse for OptionsDocArgs {
         let sync = if input.is_empty() {
             None
         } else {
-            Some((input.parse::<Token![,]>()?, parse_name(input, "sync")?))
+            Some((input.parse()?, parse_name(input, "sync")?))
         };
 
         Ok(Self { foreign_path, sync })
