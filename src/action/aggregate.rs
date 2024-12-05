@@ -55,6 +55,7 @@ where
     /// returned cursor will be a [`SessionCursor`]. If [`with_type`](Aggregate::with_type) was
     /// called, the returned cursor will be generic over the `T` specified.
     #[deeplink]
+    #[options_doc(aggregate_setters)]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
             target: AggregateTargetRef::Collection(CollRef::new(self)),
@@ -78,6 +79,7 @@ impl crate::sync::Database {
     /// [`crate::sync::SessionCursor`]. If [`with_type`](Aggregate::with_type) was called, the
     /// returned cursor will be generic over the `T` specified.
     #[deeplink]
+    #[options_doc(aggregate_setters, sync)]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_database.aggregate(pipeline)
     }
@@ -98,6 +100,7 @@ where
     /// `crate::sync::SessionCursor`. If [`with_type`](Aggregate::with_type) was called, the
     /// returned cursor will be generic over the `T` specified.
     #[deeplink]
+    #[options_doc(aggregate_setters, sync)]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_collection.aggregate(pipeline)
     }
@@ -117,26 +120,8 @@ pub struct Aggregate<'a, Session = ImplicitSession, T = Document> {
 #[option_setters_2(
     source = crate::coll::options::AggregateOptions,
     doc_name = aggregate_setters,
-    extra = [session, with_type]
+    extra = [session]
 )]
-impl<Session, T> Aggregate<'_, Session, T> {}
-
-impl<'a, T> Aggregate<'a, ImplicitSession, T> {
-    /// Use the provided session when running the operation.
-    pub fn session(
-        self,
-        value: impl Into<&'a mut ClientSession>,
-    ) -> Aggregate<'a, ExplicitSession<'a>> {
-        Aggregate {
-            target: self.target,
-            pipeline: self.pipeline,
-            options: self.options,
-            session: ExplicitSession(value.into()),
-            _phantom: PhantomData,
-        }
-    }
-}
-
 impl<'a, Session, T> Aggregate<'a, Session, T> {
     /// Use the provided type for the returned cursor.
     ///
@@ -166,6 +151,22 @@ impl<'a, Session, T> Aggregate<'a, Session, T> {
             pipeline: self.pipeline,
             options: self.options,
             session: self.session,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a, T> Aggregate<'a, ImplicitSession, T> {
+    /// Use the provided session when running the operation.
+    pub fn session(
+        self,
+        value: impl Into<&'a mut ClientSession>,
+    ) -> Aggregate<'a, ExplicitSession<'a>> {
+        Aggregate {
+            target: self.target,
+            pipeline: self.pipeline,
+            options: self.options,
+            session: ExplicitSession(value.into()),
             _phantom: PhantomData,
         }
     }
