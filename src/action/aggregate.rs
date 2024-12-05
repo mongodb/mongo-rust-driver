@@ -1,7 +1,6 @@
 use std::{marker::PhantomData, time::Duration};
 
 use bson::{Bson, Document};
-use macro_magic::export_tokens;
 use mongodb_internal_macros::{option_setters_2, options_doc};
 
 use crate::{
@@ -115,8 +114,7 @@ pub struct Aggregate<'a, Session = ImplicitSession, T = Document> {
     _phantom: PhantomData<T>,
 }
 
-#[option_setters_2(crate::coll::options::AggregateOptions)]
-#[export_tokens(aggregate_setters)]
+#[option_setters_2(source = crate::coll::options::AggregateOptions, doc_name = aggregate_setters)]
 impl<Session, T> Aggregate<'_, Session, T> {}
 
 impl<'a, T> Aggregate<'a, ImplicitSession, T> {

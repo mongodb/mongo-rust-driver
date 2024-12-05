@@ -461,6 +461,7 @@ impl Parse for OptionSetter {
 }
 
 #[import_tokens_attr]
+#[with_custom_parsing(OptionSettersArgs)]
 #[proc_macro_attribute]
 pub fn option_setters_2(
     attr: proc_macro::TokenStream,
@@ -468,6 +469,7 @@ pub fn option_setters_2(
 ) -> proc_macro::TokenStream {
     let opt_struct = parse_macro_input!(attr as ItemStruct);
     let mut impl_in = parse_macro_input!(item as ItemImpl);
+    let args = parse_macro_input!(__custom_tokens as OptionSettersArgs);
 
     // Gather information about each option struct field
     struct OptInfo {
@@ -549,7 +551,56 @@ pub fn option_setters_2(
     }
 
     // All done.
-    impl_in.to_token_stream().into()
+    let doc_name = args.doc_name;
+    quote! {
+        #[macro_magic::export_tokens(#doc_name)]
+        #impl_in
+    }
+    .into()
+}
+
+struct OptionSettersArgs {
+    source_text: (Ident, Token![=]), // source =
+    foreign_path: syn::Path,
+    name_text: (Token![,], Ident, Token![=]), // , doc_name =
+    doc_name: Ident,
+}
+
+impl Parse for OptionSettersArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let source_text = (parse_name(input, "source")?, input.parse::<Token![=]>()?);
+        let foreign_path = input.parse()?;
+        let name_text = (
+            input.parse::<Token![,]>()?,
+            parse_name(input, "doc_name")?,
+            input.parse::<Token![=]>()?,
+        );
+        let doc_name = input.parse()?;
+        Ok(Self {
+            source_text,
+            foreign_path,
+            name_text,
+            doc_name,
+        })
+    }
+}
+
+impl ToTokens for OptionSettersArgs {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        tokens.extend(self.source_text.0.to_token_stream());
+        tokens.extend(self.source_text.1.to_token_stream());
+        tokens.extend(self.foreign_path.to_token_stream());
+        tokens.extend(self.name_text.0.to_token_stream());
+        tokens.extend(self.name_text.1.to_token_stream());
+        tokens.extend(self.name_text.2.to_token_stream());
+        tokens.extend(self.doc_name.to_token_stream());
+    }
+}
+
+impl ForeignPath for OptionSettersArgs {
+    fn foreign_path(&self) -> &syn::Path {
+        &self.foreign_path
+    }
 }
 
 #[import_tokens_attr]
