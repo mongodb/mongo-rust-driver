@@ -30,8 +30,8 @@ async fn run_unified() {
 
     let mut skipped_tests = vec![
         // Unacknowledged write; see above.
-        "Unacknowledged write using dollar-prefixed or dotted keys may be silently rejected \
-         on pre-5.0 server",
+        "Unacknowledged write using dollar-prefixed or dotted keys may be silently rejected on \
+         pre-5.0 server",
         // TODO RUST-663: Unskip these tests.
         "Aggregate with $out includes read preference for 5.0+ server",
         "Aggregate with $out omits read preference for pre-5.0 server",

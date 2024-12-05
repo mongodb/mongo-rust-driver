@@ -331,12 +331,14 @@ impl PinnedConnectionHandle {
     /// connection has been unpinned.
     pub(crate) async fn take_connection(&self) -> Result<PooledConnection> {
         let mut receiver = self.receiver.lock().await;
-        receiver.recv().await.ok_or_else(|| {
+        let mut connection = receiver.recv().await.ok_or_else(|| {
             Error::internal(format!(
                 "cannot take connection after unpin (id={})",
                 self.id
             ))
-        })
+        })?;
+        connection.mark_pinned_in_use();
+        Ok(connection)
     }
 
     pub(crate) fn id(&self) -> u32 {
