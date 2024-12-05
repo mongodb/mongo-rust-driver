@@ -1,7 +1,6 @@
 extern crate proc_macro;
 
 use macro_magic::{import_tokens_attr, mm_core::ForeignPath};
-use proc_macro2::extra;
 use quote::{quote, ToTokens};
 use syn::{
     braced,
@@ -559,9 +558,7 @@ pub fn option_setters_2(
     let mut doc_impl = impl_in.clone();
     // Synthesize a fn entry for each extra listed so it'll get a rustdoc entry
     if let Some((_, extra)) = args.extra {
-        dbg!("extra");
         for name in &extra.names {
-            dbg!(name);
             doc_impl.items.push(parse_quote! {
                 pub fn #name(&self) {}
             });
