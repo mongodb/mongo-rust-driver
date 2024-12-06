@@ -5,6 +5,7 @@ use bson::{doc, Document};
 use crate::{
     event::sdam::SdamEvent,
     hello::LEGACY_HELLO_COMMAND_NAME,
+    options::ClientOptions,
     runtime,
     test::{
         get_client_options,
@@ -35,7 +36,7 @@ async fn run_unified() {
     run_unified_tests(&["server-discovery-and-monitoring", "unified"])
         .skip_files(&skipped_files)
         .skip_tests(&[
-            // The driver does not support socketTimeoutMS.
+            // Flaky tests
             "Reset server and pool after network timeout error during authentication",
             "Ignore network timeout error on find",
         ])
@@ -228,6 +229,24 @@ async fn rtt_is_updated() {
     })
     .await
     .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn socket_timeout_ms_uri_option() {
+    let uri = "mongodb+srv://test1.test.build.10gen.cc/?socketTimeoutMs=1";
+    let options = ClientOptions::parse(uri).await.unwrap();
+    assert_eq!(options.socket_timeout.unwrap().as_millis(), 1);
+
+    let client = Client::with_options(options.clone()).unwrap();
+    let db = client.database("test");
+    let error = db
+        .run_command(doc! {"ping": 1})
+        .await
+        .expect_err("should fail with socket timeout error");
+    let error_description = format!("{}", error);
+    for host in options.hosts.iter() {
+        assert!(error_description.contains(format!("{}", host).as_str()));
+    }
 }
 
 /* TODO RUST-1895 enable this
