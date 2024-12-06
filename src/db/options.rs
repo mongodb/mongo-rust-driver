@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use bson::doc;
+use macro_magic::export_tokens;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -36,6 +37,7 @@ pub struct DatabaseOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct CreateCollectionOptions {
     /// Whether the collection should be capped. If true, `size` must also be set.
     pub capped: Option<bool>,
