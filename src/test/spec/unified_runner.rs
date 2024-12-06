@@ -159,7 +159,7 @@ async fn invalid() {
 
 #[derive(Debug)]
 enum TestFileResult {
-    Ok(TestFile),
+    Ok(Box<TestFile>),
     Err,
 }
 
@@ -190,7 +190,7 @@ async fn expect_failures(spec: &[&str], skipped_files: Option<&'static [&'static
             std::panic::AssertUnwindSafe(async {
                 TestRunner::new()
                     .await
-                    .run_test(test_file, path.clone(), None)
+                    .run_test(*test_file, path.clone(), None)
                     .await;
             })
             .catch_unwind()

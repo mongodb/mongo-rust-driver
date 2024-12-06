@@ -50,7 +50,7 @@ impl<'a> Insert<'a> {
     }
 }
 
-impl<'a> OperationWithDefaults for Insert<'a> {
+impl OperationWithDefaults for Insert<'_> {
     type O = InsertManyResult;
 
     const NAME: &'static str = "insert";

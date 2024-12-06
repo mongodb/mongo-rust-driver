@@ -111,7 +111,7 @@ pub struct Aggregate<'a, Session = ImplicitSession, T = Document> {
     _phantom: PhantomData<T>,
 }
 
-impl<'a, Session, T> Aggregate<'a, Session, T> {
+impl<Session, T> Aggregate<'_, Session, T> {
     option_setters!(options: AggregateOptions;
         allow_disk_use: bool,
         batch_size: u32,
@@ -230,7 +230,7 @@ enum AggregateTargetRef<'a> {
     Collection(CollRef<'a>),
 }
 
-impl<'a> AggregateTargetRef<'a> {
+impl AggregateTargetRef<'_> {
     fn target(&self) -> AggregateTarget {
         match self {
             Self::Collection(cr) => AggregateTarget::Collection(cr.namespace()),

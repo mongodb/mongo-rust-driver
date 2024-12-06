@@ -222,7 +222,7 @@ impl<'a> From<&'a OperationType> for OperationTypeWrapper<'a> {
     }
 }
 
-impl<'a> From<OperationTypeWrapper<'a>> for OperationType {
+impl From<OperationTypeWrapper<'_>> for OperationType {
     fn from(src: OperationTypeWrapper) -> Self {
         match src {
             OperationTypeWrapper::Known(h) => match h {
