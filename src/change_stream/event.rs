@@ -43,7 +43,7 @@ impl ResumeToken {
     }
 
     #[cfg(test)]
-    pub fn parsed(self) -> std::result::Result<Bson, bson::raw::Error> {
+    pub(crate) fn parsed(self) -> std::result::Result<Bson, bson::raw::Error> {
         self.0.try_into()
     }
 }

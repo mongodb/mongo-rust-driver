@@ -23,7 +23,7 @@ impl ClientEncryption {
         db: &'a Database,
         name: &'a str,
         master_key: MasterKey,
-    ) -> CreateEncryptedCollection {
+    ) -> CreateEncryptedCollection<'a> {
         CreateEncryptedCollection {
             client_enc: self,
             db,

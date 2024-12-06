@@ -63,7 +63,7 @@ impl Event {
 }
 
 impl SdamEvent {
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         match self {
             Self::ServerDescriptionChanged(_) => "ServerDescriptionChangedEvent",
             Self::ServerOpening(_) => "ServerOpeningEvent",
@@ -79,7 +79,7 @@ impl SdamEvent {
 }
 
 impl CommandEvent {
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         match self {
             Self::Started(_) => "CommandStartedEvent",
             Self::Succeeded(_) => "CommandSucceededEvent",

@@ -354,7 +354,7 @@ impl TopologyDescription {
     pub(crate) fn diff<'a>(
         &'a self,
         other: &'a TopologyDescription,
-    ) -> Option<TopologyDescriptionDiff> {
+    ) -> Option<TopologyDescriptionDiff<'a>> {
         if self == other {
             return None;
         }
