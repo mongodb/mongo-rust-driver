@@ -19,6 +19,6 @@ cargo_test test::spec::transactions
 cargo_test test::spec::load_balancers
 cargo_test test::cursor
 cargo_test test::spec::collection_management
-cargo_test test::spec::command_monitoring_unified
+cargo_test test::spec::command_monitoring::command_monitoring_unified
 
 exit $CARGO_RESULT

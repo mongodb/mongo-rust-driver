@@ -1,6 +1,6 @@
 description: "aggregate with $out/$merge does not set txnNumber"
 
-schemaVersion: "1.3"
+schemaVersion: "1.4"
 
 runOnRequirements:
   - minServerVersion: "3.6"
@@ -30,6 +30,8 @@ initialData:
   
 tests:
   - description: "aggregate with $out does not set txnNumber"
+    runOnRequirements:
+      - serverless: forbid # $out is not supported on serverless
     operations:
       - object: *collection0
         name: aggregate
