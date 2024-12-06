@@ -705,8 +705,8 @@ pub fn options_doc(
         #[doc = ""]
     });
     let preamble = format!(
-        "These methods can be chained before calling `.{}` to set options:",
-        if args.is_async() { "await" } else { "run()" }
+        "These methods can be chained before `{}` to set options:",
+        if args.is_async() { ".await" } else { "run" }
     );
     impl_fn.attrs.push(parse_quote! {
         #[doc = #preamble]
