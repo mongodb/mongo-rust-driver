@@ -68,7 +68,7 @@ pub struct Find<'a> {
     options: Option<GridFsFindOptions>,
 }
 
-impl<'a> Find<'a> {
+impl Find<'_> {
     option_setters! { options: GridFsFindOptions;
         allow_disk_use: bool,
         batch_size: u32,
@@ -102,7 +102,7 @@ pub struct FindOne<'a> {
     options: Option<GridFsFindOneOptions>,
 }
 
-impl<'a> FindOne<'a> {
+impl FindOne<'_> {
     option_setters! { options: GridFsFindOneOptions;
         max_time: Duration,
         skip: u64,

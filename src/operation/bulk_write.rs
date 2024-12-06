@@ -177,7 +177,7 @@ impl<'a> NamespaceInfo<'a> {
     }
 }
 
-impl<'a, R> OperationWithDefaults for BulkWrite<'a, R>
+impl<R> OperationWithDefaults for BulkWrite<'_, R>
 where
     R: BulkWriteResult,
 {

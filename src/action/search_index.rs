@@ -159,7 +159,7 @@ pub struct CreateSearchIndex<'a, Mode> {
     _mode: PhantomData<Mode>,
 }
 
-impl<'a, Mode> CreateSearchIndex<'a, Mode> {
+impl<Mode> CreateSearchIndex<'_, Mode> {
     option_setters! { options: CreateSearchIndexOptions;
     }
 }
@@ -201,7 +201,7 @@ pub struct UpdateSearchIndex<'a> {
     options: Option<UpdateSearchIndexOptions>,
 }
 
-impl<'a> UpdateSearchIndex<'a> {
+impl UpdateSearchIndex<'_> {
     option_setters! { options: UpdateSearchIndexOptions; }
 }
 
@@ -224,7 +224,7 @@ pub struct DropSearchIndex<'a> {
     options: Option<DropSearchIndexOptions>,
 }
 
-impl<'a> DropSearchIndex<'a> {
+impl DropSearchIndex<'_> {
     option_setters! { options: DropSearchIndexOptions; }
 }
 
@@ -247,7 +247,7 @@ pub struct ListSearchIndexes<'a> {
     options: Option<ListSearchIndexOptions>,
 }
 
-impl<'a> ListSearchIndexes<'a> {
+impl ListSearchIndexes<'_> {
     option_setters! { options: ListSearchIndexOptions; }
 
     /// Get information for the named index.

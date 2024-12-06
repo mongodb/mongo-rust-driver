@@ -2260,7 +2260,7 @@ impl<'de> Deserialize<'de> for ConnectionString {
 
 struct ConnectionStringVisitor;
 
-impl<'de> serde::de::Visitor<'de> for ConnectionStringVisitor {
+impl serde::de::Visitor<'_> for ConnectionStringVisitor {
     type Value = ConnectionString;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

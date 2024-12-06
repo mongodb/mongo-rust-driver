@@ -394,7 +394,7 @@ pub struct SessionCursorStream<'cursor, 'session, T = Document> {
     generic_cursor: ExplicitSessionCursor<'session>,
 }
 
-impl<'cursor, 'session, T> SessionCursorStream<'cursor, 'session, T>
+impl<T> SessionCursorStream<'_, '_, T>
 where
     T: DeserializeOwned,
 {
@@ -407,7 +407,7 @@ where
     }
 }
 
-impl<'cursor, 'session, T> Stream for SessionCursorStream<'cursor, 'session, T>
+impl<T> Stream for SessionCursorStream<'_, '_, T>
 where
     T: DeserializeOwned,
 {
@@ -418,7 +418,7 @@ where
     }
 }
 
-impl<'cursor, 'session, T> CursorStream for SessionCursorStream<'cursor, 'session, T>
+impl<T> CursorStream for SessionCursorStream<'_, '_, T>
 where
     T: DeserializeOwned,
 {
@@ -427,7 +427,7 @@ where
     }
 }
 
-impl<'cursor, 'session, T> Drop for SessionCursorStream<'cursor, 'session, T> {
+impl<T> Drop for SessionCursorStream<'_, '_, T> {
     fn drop(&mut self) {
         // Update the parent cursor's state based on any iteration performed on this handle.
         self.session_cursor.state = Some(self.generic_cursor.take_state());

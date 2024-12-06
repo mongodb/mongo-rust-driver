@@ -38,7 +38,7 @@ pub struct StartSession<'a> {
     options: Option<SessionOptions>,
 }
 
-impl<'a> StartSession<'a> {
+impl StartSession<'_> {
     option_setters!(options: SessionOptions;
         default_transaction_options: TransactionOptions,
         causal_consistency: bool,

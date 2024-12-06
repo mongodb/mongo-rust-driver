@@ -23,7 +23,7 @@ impl ClientEncryption {
         db: &'a Database,
         name: &'a str,
         master_key: MasterKey,
-    ) -> CreateEncryptedCollection {
+    ) -> CreateEncryptedCollection<'a> {
         CreateEncryptedCollection {
             client_enc: self,
             db,
@@ -45,7 +45,7 @@ pub struct CreateEncryptedCollection<'a> {
     options: Option<CreateCollectionOptions>,
 }
 
-impl<'a> CreateEncryptedCollection<'a> {
+impl CreateEncryptedCollection<'_> {
     option_setters!(options: CreateCollectionOptions;
         capped: bool,
         size: u64,

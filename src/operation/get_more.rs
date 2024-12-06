@@ -46,7 +46,7 @@ impl<'conn> GetMore<'conn> {
     }
 }
 
-impl<'conn> OperationWithDefaults for GetMore<'conn> {
+impl OperationWithDefaults for GetMore<'_> {
     type O = GetMoreResult;
 
     const NAME: &'static str = "getMore";

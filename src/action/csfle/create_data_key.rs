@@ -42,7 +42,7 @@ pub struct DataKeyOptions {
     pub key_material: Option<Vec<u8>>,
 }
 
-impl<'a> CreateDataKey<'a> {
+impl CreateDataKey<'_> {
     option_setters! { options: DataKeyOptions;
         key_alt_names: Vec<String>,
         key_material: Vec<u8>,

@@ -57,7 +57,7 @@ impl<'conn> RunCommand<'conn> {
     }
 }
 
-impl<'conn> OperationWithDefaults for RunCommand<'conn> {
+impl OperationWithDefaults for RunCommand<'_> {
     type O = Document;
 
     // Since we can't actually specify a string statically here, we just put a descriptive string

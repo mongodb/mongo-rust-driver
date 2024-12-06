@@ -31,7 +31,7 @@ impl<'conn> RunCursorCommand<'conn> {
     }
 }
 
-impl<'conn> Operation for RunCursorCommand<'conn> {
+impl Operation for RunCursorCommand<'_> {
     type O = CursorSpecification;
 
     const NAME: &'static str = "run_cursor_command";

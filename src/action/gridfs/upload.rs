@@ -46,7 +46,7 @@ pub struct OpenUploadStream<'a> {
     options: Option<GridFsUploadOptions>,
 }
 
-impl<'a> OpenUploadStream<'a> {
+impl OpenUploadStream<'_> {
     /// Set the value to be used for the corresponding [`FilesCollectionDocument`]'s `id`
     /// field.  If not set, a unique [`ObjectId`] will be generated that can be accessed via the
     /// stream's [`id`](GridFsUploadStream::id) method.

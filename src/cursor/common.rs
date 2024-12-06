@@ -297,7 +297,7 @@ where
     }
 }
 
-impl<'a, C> Future for NextInBatchFuture<'a, C>
+impl<C> Future for NextInBatchFuture<'_, C>
 where
     C: CursorStream,
 {

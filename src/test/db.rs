@@ -142,7 +142,7 @@ async fn collection_management() {
 
     assert!(db.list_collection_names().await.unwrap().is_empty());
 
-    db.create_collection(&format!("{}{}", function_name!(), 1))
+    db.create_collection(format!("{}{}", function_name!(), 1))
         .await
         .unwrap();
 
@@ -163,7 +163,7 @@ async fn collection_management() {
         )
         .build();
 
-    db.create_collection(&format!("{}{}", function_name!(), 2))
+    db.create_collection(format!("{}{}", function_name!(), 2))
         .with_options(options.clone())
         .await
         .unwrap();
@@ -172,7 +172,7 @@ async fn collection_management() {
         .view_on(format!("{}{}", function_name!(), 2))
         .pipeline(vec![doc! { "$match": {} }])
         .build();
-    db.create_collection(&format!("{}{}", function_name!(), 3))
+    db.create_collection(format!("{}{}", function_name!(), 3))
         .with_options(view_options.clone())
         .await
         .unwrap();

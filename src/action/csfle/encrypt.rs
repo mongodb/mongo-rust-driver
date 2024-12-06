@@ -142,14 +142,14 @@ pub struct RangeOptions {
     pub precision: Option<i32>,
 }
 
-impl<'a, Mode> Encrypt<'a, Mode> {
+impl<Mode> Encrypt<'_, Mode> {
     option_setters!(options: EncryptOptions;
         contention_factor: i64,
         range_options: RangeOptions,
     );
 }
 
-impl<'a> Encrypt<'a, Value> {
+impl Encrypt<'_, Value> {
     /// Set the [`EncryptOptions::query_type`] option.
     pub fn query_type(mut self, value: impl Into<String>) -> Self {
         self.options().query_type = Some(value.into());
