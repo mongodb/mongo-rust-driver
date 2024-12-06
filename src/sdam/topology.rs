@@ -374,7 +374,9 @@ impl TopologyWorker {
                             UpdateMessage::SyncHosts(hosts) => {
                                 self.sync_hosts(hosts).await
                             }
-                            UpdateMessage::ServerUpdate(sd) => self.update_server(*sd).await,
+                            UpdateMessage::ServerUpdate(sd) => {
+                                self.update_server(*sd).await
+                            }
                             UpdateMessage::MonitorError { address, error } => {
                                 self.handle_monitor_error(address, error).await
                             }
