@@ -1,8 +1,24 @@
-use bson::Document;
+use bson::{Bson, Document};
+use mongodb_internal_macros::{option_setters_2, options_doc};
+use std::time::Duration;
 
-use crate::{options::CreateCollectionOptions, ClientSession, Database};
+use crate::{
+    collation::Collation,
+    concern::WriteConcern,
+    db::options::{
+        ChangeStreamPreAndPostImages,
+        ClusteredIndex,
+        IndexOptionDefaults,
+        TimeseriesOptions,
+        ValidationAction,
+        ValidationLevel,
+    },
+    options::CreateCollectionOptions,
+    ClientSession,
+    Database,
+};
 
-use crate::action::{deeplink, option_setters};
+use crate::action::deeplink;
 
 impl Database {
     /// Creates a new collection in the database with the given `name`.
@@ -12,6 +28,7 @@ impl Database {
     ///
     /// `await` will return d[`Result<()>`].
     #[deeplink]
+    #[options_doc(create_coll_setters)]
     pub fn create_collection(&self, name: impl Into<String>) -> CreateCollection {
         CreateCollection {
             db: self,
@@ -31,6 +48,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](CreateCollection::run) will return d[`Result<()>`].
     #[deeplink]
+    #[options_doc(create_coll_setters, sync)]
     pub fn create_collection(&self, name: impl Into<String>) -> CreateCollection {
         self.async_database.create_collection(name)
     }
@@ -45,29 +63,11 @@ pub struct CreateCollection<'a> {
     pub(crate) session: Option<&'a mut ClientSession>,
 }
 
+#[option_setters_2(
+    source = crate::db::options::CreateCollectionOptions,
+    doc_name = create_coll_setters
+)]
 impl<'a> CreateCollection<'a> {
-    option_setters!(options: CreateCollectionOptions;
-        capped: bool,
-        size: u64,
-        max: u64,
-        storage_engine: Document,
-        validator: Document,
-        validation_level: crate::db::options::ValidationLevel,
-        validation_action: crate::db::options::ValidationAction,
-        view_on: String,
-        pipeline: Vec<Document>,
-        collation: crate::collation::Collation,
-        write_concern: crate::options::WriteConcern,
-        index_option_defaults: crate::db::options::IndexOptionDefaults,
-        timeseries: crate::db::options::TimeseriesOptions,
-        expire_after_seconds: std::time::Duration,
-        change_stream_pre_and_post_images: crate::db::options::ChangeStreamPreAndPostImages,
-        clustered_index: crate::db::options::ClusteredIndex,
-        comment: bson::Bson,
-        #[cfg(feature = "in-use-encryption")]
-        encrypted_fields: Document,
-    );
-
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
