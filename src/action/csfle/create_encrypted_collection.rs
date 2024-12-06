@@ -45,7 +45,7 @@ pub struct CreateEncryptedCollection<'a> {
     options: Option<CreateCollectionOptions>,
 }
 
-impl<'a> CreateEncryptedCollection<'a> {
+impl CreateEncryptedCollection<'_> {
     option_setters!(options: CreateCollectionOptions;
         capped: bool,
         size: u64,

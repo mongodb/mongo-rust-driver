@@ -210,7 +210,7 @@ impl<'a> StartTransaction<&'a mut ClientSession> {
 }
 
 #[cfg(feature = "sync")]
-impl<'a> StartTransaction<&'a mut crate::sync::ClientSession> {
+impl StartTransaction<&mut crate::sync::ClientSession> {
     /// Synchronously execute this action.
     pub fn run(self) -> Result<()> {
         crate::sync::TOKIO_RUNTIME.block_on(
