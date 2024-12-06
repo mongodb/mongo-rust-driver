@@ -626,6 +626,7 @@ pub struct AggregateOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct CountOptions {
     /// The index to use for the operation.
     pub hint: Option<Hint>,
@@ -680,6 +681,7 @@ pub struct CountOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct EstimatedDocumentCountOptions {
     /// The maximum amount of time to allow the query to run.
     ///
