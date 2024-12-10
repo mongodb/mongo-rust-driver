@@ -1,13 +1,18 @@
-use bson::Document;
+use bson::{Bson, Document};
+use mongodb_internal_macros::{option_setters_2, options_doc};
+use std::time::Duration;
 
 use crate::{
-    coll::options::{CountOptions, EstimatedDocumentCountOptions},
+    coll::options::{CountOptions, EstimatedDocumentCountOptions, Hint},
+    collation::Collation,
+    concern::ReadConcern,
     error::Result,
+    selection_criteria::SelectionCriteria,
     ClientSession,
     Collection,
 };
 
-use super::{action_impl, deeplink, option_setters, CollRef};
+use super::{action_impl, deeplink, CollRef};
 
 impl<T> Collection<T>
 where
@@ -27,6 +32,7 @@ where
     ///
     /// `await` will return d[`Result<u64>`].
     #[deeplink]
+    #[options_doc(estimated_doc_count_setters)]
     pub fn estimated_document_count(&self) -> EstimatedDocumentCount {
         EstimatedDocumentCount {
             cr: CollRef::new(self),
@@ -40,6 +46,7 @@ where
     ///
     /// `await` will return d[`Result<u64>`].
     #[deeplink]
+    #[options_doc(count_docs_setters)]
     pub fn count_documents(&self, filter: Document) -> CountDocuments {
         CountDocuments {
             cr: CollRef::new(self),
@@ -69,6 +76,7 @@ where
     ///
     /// [`run`](EstimatedDocumentCount::run) will return d[`Result<u64>`].
     #[deeplink]
+    #[options_doc(estimated_doc_count_setters, sync)]
     pub fn estimated_document_count(&self) -> EstimatedDocumentCount {
         self.async_collection.estimated_document_count()
     }
@@ -79,6 +87,7 @@ where
     ///
     /// [`run`](CountDocuments::run) will return d[`Result<u64>`].
     #[deeplink]
+    #[options_doc(count_docs_setters, sync)]
     pub fn count_documents(&self, filter: Document) -> CountDocuments {
         self.async_collection.count_documents(filter)
     }
@@ -91,14 +100,11 @@ pub struct EstimatedDocumentCount<'a> {
     options: Option<EstimatedDocumentCountOptions>,
 }
 
-impl EstimatedDocumentCount<'_> {
-    option_setters!(options: EstimatedDocumentCountOptions;
-        max_time: std::time::Duration,
-        selection_criteria: crate::selection_criteria::SelectionCriteria,
-        read_concern: crate::options::ReadConcern,
-        comment: bson::Bson,
-    );
-}
+#[option_setters_2(
+    source = crate::coll::options::EstimatedDocumentCountOptions,
+    doc_name = estimated_doc_count_setters
+)]
+impl EstimatedDocumentCount<'_> {}
 
 #[action_impl]
 impl<'a> Action for EstimatedDocumentCount<'a> {
@@ -120,18 +126,11 @@ pub struct CountDocuments<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
+#[option_setters_2(
+    source = crate::coll::options::CountOptions,
+    doc_name = count_docs_setters
+)]
 impl<'a> CountDocuments<'a> {
-    option_setters!(options: CountOptions;
-        hint: crate::coll::options::Hint,
-        limit: u64,
-        max_time: std::time::Duration,
-        skip: u64,
-        collation: crate::collation::Collation,
-        selection_criteria: crate::selection_criteria::SelectionCriteria,
-        read_concern: crate::options::ReadConcern,
-        comment: bson::Bson,
-    );
-
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());

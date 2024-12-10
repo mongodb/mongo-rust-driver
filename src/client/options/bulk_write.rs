@@ -1,5 +1,6 @@
 use std::borrow::Borrow;
 
+use macro_magic::export_tokens;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -19,6 +20,7 @@ use crate::{
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[export_tokens]
 pub struct BulkWriteOptions {
     /// Whether the operations should be performed in the order in which they were specified. If
     /// true, no more writes will be performed if a single write fails. If false, writes will

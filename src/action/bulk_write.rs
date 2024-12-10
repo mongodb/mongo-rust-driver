@@ -1,5 +1,7 @@
 use std::{collections::HashMap, marker::PhantomData};
 
+use mongodb_internal_macros::{option_setters_2, options_doc};
+
 use crate::{
     bson::{Bson, Document},
     error::{BulkWriteError, Error, ErrorKind, Result},
@@ -10,7 +12,7 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_impl, deeplink, option_setters};
+use super::{action_impl, deeplink};
 
 impl Client {
     /// Executes the provided list of write operations.
@@ -26,6 +28,7 @@ impl Client {
     ///
     /// Bulk write is only available on MongoDB 8.0+.
     #[deeplink]
+    #[options_doc(bulk_write_setters)]
     pub fn bulk_write(
         &self,
         models: impl IntoIterator<Item = impl Into<WriteModel>>,
@@ -53,6 +56,7 @@ impl crate::sync::Client {
     ///
     /// Bulk write is only available on MongoDB 8.0+.
     #[deeplink]
+    #[options_doc(bulk_write_setters, sync)]
     pub fn bulk_write(
         &self,
         models: impl IntoIterator<Item = impl Into<WriteModel>>,
@@ -85,18 +89,15 @@ impl<'a> BulkWrite<'a, SummaryBulkWriteResult> {
     }
 }
 
+#[option_setters_2(
+    source = crate::client::options::BulkWriteOptions,
+    doc_name = bulk_write_setters,
+    extra = [verbose_results]
+)]
 impl<'a, R> BulkWrite<'a, R>
 where
     R: BulkWriteResult,
 {
-    option_setters!(options: BulkWriteOptions;
-        ordered: bool,
-        bypass_document_validation: bool,
-        comment: Bson,
-        let_vars: Document,
-        write_concern: WriteConcern,
-    );
-
     /// Use the provided session when running the operation.
     pub fn session(mut self, session: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(session.into());
