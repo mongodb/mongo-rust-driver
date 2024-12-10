@@ -5,7 +5,7 @@ pub(crate) mod state_machine;
 
 use std::{path::Path, time::Duration};
 
-use derivative::Derivative;
+use derive_where::derive_where;
 use mongocrypt::Crypt;
 
 use crate::{
@@ -28,13 +28,12 @@ use self::state_machine::{CryptExecutor, MongocryptdOptions};
 
 use super::WeakClient;
 
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive_where(Debug)]
 pub(super) struct ClientState {
-    #[derivative(Debug = "ignore")]
+    #[derive_where(skip)]
     crypt: Crypt,
     exec: CryptExecutor,
-    internal_client: Option<Client>,
+    _internal_client: Option<Client>,
     opts: AutoEncryptionOptions,
 }
 
@@ -79,7 +78,7 @@ impl ClientState {
         Ok(Self {
             crypt,
             exec,
-            internal_client: aux_clients.internal_client,
+            _internal_client: aux_clients.internal_client,
             opts,
         })
     }

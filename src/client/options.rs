@@ -17,7 +17,7 @@ use std::{
 };
 
 use bson::UuidRepresentation;
-use derivative::Derivative;
+use derive_where::derive_where;
 use once_cell::sync::Lazy;
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 use serde_with::skip_serializing_none;
@@ -357,9 +357,9 @@ pub struct ServerApi {
 }
 
 /// Contains the options that can be used to create a new [`Client`](../struct.Client.html).
-#[derive(Clone, Derivative, Deserialize, TypedBuilder)]
+#[derive(Clone, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
-#[derivative(Debug, PartialEq)]
+#[derive_where(Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ClientOptions {
@@ -393,7 +393,7 @@ pub struct ClientOptions {
     pub compressors: Option<Vec<Compressor>>,
 
     /// The handler that should process all Connection Monitoring and Pooling events.
-    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    #[derive_where(skip)]
     #[builder(setter(strip_option))]
     #[serde(skip)]
     pub cmap_event_handler: Option<EventHandler<crate::event::cmap::CmapEvent>>,
@@ -401,7 +401,7 @@ pub struct ClientOptions {
     /// The handler that should process all command-related events.
     ///
     /// Note that monitoring command events may incur a performance penalty.
-    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    #[derive_where(skip)]
     #[builder(setter(strip_option))]
     #[serde(skip)]
     pub command_event_handler: Option<EventHandler<crate::event::command::CommandEvent>>,
@@ -497,7 +497,7 @@ pub struct ClientOptions {
     pub server_monitoring_mode: Option<ServerMonitoringMode>,
 
     /// The handler that should process all Server Discovery and Monitoring events.
-    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    #[derive_where(skip)]
     #[builder(setter(strip_option))]
     #[serde(skip)]
     pub sdam_event_handler: Option<EventHandler<crate::event::sdam::SdamEvent>>,
@@ -531,7 +531,7 @@ pub struct ClientOptions {
     pub default_database: Option<String>,
 
     #[builder(setter(skip))]
-    #[derivative(Debug = "ignore")]
+    #[derive_where(skip(Debug))]
     pub(crate) socket_timeout: Option<Duration>,
 
     /// The TLS configuration for the Client to use in its connections with the server.
@@ -561,12 +561,12 @@ pub struct ClientOptions {
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(setter(skip))]
     #[serde(skip)]
-    #[derivative(Debug = "ignore")]
+    #[derive_where(skip(Debug))]
     pub(crate) original_srv_info: Option<OriginalSrvInfo>,
 
     #[cfg(test)]
     #[builder(setter(skip))]
-    #[derivative(Debug = "ignore")]
+    #[derive_where(skip(Debug))]
     pub(crate) original_uri: Option<String>,
 
     /// Configuration of the DNS resolver used for SRV and TXT lookups.
@@ -576,7 +576,7 @@ pub struct ClientOptions {
     /// system configuration, so a custom configuration is recommended.
     #[builder(setter(skip))]
     #[serde(skip)]
-    #[derivative(Debug = "ignore")]
+    #[derive_where(skip(Debug))]
     #[cfg(feature = "dns-resolver")]
     pub(crate) resolver_config: Option<ResolverConfig>,
 
@@ -584,7 +584,7 @@ pub struct ClientOptions {
     #[cfg(test)]
     #[builder(setter(skip))]
     #[serde(skip)]
-    #[derivative(PartialEq = "ignore")]
+    #[derive_where(skip)]
     pub(crate) test_options: Option<TestOptions>,
 }
 
