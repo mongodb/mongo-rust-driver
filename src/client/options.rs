@@ -567,8 +567,6 @@ pub struct ClientOptions {
     /// Overrides the default "mongodb" service name for SRV lookup in both discovery and polling
     pub srv_service_name: Option<String>,
 
-    #[builder(setter(skip))]
-    #[derive_where(skip(Debug))]
     pub(crate) socket_timeout: Option<Duration>,
 
     /// The TLS configuration for the Client to use in its connections with the server.

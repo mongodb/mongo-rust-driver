@@ -44,7 +44,7 @@ impl ClientOptions {
     ///   * `retryWrites`: not yet implemented
     ///   * `retryReads`: maps to the `retry_reads` field
     ///   * `serverSelectionTimeoutMS`: maps to the `server_selection_timeout` field
-    ///   * `socketTimeoutMS`: unsupported, does not map to any field
+    ///   * `socketTimeoutMS`: maps to `socket_timeout` field
     ///   * `ssl`: an alias of the `tls` option
     ///   * `tls`: maps to the TLS variant of the `tls` field`.
     ///   * `tlsInsecure`: relaxes the TLS constraints on connections being made; currently is just
