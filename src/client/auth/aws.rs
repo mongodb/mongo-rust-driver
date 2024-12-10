@@ -305,7 +305,7 @@ impl AwsCredential {
     /// Obtains temporary credentials for an EC2 instance to use for authentication.
     async fn get_from_ec2(http_client: &HttpClient) -> Result<Self> {
         let temporary_token = http_client
-            .put(&format!("http://{}/latest/api/token", AWS_EC2_IP))
+            .put(format!("http://{}/latest/api/token", AWS_EC2_IP))
             .headers(&[("X-aws-ec2-metadata-token-ttl-seconds", "30")])
             .send_and_get_string()
             .await

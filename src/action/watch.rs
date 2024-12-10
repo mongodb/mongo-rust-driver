@@ -198,7 +198,7 @@ impl<'a, T> Watch<'a, T, ImplicitSession> {
     }
 }
 
-impl<'a, S> Watch<'a, S> {
+impl<S> Watch<'_, S> {
     /// Apply an aggregation pipeline to the change stream.
     ///
     /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`

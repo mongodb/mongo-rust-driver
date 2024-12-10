@@ -90,7 +90,7 @@ pub struct ListIndexes<'a, Mode = ListSpecifications, Session = ImplicitSession>
     _mode: PhantomData<Mode>,
 }
 
-impl<'a, Mode, Session> ListIndexes<'a, Mode, Session> {
+impl<Mode, Session> ListIndexes<'_, Mode, Session> {
     option_setters!(options: ListIndexesOptions;
         max_time: Duration,
         batch_size: u32,

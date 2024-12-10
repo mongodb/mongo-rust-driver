@@ -149,7 +149,7 @@ pub struct RunCursorCommand<'a, Session = ImplicitSession> {
     session: Session,
 }
 
-impl<'a, Session> RunCursorCommand<'a, Session> {
+impl<Session> RunCursorCommand<'_, Session> {
     option_setters!(options: RunCursorCommandOptions;
         selection_criteria: SelectionCriteria,
         cursor_type: crate::coll::options::CursorType,

@@ -151,7 +151,7 @@ pub struct OpenDownloadStreamByName<'a> {
     options: Option<GridFsDownloadByNameOptions>,
 }
 
-impl<'a> OpenDownloadStreamByName<'a> {
+impl OpenDownloadStreamByName<'_> {
     option_setters! { options: GridFsDownloadByNameOptions;
         revision: i32,
     }

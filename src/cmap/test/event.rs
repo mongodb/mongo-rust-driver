@@ -70,7 +70,7 @@ impl<'de> Deserialize<'de> for CmapEvent {
 }
 
 impl CmapEvent {
-    pub fn name(&self) -> &'static str {
+    pub(crate) fn name(&self) -> &'static str {
         match self {
             CmapEvent::PoolCreated(_) => "ConnectionPoolCreated",
             CmapEvent::PoolReady(_) => "ConnectionPoolReady",
@@ -88,7 +88,7 @@ impl CmapEvent {
 
     // The names in drivers-atlas-testing tests are slightly different than those used in spec
     // tests.
-    pub fn planned_maintenance_testing_name(&self) -> &'static str {
+    pub(crate) fn planned_maintenance_testing_name(&self) -> &'static str {
         match self {
             CmapEvent::PoolCreated(_) => "PoolCreatedEvent",
             CmapEvent::PoolReady(_) => "PoolReadyEvent",

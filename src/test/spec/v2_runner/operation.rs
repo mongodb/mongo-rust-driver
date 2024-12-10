@@ -870,7 +870,10 @@ pub(super) struct TargetedFailPoint {
 }
 
 impl TestOperation for TargetedFailPoint {
-    fn execute_on_client<'a>(&'a self, _client: &'a TestClient) -> BoxFuture<Result<Option<Bson>>> {
+    fn execute_on_client<'a>(
+        &'a self,
+        _client: &'a TestClient,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let command_document = bson::to_document(&self.fail_point).unwrap();
             Ok(Some(command_document.into()))

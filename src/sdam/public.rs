@@ -19,7 +19,7 @@ pub struct ServerInfo<'a> {
     pub(crate) description: Cow<'a, ServerDescription>,
 }
 
-impl<'a> Serialize for ServerInfo<'a> {
+impl Serialize for ServerInfo<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -112,7 +112,7 @@ impl<'a> ServerInfo<'a> {
     }
 }
 
-impl<'a> fmt::Debug for ServerInfo<'a> {
+impl fmt::Debug for ServerInfo<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
         match self.description.reply {
             Ok(_) => f
@@ -141,7 +141,7 @@ impl<'a> fmt::Debug for ServerInfo<'a> {
     }
 }
 
-impl<'a> fmt::Display for ServerInfo<'a> {
+impl fmt::Display for ServerInfo<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
         write!(
             f,

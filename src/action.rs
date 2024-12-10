@@ -127,7 +127,7 @@ impl<'a> CollRef<'a> {
     }
 }
 
-impl<'a> Deref for CollRef<'a> {
+impl Deref for CollRef<'_> {
     type Target = Collection<Document>;
 
     fn deref(&self) -> &Self::Target {

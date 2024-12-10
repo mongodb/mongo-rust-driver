@@ -91,7 +91,7 @@ pub struct EstimatedDocumentCount<'a> {
     options: Option<EstimatedDocumentCountOptions>,
 }
 
-impl<'a> EstimatedDocumentCount<'a> {
+impl EstimatedDocumentCount<'_> {
     option_setters!(options: EstimatedDocumentCountOptions;
         max_time: std::time::Duration,
         selection_criteria: crate::selection_criteria::SelectionCriteria,

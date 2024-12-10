@@ -199,6 +199,7 @@ pub enum ConnectionClosedReason {
     PoolClosed,
 
     #[cfg(test)]
+    /// The value was not set in the test file.
     Unset,
 }
 
@@ -258,6 +259,7 @@ pub enum ConnectionCheckoutFailedReason {
     ConnectionError,
 
     #[cfg(test)]
+    /// The value was not set in the test file.
     Unset,
 }
 
