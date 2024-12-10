@@ -20,8 +20,9 @@ impl Client {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// `await` will return d[`Result<SummaryBulkWriteResult`] or d[`Result<VerboseBulkWriteResult`]
-    /// if [`verbose_results`](BulkWrite::verbose_results) is configured.
+    /// `await` will return d[`Result<SummaryBulkWriteResult>`] or
+    /// d[`Result<VerboseBulkWriteResult>`] if [`verbose_results`](BulkWrite::verbose_results)
+    /// is configured.
     ///
     /// Bulk write is only available on MongoDB 8.0+.
     #[deeplink]
