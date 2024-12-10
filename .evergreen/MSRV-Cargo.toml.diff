@@ -1,10 +1,31 @@
-116a117
-> url = "=2.5.2"
-144c145
-< version = "1.17.0"
----
-> version = "=1.38.0"
-153c154
-< version = "0.7.0"
----
-> version = "=0.7.11"
+--- Cargo.toml.orig	2024-12-10 13:30:38
++++ Cargo.toml	2024-12-10 13:43:42
+@@ -112,8 +112,10 @@
+ strsim = "0.11.1"
+ take_mut = "0.2.2"
+ thiserror = "1.0.24"
++time = "=0.3.36"
+ tokio-openssl = { version = "0.6.3", optional = true }
+ tracing = { version = "0.1.36", optional = true }
++url = "=2.5.2"
+ typed-builder = "0.10.0"
+ webpki-roots = "0.25.2"
+ zstd = { version = "0.11.2", optional = true }
+@@ -142,7 +144,7 @@
+ version = "0.11.5"
+ 
+ [dependencies.tokio]
+-version = "1.17.0"
++version = "=1.38.0"
+ features = ["io-util", "sync", "macros", "net", "process", "rt", "time"]
+ 
+ [dependencies.tokio-rustls]
+@@ -151,7 +153,7 @@
+ features = ["dangerous_configuration"]
+ 
+ [dependencies.tokio-util]
+-version = "0.7.0"
++version = "=0.7.11"
+ features = ["io", "compat"]
+ 
+ [dependencies.uuid]
