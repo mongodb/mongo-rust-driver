@@ -599,7 +599,7 @@ impl TopologyDescription {
             return Ok(());
         }
 
-        self.add_new_servers(server_description.known_hosts()?)?;
+        self.add_new_servers(server_description.known_hosts()?);
 
         if server_description.invalid_me()? {
             self.servers.remove(&server_description.address);
@@ -693,11 +693,11 @@ impl TopologyDescription {
             }
         }
 
-        self.add_new_servers(server_description.known_hosts()?)?;
-        let known_hosts: HashSet<_> = server_description.known_hosts()?.collect();
+        let known_hosts = server_description.known_hosts()?;
+        self.add_new_servers(known_hosts.clone());
 
         for address in addresses {
-            if !known_hosts.contains(&address.to_string()) {
+            if !known_hosts.contains(&address) {
                 self.servers.remove(&address);
             }
         }
@@ -724,20 +724,9 @@ impl TopologyDescription {
     }
 
     /// Create a new ServerDescription for each address and add it to the topology.
-    fn add_new_servers<'a>(&mut self, servers: impl Iterator<Item = &'a String>) -> Result<()> {
-        let servers: Result<Vec<_>> = servers.map(ServerAddress::parse).collect();
-
-        self.add_new_servers_from_addresses(servers?.iter());
-        Ok(())
-    }
-
-    /// Create a new ServerDescription for each address and add it to the topology.
-    fn add_new_servers_from_addresses<'a>(
-        &mut self,
-        servers: impl Iterator<Item = &'a ServerAddress>,
-    ) {
+    fn add_new_servers(&mut self, servers: Vec<ServerAddress>) {
         for server in servers {
-            if !self.servers.contains_key(server) {
+            if !self.servers.contains_key(&server) {
                 self.servers
                     .insert(server.clone(), ServerDescription::new(server.clone()));
             }

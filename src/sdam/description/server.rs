@@ -310,7 +310,7 @@ impl ServerDescription {
         Ok(set_name)
     }
 
-    pub(crate) fn known_hosts(&self) -> Result<impl Iterator<Item = &String>> {
+    pub(crate) fn known_hosts(&self) -> Result<Vec<ServerAddress>> {
         let known_hosts = self
             .reply
             .as_ref()
@@ -328,7 +328,11 @@ impl ServerDescription {
                     .chain(arbiters.into_iter().flatten())
             });
 
-        Ok(known_hosts.into_iter().flatten())
+        known_hosts
+            .into_iter()
+            .flatten()
+            .map(ServerAddress::parse)
+            .collect()
     }
 
     pub(crate) fn invalid_me(&self) -> Result<bool> {
