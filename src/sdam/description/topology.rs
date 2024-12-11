@@ -726,9 +726,9 @@ impl TopologyDescription {
     /// Create a new ServerDescription for each address and add it to the topology.
     fn add_new_servers(&mut self, addresses: impl IntoIterator<Item = ServerAddress>) {
         for address in addresses {
-            self.servers.entry(address.clone()).or_insert_with(|| {
-                ServerDescription::new(&address)
-            });
+            self.servers
+                .entry(address.clone())
+                .or_insert_with(|| ServerDescription::new(&address));
         }
     }
 }
