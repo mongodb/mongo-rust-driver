@@ -6,7 +6,9 @@
 > hickory-resolver = { version = "=0.24.1", optional = true }
 110a111
 > time = "=0.3.36"
-140c141
+113a115
+> url = "=2.5.2"
+140c142
 < version = "1.17.0"
 ---
 > version = "=1.38.0"
