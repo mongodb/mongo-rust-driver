@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use bson::{Bson, Document};
-use macro_magic::export_tokens;
 use mongodb_internal_macros::{option_setters_2, options_doc};
 use serde::de::DeserializeOwned;
 
@@ -18,7 +17,7 @@ use crate::{
     SessionCursor,
 };
 
-use super::{action_impl, deeplink, option_setters, ExplicitSession, ImplicitSession};
+use super::{action_impl, deeplink, ExplicitSession, ImplicitSession};
 
 impl<T: Send + Sync> Collection<T> {
     /// Finds the documents in the collection matching `filter`.
@@ -42,6 +41,7 @@ impl<T: DeserializeOwned + Send + Sync> Collection<T> {
     ///
     /// `await` will return d[`Result<Option<T>>`].
     #[deeplink]
+    #[options_doc(find_one_setters)]
     pub fn find_one(&self, filter: Document) -> FindOne<'_, T> {
         FindOne {
             coll: self,
@@ -59,6 +59,7 @@ impl<T: Send + Sync> crate::sync::Collection<T> {
     /// [`run`](Find::run) will return d[`Result<crate::sync::Cursor<T>>`] (or
     /// d[`Result<crate::sync::SessionCursor<T>>`] if a session is provided).
     #[deeplink]
+    #[options_doc(find_setters, sync)]
     pub fn find(&self, filter: Document) -> Find<'_, T> {
         self.async_collection.find(filter)
     }
@@ -68,8 +69,9 @@ impl<T: Send + Sync> crate::sync::Collection<T> {
 impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     /// Finds a single document in the collection matching `filter`.
     ///
-    /// [`run`](Find::run) will return d[`Result<Option<T>>`].
+    /// [`run`](FindOne::run) will return d[`Result<Option<T>>`].
     #[deeplink]
+    #[options_doc(find_one_setters, sync)]
     pub fn find_one(&self, filter: Document) -> FindOne<'_, T> {
         self.async_collection.find_one(filter)
     }
@@ -84,8 +86,7 @@ pub struct Find<'a, T: Send + Sync, Session = ImplicitSession> {
     session: Session,
 }
 
-#[option_setters_2(crate::coll::options::FindOptions)]
-#[export_tokens(find_setters)]
+#[option_setters_2(source = crate::coll::options::FindOptions, doc_name = find_setters)]
 impl<'a, T: Send + Sync, Session> Find<'a, T, Session> {
     /// Use the provided session when running the operation.
     pub fn session<'s>(
@@ -143,26 +144,8 @@ pub struct FindOne<'a, T: Send + Sync> {
     session: Option<&'a mut ClientSession>,
 }
 
+#[option_setters_2(source = crate::coll::options::FindOneOptions, doc_name = find_one_setters)]
 impl<'a, T: Send + Sync> FindOne<'a, T> {
-    option_setters! { options: FindOneOptions;
-        allow_partial_results: bool,
-        collation: Collation,
-        comment: Bson,
-        hint: Hint,
-        max: Document,
-        max_scan: u64,
-        max_time: Duration,
-        min: Document,
-        projection: Document,
-        read_concern: ReadConcern,
-        return_key: bool,
-        selection_criteria: SelectionCriteria,
-        show_record_id: bool,
-        skip: u64,
-        sort: Document,
-        let_vars: Document,
-    }
-
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());

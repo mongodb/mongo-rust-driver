@@ -529,6 +529,7 @@ pub struct FindOneAndUpdateOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct AggregateOptions {
     /// Enables writing to temporary files. When set to true, aggregation stages can write data to
     /// the _tmp subdirectory in the dbPath directory.
@@ -625,6 +626,7 @@ pub struct AggregateOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct CountOptions {
     /// The index to use for the operation.
     pub hint: Option<Hint>,
@@ -679,6 +681,7 @@ pub struct CountOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct EstimatedDocumentCountOptions {
     /// The maximum amount of time to allow the query to run.
     ///
@@ -932,6 +935,7 @@ where
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct FindOneOptions {
     /// If true, partial results will be returned from a mongos rather than an error being
     /// returned if one or more shards is down.

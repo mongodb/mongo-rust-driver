@@ -1,15 +1,18 @@
 extern crate proc_macro;
 
-use macro_magic::import_tokens_attr;
+use macro_magic::{import_tokens_attr, mm_core::ForeignPath};
 use quote::{quote, ToTokens};
 use syn::{
     braced,
+    bracketed,
     parenthesized,
     parse::{Parse, ParseStream},
     parse_macro_input,
     parse_quote,
     parse_quote_spanned,
+    punctuated::Punctuated,
     spanned::Spanned,
+    token::Bracket,
     Attribute,
     Block,
     Error,
@@ -206,7 +209,7 @@ impl Parse for ActionImplAttrs {
 }
 
 /// Parse an identifier with a specific expected value.
-fn parse_name(input: ParseStream, name: &str) -> syn::Result<()> {
+fn parse_name(input: ParseStream, name: &str) -> syn::Result<Ident> {
     let ident = input.parse::<Ident>()?;
     if ident.to_string() != name {
         return Err(Error::new(
@@ -214,7 +217,7 @@ fn parse_name(input: ParseStream, name: &str) -> syn::Result<()> {
             format!("expected '{}', got '{}'", name, ident),
         ));
     }
-    Ok(())
+    Ok(ident)
 }
 
 macro_rules! compile_error {
@@ -461,6 +464,7 @@ impl Parse for OptionSetter {
 }
 
 #[import_tokens_attr]
+#[with_custom_parsing(OptionSettersArgs)]
 #[proc_macro_attribute]
 pub fn option_setters_2(
     attr: proc_macro::TokenStream,
@@ -468,6 +472,7 @@ pub fn option_setters_2(
 ) -> proc_macro::TokenStream {
     let opt_struct = parse_macro_input!(attr as ItemStruct);
     let mut impl_in = parse_macro_input!(item as ItemImpl);
+    let args = parse_macro_input!(__custom_tokens as OptionSettersArgs);
 
     // Gather information about each option struct field
     struct OptInfo {
@@ -545,14 +550,126 @@ pub fn option_setters_2(
                 self.options().#name = Some(#value);
                 self
             }
-        })
+        });
     }
 
-    // All done.
-    impl_in.to_token_stream().into()
+    // Build rustdoc information.
+    let doc_name = args.doc_name;
+    let mut doc_impl = impl_in.clone();
+    // Synthesize a fn entry for each extra listed so it'll get a rustdoc entry
+    if let Some((_, extra)) = args.extra {
+        for name in &extra.names {
+            doc_impl.items.push(parse_quote! {
+                pub fn #name(&self) {}
+            });
+        }
+    }
+
+    // All done.  Export the tokens for doc use as their own distinct (uncompiled) item.
+    quote! {
+        #impl_in
+
+        #[macro_magic::export_tokens_no_emit(#doc_name)]
+        #doc_impl
+    }
+    .into()
+}
+
+struct OptionSettersArgs {
+    source_text: (Ident, Token![=]), // source =
+    foreign_path: syn::Path,
+    name_text: (Token![,], Ident, Token![=]), // , doc_name =
+    doc_name: Ident,
+    extra: Option<(Token![,], OptionSettersArgsExtra)>,
+}
+
+#[derive(Debug)]
+struct OptionSettersArgsExtra {
+    extra_text: (Ident, Token![=]), // extra =
+    bracket: Bracket,
+    names: Punctuated<Ident, Token![,]>,
+}
+
+impl Parse for OptionSettersArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let source_text = (parse_name(input, "source")?, input.parse()?);
+        let foreign_path = input.parse()?;
+        let name_text = (
+            input.parse()?,
+            parse_name(input, "doc_name")?,
+            input.parse()?,
+        );
+        let doc_name = input.parse()?;
+        let extra = if input.is_empty() {
+            None
+        } else {
+            Some((input.parse()?, input.parse()?))
+        };
+        Ok(Self {
+            source_text,
+            foreign_path,
+            name_text,
+            doc_name,
+            extra,
+        })
+    }
+}
+
+impl ToTokens for OptionSettersArgs {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let Self {
+            source_text,
+            foreign_path,
+            name_text,
+            doc_name,
+            extra,
+        } = &self;
+        tokens.extend(source_text.0.to_token_stream());
+        tokens.extend(source_text.1.to_token_stream());
+        tokens.extend(foreign_path.to_token_stream());
+        tokens.extend(name_text.0.to_token_stream());
+        tokens.extend(name_text.1.to_token_stream());
+        tokens.extend(name_text.2.to_token_stream());
+        tokens.extend(doc_name.to_token_stream());
+        if let Some(extra) = extra {
+            tokens.extend(extra.0.to_token_stream());
+            tokens.extend(extra.1.to_token_stream());
+        }
+    }
+}
+
+impl ForeignPath for OptionSettersArgs {
+    fn foreign_path(&self) -> &syn::Path {
+        &self.foreign_path
+    }
+}
+
+impl Parse for OptionSettersArgsExtra {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let extra_text = (parse_name(input, "extra")?, input.parse::<Token![=]>()?);
+        let content;
+        let bracket = bracketed!(content in input);
+        let names = Punctuated::parse_separated_nonempty(&content)?;
+        Ok(Self {
+            extra_text,
+            bracket,
+            names,
+        })
+    }
+}
+
+impl ToTokens for OptionSettersArgsExtra {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        tokens.extend(self.extra_text.0.to_token_stream());
+        tokens.extend(self.extra_text.1.to_token_stream());
+        self.bracket.surround(tokens, |content| {
+            content.extend(self.names.to_token_stream());
+        });
+    }
 }
 
 #[import_tokens_attr]
+#[with_custom_parsing(OptionsDocArgs)]
 #[proc_macro_attribute]
 pub fn options_doc(
     attr: proc_macro::TokenStream,
@@ -560,6 +677,7 @@ pub fn options_doc(
 ) -> proc_macro::TokenStream {
     let setters = parse_macro_input!(attr as ItemImpl);
     let mut impl_fn = parse_macro_input!(item as ImplItemFn);
+    let args = parse_macro_input!(__custom_tokens as OptionsDocArgs);
 
     // Collect a list of names from the setters impl
     let mut setter_names = vec![];
@@ -586,8 +704,12 @@ pub fn options_doc(
     impl_fn.attrs.push(parse_quote! {
         #[doc = ""]
     });
+    let preamble = format!(
+        "These methods can be chained before `{}` to set options:",
+        if args.is_async() { ".await" } else { "run" }
+    );
     impl_fn.attrs.push(parse_quote! {
-        #[doc = "These methods can be chained before calling `.await` to set options:"]
+        #[doc = #preamble]
     });
     for name in setter_names {
         let docstr = format!("  * [`{0}`]({1}::{0})", name, doc_path);
@@ -596,4 +718,44 @@ pub fn options_doc(
         });
     }
     impl_fn.into_token_stream().into()
+}
+
+struct OptionsDocArgs {
+    foreign_path: syn::Path,
+    sync: Option<(Token![,], Ident)>,
+}
+
+impl OptionsDocArgs {
+    fn is_async(&self) -> bool {
+        self.sync.is_none()
+    }
+}
+
+impl Parse for OptionsDocArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let foreign_path = input.parse()?;
+        let sync = if input.is_empty() {
+            None
+        } else {
+            Some((input.parse()?, parse_name(input, "sync")?))
+        };
+
+        Ok(Self { foreign_path, sync })
+    }
+}
+
+impl ToTokens for OptionsDocArgs {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        tokens.extend(self.foreign_path.to_token_stream());
+        if let Some((comma, ident)) = &self.sync {
+            tokens.extend(comma.to_token_stream());
+            tokens.extend(ident.to_token_stream());
+        }
+    }
+}
+
+impl ForeignPath for OptionsDocArgs {
+    fn foreign_path(&self) -> &syn::Path {
+        &self.foreign_path
+    }
 }

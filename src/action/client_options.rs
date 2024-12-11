@@ -1,3 +1,6 @@
+use macro_magic::export_tokens;
+use mongodb_internal_macros::options_doc;
+
 use crate::{
     client::options::{ClientOptions, ConnectionString, ResolverConfig},
     error::{Error, Result},
@@ -62,6 +65,7 @@ impl ClientOptions {
     ///     [`Compressor`](crate::compression::compressors::Compressor) enum
     ///
     /// `await` will return `Result<ClientOptions>`.
+    #[options_doc(parse_conn_str_setters)]
     pub fn parse<C, E>(conn_str: C) -> ParseConnectionString
     where
         C: TryInto<ConnectionString, Error = E>,
@@ -92,6 +96,7 @@ pub struct ParseConnectionString {
     pub(crate) resolver_config: Option<ResolverConfig>,
 }
 
+#[export_tokens(parse_conn_str_setters)]
 impl ParseConnectionString {
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
     /// provided `ResolverConfig` as part of this method.
