@@ -2156,6 +2156,13 @@ impl ConnectionString {
                     ))
                 }
             },
+            #[cfg(not(feature = "cert-key-password"))]
+            "tlscertificatekeyfilepassword" => {
+                return Err(Error::invalid_argument(
+                    "the cert-key-password feature must be enabled to specify \
+                     tlsCertificateKeyFilePassword in the URI",
+                ));
+            }
             "uuidrepresentation" => match value.to_lowercase().as_str() {
                 "csharplegacy" => self.uuid_representation = Some(UuidRepresentation::CSharpLegacy),
                 "javalegacy" => self.uuid_representation = Some(UuidRepresentation::JavaLegacy),
