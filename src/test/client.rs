@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, future::IntoFuture, time::Duration};
+use std::{borrow::Cow, collections::HashMap, future::IntoFuture, net::Ipv6Addr, time::Duration};
 
 use bson::Document;
 use serde::{Deserialize, Serialize};
@@ -985,8 +985,7 @@ async fn end_sessions_on_shutdown() {
 
 #[tokio::test]
 async fn ipv6_connect() {
-    // The ipv6 address for localhost.
-    let ipv6_localhost = "::1";
+    let ipv6_localhost = Ipv6Addr::LOCALHOST.to_string();
 
     let client = Client::for_test().await;
     let is_ipv6_localhost = client
@@ -998,7 +997,7 @@ async fn ipv6_connect() {
             response
                 .get_str("you")
                 .ok()
-                .map(|you| you.contains(ipv6_localhost))
+                .map(|you| you.contains(&ipv6_localhost))
         })
         .unwrap_or(false);
     if !is_ipv6_localhost {
@@ -1009,7 +1008,7 @@ async fn ipv6_connect() {
     let mut options = get_client_options().await.clone();
     for address in options.hosts.iter_mut() {
         if let ServerAddress::Tcp { host, .. } = address {
-            *host = ipv6_localhost.to_string();
+            *host = ipv6_localhost.clone();
         }
     }
     let client = Client::with_options(options).unwrap();
