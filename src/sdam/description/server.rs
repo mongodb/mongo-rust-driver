@@ -192,15 +192,15 @@ impl PartialEq for ServerDescription {
 }
 
 impl ServerDescription {
-    pub(crate) fn new(address: ServerAddress) -> Self {
+    pub(crate) fn new(address: &ServerAddress) -> Self {
         Self {
             address: match address {
                 ServerAddress::Tcp { host, port } => ServerAddress::Tcp {
                     host: host.to_lowercase(),
-                    port,
+                    port: *port,
                 },
                 #[cfg(unix)]
-                ServerAddress::Unix { path } => ServerAddress::Unix { path },
+                ServerAddress::Unix { path } => ServerAddress::Unix { path: path.clone() },
             },
             server_type: Default::default(),
             last_update_time: None,
@@ -214,7 +214,7 @@ impl ServerDescription {
         mut reply: HelloReply,
         average_rtt: Duration,
     ) -> Self {
-        let mut description = Self::new(address);
+        let mut description = Self::new(&address);
         description.average_round_trip_time = Some(average_rtt);
         description.last_update_time = Some(DateTime::now());
 
@@ -259,7 +259,7 @@ impl ServerDescription {
     }
 
     pub(crate) fn new_from_error(address: ServerAddress, error: Error) -> Self {
-        let mut description = Self::new(address);
+        let mut description = Self::new(&address);
         description.last_update_time = Some(DateTime::now());
         description.average_round_trip_time = None;
         description.reply = Err(error);
