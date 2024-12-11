@@ -988,6 +988,9 @@ async fn ipv6_connect() {
     let ipv6_localhost = Ipv6Addr::LOCALHOST.to_string();
 
     let client = Client::for_test().await;
+    // The hello command returns the hostname as "localhost". However, whatsmyuri returns an
+    // IP-literal, which allows us to detect whether we can re-construct the client with an IPv6
+    // address.
     let is_ipv6_localhost = client
         .database("admin")
         .run_command(doc! { "whatsmyuri": 1 })
