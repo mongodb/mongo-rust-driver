@@ -986,7 +986,7 @@ async fn end_sessions_on_shutdown() {
 #[tokio::test]
 async fn ipv6_connect() {
     // The ipv6 address for localhost.
-    let ipv6_localhost = "[::1]";
+    let ipv6_localhost = "::1";
 
     let client = Client::for_test().await;
     let is_ipv6_localhost = client
