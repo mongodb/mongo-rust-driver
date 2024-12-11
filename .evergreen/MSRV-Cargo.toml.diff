@@ -1,4 +1,18 @@
-140c140
+86,87c86,87
+< hickory-proto = { version = "0.24.2", optional = true }
+< hickory-resolver = { version = "0.24.2", optional = true }
+---
+> hickory-proto = { version = "=0.24.1", optional = true }
+> hickory-resolver = { version = "=0.24.1", optional = true }
+110a111
+> time = "=0.3.36"
+113a115
+> url = "=2.5.2"
+140c142
 < version = "1.17.0"
 ---
 > version = "=1.38.0"
+149c151
+< version = "0.7.0"
+---
+> version = "=0.7.0"
