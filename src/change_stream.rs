@@ -14,7 +14,7 @@ use std::{
 #[cfg(test)]
 use bson::RawDocumentBuf;
 use bson::{Document, Timestamp};
-use derivative::Derivative;
+use derive_where::derive_where;
 use futures_core::{future::BoxFuture, Stream};
 use serde::de::DeserializeOwned;
 #[cfg(test)]
@@ -74,8 +74,7 @@ use crate::{
 ///
 /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams) for more
 /// details. Also see the documentation on [usage recommendations](https://www.mongodb.com/docs/manual/administration/change-streams-production-recommendations/).
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive_where(Debug)]
 pub struct ChangeStream<T>
 where
     T: DeserializeOwned,
@@ -90,7 +89,7 @@ where
     data: ChangeStreamData,
 
     /// A pending future for a resume.
-    #[derivative(Debug = "ignore")]
+    #[derive_where(skip)]
     pending_resume: Option<BoxFuture<'static, Result<ChangeStream<T>>>>,
 }
 

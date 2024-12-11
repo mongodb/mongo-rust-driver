@@ -13,7 +13,7 @@ use std::{
 
 #[cfg(feature = "in-use-encryption-unstable")]
 pub use self::csfle::client_builder::*;
-use derivative::Derivative;
+use derive_where::derive_where;
 use futures_core::Future;
 use futures_util::FutureExt;
 
@@ -116,8 +116,7 @@ const _: fn() = || {
     assert_sync(_c);
 };
 
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive(Debug)]
 struct ClientInner {
     topology: Topology,
     options: ClientOptions,
@@ -604,10 +603,9 @@ impl WeakClient {
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive_where(Debug)]
 pub(crate) struct AsyncDropToken {
-    #[derivative(Debug = "ignore")]
+    #[derive_where(skip)]
     tx: Option<tokio::sync::oneshot::Sender<BoxFuture<'static, ()>>>,
 }
 

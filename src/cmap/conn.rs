@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use derivative::Derivative;
+use derive_where::derive_where;
 use serde::Serialize;
 use tokio::{
     io::BufStream,
@@ -59,8 +59,7 @@ pub struct ConnectionInfo {
 }
 
 /// A wrapper around Stream that contains all the CMAP information needed to maintain a connection.
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive_where(Debug)]
 pub(crate) struct Connection {
     /// Driver-generated ID for the connection.
     pub(crate) id: u32,
@@ -118,11 +117,11 @@ pub(crate) struct Connection {
 
     /// Type responsible for emitting events related to this connection. This is None for
     /// monitoring connections as we do not emit events for those.
-    #[derivative(Debug = "ignore")]
+    #[derive_where(skip)]
     event_emitter: Option<CmapEventEmitter>,
 
     /// The token callback for OIDC authentication.
-    #[derivative(Debug = "ignore")]
+    #[derive_where(skip)]
     pub(crate) oidc_token_gen_id: tokio::sync::Mutex<u32>,
 }
 
