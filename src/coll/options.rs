@@ -1025,6 +1025,7 @@ pub struct FindOneOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[non_exhaustive]
+#[export_tokens]
 pub struct CreateIndexOptions {
     /// Specify the commit quorum needed to mark an `index` as ready.
     pub commit_quorum: Option<CommitQuorum>,

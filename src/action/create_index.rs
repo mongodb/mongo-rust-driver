@@ -1,6 +1,7 @@
 use std::{marker::PhantomData, time::Duration};
 
 use bson::Bson;
+use mongodb_internal_macros::{option_setters_2, options_doc};
 
 use crate::{
     coll::options::{CommitQuorum, CreateIndexOptions},
@@ -13,7 +14,7 @@ use crate::{
     IndexModel,
 };
 
-use super::{action_impl, deeplink, option_setters, CollRef, Multiple, Single};
+use super::{action_impl, deeplink, CollRef, Multiple, Single};
 
 impl<T> Collection<T>
 where
@@ -23,6 +24,7 @@ where
     ///
     /// `await` will return d[`Result<CreateIndexResult>`].
     #[deeplink]
+    #[options_doc(create_index_setters)]
     pub fn create_index(&self, index: IndexModel) -> CreateIndex {
         CreateIndex {
             coll: CollRef::new(self),
@@ -37,6 +39,7 @@ where
     ///
     /// `await` will return d[`Result<CreateIndexesResult>`].
     #[deeplink]
+    #[options_doc(create_index_setters)]
     pub fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
@@ -60,6 +63,7 @@ where
     ///
     /// [`run`](CreateIndex::run) will return d[`Result<CreateIndexResult>`].
     #[deeplink]
+    #[options_doc(create_index_setters, sync)]
     pub fn create_index(&self, index: IndexModel) -> CreateIndex {
         self.async_collection.create_index(index)
     }
@@ -68,6 +72,7 @@ where
     ///
     /// [`run`](CreateIndex::run) will return d[`Result<CreateIndexesResult>`].
     #[deeplink]
+    #[options_doc(create_index_setters, sync)]
     pub fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
@@ -87,14 +92,11 @@ pub struct CreateIndex<'a, M = Single> {
     _mode: PhantomData<M>,
 }
 
+#[option_setters_2(
+    source = crate::coll::options::CreateIndexOptions,
+    doc_name = create_index_setters
+)]
 impl<'a, M> CreateIndex<'a, M> {
-    option_setters!(options: CreateIndexOptions;
-        commit_quorum: CommitQuorum,
-        max_time: Duration,
-        write_concern: WriteConcern,
-        comment: Bson,
-    );
-
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
