@@ -103,7 +103,7 @@ impl TestServerDescription {
                 reply,
                 avg_rtt_ms.map(f64_ms_as_duration).unwrap(),
             ),
-            None => ServerDescription::new(server_address),
+            None => ServerDescription::new(&server_address),
         };
         server_desc.last_update_time = self
             .last_update_time

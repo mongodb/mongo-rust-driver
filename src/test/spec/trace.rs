@@ -459,7 +459,7 @@ fn topology_description_tracing_representation() {
     let mut servers = HashMap::new();
     servers.insert(
         ServerAddress::default(),
-        ServerDescription::new(ServerAddress::default()),
+        ServerDescription::new(&ServerAddress::default()),
     );
 
     let oid = bson::oid::ObjectId::new();

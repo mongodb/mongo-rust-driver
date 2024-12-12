@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, future::IntoFuture, time::Duration};
+use std::{borrow::Cow, collections::HashMap, future::IntoFuture, net::Ipv6Addr, time::Duration};
 
 use bson::Document;
 use serde::{Deserialize, Serialize};
@@ -981,4 +981,45 @@ async fn end_sessions_on_shutdown() {
 
     client2.into_client().shutdown().await;
     assert_eq!(get_end_session_event_count(&mut event_stream).await, 0);
+}
+
+#[tokio::test]
+async fn ipv6_connect() {
+    let ipv6_localhost = Ipv6Addr::LOCALHOST.to_string();
+
+    let client = Client::for_test().await;
+    // The hello command returns the hostname as "localhost". However, whatsmyuri returns an
+    // IP-literal, which allows us to detect whether we can re-construct the client with an IPv6
+    // address.
+    let is_ipv6_localhost = client
+        .database("admin")
+        .run_command(doc! { "whatsmyuri": 1 })
+        .await
+        .ok()
+        .and_then(|response| {
+            response
+                .get_str("you")
+                .ok()
+                .map(|you| you.contains(&ipv6_localhost))
+        })
+        .unwrap_or(false);
+    if !is_ipv6_localhost {
+        log_uncaptured("skipping ipv6_connect due to non-ipv6-localhost configuration");
+        return;
+    }
+
+    let mut options = get_client_options().await.clone();
+    for address in options.hosts.iter_mut() {
+        if let ServerAddress::Tcp { host, .. } = address {
+            *host = ipv6_localhost.clone();
+        }
+    }
+    let client = Client::with_options(options).unwrap();
+
+    let result = client
+        .database("admin")
+        .run_command(doc! { "ping": 1 })
+        .await
+        .unwrap();
+    assert_eq!(result.get_f64("ok"), Ok(1.0));
 }

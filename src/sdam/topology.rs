@@ -335,7 +335,7 @@ impl TopologyWorker {
         self.update_topology(new_description).await;
 
         if self.options.load_balanced == Some(true) {
-            let base = ServerDescription::new(self.options.hosts[0].clone());
+            let base = ServerDescription::new(&self.options.hosts[0]);
             self.update_server(ServerDescription {
                 server_type: ServerType::LoadBalancer,
                 average_round_trip_time: None,
@@ -374,7 +374,9 @@ impl TopologyWorker {
                             UpdateMessage::SyncHosts(hosts) => {
                                 self.sync_hosts(hosts).await
                             }
-                            UpdateMessage::ServerUpdate(sd) => self.update_server(*sd).await,
+                            UpdateMessage::ServerUpdate(sd) => {
+                                self.update_server(*sd).await
+                            }
                             UpdateMessage::MonitorError { address, error } => {
                                 self.handle_monitor_error(address, error).await
                             }
