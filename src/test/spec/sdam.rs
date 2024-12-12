@@ -38,7 +38,7 @@ async fn run_unified() {
         .skip_tests(&[
             // Flaky tests
             "Reset server and pool after network timeout error during authentication",
-            "Ignore network timeout error on find",
+            //"Ignore network timeout error on find",
         ])
         .await;
 }
@@ -236,6 +236,12 @@ async fn socket_timeout_ms_uri_option() {
     let uri = "mongodb+srv://test1.test.build.10gen.cc/?socketTimeoutMs=1";
     let options = ClientOptions::parse(uri).await.unwrap();
     assert_eq!(options.socket_timeout.unwrap().as_millis(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn socket_timeout_ms_client_option() {
+    let mut options = get_client_options().await.clone();
+    options.socket_timeout = Some(Duration::from_millis(1));
 
     let client = Client::with_options(options.clone()).unwrap();
     let db = client.database("test");

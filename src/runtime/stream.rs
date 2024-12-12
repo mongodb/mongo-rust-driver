@@ -1,12 +1,15 @@
 use std::{
     net::SocketAddr,
-    ops::DerefMut,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
 };
 
-use tokio::{io::AsyncWrite, net::TcpStream};
+use pin_project::pin_project;
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::TcpStream,
+};
 
 use crate::{
     error::{Error, ErrorKind, Result},
@@ -26,18 +29,19 @@ const KEEPALIVE_TIME: Duration = Duration::from_secs(120);
 /// An async stream possibly using TLS.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
+#[pin_project(project = AsyncStreamProj)]
 pub(crate) enum AsyncStream {
     Null,
 
     /// A basic TCP connection to the server.
-    Tcp(TcpStream),
+    Tcp(#[pin] TcpStream),
 
     /// A TLS connection over TCP.
-    Tls(TlsStream),
+    Tls(#[pin] TlsStream),
 
     /// A Unix domain socket connection.
     #[cfg(unix)]
-    Unix(tokio::net::UnixStream),
+    Unix(#[pin] tokio::net::UnixStream),
 }
 
 impl AsyncStream {
@@ -172,54 +176,54 @@ fn interleave<T>(left: Vec<T>, right: Vec<T>) -> Vec<T> {
     out
 }
 
-impl tokio::io::AsyncRead for AsyncStream {
+impl AsyncRead for AsyncStream {
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
-        match self.deref_mut() {
-            Self::Null => Poll::Ready(Ok(())),
-            Self::Tcp(ref mut inner) => tokio::io::AsyncRead::poll_read(Pin::new(inner), cx, buf),
-            Self::Tls(ref mut inner) => tokio::io::AsyncRead::poll_read(Pin::new(inner), cx, buf),
+        match self.project() {
+            AsyncStreamProj::Null => Poll::Ready(Ok(())),
+            AsyncStreamProj::Tcp(inner) => inner.poll_read(cx, buf),
+            AsyncStreamProj::Tls(inner) => inner.poll_read(cx, buf),
             #[cfg(unix)]
-            Self::Unix(ref mut inner) => tokio::io::AsyncRead::poll_read(Pin::new(inner), cx, buf),
+            AsyncStreamProj::Unix(inner) => inner.poll_read(cx, buf),
         }
     }
 }
 
 impl AsyncWrite for AsyncStream {
     fn poll_write(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        match self.deref_mut() {
-            Self::Null => Poll::Ready(Ok(0)),
-            Self::Tcp(ref mut inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_write(cx, buf),
+        match self.project() {
+            AsyncStreamProj::Null => Poll::Ready(Ok(0)),
+            AsyncStreamProj::Tcp(inner) => inner.poll_write(cx, buf),
+            AsyncStreamProj::Tls(inner) => inner.poll_write(cx, buf),
             #[cfg(unix)]
-            Self::Unix(ref mut inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
+            AsyncStreamProj::Unix(inner) => inner.poll_write(cx, buf),
         }
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        match self.deref_mut() {
-            Self::Null => Poll::Ready(Ok(())),
-            Self::Tcp(ref mut inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_flush(cx),
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        match self.project() {
+            AsyncStreamProj::Null => Poll::Ready(Ok(())),
+            AsyncStreamProj::Tcp(inner) => inner.poll_flush(cx),
+            AsyncStreamProj::Tls(inner) => inner.poll_flush(cx),
             #[cfg(unix)]
-            Self::Unix(ref mut inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
+            AsyncStreamProj::Unix(inner) => inner.poll_flush(cx),
         }
     }
 
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        match self.deref_mut() {
-            Self::Null => Poll::Ready(Ok(())),
-            Self::Tcp(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        match self.project() {
+            AsyncStreamProj::Null => Poll::Ready(Ok(())),
+            AsyncStreamProj::Tcp(inner) => inner.poll_shutdown(cx),
+            AsyncStreamProj::Tls(inner) => inner.poll_shutdown(cx),
             #[cfg(unix)]
-            Self::Unix(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
+            AsyncStreamProj::Unix(inner) => inner.poll_shutdown(cx),
         }
     }
 
@@ -228,22 +232,22 @@ impl AsyncWrite for AsyncStream {
         cx: &mut Context<'_>,
         bufs: &[futures_io::IoSlice<'_>],
     ) -> Poll<std::result::Result<usize, std::io::Error>> {
-        match self.get_mut() {
-            Self::Null => Poll::Ready(Ok(0)),
-            Self::Tcp(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
+        match self.project() {
+            AsyncStreamProj::Null => Poll::Ready(Ok(0)),
+            AsyncStreamProj::Tcp(inner) => inner.poll_write_vectored(cx, bufs),
+            AsyncStreamProj::Tls(inner) => inner.poll_write_vectored(cx, bufs),
             #[cfg(unix)]
-            Self::Unix(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
+            AsyncStreamProj::Unix(inner) => inner.poll_write_vectored(cx, bufs),
         }
     }
 
     fn is_write_vectored(&self) -> bool {
         match self {
             Self::Null => false,
-            Self::Tcp(ref inner) => inner.is_write_vectored(),
-            Self::Tls(ref inner) => inner.is_write_vectored(),
+            Self::Tcp(inner) => inner.is_write_vectored(),
+            Self::Tls(inner) => inner.is_write_vectored(),
             #[cfg(unix)]
-            Self::Unix(ref inner) => inner.is_write_vectored(),
+            Self::Unix(inner) => inner.is_write_vectored(),
         }
     }
 }
