@@ -128,7 +128,7 @@ impl Connection {
 
     pub(crate) fn take(&mut self) -> Self {
         Self {
-            stream: std::mem::replace(&mut self.stream, BufStream::new(AsyncStream::Null)),
+            stream: std::mem::replace(&mut self.stream, BufStream::new(AsyncStream::null())),
             stream_description: self.stream_description.take(),
             address: self.address.clone(),
             id: self.id,

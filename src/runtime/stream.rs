@@ -27,10 +27,17 @@ pub(crate) const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const KEEPALIVE_TIME: Duration = Duration::from_secs(120);
 
 /// An async stream possibly using TLS.
+#[derive(Debug)]
+#[pin_project]
+pub(crate) struct AsyncStream {
+    #[pin]
+    kind: AsyncStreamKind,
+}
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 #[pin_project(project = AsyncStreamProj)]
-pub(crate) enum AsyncStream {
+enum AsyncStreamKind {
     Null,
 
     /// A basic TCP connection to the server.
@@ -44,7 +51,17 @@ pub(crate) enum AsyncStream {
     Unix(#[pin] tokio::net::UnixStream),
 }
 
+impl From<AsyncStreamKind> for AsyncStream {
+    fn from(kind: AsyncStreamKind) -> Self {
+        AsyncStream { kind }
+    }
+}
+
 impl AsyncStream {
+    pub(crate) fn null() -> Self {
+        AsyncStreamKind::Null.into()
+    }
+
     pub(crate) async fn connect(
         address: ServerAddress,
         tls_cfg: Option<&TlsConfig>,
@@ -63,14 +80,17 @@ impl AsyncStream {
 
                 // If there are TLS options, wrap the inner stream in an AsyncTlsStream.
                 match tls_cfg {
-                    Some(cfg) => Ok(AsyncStream::Tls(tls_connect(host, inner, cfg).await?)),
-                    None => Ok(AsyncStream::Tcp(inner)),
+                    Some(cfg) => {
+                        Ok(AsyncStreamKind::Tls(tls_connect(host, inner, cfg).await?).into())
+                    }
+                    None => Ok(AsyncStreamKind::Tcp(inner).into()),
                 }
             }
             #[cfg(unix)]
-            ServerAddress::Unix { path } => Ok(AsyncStream::Unix(
+            ServerAddress::Unix { path } => Ok(AsyncStreamKind::Unix(
                 tokio::net::UnixStream::connect(path.as_path()).await?,
-            )),
+            )
+            .into()),
         }
     }
 }
@@ -182,6 +202,52 @@ impl AsyncRead for AsyncStream {
         cx: &mut Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
+        self.project().kind.poll_read(cx, buf)
+    }
+}
+
+impl AsyncWrite for AsyncStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::result::Result<usize, std::io::Error>> {
+        self.project().kind.poll_write(cx, buf)
+    }
+
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::result::Result<(), std::io::Error>> {
+        self.project().kind.poll_flush(cx)
+    }
+
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::result::Result<(), std::io::Error>> {
+        self.project().kind.poll_shutdown(cx)
+    }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[futures_io::IoSlice<'_>],
+    ) -> Poll<std::result::Result<usize, std::io::Error>> {
+        self.project().kind.poll_write_vectored(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        self.kind.is_write_vectored()
+    }
+}
+
+impl AsyncRead for AsyncStreamKind {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
         match self.project() {
             AsyncStreamProj::Null => Poll::Ready(Ok(())),
             AsyncStreamProj::Tcp(inner) => inner.poll_read(cx, buf),
@@ -192,7 +258,7 @@ impl AsyncRead for AsyncStream {
     }
 }
 
-impl AsyncWrite for AsyncStream {
+impl AsyncWrite for AsyncStreamKind {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
