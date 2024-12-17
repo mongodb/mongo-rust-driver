@@ -1,12 +1,13 @@
 extern crate proc_macro;
 
 use macro_magic::{import_tokens_attr, mm_core::ForeignPath};
+use proc_macro::Punct;
 use quote::{quote, ToTokens};
 use syn::{
     braced,
     bracketed,
     parenthesized,
-    parse::{Parse, ParseStream},
+    parse::{Parse, ParseStream, Parser},
     parse_macro_input,
     parse_quote,
     parse_quote_spanned,
@@ -220,7 +221,13 @@ fn parse_name(input: ParseStream, name: &str) -> syn::Result<Ident> {
     Ok(ident)
 }
 
-macro_rules! compile_error {
+macro_rules! parse_error {
+    ($span:expr, $($message:tt)+) => {{
+        return Err(Error::new($span, format!($($message)+)));
+    }};
+}
+
+macro_rules! macro_error {
     ($span:expr, $($message:tt)+) => {{
         return Error::new($span, format!($($message)+)).into_compile_error().into();
     }};
@@ -257,7 +264,7 @@ pub fn deeplink(
             let rest = &text[ix + 2..];
             let end = match rest.find(']') {
                 Some(v) => v,
-                None => compile_error!(attr.span(), "unterminated d["),
+                None => macro_error!(attr.span(), "unterminated d["),
             };
             let body = &rest[..end];
             let post = &rest[end + 1..];
@@ -483,7 +490,7 @@ pub fn option_setters_2(
     let mut opt_info = vec![];
     let fields = match &opt_struct.fields {
         Fields::Named(f) => &f.named,
-        _ => compile_error!(opt_struct.span(), "options struct must have named fields"),
+        _ => macro_error!(opt_struct.span(), "options struct must have named fields"),
     };
     for field in fields {
         if !matches!(field.vis, Visibility::Public(..)) {
@@ -504,11 +511,11 @@ pub fn option_setters_2(
         // type, unwrapped from `Option`
         let outer = match &field.ty {
             Type::Path(ty) => &ty.path,
-            _ => compile_error!(field.span(), "invalid type"),
+            _ => macro_error!(field.span(), "invalid type"),
         };
         let type_ = match inner_type(outer, "Option") {
             Some(Type::Path(ty)) => ty.path.clone(),
-            _ => compile_error!(field.span(), "invalid type"),
+            _ => macro_error!(field.span(), "invalid type"),
         };
 
         opt_info.push(OptInfo { name, attrs, type_ });
@@ -557,8 +564,8 @@ pub fn option_setters_2(
     let doc_name = args.doc_name;
     let mut doc_impl = impl_in.clone();
     // Synthesize a fn entry for each extra listed so it'll get a rustdoc entry
-    if let Some((_, extra)) = args.extra {
-        for name in &extra.names {
+    if let Some(extra) = args.extra {
+        for name in &extra {
             doc_impl.items.push(parse_quote! {
                 pub fn #name(&self) {}
             });
@@ -575,96 +582,89 @@ pub fn option_setters_2(
     .into()
 }
 
-struct OptionSettersArgs {
-    source_text: (Ident, Token![=]), // source =
-    foreign_path: syn::Path,
-    name_text: (Token![,], Ident, Token![=]), // , doc_name =
-    doc_name: Ident,
-    extra: Option<(Token![,], OptionSettersArgsExtra)>,
+#[derive(Debug)]
+struct Arg {
+    key: Ident,
+    eq: Token![=],
+    val: proc_macro2::TokenStream,
 }
 
-#[derive(Debug)]
-struct OptionSettersArgsExtra {
-    extra_text: (Ident, Token![=]), // extra =
-    bracket: Bracket,
-    names: Punctuated<Ident, Token![,]>,
+impl Parse for Arg {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let key = input.parse()?;
+        let eq = input.parse()?;
+        let val = input.parse()?;
+        Ok(Self { key, eq, val })
+    }
+}
+
+impl ToTokens for Arg {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let Self { key, eq, val } = &self;
+        tokens.extend(key.to_token_stream());
+        tokens.extend(eq.to_token_stream());
+        tokens.extend(val.clone());
+    }
+}
+
+impl Arg {
+    fn named_val<T: Parse>(&self, name: &str) -> syn::Result<T> {
+        if self.key.to_string() != name {
+            parse_error!(self.key.span(), "expected '{}', got '{}'", name, self.key);
+        }
+        syn::parse2(self.val.clone())
+    }
+}
+
+struct OptionSettersArgs {
+    tokens: proc_macro2::TokenStream,
+    foreign_path: syn::Path,   // source = <path>
+    doc_name: Ident,           // doc_name = <ident>
+    extra: Option<Vec<Ident>>, // extra = [ident,..]
 }
 
 impl Parse for OptionSettersArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let source_text = (parse_name(input, "source")?, input.parse()?);
+        let tokens: proc_macro2::TokenStream = input.fork().parse()?;
+        parse_name(input, "source")?;
+        input.parse::<Token![=]>()?;
         let foreign_path = input.parse()?;
-        let name_text = (
-            input.parse()?,
-            parse_name(input, "doc_name")?,
-            input.parse()?,
-        );
+        input.parse::<Token![,]>()?;
+        parse_name(input, "doc_name")?;
+        input.parse::<Token![=]>()?;
         let doc_name = input.parse()?;
-        let extra = if input.is_empty() {
-            None
-        } else {
-            Some((input.parse()?, input.parse()?))
-        };
-        Ok(Self {
-            source_text,
+        let mut out = Self {
+            tokens,
             foreign_path,
-            name_text,
             doc_name,
-            extra,
-        })
+            extra: None,
+        };
+        if input.is_empty() {
+            return Ok(out);
+        }
+        input.parse::<Token![,]>()?;
+        if input.is_empty() {
+            return Ok(out);
+        }
+        parse_name(input, "extra")?;
+        input.parse::<Token![=]>()?;
+        let content;
+        bracketed!(content in input);
+        let punc = Punctuated::<Ident, Token![,]>::parse_terminated(&content)?;
+        out.extra = Some(punc.into_pairs().map(|p| p.into_value()).collect());
+        Ok(out)
     }
 }
 
 impl ToTokens for OptionSettersArgs {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let Self {
-            source_text,
-            foreign_path,
-            name_text,
-            doc_name,
-            extra,
-        } = &self;
-        tokens.extend(source_text.0.to_token_stream());
-        tokens.extend(source_text.1.to_token_stream());
-        tokens.extend(foreign_path.to_token_stream());
-        tokens.extend(name_text.0.to_token_stream());
-        tokens.extend(name_text.1.to_token_stream());
-        tokens.extend(name_text.2.to_token_stream());
-        tokens.extend(doc_name.to_token_stream());
-        if let Some(extra) = extra {
-            tokens.extend(extra.0.to_token_stream());
-            tokens.extend(extra.1.to_token_stream());
-        }
+        tokens.extend(self.tokens.clone());
     }
 }
 
 impl ForeignPath for OptionSettersArgs {
     fn foreign_path(&self) -> &syn::Path {
         &self.foreign_path
-    }
-}
-
-impl Parse for OptionSettersArgsExtra {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let extra_text = (parse_name(input, "extra")?, input.parse::<Token![=]>()?);
-        let content;
-        let bracket = bracketed!(content in input);
-        let names = Punctuated::parse_separated_nonempty(&content)?;
-        Ok(Self {
-            extra_text,
-            bracket,
-            names,
-        })
-    }
-}
-
-impl ToTokens for OptionSettersArgsExtra {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        tokens.extend(self.extra_text.0.to_token_stream());
-        tokens.extend(self.extra_text.1.to_token_stream());
-        self.bracket.surround(tokens, |content| {
-            content.extend(self.names.to_token_stream());
-        });
     }
 }
 
@@ -693,7 +693,7 @@ pub fn options_doc(
     // Get the rustdoc path to the action type, i.e. the type with generic arguments stripped
     let mut doc_path = match &*setters.self_ty {
         Type::Path(p) => p.path.clone(),
-        t => compile_error!(t.span(), "invalid options doc argument"),
+        t => macro_error!(t.span(), "invalid options doc argument"),
     };
     for seg in &mut doc_path.segments {
         seg.arguments = PathArguments::None;

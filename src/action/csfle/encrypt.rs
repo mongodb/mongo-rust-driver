@@ -1,4 +1,5 @@
 use bson::{Binary, Bson, RawDocumentBuf};
+use macro_magic::export_tokens;
 use mongocrypt::ctx::Algorithm;
 use serde::Serialize;
 use serde_with::skip_serializing_none;
@@ -107,6 +108,7 @@ pub struct Expression {
 /// Options for encrypting a value.
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
+#[export_tokens]
 pub struct EncryptOptions {
     /// The contention factor.
     pub contention_factor: Option<i64>,
