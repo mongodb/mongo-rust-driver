@@ -1,19 +1,17 @@
 extern crate proc_macro;
 
 use macro_magic::{import_tokens_attr, mm_core::ForeignPath};
-use proc_macro::Punct;
 use quote::{quote, ToTokens};
 use syn::{
     braced,
     bracketed,
     parenthesized,
-    parse::{Parse, ParseStream, Parser},
+    parse::{Parse, ParseStream},
     parse_macro_input,
     parse_quote,
     parse_quote_spanned,
     punctuated::Punctuated,
     spanned::Spanned,
-    token::Bracket,
     Attribute,
     Block,
     Error,
@@ -219,12 +217,6 @@ fn parse_name(input: ParseStream, name: &str) -> syn::Result<Ident> {
         ));
     }
     Ok(ident)
-}
-
-macro_rules! parse_error {
-    ($span:expr, $($message:tt)+) => {{
-        return Err(Error::new($span, format!($($message)+)));
-    }};
 }
 
 macro_rules! macro_error {
@@ -582,40 +574,6 @@ pub fn option_setters_2(
     .into()
 }
 
-#[derive(Debug)]
-struct Arg {
-    key: Ident,
-    eq: Token![=],
-    val: proc_macro2::TokenStream,
-}
-
-impl Parse for Arg {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let key = input.parse()?;
-        let eq = input.parse()?;
-        let val = input.parse()?;
-        Ok(Self { key, eq, val })
-    }
-}
-
-impl ToTokens for Arg {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let Self { key, eq, val } = &self;
-        tokens.extend(key.to_token_stream());
-        tokens.extend(eq.to_token_stream());
-        tokens.extend(val.clone());
-    }
-}
-
-impl Arg {
-    fn named_val<T: Parse>(&self, name: &str) -> syn::Result<T> {
-        if self.key.to_string() != name {
-            parse_error!(self.key.span(), "expected '{}', got '{}'", name, self.key);
-        }
-        syn::parse2(self.val.clone())
-    }
-}
-
 struct OptionSettersArgs {
     tokens: proc_macro2::TokenStream,
     foreign_path: syn::Path,   // source = <path>
@@ -639,11 +597,7 @@ impl Parse for OptionSettersArgs {
             doc_name,
             extra: None,
         };
-        if input.is_empty() {
-            return Ok(out);
-        }
-        input.parse::<Token![,]>()?;
-        if input.is_empty() {
+        if input.parse::<Option<Token![,]>>()?.is_none() || input.is_empty() {
             return Ok(out);
         }
         parse_name(input, "extra")?;
