@@ -1,4 +1,5 @@
 use bson::{Bson, Document};
+use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
 
 use crate::{
     coll::options::{DeleteOptions, Hint},
@@ -11,7 +12,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, deeplink, option_setters, CollRef};
+use super::{action_impl, deeplink, CollRef};
 
 impl<T> Collection<T>
 where
@@ -26,6 +27,7 @@ where
     ///
     /// `await` will return d[`Result<DeleteResult>`].
     #[deeplink]
+    #[options_doc(delete_setters)]
     pub fn delete_one(&self, query: Document) -> Delete {
         Delete {
             coll: CollRef::new(self),
@@ -40,6 +42,7 @@ where
     ///
     /// `await` will return d[`Result<DeleteResult>`].
     #[deeplink]
+    #[options_doc(delete_setters)]
     pub fn delete_many(&self, query: Document) -> Delete {
         Delete {
             coll: CollRef::new(self),
@@ -65,6 +68,7 @@ where
     ///
     /// [`run`](Delete::run) will return d[`Result<DeleteResult>`].
     #[deeplink]
+    #[options_doc(delete_setters, sync)]
     pub fn delete_one(&self, query: Document) -> Delete {
         self.async_collection.delete_one(query)
     }
@@ -73,6 +77,7 @@ where
     ///
     /// [`run`](Delete::run) will return d[`Result<DeleteResult>`].
     #[deeplink]
+    #[options_doc(delete_setters, sync)]
     pub fn delete_many(&self, query: Document) -> Delete {
         self.async_collection.delete_many(query)
     }
@@ -89,15 +94,9 @@ pub struct Delete<'a> {
     limit: Option<u32>,
 }
 
+#[option_setters_2(crate::coll::options::DeleteOptions)]
+#[export_doc(delete_setters)]
 impl<'a> Delete<'a> {
-    option_setters!(options: DeleteOptions;
-        collation: Collation,
-        write_concern: WriteConcern,
-        hint: Hint,
-        let_vars: Document,
-        comment: Bson,
-    );
-
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());

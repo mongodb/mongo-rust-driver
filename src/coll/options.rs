@@ -322,6 +322,7 @@ pub struct ReplaceOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct DeleteOptions {
     /// The collation to use for the operation.
     ///
