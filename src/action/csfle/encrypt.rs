@@ -49,7 +49,7 @@ impl ClientEncryption {
     ///
     /// `await` will return a d[`Result<Document>`] containing the encrypted expression.
     #[deeplink]
-    #[options_doc(encrypt_setters)]
+    #[options_doc(encrypt_expr_setters)]
     pub fn encrypt_expression(
         &self,
         expression: RawDocumentBuf,
@@ -148,7 +148,8 @@ pub struct RangeOptions {
 }
 
 #[option_setters_2(EncryptOptions, skip = [query_type])]
-#[export_doc(encrypt_setters)]
+#[export_doc(encrypt_setters, extra = [query_type])]
+#[export_doc(encrypt_expr_setters)]
 impl<Mode> Encrypt<'_, Mode> {}
 
 impl Encrypt<'_, Value> {
