@@ -1,5 +1,7 @@
 extern crate proc_macro;
 
+use std::collections::HashSet;
+
 use macro_magic::mm_core::ForeignPath;
 use quote::{quote, ToTokens};
 use syn::{
@@ -229,6 +231,13 @@ pub fn option_setters_2(
     });
     // Append setter fns to `impl` block item list
     for OptInfo { name, attrs, type_ } in opt_info {
+        if args
+            .skip
+            .as_ref()
+            .map_or(false, |skip| skip.contains(&name))
+        {
+            continue;
+        }
         let (accept, value) = if type_.is_ident("String")
             || type_.is_ident("Bson")
             || path_eq(&type_, &["bson", "Bson"])
@@ -275,14 +284,16 @@ pub fn option_setters_2(
 
 pub(crate) struct OptionSettersArgs {
     tokens: proc_macro2::TokenStream,
-    foreign_path: syn::Path,   // source = <path>
-    doc_name: Ident,           // doc_name = <ident>
-    extra: Option<Vec<Ident>>, // extra = [ident,..]
+    foreign_path: syn::Path,      // source = <path>
+    doc_name: Ident,              // doc_name = <ident>
+    extra: Option<Vec<Ident>>,    // extra = [ident, ..]
+    skip: Option<HashSet<Ident>>, // skip = [ident, ..]
 }
 
 impl Parse for OptionSettersArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let tokens: proc_macro2::TokenStream = input.fork().parse()?;
+
         parse_name(input, "source")?;
         input.parse::<Token![=]>()?;
         let foreign_path = input.parse()?;
@@ -295,16 +306,28 @@ impl Parse for OptionSettersArgs {
             foreign_path,
             doc_name,
             extra: None,
+            skip: None,
         };
         if input.parse::<Option<Token![,]>>()?.is_none() || input.is_empty() {
             return Ok(out);
         }
-        parse_name(input, "extra")?;
-        input.parse::<Token![=]>()?;
-        let content;
-        bracketed!(content in input);
-        let punc = Punctuated::<Ident, Token![,]>::parse_terminated(&content)?;
-        out.extra = Some(punc.into_pairs().map(|p| p.into_value()).collect());
+
+        let parse_ident_list = |name| -> syn::Result<Vec<Ident>> {
+            parse_name(input, name)?;
+            input.parse::<Token![=]>()?;
+            let content;
+            bracketed!(content in input);
+            let punc = Punctuated::<Ident, Token![,]>::parse_terminated(&content)?;
+            Ok(punc.into_pairs().map(|p| p.into_value()).collect())
+        };
+
+        out.extra = Some(parse_ident_list("extra")?);
+        if input.parse::<Option<Token![,]>>()?.is_none() || input.is_empty() {
+            return Ok(out);
+        }
+
+        out.skip = Some(parse_ident_list("skip")?.into_iter().collect());
+
         Ok(out)
     }
 }
