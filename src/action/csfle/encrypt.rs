@@ -1,7 +1,7 @@
 use bson::{Binary, Bson, RawDocumentBuf};
 use macro_magic::export_tokens;
 use mongocrypt::ctx::Algorithm;
-use mongodb_internal_macros::{option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
 use serde::Serialize;
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -147,12 +147,8 @@ pub struct RangeOptions {
     pub precision: Option<i32>,
 }
 
-#[option_setters_2(
-    source = EncryptOptions,
-    doc_name = encrypt_setters,
-    extra = [],
-    skip = [query_type],
-)]
+#[option_setters_2(EncryptOptions, skip = [query_type])]
+#[export_doc(encrypt_setters)]
 impl<Mode> Encrypt<'_, Mode> {}
 
 impl Encrypt<'_, Value> {

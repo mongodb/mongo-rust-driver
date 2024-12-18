@@ -1,10 +1,12 @@
 extern crate proc_macro;
 
-use quote::ToTokens;
+use quote::{quote, ToTokens};
 use syn::{
+    bracketed,
     parse::{Parse, ParseStream},
     parse_macro_input,
     parse_quote,
+    punctuated::Punctuated,
     spanned::Spanned,
     Error,
     Expr,
@@ -202,5 +204,57 @@ impl ToTokens for OptionsDocArgs {
 impl macro_magic::mm_core::ForeignPath for OptionsDocArgs {
     fn foreign_path(&self) -> &syn::Path {
         &self.foreign_path
+    }
+}
+
+pub(crate) fn export_doc(
+    attr: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let args = parse_macro_input!(attr as ExportDocArgs);
+    let impl_in = parse_macro_input!(item as ItemImpl);
+
+    let mut doc_impl = impl_in.clone();
+    // Synthesize a fn entry for each extra listed so it'll get a rustdoc entry
+    if let Some(extra) = args.extra {
+        for name in &extra {
+            doc_impl.items.push(parse_quote! {
+                pub fn #name(&self) {}
+            });
+        }
+    }
+
+    // All done.
+    let doc_name = args.name;
+    quote! {
+        #impl_in
+
+        #[macro_magic::export_tokens_no_emit(#doc_name)]
+        #doc_impl
+    }
+    .into()
+}
+
+struct ExportDocArgs {
+    name: Ident,
+    extra: Option<Vec<Ident>>, // extra = [ident, ..]
+}
+
+impl Parse for ExportDocArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let name = input.parse()?;
+        let mut out = Self { name, extra: None };
+        if input.parse::<Option<Token![,]>>()?.is_none() || input.is_empty() {
+            return Ok(out);
+        }
+
+        parse_name(input, "extra")?;
+        input.parse::<Token![=]>()?;
+        let content;
+        bracketed!(content in input);
+        let punc = Punctuated::<Ident, Token![,]>::parse_terminated(&content)?;
+        out.extra = Some(punc.into_pairs().map(|p| p.into_value()).collect());
+
+        Ok(out)
     }
 }

@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb_internal_macros::{option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
 use std::time::Duration;
 
 use crate::{
@@ -63,10 +63,8 @@ pub struct CreateCollection<'a> {
     pub(crate) session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(
-    source = crate::db::options::CreateCollectionOptions,
-    doc_name = create_coll_setters
-)]
+#[option_setters_2(crate::db::options::CreateCollectionOptions)]
+#[export_doc(create_coll_setters)]
 impl<'a> CreateCollection<'a> {
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {

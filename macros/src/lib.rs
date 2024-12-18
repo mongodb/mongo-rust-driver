@@ -5,7 +5,7 @@ mod option;
 mod rustdoc;
 
 use macro_magic::import_tokens_attr;
-use syn::{parse::ParseStream, Error, Ident};
+use syn::{bracketed, parse::ParseStream, punctuated::Punctuated, Error, Ident, Token};
 
 /// Generates:
 /// * an `IntoFuture` executing the given method body
@@ -45,6 +45,14 @@ pub fn option_setters_2(
     crate::option::option_setters_2(attr, item, __custom_tokens)
 }
 
+#[proc_macro_attribute]
+pub fn export_doc(
+    attr: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    crate::rustdoc::export_doc(attr, item)
+}
+
 #[import_tokens_attr]
 #[with_custom_parsing(crate::rustdoc::OptionsDocArgs)]
 #[proc_macro_attribute]
@@ -73,3 +81,12 @@ macro_rules! macro_error {
     }};
 }
 use macro_error;
+
+fn parse_ident_list(input: ParseStream, name: &str) -> syn::Result<Vec<Ident>> {
+    parse_name(input, name)?;
+    input.parse::<Token![=]>()?;
+    let content;
+    bracketed!(content in input);
+    let punc = Punctuated::<Ident, Token![,]>::parse_terminated(&content)?;
+    Ok(punc.into_pairs().map(|p| p.into_value()).collect())
+}

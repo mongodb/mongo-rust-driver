@@ -5,11 +5,9 @@ use std::collections::HashSet;
 use macro_magic::mm_core::ForeignPath;
 use quote::{quote, ToTokens};
 use syn::{
-    bracketed,
     parse::{Parse, ParseStream},
     parse_macro_input,
     parse_quote,
-    punctuated::Punctuated,
     spanned::Spanned,
     Attribute,
     Error,
@@ -26,7 +24,7 @@ use syn::{
     Visibility,
 };
 
-use crate::{macro_error, parse_name};
+use crate::macro_error;
 
 pub(crate) fn option_setters(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let OptionSettersList {
@@ -260,33 +258,13 @@ pub fn option_setters_2(
         });
     }
 
-    // Build rustdoc information.
-    let doc_name = args.doc_name;
-    let mut doc_impl = impl_in.clone();
-    // Synthesize a fn entry for each extra listed so it'll get a rustdoc entry
-    if let Some(extra) = args.extra {
-        for name in &extra {
-            doc_impl.items.push(parse_quote! {
-                pub fn #name(&self) {}
-            });
-        }
-    }
-
-    // All done.  Export the tokens for doc use as their own distinct (uncompiled) item.
-    quote! {
-        #impl_in
-
-        #[macro_magic::export_tokens_no_emit(#doc_name)]
-        #doc_impl
-    }
-    .into()
+    // All done.
+    impl_in.to_token_stream().into()
 }
 
 pub(crate) struct OptionSettersArgs {
     tokens: proc_macro2::TokenStream,
-    foreign_path: syn::Path,      // source = <path>
-    doc_name: Ident,              // doc_name = <ident>
-    extra: Option<Vec<Ident>>,    // extra = [ident, ..]
+    foreign_path: syn::Path,      // <path>
     skip: Option<HashSet<Ident>>, // skip = [ident, ..]
 }
 
@@ -294,39 +272,21 @@ impl Parse for OptionSettersArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let tokens: proc_macro2::TokenStream = input.fork().parse()?;
 
-        parse_name(input, "source")?;
-        input.parse::<Token![=]>()?;
         let foreign_path = input.parse()?;
-        input.parse::<Token![,]>()?;
-        parse_name(input, "doc_name")?;
-        input.parse::<Token![=]>()?;
-        let doc_name = input.parse()?;
         let mut out = Self {
             tokens,
             foreign_path,
-            doc_name,
-            extra: None,
             skip: None,
         };
         if input.parse::<Option<Token![,]>>()?.is_none() || input.is_empty() {
             return Ok(out);
         }
 
-        let parse_ident_list = |name| -> syn::Result<Vec<Ident>> {
-            parse_name(input, name)?;
-            input.parse::<Token![=]>()?;
-            let content;
-            bracketed!(content in input);
-            let punc = Punctuated::<Ident, Token![,]>::parse_terminated(&content)?;
-            Ok(punc.into_pairs().map(|p| p.into_value()).collect())
-        };
-
-        out.extra = Some(parse_ident_list("extra")?);
-        if input.parse::<Option<Token![,]>>()?.is_none() || input.is_empty() {
-            return Ok(out);
-        }
-
-        out.skip = Some(parse_ident_list("skip")?.into_iter().collect());
+        out.skip = Some(
+            crate::parse_ident_list(input, "skip")?
+                .into_iter()
+                .collect(),
+        );
         input.parse::<Option<Token![,]>>()?;
 
         Ok(out)

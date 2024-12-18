@@ -1,5 +1,5 @@
 use macro_magic::export_tokens;
-use mongodb_internal_macros::{option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
 
 use crate::client_encryption::{ClientEncryption, MasterKey};
 
@@ -47,10 +47,8 @@ pub struct DataKeyOptions {
     pub key_material: Option<Vec<u8>>,
 }
 
-#[option_setters_2(
-    source = DataKeyOptions,
-    doc_name = create_data_key_setters
-)]
+#[option_setters_2(DataKeyOptions)]
+#[export_doc(create_data_key_setters)]
 impl CreateDataKey<'_> {
     #[cfg(test)]
     pub(crate) fn test_kms_provider(mut self, value: mongocrypt::ctx::KmsProvider) -> Self {
