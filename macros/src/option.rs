@@ -327,6 +327,7 @@ impl Parse for OptionSettersArgs {
         }
 
         out.skip = Some(parse_ident_list("skip")?.into_iter().collect());
+        input.parse::<Option<Token![,]>>()?;
 
         Ok(out)
     }

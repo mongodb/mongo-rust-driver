@@ -1,11 +1,12 @@
 use bson::{Binary, Bson, RawDocumentBuf};
 use macro_magic::export_tokens;
 use mongocrypt::ctx::Algorithm;
+use mongodb_internal_macros::{option_setters_2, options_doc};
 use serde::Serialize;
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
-use super::super::{deeplink, option_setters};
+use super::super::deeplink;
 use crate::client_encryption::ClientEncryption;
 
 impl ClientEncryption {
@@ -17,6 +18,7 @@ impl ClientEncryption {
     ///
     /// `await` will return a d[`Result<Binary>`] (subtype 6) containing the encrypted value.
     #[deeplink]
+    #[options_doc(encrypt_setters)]
     pub fn encrypt(
         &self,
         value: impl Into<bson::RawBson>,
@@ -47,6 +49,7 @@ impl ClientEncryption {
     ///
     /// `await` will return a d[`Result<Document>`] containing the encrypted expression.
     #[deeplink]
+    #[options_doc(encrypt_setters)]
     pub fn encrypt_expression(
         &self,
         expression: RawDocumentBuf,
@@ -144,12 +147,13 @@ pub struct RangeOptions {
     pub precision: Option<i32>,
 }
 
-impl<Mode> Encrypt<'_, Mode> {
-    option_setters!(options: EncryptOptions;
-        contention_factor: i64,
-        range_options: RangeOptions,
-    );
-}
+#[option_setters_2(
+    source = EncryptOptions,
+    doc_name = encrypt_setters,
+    extra = [],
+    skip = [query_type],
+)]
+impl<Mode> Encrypt<'_, Mode> {}
 
 impl Encrypt<'_, Value> {
     /// Set the [`EncryptOptions::query_type`] option.
