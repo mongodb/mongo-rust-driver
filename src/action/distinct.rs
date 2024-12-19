@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use bson::{Bson, Document};
+use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
 
 use crate::{
     coll::options::DistinctOptions,
@@ -13,7 +14,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, deeplink, option_setters, CollRef};
+use super::{action_impl, deeplink, CollRef};
 
 impl<T> Collection<T>
 where
@@ -23,6 +24,7 @@ where
     ///
     /// `await` will return d[`Result<Vec<Bson>>`].
     #[deeplink]
+    #[options_doc(distinct_setters)]
     pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
         Distinct {
             coll: CollRef::new(self),
@@ -43,6 +45,7 @@ where
     ///
     /// [`run`](Distinct::run) will return d[`Result<Vec<Bson>>`].
     #[deeplink]
+    #[options_doc(distinct_setters, sync)]
     pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
         self.async_collection.distinct(field_name, filter)
     }
@@ -58,15 +61,9 @@ pub struct Distinct<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
+#[option_setters_2(crate::coll::options::DistinctOptions)]
+#[export_doc(distinct_setters)]
 impl<'a> Distinct<'a> {
-    option_setters!(options: DistinctOptions;
-        max_time: Duration,
-        selection_criteria: SelectionCriteria,
-        read_concern: ReadConcern,
-        collation: Collation,
-        comment: Bson,
-    );
-
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());

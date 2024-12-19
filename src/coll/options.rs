@@ -722,6 +722,7 @@ pub struct EstimatedDocumentCountOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[export_tokens]
 pub struct DistinctOptions {
     /// The maximum amount of time to allow the query to run.
     ///
