@@ -1081,6 +1081,7 @@ pub struct DropCollectionOptions {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct DropIndexOptions {
     /// The maximum amount of time to allow the index to drop.
     ///
