@@ -8,14 +8,18 @@ use crate::{
     Collection,
     Database,
 };
+#[cfg(feature = "in-use-encryption")]
+use bson::Document;
+use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
 
-use super::{action_impl, deeplink, option_setters, CollRef};
+use super::{action_impl, deeplink, CollRef};
 
 impl Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.
     ///
     /// `await` will return d[`Result<()>`].
     #[deeplink]
+    #[options_doc(drop_db)]
     pub fn drop(&self) -> DropDatabase {
         DropDatabase {
             db: self,
@@ -31,6 +35,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](DropDatabase::run) will return d[`Result<()>`].
     #[deeplink]
+    #[options_doc(drop_db, sync)]
     pub fn drop(&self) -> DropDatabase {
         self.async_database.drop()
     }
@@ -45,11 +50,9 @@ pub struct DropDatabase<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
+#[option_setters_2(crate::db::options::DropDatabaseOptions)]
+#[export_doc(drop_db)]
 impl<'a> DropDatabase<'a> {
-    option_setters!(options: DropDatabaseOptions;
-        write_concern: WriteConcern,
-    );
-
     /// Runs the drop using the provided session.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
@@ -76,6 +79,7 @@ where
     ///
     /// `await` will return d[`Result<()>`].
     #[deeplink]
+    #[options_doc(drop_coll)]
     pub fn drop(&self) -> DropCollection {
         DropCollection {
             cr: CollRef::new(self),
@@ -94,6 +98,7 @@ where
     ///
     /// [`run`](DropCollection::run) will return d[`Result<()>`].
     #[deeplink]
+    #[options_doc(drop_coll, sync)]
     pub fn drop(&self) -> DropCollection {
         self.async_collection.drop()
     }
@@ -108,13 +113,9 @@ pub struct DropCollection<'a> {
     pub(crate) session: Option<&'a mut ClientSession>,
 }
 
+#[option_setters_2(crate::coll::options::DropCollectionOptions)]
+#[export_doc(drop_coll)]
 impl<'a> DropCollection<'a> {
-    option_setters!(options: DropCollectionOptions;
-        write_concern: WriteConcern,
-        #[cfg(feature = "in-use-encryption")]
-        encrypted_fields: bson::Document,
-    );
-
     /// Runs the drop using the provided session.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());

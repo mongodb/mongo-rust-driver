@@ -285,6 +285,7 @@ pub enum TimeseriesGranularity {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct DropDatabaseOptions {
     /// The write concern for the operation.
     pub write_concern: Option<WriteConcern>,
