@@ -76,7 +76,7 @@ pub struct Single;
 #[allow(missing_docs)]
 pub struct Multiple;
 
-use mongodb_internal_macros::option_setters;
+use mongodb_internal_macros::{export_doc, option_setters, option_setters_2, options_doc};
 
 pub(crate) mod private {
     pub trait Sealed {}

@@ -3,7 +3,7 @@ use bson::{oid::ObjectId, Bson, Document};
 #[cfg(docsrs)]
 use crate::gridfs::FilesCollectionDocument;
 use crate::{
-    action::{action_impl, deeplink, option_setters},
+    action::{action_impl, deeplink, export_doc, option_setters_2, options_doc},
     error::Result,
     gridfs::{GridFsBucket, GridFsUploadOptions, GridFsUploadStream},
 };
@@ -14,6 +14,7 @@ impl GridFsBucket {
     ///
     /// `await` will return d[`Result<GridFsUploadStream>`].
     #[deeplink]
+    #[options_doc(open_upload_stream_setters)]
     pub fn open_upload_stream(&self, filename: impl AsRef<str>) -> OpenUploadStream {
         OpenUploadStream {
             bucket: self,
@@ -31,6 +32,7 @@ impl crate::sync::gridfs::GridFsBucket {
     ///
     /// [`run`](OpenUploadStream::run) will return d[`Result<GridFsUploadStream>`].
     #[deeplink]
+    #[options_doc(open_upload_stream_setters, sync)]
     pub fn open_upload_stream(&self, filename: impl AsRef<str>) -> OpenUploadStream {
         self.async_bucket.open_upload_stream(filename)
     }
@@ -46,6 +48,8 @@ pub struct OpenUploadStream<'a> {
     options: Option<GridFsUploadOptions>,
 }
 
+#[option_setters_2(crate::gridfs::options::GridFsUploadOptions)]
+#[export_doc(open_upload_stream_setters)]
 impl OpenUploadStream<'_> {
     /// Set the value to be used for the corresponding [`FilesCollectionDocument`]'s `id`
     /// field.  If not set, a unique [`ObjectId`] will be generated that can be accessed via the
@@ -53,11 +57,6 @@ impl OpenUploadStream<'_> {
     pub fn id(mut self, value: Bson) -> Self {
         self.id = Some(value);
         self
-    }
-
-    option_setters! { options: GridFsUploadOptions;
-        chunk_size_bytes: u32,
-        metadata: Document,
     }
 }
 

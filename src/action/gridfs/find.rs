@@ -3,7 +3,7 @@ use std::time::Duration;
 use bson::Document;
 
 use crate::{
-    action::{action_impl, deeplink, option_setters},
+    action::{action_impl, deeplink, export_doc, option_setters_2, options_doc},
     coll::options::{FindOneOptions, FindOptions},
     error::Result,
     gridfs::{FilesCollectionDocument, GridFsBucket, GridFsFindOneOptions, GridFsFindOptions},
@@ -16,6 +16,7 @@ impl GridFsBucket {
     ///
     /// `await` will return d[`Result<Cursor<FilesCollectionDocument>>`].
     #[deeplink]
+    #[options_doc(find_setters)]
     pub fn find(&self, filter: Document) -> Find {
         Find {
             bucket: self,
@@ -29,6 +30,7 @@ impl GridFsBucket {
     ///
     /// `await` will return d[`Result<Option<FilesCollectionDocument>>`].
     #[deeplink]
+    #[options_doc(find_one_setters)]
     pub fn find_one(&self, filter: Document) -> FindOne {
         FindOne {
             bucket: self,
@@ -45,6 +47,7 @@ impl crate::sync::gridfs::GridFsBucket {
     ///
     /// [`run`](Find::run) will return d[`Result<crate::sync::Cursor<FilesCollectionDocument>>`].
     #[deeplink]
+    #[options_doc(find_setters, sync)]
     pub fn find(&self, filter: Document) -> Find {
         self.async_bucket.find(filter)
     }
@@ -54,6 +57,7 @@ impl crate::sync::gridfs::GridFsBucket {
     ///
     /// [`run`](FindOne::run) will return d[`Result<Option<FilesCollectionDocument>>`].
     #[deeplink]
+    #[options_doc(find_one_setters, sync)]
     pub fn find_one(&self, filter: Document) -> FindOne {
         self.async_bucket.find_one(filter)
     }
@@ -68,16 +72,9 @@ pub struct Find<'a> {
     options: Option<GridFsFindOptions>,
 }
 
-impl Find<'_> {
-    option_setters! { options: GridFsFindOptions;
-        allow_disk_use: bool,
-        batch_size: u32,
-        limit: i64,
-        max_time: Duration,
-        skip: u64,
-        sort: Document,
-    }
-}
+#[option_setters_2(crate::gridfs::options::GridFsFindOptions)]
+#[export_doc(find_setters)]
+impl Find<'_> {}
 
 #[action_impl(sync = crate::sync::Cursor<FilesCollectionDocument>)]
 impl<'a> Action for Find<'a> {
@@ -102,13 +99,9 @@ pub struct FindOne<'a> {
     options: Option<GridFsFindOneOptions>,
 }
 
-impl FindOne<'_> {
-    option_setters! { options: GridFsFindOneOptions;
-        max_time: Duration,
-        skip: u64,
-        sort: Document,
-    }
-}
+#[option_setters_2(crate::gridfs::options::GridFsFindOneOptions)]
+#[export_doc(find_one_setters)]
+impl FindOne<'_> {}
 
 #[action_impl]
 impl<'a> Action for FindOne<'a> {
