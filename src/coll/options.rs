@@ -360,6 +360,7 @@ pub struct DeleteOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct FindOneAndDeleteOptions {
     /// The maximum amount of time to allow the query to run.
     ///
@@ -409,6 +410,7 @@ pub struct FindOneAndDeleteOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[export_tokens]
 pub struct FindOneAndReplaceOptions {
     /// Opt out of document-level validation.
     pub bypass_document_validation: Option<bool>,
@@ -467,6 +469,7 @@ pub struct FindOneAndReplaceOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct FindOneAndUpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
     ///
