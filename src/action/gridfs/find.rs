@@ -3,7 +3,7 @@ use std::time::Duration;
 use bson::Document;
 
 use crate::{
-    action::{action_impl, deeplink, export_doc, option_setters_2, options_doc},
+    action::{action_impl, deeplink, export_doc, option_setters, options_doc},
     coll::options::{FindOneOptions, FindOptions},
     error::Result,
     gridfs::{FilesCollectionDocument, GridFsBucket, GridFsFindOneOptions, GridFsFindOptions},
@@ -72,7 +72,7 @@ pub struct Find<'a> {
     options: Option<GridFsFindOptions>,
 }
 
-#[option_setters_2(crate::gridfs::options::GridFsFindOptions)]
+#[option_setters(crate::gridfs::options::GridFsFindOptions)]
 #[export_doc(find)]
 impl Find<'_> {}
 
@@ -99,7 +99,7 @@ pub struct FindOne<'a> {
     options: Option<GridFsFindOneOptions>,
 }
 
-#[option_setters_2(crate::gridfs::options::GridFsFindOneOptions)]
+#[option_setters(crate::gridfs::options::GridFsFindOneOptions)]
 #[export_doc(find_one)]
 impl FindOne<'_> {}
 

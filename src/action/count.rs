@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 use std::time::Duration;
 
 use crate::{
@@ -100,7 +100,7 @@ pub struct EstimatedDocumentCount<'a> {
     options: Option<EstimatedDocumentCountOptions>,
 }
 
-#[option_setters_2(crate::coll::options::EstimatedDocumentCountOptions)]
+#[option_setters(crate::coll::options::EstimatedDocumentCountOptions)]
 #[export_doc(estimated_doc_count)]
 impl EstimatedDocumentCount<'_> {}
 
@@ -124,7 +124,7 @@ pub struct CountDocuments<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(crate::coll::options::CountOptions)]
+#[option_setters(crate::coll::options::CountOptions)]
 #[export_doc(count_docs)]
 impl<'a> CountDocuments<'a> {
     /// Use the provided session when running the operation.

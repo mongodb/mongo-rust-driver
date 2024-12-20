@@ -18,7 +18,7 @@ use super::{
     action_impl,
     deeplink,
     export_doc,
-    option_setters_2,
+    option_setters,
     options_doc,
     CollRef,
     ExplicitSession,
@@ -96,7 +96,7 @@ pub struct ListIndexes<'a, Mode = ListSpecifications, Session = ImplicitSession>
     _mode: PhantomData<Mode>,
 }
 
-#[option_setters_2(crate::coll::options::ListIndexesOptions)]
+#[option_setters(crate::coll::options::ListIndexesOptions)]
 #[export_doc(list_indexes, extra = [session])]
 impl<Mode, Session> ListIndexes<'_, Mode, Session> {}
 

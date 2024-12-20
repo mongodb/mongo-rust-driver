@@ -33,11 +33,11 @@ pub fn deeplink(
 #[import_tokens_attr]
 #[with_custom_parsing(crate::option::OptionSettersArgs)]
 #[proc_macro_attribute]
-pub fn option_setters_2(
+pub fn option_setters(
     attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    crate::option::option_setters_2(attr, item, __custom_tokens)
+    crate::option::option_setters(attr, item, __custom_tokens)
 }
 
 #[proc_macro_attribute]

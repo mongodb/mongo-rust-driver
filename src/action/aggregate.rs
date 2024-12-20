@@ -1,7 +1,7 @@
 use std::{marker::PhantomData, time::Duration};
 
 use bson::{Bson, Document};
-use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use crate::{
     coll::options::{AggregateOptions, Hint},
@@ -117,7 +117,7 @@ pub struct Aggregate<'a, Session = ImplicitSession, T = Document> {
     _phantom: PhantomData<T>,
 }
 
-#[option_setters_2(crate::coll::options::AggregateOptions)]
+#[option_setters(crate::coll::options::AggregateOptions)]
 #[export_doc(aggregate, extra = [session])]
 impl<'a, Session, T> Aggregate<'a, Session, T> {
     /// Use the provided type for the returned cursor.

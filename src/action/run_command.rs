@@ -19,7 +19,7 @@ use super::{
     action_impl,
     deeplink,
     export_doc,
-    option_setters_2,
+    option_setters,
     options_doc,
     ExplicitSession,
     ImplicitSession,
@@ -99,7 +99,7 @@ pub struct RunCommand<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(crate::db::options::RunCommandOptions)]
+#[option_setters(crate::db::options::RunCommandOptions)]
 #[export_doc(run_command)]
 impl<'a> RunCommand<'a> {
     /// Run the command using the provided [`ClientSession`].
@@ -162,7 +162,7 @@ pub struct RunCursorCommand<'a, Session = ImplicitSession> {
     session: Session,
 }
 
-#[option_setters_2(crate::db::options::RunCursorCommandOptions)]
+#[option_setters(crate::db::options::RunCursorCommandOptions)]
 #[export_doc(run_cursor_command, extra = [session])]
 impl<Session> RunCursorCommand<'_, Session> {}
 

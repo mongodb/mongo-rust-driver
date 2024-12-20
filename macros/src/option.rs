@@ -26,7 +26,7 @@ use syn::{
 
 use crate::macro_error;
 
-pub fn option_setters_2(
+pub fn option_setters(
     attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
     custom_tokens: proc_macro::TokenStream,

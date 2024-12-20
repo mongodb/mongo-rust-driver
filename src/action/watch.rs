@@ -7,7 +7,7 @@ use super::{
     action_impl,
     deeplink,
     export_doc,
-    option_setters_2,
+    option_setters,
     options_doc,
     ExplicitSession,
     ImplicitSession,
@@ -212,7 +212,7 @@ impl<'a, T> Watch<'a, T, ImplicitSession> {
     }
 }
 
-#[option_setters_2(crate::change_stream::options::ChangeStreamOptions, skip = [resume_after, all_changes_for_cluster])]
+#[option_setters(crate::change_stream::options::ChangeStreamOptions, skip = [resume_after, all_changes_for_cluster])]
 #[export_doc(watch, extra = [session])]
 impl<S> Watch<'_, S> {
     /// Apply an aggregation pipeline to the change stream.

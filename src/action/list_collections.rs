@@ -18,7 +18,7 @@ use super::{
     action_impl,
     deeplink,
     export_doc,
-    option_setters_2,
+    option_setters,
     options_doc,
     ExplicitSession,
     ImplicitSession,
@@ -88,7 +88,7 @@ pub struct ListCollections<'a, M = ListSpecifications, S = ImplicitSession> {
     session: S,
 }
 
-#[option_setters_2(crate::db::options::ListCollectionsOptions)]
+#[option_setters(crate::db::options::ListCollectionsOptions)]
 #[export_doc(list_collections, extra = [session])]
 impl<M, S> ListCollections<'_, M, S> {}
 

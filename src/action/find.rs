@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bson::{Bson, Document};
-use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 use serde::de::DeserializeOwned;
 
 use crate::{
@@ -86,7 +86,7 @@ pub struct Find<'a, T: Send + Sync, Session = ImplicitSession> {
     session: Session,
 }
 
-#[option_setters_2(crate::coll::options::FindOptions)]
+#[option_setters(crate::coll::options::FindOptions)]
 #[export_doc(find)]
 impl<'a, T: Send + Sync, Session> Find<'a, T, Session> {
     /// Use the provided session when running the operation.
@@ -145,7 +145,7 @@ pub struct FindOne<'a, T: Send + Sync> {
     session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(crate::coll::options::FindOneOptions)]
+#[option_setters(crate::coll::options::FindOneOptions)]
 #[export_doc(find_one)]
 impl<'a, T: Send + Sync> FindOne<'a, T> {
     /// Use the provided session when running the operation.

@@ -10,7 +10,7 @@ use crate::{
 };
 #[cfg(feature = "in-use-encryption")]
 use bson::Document;
-use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use super::{action_impl, deeplink, CollRef};
 
@@ -50,7 +50,7 @@ pub struct DropDatabase<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(crate::db::options::DropDatabaseOptions)]
+#[option_setters(crate::db::options::DropDatabaseOptions)]
 #[export_doc(drop_db)]
 impl<'a> DropDatabase<'a> {
     /// Runs the drop using the provided session.
@@ -113,7 +113,7 @@ pub struct DropCollection<'a> {
     pub(crate) session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(crate::coll::options::DropCollectionOptions)]
+#[option_setters(crate::coll::options::DropCollectionOptions)]
 #[export_doc(drop_coll)]
 impl<'a> DropCollection<'a> {
     /// Runs the drop using the provided session.

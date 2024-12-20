@@ -7,7 +7,7 @@ use crate::{
     ClientSession,
 };
 
-use super::{export_doc, option_setters_2, options_doc};
+use super::{export_doc, option_setters, options_doc};
 
 impl ClientSession {
     /// Starts a new transaction on this session. If no options are set, the session's
@@ -212,7 +212,7 @@ pub struct StartTransaction<S> {
     pub(crate) options: Option<TransactionOptions>,
 }
 
-#[option_setters_2(crate::client::options::TransactionOptions)]
+#[option_setters(crate::client::options::TransactionOptions)]
 #[export_doc(start_transaction)]
 impl<S> StartTransaction<S> {}
 

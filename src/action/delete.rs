@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use crate::{
     coll::options::{DeleteOptions, Hint},
@@ -94,7 +94,7 @@ pub struct Delete<'a> {
     limit: Option<u32>,
 }
 
-#[option_setters_2(crate::coll::options::DeleteOptions)]
+#[option_setters(crate::coll::options::DeleteOptions)]
 #[export_doc(delete)]
 impl<'a> Delete<'a> {
     /// Use the provided session when running the operation.

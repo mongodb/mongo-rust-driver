@@ -1,7 +1,7 @@
 use std::{marker::PhantomData, time::Duration};
 
 use bson::Bson;
-use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use crate::{
     coll::options::{CommitQuorum, CreateIndexOptions},
@@ -92,7 +92,7 @@ pub struct CreateIndex<'a, M = Single> {
     _mode: PhantomData<M>,
 }
 
-#[option_setters_2(crate::coll::options::CreateIndexOptions)]
+#[option_setters(crate::coll::options::CreateIndexOptions)]
 #[export_doc(create_index)]
 impl<'a, M> CreateIndex<'a, M> {
     /// Use the provided session when running the operation.

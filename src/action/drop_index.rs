@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bson::Bson;
-use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use super::{action_impl, deeplink, CollRef};
 use crate::{
@@ -80,7 +80,7 @@ pub struct DropIndex<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(crate::coll::options::DropIndexOptions)]
+#[option_setters(crate::coll::options::DropIndexOptions)]
 #[export_doc(drop_index)]
 impl<'a> DropIndex<'a> {
     /// Use the provided session when running the operation.

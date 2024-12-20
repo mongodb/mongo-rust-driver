@@ -3,7 +3,7 @@ use bson::{oid::ObjectId, Bson, Document};
 #[cfg(docsrs)]
 use crate::gridfs::FilesCollectionDocument;
 use crate::{
-    action::{action_impl, deeplink, export_doc, option_setters_2, options_doc},
+    action::{action_impl, deeplink, export_doc, option_setters, options_doc},
     error::Result,
     gridfs::{GridFsBucket, GridFsUploadOptions, GridFsUploadStream},
 };
@@ -48,7 +48,7 @@ pub struct OpenUploadStream<'a> {
     options: Option<GridFsUploadOptions>,
 }
 
-#[option_setters_2(crate::gridfs::options::GridFsUploadOptions)]
+#[option_setters(crate::gridfs::options::GridFsUploadOptions)]
 #[export_doc(open_upload_stream)]
 impl OpenUploadStream<'_> {
     /// Set the value to be used for the corresponding [`FilesCollectionDocument`]'s `id`

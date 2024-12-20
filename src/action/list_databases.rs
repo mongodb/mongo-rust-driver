@@ -17,7 +17,7 @@ use super::{
     action_impl,
     deeplink,
     export_doc,
-    option_setters_2,
+    option_setters,
     options_doc,
     ListNames,
     ListSpecifications,
@@ -84,7 +84,7 @@ pub struct ListDatabases<'a, M = ListSpecifications> {
     mode: PhantomData<M>,
 }
 
-#[option_setters_2(crate::db::options::ListDatabasesOptions)]
+#[option_setters(crate::db::options::ListDatabasesOptions)]
 #[export_doc(list_databases)]
 impl<'a, M> ListDatabases<'a, M> {
     /// Use the provided session when running the operation.

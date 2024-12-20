@@ -5,7 +5,7 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_impl, deeplink, export_doc, option_setters_2, options_doc};
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc};
 
 impl Client {
     /// Starts a new [`ClientSession`].
@@ -40,7 +40,7 @@ pub struct StartSession<'a> {
     options: Option<SessionOptions>,
 }
 
-#[option_setters_2(crate::client::options::SessionOptions)]
+#[option_setters(crate::client::options::SessionOptions)]
 #[export_doc(start_session)]
 impl StartSession<'_> {}
 

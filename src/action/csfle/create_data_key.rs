@@ -1,5 +1,5 @@
 use macro_magic::export_tokens;
-use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use crate::client_encryption::{ClientEncryption, MasterKey};
 
@@ -47,7 +47,7 @@ pub struct DataKeyOptions {
     pub key_material: Option<Vec<u8>>,
 }
 
-#[option_setters_2(DataKeyOptions)]
+#[option_setters(DataKeyOptions)]
 #[export_doc(create_data_keys)]
 impl CreateDataKey<'_> {
     #[cfg(test)]

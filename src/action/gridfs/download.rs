@@ -1,5 +1,5 @@
 use bson::{doc, Bson};
-use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use crate::{
     action::{action_impl, deeplink},
@@ -154,7 +154,7 @@ pub struct OpenDownloadStreamByName<'a> {
     options: Option<GridFsDownloadByNameOptions>,
 }
 
-#[option_setters_2(crate::gridfs::GridFsDownloadByNameOptions)]
+#[option_setters(crate::gridfs::GridFsDownloadByNameOptions)]
 #[export_doc(download_by_name)]
 impl OpenDownloadStreamByName<'_> {}
 

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, marker::PhantomData};
 
-use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use crate::{
     bson::{Bson, Document},
@@ -89,7 +89,7 @@ impl<'a> BulkWrite<'a, SummaryBulkWriteResult> {
     }
 }
 
-#[option_setters_2(crate::client::options::BulkWriteOptions)]
+#[option_setters(crate::client::options::BulkWriteOptions)]
 #[export_doc(bulk_write, extra = [verbose_results])]
 impl<'a, R> BulkWrite<'a, R>
 where

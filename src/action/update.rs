@@ -11,7 +11,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, deeplink, export_doc, option_setters_2, options_doc, CollRef};
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc, CollRef};
 
 impl<T> Collection<T>
 where
@@ -116,7 +116,7 @@ pub struct Update<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(crate::coll::options::UpdateOptions)]
+#[option_setters(crate::coll::options::UpdateOptions)]
 #[export_doc(update)]
 impl<'a> Update<'a> {
     /// Use the provided session when running the operation.

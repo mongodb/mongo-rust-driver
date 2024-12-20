@@ -6,7 +6,7 @@ use super::{
     action_impl,
     deeplink,
     export_doc,
-    option_setters_2,
+    option_setters,
     options_doc,
     CollRef,
     Multiple,
@@ -178,7 +178,7 @@ pub struct CreateSearchIndex<'a, Mode> {
     _mode: PhantomData<Mode>,
 }
 
-#[option_setters_2(crate::search_index::options::CreateSearchIndexOptions)]
+#[option_setters(crate::search_index::options::CreateSearchIndexOptions)]
 #[export_doc(create_search_index)]
 impl<Mode> CreateSearchIndex<'_, Mode> {}
 
@@ -219,7 +219,7 @@ pub struct UpdateSearchIndex<'a> {
     options: Option<UpdateSearchIndexOptions>,
 }
 
-#[option_setters_2(crate::search_index::options::UpdateSearchIndexOptions)]
+#[option_setters(crate::search_index::options::UpdateSearchIndexOptions)]
 #[export_doc(update_search_index)]
 impl UpdateSearchIndex<'_> {}
 
@@ -242,7 +242,7 @@ pub struct DropSearchIndex<'a> {
     options: Option<DropSearchIndexOptions>,
 }
 
-#[option_setters_2(crate::search_index::options::DropSearchIndexOptions)]
+#[option_setters(crate::search_index::options::DropSearchIndexOptions)]
 #[export_doc(drop_search_index)]
 impl DropSearchIndex<'_> {}
 
@@ -265,7 +265,7 @@ pub struct ListSearchIndexes<'a> {
     options: Option<ListSearchIndexOptions>,
 }
 
-#[option_setters_2(crate::search_index::options::ListSearchIndexOptions)]
+#[option_setters(crate::search_index::options::ListSearchIndexOptions)]
 #[export_doc(list_search_indexes)]
 impl ListSearchIndexes<'_> {
     /// Get information for the named index.

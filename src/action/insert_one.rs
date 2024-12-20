@@ -13,7 +13,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, deeplink, export_doc, option_setters_2, options_doc, CollRef};
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc, CollRef};
 
 impl<T: Serialize + Send + Sync> Collection<T> {
     /// Inserts `doc` into the collection.
@@ -68,7 +68,7 @@ pub struct InsertOne<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(crate::coll::options::InsertOneOptions)]
+#[option_setters(crate::coll::options::InsertOneOptions)]
 #[export_doc(insert_one)]
 impl<'a> InsertOne<'a> {
     /// Use the provided session when running the operation.

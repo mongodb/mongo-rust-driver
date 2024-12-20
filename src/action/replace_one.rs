@@ -14,7 +14,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, deeplink, export_doc, option_setters_2, options_doc, CollRef};
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc, CollRef};
 
 impl<T: Serialize + Send + Sync> Collection<T> {
     /// Replaces up to one document matching `query` in the collection with `replacement`.
@@ -65,7 +65,7 @@ pub struct ReplaceOne<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(crate::coll::options::ReplaceOptions)]
+#[option_setters(crate::coll::options::ReplaceOptions)]
 #[export_doc(replace_one)]
 impl<'a> ReplaceOne<'a> {
     /// Use the provided session when running the operation.

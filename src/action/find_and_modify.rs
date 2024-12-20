@@ -1,7 +1,7 @@
 use std::{borrow::Borrow, time::Duration};
 
 use bson::{Bson, Document, RawDocumentBuf};
-use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -186,7 +186,7 @@ pub struct FindOneAndDelete<'a, T: Send + Sync> {
     session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(crate::coll::options::FindOneAndDeleteOptions)]
+#[option_setters(crate::coll::options::FindOneAndDeleteOptions)]
 #[export_doc(find_one_and_delete)]
 impl<'a, T: Send + Sync> FindOneAndDelete<'a, T> {
     /// Use the provided session when running the operation.
@@ -223,7 +223,7 @@ pub struct FindOneAndUpdate<'a, T: Send + Sync> {
     session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(crate::coll::options::FindOneAndUpdateOptions)]
+#[option_setters(crate::coll::options::FindOneAndUpdateOptions)]
 #[export_doc(find_one_and_update)]
 impl<'a, T: Send + Sync> FindOneAndUpdate<'a, T> {
     /// Use the provided session when running the operation.
@@ -260,7 +260,7 @@ pub struct FindOneAndReplace<'a, T: Send + Sync> {
     session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(crate::coll::options::FindOneAndReplaceOptions)]
+#[option_setters(crate::coll::options::FindOneAndReplaceOptions)]
 #[export_doc(find_one_and_replace)]
 impl<'a, T: Send + Sync> FindOneAndReplace<'a, T> {
     /// Use the provided session when running the operation.

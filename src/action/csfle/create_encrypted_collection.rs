@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bson::{doc, Bson, Document};
-use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use super::super::action_impl;
 use crate::{
@@ -59,7 +59,7 @@ pub struct CreateEncryptedCollection<'a> {
     options: Option<CreateCollectionOptions>,
 }
 
-#[option_setters_2(crate::db::options::CreateCollectionOptions)]
+#[option_setters(crate::db::options::CreateCollectionOptions)]
 #[export_doc(create_enc_coll)]
 impl CreateEncryptedCollection<'_> {}
 

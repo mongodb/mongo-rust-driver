@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bson::{Bson, Document};
-use mongodb_internal_macros::{export_doc, option_setters_2, options_doc};
+use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use crate::{
     coll::options::DistinctOptions,
@@ -61,7 +61,7 @@ pub struct Distinct<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(crate::coll::options::DistinctOptions)]
+#[option_setters(crate::coll::options::DistinctOptions)]
 #[export_doc(distinct)]
 impl<'a> Distinct<'a> {
     /// Use the provided session when running the operation.
