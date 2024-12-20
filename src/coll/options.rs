@@ -132,6 +132,7 @@ pub struct InsertOneOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[export_tokens]
 pub struct InsertManyOptions {
     /// Opt out of document-level validation.
     pub bypass_document_validation: Option<bool>,
