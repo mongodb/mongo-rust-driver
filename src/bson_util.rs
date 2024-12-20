@@ -158,13 +158,14 @@ fn num_decimal_digits(mut n: usize) -> usize {
 
 /// Read a document's raw BSON bytes from the provided reader.
 pub(crate) fn read_document_bytes<R: Read>(mut reader: R) -> Result<Vec<u8>> {
-    let length = reader.read_i32_sync()?;
+    let length = Checked::new(reader.read_i32_sync()?);
 
-    let mut bytes = Vec::with_capacity(Checked::new(length).try_into()?);
-    // this is safe because the Checked::try_into would fail above if length was negative
-    bytes.write_all(&length.to_le_bytes())?;
+    let mut bytes = Vec::with_capacity(length.try_into()?);
+    bytes.write_all(&length.try_into::<u32>()?.to_le_bytes())?;
 
-    reader.take(length as u64 - 4).read_to_end(&mut bytes)?;
+    reader
+        .take((length - 4).try_into()?)
+        .read_to_end(&mut bytes)?;
 
     Ok(bytes)
 }

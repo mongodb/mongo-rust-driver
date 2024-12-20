@@ -391,6 +391,7 @@ impl TopologyDescription {
             }
         }
         if let Some(max) = self.srv_max_hosts {
+            // max is u32, so this is safe.
             let max = max as usize;
             if max > 0 && max < self.servers.len() + new.len() {
                 new = choose_n(&new, max.saturating_sub(self.servers.len()))

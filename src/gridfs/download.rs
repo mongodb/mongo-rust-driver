@@ -201,6 +201,7 @@ async fn get_bytes(
 
         let expected_len =
             FilesCollectionDocument::expected_chunk_length_from_vals(file_len, chunk_size_bytes, n);
+        // expected_len is u32, so we can safely cast it to usize
         if chunk_bytes.len() != (expected_len as usize) {
             return Err(ErrorKind::GridFs(GridFsErrorKind::WrongSizeChunk {
                 actual_size: chunk_bytes.len(),
