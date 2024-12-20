@@ -1,7 +1,5 @@
 use std::{collections::HashMap, marker::PhantomData};
 
-use mongodb_internal_macros::{option_setters_2, options_doc};
-
 use crate::{
     bson::{Bson, Document},
     error::{BulkWriteError, Error, ErrorKind, Result},
@@ -12,7 +10,7 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_impl, deeplink};
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc};
 
 impl Client {
     /// Executes the provided list of write operations.
@@ -28,7 +26,7 @@ impl Client {
     ///
     /// Bulk write is only available on MongoDB 8.0+.
     #[deeplink]
-    #[options_doc(bulk_write_setters)]
+    #[options_doc(bulk_write)]
     pub fn bulk_write(
         &self,
         models: impl IntoIterator<Item = impl Into<WriteModel>>,
@@ -56,7 +54,7 @@ impl crate::sync::Client {
     ///
     /// Bulk write is only available on MongoDB 8.0+.
     #[deeplink]
-    #[options_doc(bulk_write_setters, sync)]
+    #[options_doc(bulk_write, sync)]
     pub fn bulk_write(
         &self,
         models: impl IntoIterator<Item = impl Into<WriteModel>>,
@@ -89,11 +87,8 @@ impl<'a> BulkWrite<'a, SummaryBulkWriteResult> {
     }
 }
 
-#[option_setters_2(
-    source = crate::client::options::BulkWriteOptions,
-    doc_name = bulk_write_setters,
-    extra = [verbose_results]
-)]
+#[option_setters(crate::client::options::BulkWriteOptions)]
+#[export_doc(bulk_write, extra = [verbose_results])]
 impl<'a, R> BulkWrite<'a, R>
 where
     R: BulkWriteResult,

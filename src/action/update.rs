@@ -11,7 +11,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, deeplink, option_setters, CollRef};
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc, CollRef};
 
 impl<T> Collection<T>
 where
@@ -26,6 +26,7 @@ where
     ///
     /// `await` will return d[`Result<UpdateResult>`].
     #[deeplink]
+    #[options_doc(update)]
     pub fn update_many(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         Update {
             coll: CollRef::new(self),
@@ -51,6 +52,7 @@ where
     ///
     /// `await` will return d[`Result<UpdateResult>`].
     #[deeplink]
+    #[options_doc(update)]
     pub fn update_one(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         Update {
             coll: CollRef::new(self),
@@ -77,6 +79,7 @@ where
     ///
     /// [`run`](Update::run) will return d[`Result<UpdateResult>`].
     #[deeplink]
+    #[options_doc(update, sync)]
     pub fn update_many(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         self.async_collection.update_many(query, update)
     }
@@ -95,6 +98,7 @@ where
     ///
     /// [`run`](Update::run) will return d[`Result<UpdateResult>`].
     #[deeplink]
+    #[options_doc(update, sync)]
     pub fn update_one(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
         self.async_collection.update_one(query, update)
     }
@@ -112,19 +116,9 @@ pub struct Update<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
+#[option_setters(crate::coll::options::UpdateOptions)]
+#[export_doc(update)]
 impl<'a> Update<'a> {
-    option_setters!(options: UpdateOptions;
-        array_filters: Vec<Document>,
-        bypass_document_validation: bool,
-        upsert: bool,
-        collation: Collation,
-        hint: Hint,
-        write_concern: WriteConcern,
-        let_vars: Document,
-        comment: Bson,
-        sort: Document,
-    );
-
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());

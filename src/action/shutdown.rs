@@ -1,5 +1,7 @@
 use crate::Client;
 
+use super::{export_doc, options_doc};
+
 impl Client {
     /// Shut down this `Client`, terminating background thread workers and closing connections.
     /// Using this method is not required under most circumstances (resources will be cleaned up in
@@ -54,6 +56,7 @@ impl Client {
     /// `GridFsUploadStream`.
     ///
     /// `await` will return `()`.
+    #[options_doc(shutdown)]
     pub fn shutdown(self) -> Shutdown {
         Shutdown {
             client: self,
@@ -117,6 +120,7 @@ impl crate::sync::Client {
     /// `GridFsUploadStream`.
     ///
     /// [`run`](Shutdown::run) will return `()`.
+    #[options_doc(shutdown, sync)]
     pub fn shutdown(self) -> Shutdown {
         self.async_client.shutdown()
     }
@@ -130,6 +134,7 @@ pub struct Shutdown {
     pub(crate) immediate: bool,
 }
 
+#[export_doc(shutdown)]
 impl Shutdown {
     /// If `true`, execution will not wait for pending resources to be cleaned up,
     /// which may cause both client-side errors and server-side resource leaks.  Defaults to

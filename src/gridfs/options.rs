@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use macro_magic::export_tokens;
 use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
@@ -34,9 +35,10 @@ pub struct GridFsBucketOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct GridFsUploadOptions {
     /// The number of bytes per chunk of this file. Defaults to the `chunk_size_bytes` specified
-    /// in the [`GridFsBucketOptions`].
+    /// in the [`GridFsBucketOptions`](crate::options::GridFsBucketOptions).
     pub chunk_size_bytes: Option<u32>,
 
     /// User data for the 'metadata' field of the files collection document.
@@ -48,6 +50,7 @@ pub struct GridFsUploadOptions {
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct GridFsDownloadByNameOptions {
     /// Which revision (documents with the same filename and different `upload_date`s)
     /// of the file to retrieve. Defaults to -1 (the most recent revision).
@@ -68,6 +71,7 @@ pub struct GridFsDownloadByNameOptions {
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct GridFsFindOptions {
     /// Enables writing to temporary files on the server. When set to true, the
     /// server can write temporary data to disk while executing the find operation
@@ -110,6 +114,7 @@ impl From<GridFsFindOptions> for FindOptions {
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct GridFsFindOneOptions {
     /// The maximum amount of time to allow the query to run.
     pub max_time: Option<Duration>,

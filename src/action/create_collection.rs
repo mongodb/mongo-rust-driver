@@ -1,5 +1,4 @@
 use bson::{Bson, Document};
-use mongodb_internal_macros::{option_setters_2, options_doc};
 use std::time::Duration;
 
 use crate::{
@@ -18,7 +17,7 @@ use crate::{
     Database,
 };
 
-use crate::action::deeplink;
+use super::{deeplink, export_doc, option_setters, options_doc};
 
 impl Database {
     /// Creates a new collection in the database with the given `name`.
@@ -28,7 +27,7 @@ impl Database {
     ///
     /// `await` will return d[`Result<()>`].
     #[deeplink]
-    #[options_doc(create_coll_setters)]
+    #[options_doc(create_coll)]
     pub fn create_collection(&self, name: impl Into<String>) -> CreateCollection {
         CreateCollection {
             db: self,
@@ -48,7 +47,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](CreateCollection::run) will return d[`Result<()>`].
     #[deeplink]
-    #[options_doc(create_coll_setters, sync)]
+    #[options_doc(create_coll, sync)]
     pub fn create_collection(&self, name: impl Into<String>) -> CreateCollection {
         self.async_database.create_collection(name)
     }
@@ -63,10 +62,8 @@ pub struct CreateCollection<'a> {
     pub(crate) session: Option<&'a mut ClientSession>,
 }
 
-#[option_setters_2(
-    source = crate::db::options::CreateCollectionOptions,
-    doc_name = create_coll_setters
-)]
+#[option_setters(crate::db::options::CreateCollectionOptions)]
+#[export_doc(create_coll)]
 impl<'a> CreateCollection<'a> {
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {

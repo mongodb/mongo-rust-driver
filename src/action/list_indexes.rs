@@ -17,7 +17,9 @@ use crate::{
 use super::{
     action_impl,
     deeplink,
+    export_doc,
     option_setters,
+    options_doc,
     CollRef,
     ExplicitSession,
     ImplicitSession,
@@ -34,6 +36,7 @@ where
     /// `await` will return d[`Result<Cursor<IndexModel>>`] (or
     /// d[`Result<SessionCursor<IndexModel>>`] if a `ClientSession` is provided).
     #[deeplink]
+    #[options_doc(list_indexes)]
     pub fn list_indexes(&self) -> ListIndexes {
         ListIndexes {
             coll: CollRef::new(self),
@@ -47,6 +50,7 @@ where
     ///
     /// `await` will return d[`Result<Vec<String>>`].
     #[deeplink]
+    #[options_doc(list_indexes)]
     pub fn list_index_names(&self) -> ListIndexes<ListNames> {
         ListIndexes {
             coll: CollRef::new(self),
@@ -67,6 +71,7 @@ where
     /// [`run`](ListIndexes::run) will return d[`Result<crate::sync::Cursor<IndexModel>>`] (or
     /// d[`Result<crate::sync::SessionCursor<IndexModel>>`] if a `ClientSession` is provided).
     #[deeplink]
+    #[options_doc(list_indexes, sync)]
     pub fn list_indexes(&self) -> ListIndexes {
         self.async_collection.list_indexes()
     }
@@ -75,6 +80,7 @@ where
     ///
     /// [`run`](ListIndexes::run) will return d[`Result<Vec<String>>`].
     #[deeplink]
+    #[options_doc(list_indexes, sync)]
     pub fn list_index_names(&self) -> ListIndexes<ListNames> {
         self.async_collection.list_index_names()
     }
@@ -90,13 +96,9 @@ pub struct ListIndexes<'a, Mode = ListSpecifications, Session = ImplicitSession>
     _mode: PhantomData<Mode>,
 }
 
-impl<Mode, Session> ListIndexes<'_, Mode, Session> {
-    option_setters!(options: ListIndexesOptions;
-        max_time: Duration,
-        batch_size: u32,
-        comment: Bson,
-    );
-}
+#[option_setters(crate::coll::options::ListIndexesOptions)]
+#[export_doc(list_indexes, extra = [session])]
+impl<Mode, Session> ListIndexes<'_, Mode, Session> {}
 
 impl<'a, Mode> ListIndexes<'a, Mode, ImplicitSession> {
     /// Use the provided session when running the operation.

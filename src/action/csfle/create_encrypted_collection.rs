@@ -1,9 +1,21 @@
+use std::time::Duration;
+
 use bson::{doc, Bson, Document};
 
-use super::super::{action_impl, option_setters};
 use crate::{
+    action::{action_impl, export_doc, option_setters, options_doc},
     client_encryption::{ClientEncryption, MasterKey},
-    db::options::CreateCollectionOptions,
+    collation::Collation,
+    concern::WriteConcern,
+    db::options::{
+        ChangeStreamPreAndPostImages,
+        ClusteredIndex,
+        CreateCollectionOptions,
+        IndexOptionDefaults,
+        TimeseriesOptions,
+        ValidationAction,
+        ValidationLevel,
+    },
     error::{Error, Result},
     Database,
 };
@@ -18,6 +30,7 @@ impl ClientEncryption {
     ///
     /// Does not affect any auto encryption settings on existing MongoClients that are already
     /// configured with auto encryption.
+    #[options_doc(create_enc_coll)]
     pub fn create_encrypted_collection<'a>(
         &'a self,
         db: &'a Database,
@@ -45,28 +58,9 @@ pub struct CreateEncryptedCollection<'a> {
     options: Option<CreateCollectionOptions>,
 }
 
-impl CreateEncryptedCollection<'_> {
-    option_setters!(options: CreateCollectionOptions;
-        capped: bool,
-        size: u64,
-        max: u64,
-        storage_engine: Document,
-        validator: Document,
-        validation_level: crate::db::options::ValidationLevel,
-        validation_action: crate::db::options::ValidationAction,
-        view_on: String,
-        pipeline: Vec<Document>,
-        collation: crate::collation::Collation,
-        write_concern: crate::options::WriteConcern,
-        index_option_defaults: crate::db::options::IndexOptionDefaults,
-        timeseries: crate::db::options::TimeseriesOptions,
-        expire_after_seconds: std::time::Duration,
-        change_stream_pre_and_post_images: crate::db::options::ChangeStreamPreAndPostImages,
-        clustered_index: crate::db::options::ClusteredIndex,
-        comment: bson::Bson,
-        encrypted_fields: Document,
-    );
-}
+#[option_setters(crate::db::options::CreateCollectionOptions)]
+#[export_doc(create_enc_coll)]
+impl CreateEncryptedCollection<'_> {}
 
 #[action_impl]
 impl<'a> Action for CreateEncryptedCollection<'a> {

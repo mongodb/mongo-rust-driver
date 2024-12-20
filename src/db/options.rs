@@ -285,6 +285,7 @@ pub enum TimeseriesGranularity {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct DropDatabaseOptions {
     /// The write concern for the operation.
     pub write_concern: Option<WriteConcern>,
@@ -297,6 +298,7 @@ pub struct DropDatabaseOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct ListCollectionsOptions {
     /// The number of documents the server should return per cursor batch.
     ///
@@ -332,6 +334,7 @@ pub struct ListCollectionsOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct ListDatabasesOptions {
     /// Determines which databases to return based on the user's access privileges. This option is
     /// only supported on server versions 4.0.5+.
@@ -362,6 +365,7 @@ pub struct ChangeStreamPreAndPostImages {
 #[derive(Clone, Debug, Default, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct RunCommandOptions {
     /// The default read preference for operations.
     pub selection_criteria: Option<SelectionCriteria>,
@@ -374,6 +378,7 @@ pub struct RunCommandOptions {
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
 #[non_exhaustive]
+#[export_tokens]
 pub struct RunCursorCommandOptions {
     /// The default read preference for operations.
     pub selection_criteria: Option<SelectionCriteria>,

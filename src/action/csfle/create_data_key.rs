@@ -1,6 +1,9 @@
-use crate::client_encryption::{ClientEncryption, MasterKey};
+use macro_magic::export_tokens;
 
-use super::super::{deeplink, option_setters};
+use crate::{
+    action::{deeplink, export_doc, option_setters, options_doc},
+    client_encryption::{ClientEncryption, MasterKey},
+};
 
 impl ClientEncryption {
     /// Creates a new key document and inserts into the key vault collection.
@@ -8,6 +11,7 @@ impl ClientEncryption {
     /// `await` will return d[`Result<Binary>`] (subtype 0x04) with the _id of the created
     /// document as a UUID.
     #[deeplink]
+    #[options_doc(create_data_keys)]
     pub fn create_data_key(&self, master_key: impl Into<MasterKey>) -> CreateDataKey {
         CreateDataKey {
             client_enc: self,
@@ -33,6 +37,7 @@ pub struct CreateDataKey<'a> {
 /// Options for creating a data key.
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
+#[export_tokens]
 pub struct DataKeyOptions {
     /// An optional list of alternate names that can be used to reference the key.
     pub key_alt_names: Option<Vec<String>>,
@@ -42,12 +47,9 @@ pub struct DataKeyOptions {
     pub key_material: Option<Vec<u8>>,
 }
 
+#[option_setters(DataKeyOptions)]
+#[export_doc(create_data_keys)]
 impl CreateDataKey<'_> {
-    option_setters! { options: DataKeyOptions;
-        key_alt_names: Vec<String>,
-        key_material: Vec<u8>,
-    }
-
     #[cfg(test)]
     pub(crate) fn test_kms_provider(mut self, value: mongocrypt::ctx::KmsProvider) -> Self {
         self.test_kms_provider = Some(value);

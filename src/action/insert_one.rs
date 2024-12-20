@@ -13,7 +13,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, deeplink, option_setters, CollRef};
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc, CollRef};
 
 impl<T: Serialize + Send + Sync> Collection<T> {
     /// Inserts `doc` into the collection.
@@ -28,6 +28,7 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     ///
     /// `await` will return d[`Result<InsertOneResult>`].
     #[deeplink]
+    #[options_doc(insert_one)]
     pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
         InsertOne {
             coll: CollRef::new(self),
@@ -52,6 +53,7 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](InsertOne::run) will return d[`Result<InsertOneResult>`].
     #[deeplink]
+    #[options_doc(insert_one, sync)]
     pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
         self.async_collection.insert_one(doc)
     }
@@ -66,13 +68,9 @@ pub struct InsertOne<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
+#[option_setters(crate::coll::options::InsertOneOptions)]
+#[export_doc(insert_one)]
 impl<'a> InsertOne<'a> {
-    option_setters! { options: InsertOneOptions;
-        bypass_document_validation: bool,
-        write_concern: WriteConcern,
-        comment: Bson,
-    }
-
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
