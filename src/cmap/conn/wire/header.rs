@@ -1,10 +1,15 @@
+use std::io::Cursor;
+use byteorder::{ReadBytesExt, LittleEndian};
 use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
-
 use crate::error::{ErrorKind, Result};
+
+#[cfg(feature = "fuzzing")]
+use arbitrary::Arbitrary;
 
 /// The wire protocol op codes.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum OpCode {
+#[cfg_attr(feature = "fuzzing", derive(Arbitrary))]
+pub enum OpCode {
     Reply = 1,
     Query = 2004,
     Message = 2013,
@@ -13,7 +18,7 @@ pub(crate) enum OpCode {
 
 impl OpCode {
     /// Attempt to infer the op code based on the numeric value.
-    fn from_i32(i: i32) -> Result<Self> {
+    pub fn from_i32(i: i32) -> Result<Self> {
         match i {
             1 => Ok(OpCode::Reply),
             2004 => Ok(OpCode::Query),
@@ -28,8 +33,9 @@ impl OpCode {
 }
 
 /// The header for any wire protocol message.
-#[derive(Debug)]
-pub(crate) struct Header {
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "fuzzing", derive(Arbitrary))]
+pub struct Header {
     pub length: i32,
     pub request_id: i32,
     pub response_to: i32,
@@ -37,9 +43,50 @@ pub(crate) struct Header {
 }
 
 impl Header {
+    #[cfg(feature = "fuzzing")]
+    pub const LENGTH: usize = 4 * std::mem::size_of::<i32>();
+
+    #[cfg(not(feature = "fuzzing"))]
     pub(crate) const LENGTH: usize = 4 * std::mem::size_of::<i32>();
 
-    /// Serializes the Header and writes the bytes to `w`.
+    #[cfg(feature = "fuzzing")]
+    pub fn from_slice(data: &[u8]) -> Result<Self> {
+        if data.len() < Self::LENGTH {
+            return Err(ErrorKind::InvalidResponse {
+                message: format!(
+                    "Header requires {} bytes but only got {}",
+                    Self::LENGTH,
+                    data.len()
+                ),
+            }
+            .into());
+        }
+        let mut cursor = Cursor::new(data);
+
+        let length = ReadBytesExt::read_i32::<LittleEndian>(&mut cursor).map_err(|e| ErrorKind::InvalidResponse {
+            message: format!("Failed to read length: {}", e),
+        })?;
+
+        let request_id = ReadBytesExt::read_i32::<LittleEndian>(&mut cursor).map_err(|e| ErrorKind::InvalidResponse {
+            message: format!("Failed to read request_id: {}", e),
+        })?;
+
+        let response_to = ReadBytesExt::read_i32::<LittleEndian>(&mut cursor).map_err(|e| ErrorKind::InvalidResponse {
+            message: format!("Failed to read response_to: {}", e),
+        })?;
+
+        let op_code = OpCode::from_i32(ReadBytesExt::read_i32::<LittleEndian>(&mut cursor).map_err(|e| ErrorKind::InvalidResponse {
+            message: format!("Failed to read op_code: {}", e),
+        })?)?;
+
+        Ok(Self {
+            length,
+            request_id,
+            response_to,
+            op_code,
+        })
+    }
+
     pub(crate) async fn write_to<W: AsyncWrite + Unpin>(&self, stream: &mut W) -> Result<()> {
         stream.write_all(&self.length.to_le_bytes()).await?;
         stream.write_all(&self.request_id.to_le_bytes()).await?;
@@ -51,7 +98,6 @@ impl Header {
         Ok(())
     }
 
-    /// Reads bytes from `r` and deserializes them into a header.
     pub(crate) async fn read_from<R: tokio::io::AsyncRead + Unpin + Send>(
         reader: &mut R,
     ) -> Result<Self> {

@@ -1,6 +1,11 @@
 mod command;
 pub(crate) mod pooled;
 mod stream_description;
+
+#[cfg(feature = "fuzzing")]
+pub mod wire;
+
+#[cfg(not(feature = "fuzzing"))]
 pub(crate) mod wire;
 
 use std::{sync::Arc, time::Instant};

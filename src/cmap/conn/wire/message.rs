@@ -1,57 +1,99 @@
 use std::io::Read;
 
-use bitflags::bitflags;
-use bson::{doc, Array, Document};
+use bson::{doc, Array, Document, RawDocumentBuf};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
-use crate::options::Compressor;
+#[cfg(feature = "fuzzing")]
+use arbitrary::Arbitrary;
+
+#[cfg(feature = "fuzzing")]
+use crate::fuzz::{
+    message_flags::MessageFlags,
+    raw_document::{FuzzDocumentSequenceImpl, FuzzRawDocumentImpl},
+};
+
+#[cfg(not(feature = "fuzzing"))]
+use bitflags::bitflags;
+
+#[cfg(not(feature = "fuzzing"))]
+bitflags::bitflags! {
+    pub struct MessageFlags: u32 {
+        const NONE = 0;
+        const CHECKSUM_PRESENT = 0x04;
+        const MORE_TO_COME = 0x02;
+        const EXHAUST_ALLOWED = 0x10000;
+    }
+}
+
 use crate::{
-    bson::RawDocumentBuf,
     bson_util,
     checked::Checked,
-    cmap::{conn::wire::util::SyncCountReader, Command},
+    cmap::conn::{
+        wire::{header::Header, header::OpCode, next_request_id, util::SyncCountReader},
+        Command,
+    },
     compression::decompress::decompress_message,
     error::{Error, ErrorKind, Result},
-    runtime::SyncLittleEndianRead,
 };
 
-use super::{
-    header::{Header, OpCode},
-    next_request_id,
-};
+#[cfg(feature = "fuzzing")]
+fn generate_raw_document(u: &mut arbitrary::Unstructured) -> arbitrary::Result<RawDocumentBuf> {
+    let doc = FuzzRawDocumentImpl::arbitrary(u)?;
+    Ok(doc.into())
+}
+
+#[cfg(feature = "fuzzing")]
+fn generate_document_sequences(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Vec<DocumentSequence>> {
+    let seq = FuzzDocumentSequenceImpl::arbitrary(u)?;
+    Ok(vec![DocumentSequence {
+        identifier: String::arbitrary(u)?,
+        documents: seq.0.into_iter().map(Into::into).collect(),
+    }])
+}
+
+const DEFAULT_MAX_MESSAGE_SIZE_BYTES: i32 = 48 * 1024 * 1024;
 
 /// Represents an OP_MSG wire protocol operation.
-#[derive(Debug)]
-pub(crate) struct Message {
-    /// OP_MSG payload type 0.
-    pub(crate) document_payload: RawDocumentBuf,
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "fuzzing", derive(Arbitrary))]
+pub struct Message {
+    /// OP_MSG flags
+    pub flags: MessageFlags,
 
-    /// OP_MSG payload type 1.
-    pub(crate) document_sequences: Vec<DocumentSequence>,
+    /// OP_MSG payload type 0 (the main document)
+    #[cfg_attr(feature = "fuzzing", arbitrary(with = generate_raw_document))]
+    pub document_payload: RawDocumentBuf,
 
-    pub(crate) response_to: i32,
+    /// OP_MSG payload type 1 (document sequences)
+    #[cfg_attr(feature = "fuzzing", arbitrary(with = generate_document_sequences))]
+    pub document_sequences: Vec<DocumentSequence>,
 
-    pub(crate) flags: MessageFlags,
+    /// Optional CRC32C checksum
+    pub checksum: Option<u32>,
 
-    pub(crate) checksum: Option<u32>,
+    /// Request ID for the message
+    pub request_id: Option<i32>,
 
-    pub(crate) request_id: Option<i32>,
+    /// Response to request ID
+    pub response_to: i32,
 
-    /// Whether the message should be compressed by the driver.
+    /// Whether the message should be compressed
     #[cfg(any(
         feature = "zstd-compression",
         feature = "zlib-compression",
         feature = "snappy-compression"
     ))]
-    pub(crate) should_compress: bool,
+    pub should_compress: bool,
 }
 
 #[derive(Clone, Debug)]
+#[cfg(feature = "fuzzing")]
+pub struct DocumentSequence {
+    pub identifier: String,
+    pub documents: Vec<RawDocumentBuf>,
+}
+
+#[cfg(not(feature = "fuzzing"))]
 pub(crate) struct DocumentSequence {
     pub(crate) identifier: String,
     pub(crate) documents: Vec<RawDocumentBuf>,
@@ -77,7 +119,7 @@ impl TryFrom<Command> for Message {
 
         Ok(Self {
             document_payload,
-            document_sequences: command.document_sequences,
+            document_sequences: command.document_sequences.into_iter().map(Into::into).collect(),
             response_to: 0,
             flags,
             checksum: None,
@@ -92,7 +134,41 @@ impl TryFrom<Command> for Message {
     }
 }
 
+#[cfg(feature = "fuzzing")]
+impl From<FuzzDocumentSequenceImpl> for Vec<DocumentSequence> {
+    fn from(seq: FuzzDocumentSequenceImpl) -> Self {
+        vec![DocumentSequence {
+            identifier: "documents".to_string(),
+            documents: seq.0.into_iter().map(Into::into).collect(),
+        }]
+    }
+}
+
 impl Message {
+    #[cfg(feature = "fuzzing")]
+    pub fn read_from_slice(data: &[u8], header: Header) -> Result<Self> {
+        if data.len() < Header::LENGTH {
+            return Err(ErrorKind::InvalidResponse {
+                message: format!("Message data too short: {} bytes", data.len()),
+            }
+            .into());
+        }
+        let data = &data[Header::LENGTH..];
+        if header.op_code == OpCode::Message {
+            return Self::read_op_common(data, data.len(), &header);
+        }
+        Err(Error::new(
+            ErrorKind::InvalidResponse {
+                message: format!(
+                    "Invalid op code for fuzzing, expected {} but got {}",
+                    OpCode::Message as u32,
+                    header.op_code as u32
+                ),
+            },
+            Option::<Vec<String>>::None,
+        ))
+    }
+
     /// Gets this message's command as a Document. If serialization fails, returns a document
     /// containing the error.
     pub(crate) fn get_command_document(&self) -> Document {
@@ -166,6 +242,8 @@ impl Message {
         mut reader: T,
         header: &Header,
     ) -> Result<Self> {
+        use crate::runtime::SyncLittleEndianRead;
+
         let length = Checked::<usize>::try_from(header.length)?;
         let length_remaining = length - Header::LENGTH;
         let mut buffer = vec![0u8; length_remaining.get()?];
@@ -208,6 +286,7 @@ impl Message {
     }
 
     fn read_op_common(mut reader: &[u8], length_remaining: usize, header: &Header) -> Result<Self> {
+        use crate::runtime::SyncLittleEndianRead;
         let mut length_remaining = Checked::new(length_remaining);
         let flags = MessageFlags::from_bits_truncate(reader.read_u32_sync()?);
         length_remaining -= std::mem::size_of::<u32>();
@@ -383,16 +462,10 @@ impl Message {
     }
 }
 
-const DEFAULT_MAX_MESSAGE_SIZE_BYTES: i32 = 48 * 1024 * 1024;
 
-bitflags! {
-    /// Represents the bitwise flags for an OP_MSG as defined in the spec.
-    pub(crate) struct MessageFlags: u32 {
-        const CHECKSUM_PRESENT = 0b_0000_0000_0000_0000_0000_0000_0000_0001;
-        const MORE_TO_COME     = 0b_0000_0000_0000_0000_0000_0000_0000_0010;
-        const EXHAUST_ALLOWED  = 0b_0000_0000_0000_0001_0000_0000_0000_0000;
-    }
-}
+
+
+
 
 /// Represents a section as defined by the OP_MSG spec.
 #[derive(Debug)]
@@ -403,7 +476,8 @@ enum MessageSection {
 
 impl MessageSection {
     /// Reads bytes from `reader` and deserializes them into a MessageSection.
-    fn read<R: Read>(reader: &mut R) -> Result<Self> {
+    fn read<R: Read>(reader: &mut SyncCountReader<R>) -> Result<Self> {
+        use crate::runtime::SyncLittleEndianRead;
         let payload_type = reader.read_u8_sync()?;
 
         if payload_type == 0 {

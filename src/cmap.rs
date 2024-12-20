@@ -1,7 +1,12 @@
 #[cfg(test)]
 pub(crate) mod test;
 
+#[cfg(feature = "fuzzing")]
+pub mod conn;
+
+#[cfg(not(feature = "fuzzing"))]
 pub(crate) mod conn;
+
 mod connection_requester;
 pub(crate) mod establish;
 mod manager;

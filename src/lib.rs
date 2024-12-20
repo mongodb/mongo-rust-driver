@@ -26,8 +26,11 @@ mod bson_util;
 pub mod change_stream;
 pub(crate) mod checked;
 mod client;
+#[cfg(feature = "fuzzing")]
+pub mod cmap;
+#[cfg(not(feature = "fuzzing"))]
 mod cmap;
-mod coll;
+pub mod coll;
 mod collation;
 mod compression;
 mod concern;
@@ -53,6 +56,8 @@ pub mod sync;
 mod test;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
+#[cfg(feature = "fuzzing")]
+pub mod fuzz;
 pub(crate) mod tracking_arc;
 
 #[cfg(feature = "in-use-encryption")]
