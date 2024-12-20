@@ -2,7 +2,16 @@ use std::marker::PhantomData;
 
 use bson::{doc, Document};
 
-use super::{action_impl, deeplink, option_setters, CollRef, Multiple, Single};
+use super::{
+    action_impl,
+    deeplink,
+    export_doc,
+    option_setters_2,
+    options_doc,
+    CollRef,
+    Multiple,
+    Single,
+};
 use crate::{
     coll::options::AggregateOptions,
     error::{Error, Result},
@@ -26,6 +35,7 @@ where
     ///
     /// `await` will return d[`Result<Vec<String>>`].
     #[deeplink]
+    #[options_doc(create_search_index)]
     pub fn create_search_indexes(
         &self,
         models: impl IntoIterator<Item = SearchIndexModel>,
@@ -42,6 +52,7 @@ where
     ///
     /// `await` will return d[`Result<String>`].
     #[deeplink]
+    #[options_doc(create_search_index)]
     pub fn create_search_index(&self, model: SearchIndexModel) -> CreateSearchIndex<Single> {
         CreateSearchIndex {
             coll: CollRef::new(self),
@@ -54,6 +65,7 @@ where
     /// Updates the search index with the given name to use the provided definition.
     ///
     /// `await` will return [`Result<()>`].
+    #[options_doc(update_search_index)]
     pub fn update_search_index(
         &self,
         name: impl Into<String>,
@@ -70,6 +82,7 @@ where
     /// Drops the search index with the given name.
     ///
     /// `await` will return [`Result<()>`].
+    #[options_doc(drop_search_index)]
     pub fn drop_search_index(&self, name: impl Into<String>) -> DropSearchIndex {
         DropSearchIndex {
             coll: CollRef::new(self),
@@ -85,6 +98,7 @@ where
     ///
     /// `await` will return d[`Result<Cursor<Document>>`].
     #[deeplink]
+    #[options_doc(list_search_indexes)]
     pub fn list_search_indexes(&self) -> ListSearchIndexes {
         ListSearchIndexes {
             coll: CollRef::new(self),
@@ -104,6 +118,7 @@ where
     ///
     /// [`run`](CreateSearchIndex::run) will return d[`Result<Vec<String>>`].
     #[deeplink]
+    #[options_doc(create_search_index, sync)]
     pub fn create_search_indexes(
         &self,
         models: impl IntoIterator<Item = SearchIndexModel>,
@@ -115,6 +130,7 @@ where
     ///
     /// [`run`](CreateSearchIndex::run) will return d[`Result<String>`].
     #[deeplink]
+    #[options_doc(create_search_index, sync)]
     pub fn create_search_index(&self, model: SearchIndexModel) -> CreateSearchIndex<Single> {
         self.async_collection.create_search_index(model)
     }
@@ -122,6 +138,7 @@ where
     /// Updates the search index with the given name to use the provided definition.
     ///
     /// [`run`](UpdateSearchIndex::run) will return [`Result<()>`].
+    #[options_doc(update_search_index, sync)]
     pub fn update_search_index(
         &self,
         name: impl Into<String>,
@@ -133,6 +150,7 @@ where
     /// Drops the search index with the given name.
     ///
     /// [`run`](DropSearchIndex::run) will return [`Result<()>`].
+    #[options_doc(drop_search_index, sync)]
     pub fn drop_search_index(&self, name: impl Into<String>) -> DropSearchIndex {
         self.async_collection.drop_search_index(name)
     }
@@ -144,6 +162,7 @@ where
     ///
     /// [`run`](ListSearchIndexes::run) will return d[`Result<crate::sync::Cursor<Document>>`].
     #[deeplink]
+    #[options_doc(list_search_indexes, sync)]
     pub fn list_search_indexes(&self) -> ListSearchIndexes {
         self.async_collection.list_search_indexes()
     }
@@ -159,10 +178,9 @@ pub struct CreateSearchIndex<'a, Mode> {
     _mode: PhantomData<Mode>,
 }
 
-impl<Mode> CreateSearchIndex<'_, Mode> {
-    option_setters! { options: CreateSearchIndexOptions;
-    }
-}
+#[option_setters_2(crate::search_index::options::CreateSearchIndexOptions)]
+#[export_doc(create_search_index)]
+impl<Mode> CreateSearchIndex<'_, Mode> {}
 
 #[action_impl]
 impl<'a> Action for CreateSearchIndex<'a, Multiple> {
@@ -201,9 +219,9 @@ pub struct UpdateSearchIndex<'a> {
     options: Option<UpdateSearchIndexOptions>,
 }
 
-impl UpdateSearchIndex<'_> {
-    option_setters! { options: UpdateSearchIndexOptions; }
-}
+#[option_setters_2(crate::search_index::options::UpdateSearchIndexOptions)]
+#[export_doc(update_search_index)]
+impl UpdateSearchIndex<'_> {}
 
 #[action_impl]
 impl<'a> Action for UpdateSearchIndex<'a> {
@@ -224,9 +242,9 @@ pub struct DropSearchIndex<'a> {
     options: Option<DropSearchIndexOptions>,
 }
 
-impl DropSearchIndex<'_> {
-    option_setters! { options: DropSearchIndexOptions; }
-}
+#[option_setters_2(crate::search_index::options::DropSearchIndexOptions)]
+#[export_doc(drop_search_index)]
+impl DropSearchIndex<'_> {}
 
 #[action_impl]
 impl<'a> Action for DropSearchIndex<'a> {
@@ -247,9 +265,9 @@ pub struct ListSearchIndexes<'a> {
     options: Option<ListSearchIndexOptions>,
 }
 
+#[option_setters_2(crate::search_index::options::ListSearchIndexOptions)]
+#[export_doc(list_search_indexes)]
 impl ListSearchIndexes<'_> {
-    option_setters! { options: ListSearchIndexOptions; }
-
     /// Get information for the named index.
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
