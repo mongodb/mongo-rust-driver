@@ -24,7 +24,7 @@ where
     ///
     /// `await` will return d[`Result<CreateIndexResult>`].
     #[deeplink]
-    #[options_doc(create_index_setters)]
+    #[options_doc(create_index)]
     pub fn create_index(&self, index: IndexModel) -> CreateIndex {
         CreateIndex {
             coll: CollRef::new(self),
@@ -39,7 +39,7 @@ where
     ///
     /// `await` will return d[`Result<CreateIndexesResult>`].
     #[deeplink]
-    #[options_doc(create_index_setters)]
+    #[options_doc(create_index)]
     pub fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
@@ -63,7 +63,7 @@ where
     ///
     /// [`run`](CreateIndex::run) will return d[`Result<CreateIndexResult>`].
     #[deeplink]
-    #[options_doc(create_index_setters, sync)]
+    #[options_doc(create_index, sync)]
     pub fn create_index(&self, index: IndexModel) -> CreateIndex {
         self.async_collection.create_index(index)
     }
@@ -72,7 +72,7 @@ where
     ///
     /// [`run`](CreateIndex::run) will return d[`Result<CreateIndexesResult>`].
     #[deeplink]
-    #[options_doc(create_index_setters, sync)]
+    #[options_doc(create_index, sync)]
     pub fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
@@ -93,7 +93,7 @@ pub struct CreateIndex<'a, M = Single> {
 }
 
 #[option_setters_2(crate::coll::options::CreateIndexOptions)]
-#[export_doc(create_index_setters)]
+#[export_doc(create_index)]
 impl<'a, M> CreateIndex<'a, M> {
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {

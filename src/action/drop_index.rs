@@ -21,7 +21,7 @@ where
     ///
     /// `await` will return d[`Result<()>`].
     #[deeplink]
-    #[options_doc(drop_index_setters)]
+    #[options_doc(drop_index)]
     pub fn drop_index(&self, name: impl AsRef<str>) -> DropIndex {
         DropIndex {
             coll: CollRef::new(self),
@@ -35,7 +35,7 @@ where
     ///
     /// `await` will return d[`Result<()>`].
     #[deeplink]
-    #[options_doc(drop_index_setters)]
+    #[options_doc(drop_index)]
     pub fn drop_indexes(&self) -> DropIndex {
         DropIndex {
             coll: CollRef::new(self),
@@ -55,7 +55,7 @@ where
     ///
     /// [`run`](DropIndex::run) will return d[`Result<()>`].
     #[deeplink]
-    #[options_doc(drop_index_setters, sync)]
+    #[options_doc(drop_index, sync)]
     pub fn drop_index(&self, name: impl AsRef<str>) -> DropIndex {
         self.async_collection.drop_index(name)
     }
@@ -64,7 +64,7 @@ where
     ///
     /// [`run`](DropIndex::run) will return d[`Result<()>`].
     #[deeplink]
-    #[options_doc(drop_index_setters, sync)]
+    #[options_doc(drop_index, sync)]
     pub fn drop_indexes(&self) -> DropIndex {
         self.async_collection.drop_indexes()
     }
@@ -81,7 +81,7 @@ pub struct DropIndex<'a> {
 }
 
 #[option_setters_2(crate::coll::options::DropIndexOptions)]
-#[export_doc(drop_index_setters)]
+#[export_doc(drop_index)]
 impl<'a> DropIndex<'a> {
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {

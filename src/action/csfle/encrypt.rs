@@ -18,7 +18,7 @@ impl ClientEncryption {
     ///
     /// `await` will return a d[`Result<Binary>`] (subtype 6) containing the encrypted value.
     #[deeplink]
-    #[options_doc(encrypt_setters)]
+    #[options_doc(encrypt)]
     pub fn encrypt(
         &self,
         value: impl Into<bson::RawBson>,
@@ -49,7 +49,7 @@ impl ClientEncryption {
     ///
     /// `await` will return a d[`Result<Document>`] containing the encrypted expression.
     #[deeplink]
-    #[options_doc(encrypt_expr_setters)]
+    #[options_doc(encrypt_expr)]
     pub fn encrypt_expression(
         &self,
         expression: RawDocumentBuf,
@@ -148,8 +148,8 @@ pub struct RangeOptions {
 }
 
 #[option_setters_2(EncryptOptions, skip = [query_type])]
-#[export_doc(encrypt_setters, extra = [query_type])]
-#[export_doc(encrypt_expr_setters)]
+#[export_doc(encrypt, extra = [query_type])]
+#[export_doc(encrypt_expr)]
 impl<Mode> Encrypt<'_, Mode> {}
 
 impl Encrypt<'_, Value> {

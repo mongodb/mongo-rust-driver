@@ -50,7 +50,7 @@ impl<T: DeserializeOwned + Send + Sync> Collection<T> {
     ///
     /// `await` will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_and_delete_setters)]
+    #[options_doc(find_one_and_delete)]
     pub fn find_one_and_delete(&self, filter: Document) -> FindOneAndDelete<'_, T> {
         FindOneAndDelete {
             coll: self,
@@ -72,7 +72,7 @@ impl<T: DeserializeOwned + Send + Sync> Collection<T> {
     ///
     /// `await` will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_and_update_setters)]
+    #[options_doc(find_one_and_update)]
     pub fn find_one_and_update(
         &self,
         filter: Document,
@@ -99,7 +99,7 @@ impl<T: Serialize + DeserializeOwned + Send + Sync> Collection<T> {
     ///
     /// `await` will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_and_replace_setters)]
+    #[options_doc(find_one_and_replace)]
     pub fn find_one_and_replace(
         &self,
         filter: Document,
@@ -126,7 +126,7 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](FindOneAndDelete::run) will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_and_delete_setters, sync)]
+    #[options_doc(find_one_and_delete, sync)]
     pub fn find_one_and_delete(&self, filter: Document) -> FindOneAndDelete<'_, T> {
         self.async_collection.find_one_and_delete(filter)
     }
@@ -143,7 +143,7 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](FindOneAndDelete::run) will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_and_update_setters, sync)]
+    #[options_doc(find_one_and_update, sync)]
     pub fn find_one_and_update(
         &self,
         filter: Document,
@@ -165,7 +165,7 @@ impl<T: Serialize + DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](FindOneAndReplace::run) will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_and_replace_setters, sync)]
+    #[options_doc(find_one_and_replace, sync)]
     pub fn find_one_and_replace(
         &self,
         filter: Document,
@@ -187,7 +187,7 @@ pub struct FindOneAndDelete<'a, T: Send + Sync> {
 }
 
 #[option_setters_2(crate::coll::options::FindOneAndDeleteOptions)]
-#[export_doc(find_one_and_delete_setters)]
+#[export_doc(find_one_and_delete)]
 impl<'a, T: Send + Sync> FindOneAndDelete<'a, T> {
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
@@ -224,7 +224,7 @@ pub struct FindOneAndUpdate<'a, T: Send + Sync> {
 }
 
 #[option_setters_2(crate::coll::options::FindOneAndUpdateOptions)]
-#[export_doc(find_one_and_update_setters)]
+#[export_doc(find_one_and_update)]
 impl<'a, T: Send + Sync> FindOneAndUpdate<'a, T> {
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
@@ -261,7 +261,7 @@ pub struct FindOneAndReplace<'a, T: Send + Sync> {
 }
 
 #[option_setters_2(crate::coll::options::FindOneAndReplaceOptions)]
-#[export_doc(find_one_and_replace_setters)]
+#[export_doc(find_one_and_replace)]
 impl<'a, T: Send + Sync> FindOneAndReplace<'a, T> {
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {

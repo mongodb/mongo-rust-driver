@@ -30,7 +30,7 @@ impl Database {
     /// returned cursor will be a [`SessionCursor`]. If [`with_type`](Aggregate::with_type) was
     /// called, the returned cursor will be generic over the `T` specified.
     #[deeplink]
-    #[options_doc(aggregate_setters)]
+    #[options_doc(aggregate)]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
             target: AggregateTargetRef::Database(self),
@@ -55,7 +55,7 @@ where
     /// returned cursor will be a [`SessionCursor`]. If [`with_type`](Aggregate::with_type) was
     /// called, the returned cursor will be generic over the `T` specified.
     #[deeplink]
-    #[options_doc(aggregate_setters)]
+    #[options_doc(aggregate)]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         Aggregate {
             target: AggregateTargetRef::Collection(CollRef::new(self)),
@@ -79,7 +79,7 @@ impl crate::sync::Database {
     /// [`crate::sync::SessionCursor`]. If [`with_type`](Aggregate::with_type) was called, the
     /// returned cursor will be generic over the `T` specified.
     #[deeplink]
-    #[options_doc(aggregate_setters, sync)]
+    #[options_doc(aggregate, sync)]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_database.aggregate(pipeline)
     }
@@ -100,7 +100,7 @@ where
     /// `crate::sync::SessionCursor`. If [`with_type`](Aggregate::with_type) was called, the
     /// returned cursor will be generic over the `T` specified.
     #[deeplink]
-    #[options_doc(aggregate_setters, sync)]
+    #[options_doc(aggregate, sync)]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_collection.aggregate(pipeline)
     }
@@ -118,7 +118,7 @@ pub struct Aggregate<'a, Session = ImplicitSession, T = Document> {
 }
 
 #[option_setters_2(crate::coll::options::AggregateOptions)]
-#[export_doc(aggregate_setters, extra = [session])]
+#[export_doc(aggregate, extra = [session])]
 impl<'a, Session, T> Aggregate<'a, Session, T> {
     /// Use the provided type for the returned cursor.
     ///

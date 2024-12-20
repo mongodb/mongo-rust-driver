@@ -14,7 +14,7 @@ impl GridFsBucket {
     ///
     /// `await` will return d[`Result<GridFsUploadStream>`].
     #[deeplink]
-    #[options_doc(open_upload_stream_setters)]
+    #[options_doc(open_upload_stream)]
     pub fn open_upload_stream(&self, filename: impl AsRef<str>) -> OpenUploadStream {
         OpenUploadStream {
             bucket: self,
@@ -32,7 +32,7 @@ impl crate::sync::gridfs::GridFsBucket {
     ///
     /// [`run`](OpenUploadStream::run) will return d[`Result<GridFsUploadStream>`].
     #[deeplink]
-    #[options_doc(open_upload_stream_setters, sync)]
+    #[options_doc(open_upload_stream, sync)]
     pub fn open_upload_stream(&self, filename: impl AsRef<str>) -> OpenUploadStream {
         self.async_bucket.open_upload_stream(filename)
     }
@@ -49,7 +49,7 @@ pub struct OpenUploadStream<'a> {
 }
 
 #[option_setters_2(crate::gridfs::options::GridFsUploadOptions)]
-#[export_doc(open_upload_stream_setters)]
+#[export_doc(open_upload_stream)]
 impl OpenUploadStream<'_> {
     /// Set the value to be used for the corresponding [`FilesCollectionDocument`]'s `id`
     /// field.  If not set, a unique [`ObjectId`] will be generated that can be accessed via the

@@ -31,7 +31,7 @@ impl ClientEncryption {
     ///
     /// Does not affect any auto encryption settings on existing MongoClients that are already
     /// configured with auto encryption.
-    #[options_doc(create_enc_coll_setters)]
+    #[options_doc(create_enc_coll)]
     pub fn create_encrypted_collection<'a>(
         &'a self,
         db: &'a Database,
@@ -60,7 +60,7 @@ pub struct CreateEncryptedCollection<'a> {
 }
 
 #[option_setters_2(crate::db::options::CreateCollectionOptions)]
-#[export_doc(create_enc_coll_setters)]
+#[export_doc(create_enc_coll)]
 impl CreateEncryptedCollection<'_> {}
 
 #[action_impl]

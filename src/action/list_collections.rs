@@ -31,7 +31,7 @@ impl Database {
     ///
     /// `await` will return d[`Result<Cursor<CollectionSpecification>>`].
     #[deeplink]
-    #[options_doc(list_collections_doc)]
+    #[options_doc(list_collections)]
     pub fn list_collections(&self) -> ListCollections {
         ListCollections {
             db: self,
@@ -45,7 +45,7 @@ impl Database {
     ///
     /// `await` will return d[`Result<Vec<String>>`].
     #[deeplink]
-    #[options_doc(list_collections_doc)]
+    #[options_doc(list_collections)]
     pub fn list_collection_names(&self) -> ListCollections<'_, ListNames> {
         ListCollections {
             db: self,
@@ -63,7 +63,7 @@ impl crate::sync::Database {
     /// [`run`](ListCollections::run) will return
     /// d[`Result<Cursor<CollectionSpecification>>`].
     #[deeplink]
-    #[options_doc(list_collections_doc, sync)]
+    #[options_doc(list_collections, sync)]
     pub fn list_collections(&self) -> ListCollections {
         self.async_database.list_collections()
     }
@@ -72,7 +72,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](ListCollections::run) will return d[`Result<Vec<String>>`].
     #[deeplink]
-    #[options_doc(list_collections_doc, sync)]
+    #[options_doc(list_collections, sync)]
     pub fn list_collection_names(&self) -> ListCollections<'_, ListNames> {
         self.async_database.list_collection_names()
     }
@@ -89,7 +89,7 @@ pub struct ListCollections<'a, M = ListSpecifications, S = ImplicitSession> {
 }
 
 #[option_setters_2(crate::db::options::ListCollectionsOptions)]
-#[export_doc(list_collections_doc, extra = [session])]
+#[export_doc(list_collections, extra = [session])]
 impl<M, S> ListCollections<'_, M, S> {}
 
 impl<'a, M> ListCollections<'a, M, ImplicitSession> {

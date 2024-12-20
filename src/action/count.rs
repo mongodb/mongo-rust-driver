@@ -32,7 +32,7 @@ where
     ///
     /// `await` will return d[`Result<u64>`].
     #[deeplink]
-    #[options_doc(estimated_doc_count_setters)]
+    #[options_doc(estimated_doc_count)]
     pub fn estimated_document_count(&self) -> EstimatedDocumentCount {
         EstimatedDocumentCount {
             cr: CollRef::new(self),
@@ -46,7 +46,7 @@ where
     ///
     /// `await` will return d[`Result<u64>`].
     #[deeplink]
-    #[options_doc(count_docs_setters)]
+    #[options_doc(count_docs)]
     pub fn count_documents(&self, filter: Document) -> CountDocuments {
         CountDocuments {
             cr: CollRef::new(self),
@@ -76,7 +76,7 @@ where
     ///
     /// [`run`](EstimatedDocumentCount::run) will return d[`Result<u64>`].
     #[deeplink]
-    #[options_doc(estimated_doc_count_setters, sync)]
+    #[options_doc(estimated_doc_count, sync)]
     pub fn estimated_document_count(&self) -> EstimatedDocumentCount {
         self.async_collection.estimated_document_count()
     }
@@ -87,7 +87,7 @@ where
     ///
     /// [`run`](CountDocuments::run) will return d[`Result<u64>`].
     #[deeplink]
-    #[options_doc(count_docs_setters, sync)]
+    #[options_doc(count_docs, sync)]
     pub fn count_documents(&self, filter: Document) -> CountDocuments {
         self.async_collection.count_documents(filter)
     }
@@ -101,7 +101,7 @@ pub struct EstimatedDocumentCount<'a> {
 }
 
 #[option_setters_2(crate::coll::options::EstimatedDocumentCountOptions)]
-#[export_doc(estimated_doc_count_setters)]
+#[export_doc(estimated_doc_count)]
 impl EstimatedDocumentCount<'_> {}
 
 #[action_impl]
@@ -125,7 +125,7 @@ pub struct CountDocuments<'a> {
 }
 
 #[option_setters_2(crate::coll::options::CountOptions)]
-#[export_doc(count_docs_setters)]
+#[export_doc(count_docs)]
 impl<'a> CountDocuments<'a> {
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {

@@ -25,7 +25,7 @@ impl<T: Send + Sync> Collection<T> {
     /// `await` will return d[`Result<Cursor<T>>`] (or d[`Result<SessionCursor<T>>`] if a session is
     /// provided).
     #[deeplink]
-    #[options_doc(find_setters)]
+    #[options_doc(find)]
     pub fn find(&self, filter: Document) -> Find<'_, T> {
         Find {
             coll: self,
@@ -41,7 +41,7 @@ impl<T: DeserializeOwned + Send + Sync> Collection<T> {
     ///
     /// `await` will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_setters)]
+    #[options_doc(find_one)]
     pub fn find_one(&self, filter: Document) -> FindOne<'_, T> {
         FindOne {
             coll: self,
@@ -59,7 +59,7 @@ impl<T: Send + Sync> crate::sync::Collection<T> {
     /// [`run`](Find::run) will return d[`Result<crate::sync::Cursor<T>>`] (or
     /// d[`Result<crate::sync::SessionCursor<T>>`] if a session is provided).
     #[deeplink]
-    #[options_doc(find_setters, sync)]
+    #[options_doc(find, sync)]
     pub fn find(&self, filter: Document) -> Find<'_, T> {
         self.async_collection.find(filter)
     }
@@ -71,7 +71,7 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](FindOne::run) will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_setters, sync)]
+    #[options_doc(find_one, sync)]
     pub fn find_one(&self, filter: Document) -> FindOne<'_, T> {
         self.async_collection.find_one(filter)
     }
@@ -87,7 +87,7 @@ pub struct Find<'a, T: Send + Sync, Session = ImplicitSession> {
 }
 
 #[option_setters_2(crate::coll::options::FindOptions)]
-#[export_doc(find_setters)]
+#[export_doc(find)]
 impl<'a, T: Send + Sync, Session> Find<'a, T, Session> {
     /// Use the provided session when running the operation.
     pub fn session<'s>(
@@ -146,7 +146,7 @@ pub struct FindOne<'a, T: Send + Sync> {
 }
 
 #[option_setters_2(crate::coll::options::FindOneOptions)]
-#[export_doc(find_one_setters)]
+#[export_doc(find_one)]
 impl<'a, T: Send + Sync> FindOne<'a, T> {
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {

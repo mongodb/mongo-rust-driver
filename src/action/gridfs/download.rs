@@ -32,7 +32,7 @@ impl GridFsBucket {
     ///
     /// `await` will return d[`Result<GridFsDownloadStream>`].
     #[deeplink]
-    #[options_doc(download_by_name_setters)]
+    #[options_doc(download_by_name)]
     pub fn open_download_stream_by_name(
         &self,
         filename: impl Into<String>,
@@ -116,7 +116,7 @@ impl crate::sync::gridfs::GridFsBucket {
     ///
     /// [`run`](OpenDownloadStreamByName::run) will return d[`Result<GridFsDownloadStream>`].
     #[deeplink]
-    #[options_doc(download_by_name_setters, sync)]
+    #[options_doc(download_by_name, sync)]
     pub fn open_download_stream_by_name(
         &self,
         filename: impl Into<String>,
@@ -155,7 +155,7 @@ pub struct OpenDownloadStreamByName<'a> {
 }
 
 #[option_setters_2(crate::gridfs::GridFsDownloadByNameOptions)]
-#[export_doc(download_by_name_setters)]
+#[export_doc(download_by_name)]
 impl OpenDownloadStreamByName<'_> {}
 
 #[action_impl(sync = crate::sync::gridfs::GridFsDownloadStream)]

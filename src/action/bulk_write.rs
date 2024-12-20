@@ -28,7 +28,7 @@ impl Client {
     ///
     /// Bulk write is only available on MongoDB 8.0+.
     #[deeplink]
-    #[options_doc(bulk_write_setters)]
+    #[options_doc(bulk_write)]
     pub fn bulk_write(
         &self,
         models: impl IntoIterator<Item = impl Into<WriteModel>>,
@@ -56,7 +56,7 @@ impl crate::sync::Client {
     ///
     /// Bulk write is only available on MongoDB 8.0+.
     #[deeplink]
-    #[options_doc(bulk_write_setters, sync)]
+    #[options_doc(bulk_write, sync)]
     pub fn bulk_write(
         &self,
         models: impl IntoIterator<Item = impl Into<WriteModel>>,
@@ -90,7 +90,7 @@ impl<'a> BulkWrite<'a, SummaryBulkWriteResult> {
 }
 
 #[option_setters_2(crate::client::options::BulkWriteOptions)]
-#[export_doc(bulk_write_setters, extra = [verbose_results])]
+#[export_doc(bulk_write, extra = [verbose_results])]
 impl<'a, R> BulkWrite<'a, R>
 where
     R: BulkWriteResult,

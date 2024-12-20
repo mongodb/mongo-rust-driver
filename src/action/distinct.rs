@@ -24,7 +24,7 @@ where
     ///
     /// `await` will return d[`Result<Vec<Bson>>`].
     #[deeplink]
-    #[options_doc(distinct_setters)]
+    #[options_doc(distinct)]
     pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
         Distinct {
             coll: CollRef::new(self),
@@ -45,7 +45,7 @@ where
     ///
     /// [`run`](Distinct::run) will return d[`Result<Vec<Bson>>`].
     #[deeplink]
-    #[options_doc(distinct_setters, sync)]
+    #[options_doc(distinct, sync)]
     pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
         self.async_collection.distinct(field_name, filter)
     }
@@ -62,7 +62,7 @@ pub struct Distinct<'a> {
 }
 
 #[option_setters_2(crate::coll::options::DistinctOptions)]
-#[export_doc(distinct_setters)]
+#[export_doc(distinct)]
 impl<'a> Distinct<'a> {
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {

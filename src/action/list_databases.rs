@@ -28,7 +28,7 @@ impl Client {
     ///
     /// `await` will return d[`Result<Vec<DatabaseSpecification>>`].
     #[deeplink]
-    #[options_doc(list_databases_setters)]
+    #[options_doc(list_databases)]
     pub fn list_databases(&self) -> ListDatabases {
         ListDatabases {
             client: self,
@@ -42,7 +42,7 @@ impl Client {
     ///
     /// `await` will return d[`Result<Vec<String>>`].
     #[deeplink]
-    #[options_doc(list_databases_setters)]
+    #[options_doc(list_databases)]
     pub fn list_database_names(&self) -> ListDatabases<'_, ListNames> {
         ListDatabases {
             client: self,
@@ -59,7 +59,7 @@ impl SyncClient {
     ///
     /// [run](ListDatabases::run) will return d[`Result<Vec<DatabaseSpecification>>`].
     #[deeplink]
-    #[options_doc(list_databases_setters, sync)]
+    #[options_doc(list_databases, sync)]
     pub fn list_databases(&self) -> ListDatabases {
         self.async_client.list_databases()
     }
@@ -68,7 +68,7 @@ impl SyncClient {
     ///
     /// [run](ListDatabases::run) will return d[`Result<Vec<String>>`].
     #[deeplink]
-    #[options_doc(list_databases_setters, sync)]
+    #[options_doc(list_databases, sync)]
     pub fn list_database_names(&self) -> ListDatabases<'_, ListNames> {
         self.async_client.list_database_names()
     }
@@ -85,7 +85,7 @@ pub struct ListDatabases<'a, M = ListSpecifications> {
 }
 
 #[option_setters_2(crate::db::options::ListDatabasesOptions)]
-#[export_doc(list_databases_setters)]
+#[export_doc(list_databases)]
 impl<'a, M> ListDatabases<'a, M> {
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {

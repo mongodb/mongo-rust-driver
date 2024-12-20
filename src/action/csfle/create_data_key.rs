@@ -11,7 +11,7 @@ impl ClientEncryption {
     /// `await` will return d[`Result<Binary>`] (subtype 0x04) with the _id of the created
     /// document as a UUID.
     #[deeplink]
-    #[options_doc(create_data_key_setters)]
+    #[options_doc(create_data_keys)]
     pub fn create_data_key(&self, master_key: impl Into<MasterKey>) -> CreateDataKey {
         CreateDataKey {
             client_enc: self,
@@ -48,7 +48,7 @@ pub struct DataKeyOptions {
 }
 
 #[option_setters_2(DataKeyOptions)]
-#[export_doc(create_data_key_setters)]
+#[export_doc(create_data_keys)]
 impl CreateDataKey<'_> {
     #[cfg(test)]
     pub(crate) fn test_kms_provider(mut self, value: mongocrypt::ctx::KmsProvider) -> Self {

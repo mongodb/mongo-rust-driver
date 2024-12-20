@@ -16,7 +16,7 @@ impl GridFsBucket {
     ///
     /// `await` will return d[`Result<Cursor<FilesCollectionDocument>>`].
     #[deeplink]
-    #[options_doc(find_setters)]
+    #[options_doc(find)]
     pub fn find(&self, filter: Document) -> Find {
         Find {
             bucket: self,
@@ -30,7 +30,7 @@ impl GridFsBucket {
     ///
     /// `await` will return d[`Result<Option<FilesCollectionDocument>>`].
     #[deeplink]
-    #[options_doc(find_one_setters)]
+    #[options_doc(find_one)]
     pub fn find_one(&self, filter: Document) -> FindOne {
         FindOne {
             bucket: self,
@@ -47,7 +47,7 @@ impl crate::sync::gridfs::GridFsBucket {
     ///
     /// [`run`](Find::run) will return d[`Result<crate::sync::Cursor<FilesCollectionDocument>>`].
     #[deeplink]
-    #[options_doc(find_setters, sync)]
+    #[options_doc(find, sync)]
     pub fn find(&self, filter: Document) -> Find {
         self.async_bucket.find(filter)
     }
@@ -57,7 +57,7 @@ impl crate::sync::gridfs::GridFsBucket {
     ///
     /// [`run`](FindOne::run) will return d[`Result<Option<FilesCollectionDocument>>`].
     #[deeplink]
-    #[options_doc(find_one_setters, sync)]
+    #[options_doc(find_one, sync)]
     pub fn find_one(&self, filter: Document) -> FindOne {
         self.async_bucket.find_one(filter)
     }
@@ -73,7 +73,7 @@ pub struct Find<'a> {
 }
 
 #[option_setters_2(crate::gridfs::options::GridFsFindOptions)]
-#[export_doc(find_setters)]
+#[export_doc(find)]
 impl Find<'_> {}
 
 #[action_impl(sync = crate::sync::Cursor<FilesCollectionDocument>)]
@@ -100,7 +100,7 @@ pub struct FindOne<'a> {
 }
 
 #[option_setters_2(crate::gridfs::options::GridFsFindOneOptions)]
-#[export_doc(find_one_setters)]
+#[export_doc(find_one)]
 impl FindOne<'_> {}
 
 #[action_impl]

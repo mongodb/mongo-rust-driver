@@ -28,7 +28,7 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     ///
     /// `await` will return d[`Result<InsertManyResult>`].
     #[deeplink]
-    #[options_doc(insert_many_setters)]
+    #[options_doc(insert_many)]
     pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
         InsertMany {
             coll: CollRef::new(self),
@@ -56,7 +56,7 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](InsertMany::run) will return d[`Result<InsertManyResult>`].
     #[deeplink]
-    #[options_doc(insert_many_setters, sync)]
+    #[options_doc(insert_many, sync)]
     pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
         self.async_collection.insert_many(docs)
     }
@@ -72,7 +72,7 @@ pub struct InsertMany<'a> {
 }
 
 #[option_setters_2(crate::coll::options::InsertManyOptions)]
-#[export_doc(insert_many_setters)]
+#[export_doc(insert_many)]
 impl<'a> InsertMany<'a> {
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
