@@ -201,6 +201,7 @@ impl From<Vec<Document>> for UpdateModifications {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct UpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
     ///
