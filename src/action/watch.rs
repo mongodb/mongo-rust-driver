@@ -3,7 +3,15 @@ use std::{marker::PhantomData, time::Duration};
 use bson::{Bson, Document, Timestamp};
 use serde::de::DeserializeOwned;
 
-use super::{action_impl, deeplink, option_setters, ExplicitSession, ImplicitSession};
+use super::{
+    action_impl,
+    deeplink,
+    export_doc,
+    option_setters_2,
+    options_doc,
+    ExplicitSession,
+    ImplicitSession,
+};
 use crate::{
     change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
@@ -46,6 +54,7 @@ impl Client {
     /// d[`Result<SessionChangeStream<ChangeStreamEvent<Document>>>`] if a
     /// [`ClientSession`] has been provided.
     #[deeplink]
+    #[options_doc(watch)]
     pub fn watch(&self) -> Watch {
         Watch::new_cluster(self)
     }
@@ -74,6 +83,7 @@ impl Database {
     /// d[`Result<SessionChangeStream<ChangeStreamEvent<Document>>>`] if a
     /// [`ClientSession`] has been provided.
     #[deeplink]
+    #[options_doc(watch)]
     pub fn watch(&self) -> Watch {
         Watch::new(
             self.client(),
@@ -101,6 +111,7 @@ where
     /// d[`Result<SessionChangeStream<ChangeStreamEvent<T>>>`] if a
     /// [`ClientSession`] has been provided.
     #[deeplink]
+    #[options_doc(watch)]
     pub fn watch(&self) -> Watch<T> {
         Watch::new(self.client(), self.namespace().into())
     }
@@ -118,6 +129,7 @@ impl crate::sync::Client {
     ///
     /// Change streams require either a "majority" read concern or no read
     /// concern. Anything else will cause a server error.
+    #[options_doc(watch, sync)]
     pub fn watch(&self) -> Watch {
         self.async_client.watch()
     }
@@ -134,6 +146,7 @@ impl crate::sync::Database {
     ///
     /// Change streams require either a "majority" read concern or no read
     /// concern. Anything else will cause a server error.
+    #[options_doc(watch, sync)]
     pub fn watch(&self) -> Watch {
         self.async_database.watch()
     }
@@ -154,6 +167,7 @@ where
     ///
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
+    #[options_doc(watch, sync)]
     pub fn watch(&self) -> Watch<T> {
         self.async_collection.watch()
     }
@@ -198,6 +212,8 @@ impl<'a, T> Watch<'a, T, ImplicitSession> {
     }
 }
 
+#[option_setters_2(crate::change_stream::options::ChangeStreamOptions, skip = [resume_after, all_changes_for_cluster])]
+#[export_doc(watch, extra = [session])]
 impl<S> Watch<'_, S> {
     /// Apply an aggregation pipeline to the change stream.
     ///
@@ -224,20 +240,6 @@ impl<S> Watch<'_, S> {
         self.options().resume_after = value.into();
         self
     }
-
-    option_setters!(options: ChangeStreamOptions;
-        full_document: FullDocumentType,
-        full_document_before_change: FullDocumentBeforeChangeType,
-        start_at_operation_time: Timestamp,
-        start_after: ResumeToken,
-        max_await_time: Duration,
-        batch_size: u32,
-        collation: Collation,
-        read_concern: ReadConcern,
-        selection_criteria: SelectionCriteria,
-        show_expanded_events: bool,
-        comment: Bson,
-    );
 }
 
 impl<'a, T> Watch<'a, T, ImplicitSession> {
