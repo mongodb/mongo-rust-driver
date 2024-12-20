@@ -1,3 +1,5 @@
+use mongodb_internal_macros::{export_doc, options_doc};
+
 use crate::Client;
 
 impl Client {
@@ -54,6 +56,7 @@ impl Client {
     /// `GridFsUploadStream`.
     ///
     /// `await` will return `()`.
+    #[options_doc(shutdown)]
     pub fn shutdown(self) -> Shutdown {
         Shutdown {
             client: self,
@@ -117,6 +120,7 @@ impl crate::sync::Client {
     /// `GridFsUploadStream`.
     ///
     /// [`run`](Shutdown::run) will return `()`.
+    #[options_doc(shutdown, sync)]
     pub fn shutdown(self) -> Shutdown {
         self.async_client.shutdown()
     }
@@ -130,6 +134,7 @@ pub struct Shutdown {
     pub(crate) immediate: bool,
 }
 
+#[export_doc(shutdown)]
 impl Shutdown {
     /// If `true`, execution will not wait for pending resources to be cleaned up,
     /// which may cause both client-side errors and server-side resource leaks.  Defaults to
