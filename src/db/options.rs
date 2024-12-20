@@ -298,6 +298,7 @@ pub struct DropDatabaseOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct ListCollectionsOptions {
     /// The number of documents the server should return per cursor batch.
     ///
