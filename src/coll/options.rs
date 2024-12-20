@@ -111,6 +111,7 @@ pub enum CursorType {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct InsertOneOptions {
     /// Opt out of document-level validation.
     pub bypass_document_validation: Option<bool>,
