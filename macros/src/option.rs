@@ -26,143 +26,6 @@ use syn::{
 
 use crate::macro_error;
 
-pub(crate) fn option_setters(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let OptionSettersList {
-        opt_field_name,
-        opt_field_type,
-        setters,
-    } = parse_macro_input!(input as OptionSettersList);
-
-    let extras = quote! {
-        #[allow(unused)]
-        fn options(&mut self) -> &mut #opt_field_type {
-            self.#opt_field_name.get_or_insert_with(<#opt_field_type>::default)
-        }
-
-        /// Set all options.  Note that this will replace all previous values set.
-        pub fn with_options(mut self, value: impl Into<Option<#opt_field_type>>) -> Self {
-            self.#opt_field_name = value.into();
-            self
-        }
-    };
-
-    let setters: Vec<_> = setters
-        .into_iter()
-        .map(|OptionSetter { attrs, name, type_ }| {
-            let docstr = format!(
-                "Set the [`{}::{}`] option.",
-                opt_field_type.to_token_stream(),
-                name
-            );
-            let (accept, value) = if type_.is_ident("String")
-                || type_.is_ident("Bson")
-                || path_eq(&type_, &["bson", "Bson"])
-            {
-                (quote! { impl Into<#type_> }, quote! { value.into() })
-            } else if let Some(t) = inner_type(&type_, "Vec") {
-                (
-                    quote! { impl IntoIterator<Item = #t> },
-                    quote! { value.into_iter().collect() },
-                )
-            } else {
-                (quote! { #type_ }, quote! { value })
-            };
-            quote! {
-                #[doc = #docstr]
-                #(#attrs)*
-                pub fn #name(mut self, value: #accept) -> Self {
-                    self.options().#name = Some(#value);
-                    self
-                }
-            }
-        })
-        .collect();
-
-    quote! {
-        #extras
-        #(#setters)*
-    }
-    .into()
-}
-
-fn inner_type<'a>(path: &'a Path, outer: &str) -> Option<&'a Type> {
-    if path.segments.len() != 1 {
-        return None;
-    }
-    let PathSegment { ident, arguments } = path.segments.first()?;
-    if ident != outer {
-        return None;
-    }
-    let args = if let PathArguments::AngleBracketed(angle) = arguments {
-        &angle.args
-    } else {
-        return None;
-    };
-    if args.len() != 1 {
-        return None;
-    }
-    if let GenericArgument::Type(t) = args.first()? {
-        return Some(t);
-    }
-
-    None
-}
-
-fn path_eq(path: &Path, segments: &[&str]) -> bool {
-    if path.segments.len() != segments.len() {
-        return false;
-    }
-    for (actual, expected) in path.segments.iter().zip(segments.into_iter()) {
-        if actual.ident != expected {
-            return false;
-        }
-        if !actual.arguments.is_empty() {
-            return false;
-        }
-    }
-    true
-}
-
-struct OptionSettersList {
-    opt_field_name: Ident,
-    opt_field_type: Type,
-    setters: Vec<OptionSetter>,
-}
-
-impl Parse for OptionSettersList {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let opt_field_name = input.parse()?;
-        input.parse::<Token![:]>()?;
-        let opt_field_type = input.parse()?;
-        input.parse::<Token![;]>()?;
-        let setters = input
-            .parse_terminated(OptionSetter::parse, Token![,])?
-            .into_iter()
-            .collect();
-        Ok(Self {
-            opt_field_name,
-            opt_field_type,
-            setters,
-        })
-    }
-}
-
-struct OptionSetter {
-    attrs: Vec<Attribute>,
-    name: Ident,
-    type_: Path,
-}
-
-impl Parse for OptionSetter {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let attrs = input.call(Attribute::parse_outer)?;
-        let name = input.parse()?;
-        input.parse::<Token![:]>()?;
-        let type_ = input.parse()?;
-        Ok(Self { attrs, name, type_ })
-    }
-}
-
 pub fn option_setters_2(
     attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
@@ -303,4 +166,42 @@ impl ForeignPath for OptionSettersArgs {
     fn foreign_path(&self) -> &syn::Path {
         &self.foreign_path
     }
+}
+
+fn inner_type<'a>(path: &'a Path, outer: &str) -> Option<&'a Type> {
+    if path.segments.len() != 1 {
+        return None;
+    }
+    let PathSegment { ident, arguments } = path.segments.first()?;
+    if ident != outer {
+        return None;
+    }
+    let args = if let PathArguments::AngleBracketed(angle) = arguments {
+        &angle.args
+    } else {
+        return None;
+    };
+    if args.len() != 1 {
+        return None;
+    }
+    if let GenericArgument::Type(t) = args.first()? {
+        return Some(t);
+    }
+
+    None
+}
+
+fn path_eq(path: &Path, segments: &[&str]) -> bool {
+    if path.segments.len() != segments.len() {
+        return false;
+    }
+    for (actual, expected) in path.segments.iter().zip(segments.into_iter()) {
+        if actual.ident != expected {
+            return false;
+        }
+        if !actual.arguments.is_empty() {
+            return false;
+        }
+    }
+    true
 }

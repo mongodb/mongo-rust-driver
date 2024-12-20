@@ -30,11 +30,6 @@ pub fn deeplink(
     crate::rustdoc::deeplink(attr, item)
 }
 
-#[proc_macro]
-pub fn option_setters(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    crate::option::option_setters(input)
-}
-
 #[import_tokens_attr]
 #[with_custom_parsing(crate::option::OptionSettersArgs)]
 #[proc_macro_attribute]
