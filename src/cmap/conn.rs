@@ -3,6 +3,7 @@ pub(crate) mod pooled;
 mod stream_description;
 
 #[cfg(feature = "fuzzing")]
+#[allow(missing_docs)]
 pub mod wire;
 
 #[cfg(not(feature = "fuzzing"))]

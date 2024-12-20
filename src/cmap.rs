@@ -2,6 +2,7 @@
 pub(crate) mod test;
 
 #[cfg(feature = "fuzzing")]
+#[allow(missing_docs)]
 pub mod conn;
 
 #[cfg(not(feature = "fuzzing"))]

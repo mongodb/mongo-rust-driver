@@ -1,10 +1,12 @@
-use std::io::Cursor;
-use byteorder::{ReadBytesExt, LittleEndian};
-use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use crate::error::{ErrorKind, Result};
+use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 #[cfg(feature = "fuzzing")]
 use arbitrary::Arbitrary;
+#[cfg(feature = "fuzzing")]
+use byteorder::{LittleEndian, ReadBytesExt};
+#[cfg(feature = "fuzzing")]
+use std::io::Cursor;
 
 /// The wire protocol op codes.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -63,21 +65,30 @@ impl Header {
         }
         let mut cursor = Cursor::new(data);
 
-        let length = ReadBytesExt::read_i32::<LittleEndian>(&mut cursor).map_err(|e| ErrorKind::InvalidResponse {
-            message: format!("Failed to read length: {}", e),
+        let length = ReadBytesExt::read_i32::<LittleEndian>(&mut cursor).map_err(|e| {
+            ErrorKind::InvalidResponse {
+                message: format!("Failed to read length: {}", e),
+            }
         })?;
 
-        let request_id = ReadBytesExt::read_i32::<LittleEndian>(&mut cursor).map_err(|e| ErrorKind::InvalidResponse {
-            message: format!("Failed to read request_id: {}", e),
+        let request_id = ReadBytesExt::read_i32::<LittleEndian>(&mut cursor).map_err(|e| {
+            ErrorKind::InvalidResponse {
+                message: format!("Failed to read request_id: {}", e),
+            }
         })?;
 
-        let response_to = ReadBytesExt::read_i32::<LittleEndian>(&mut cursor).map_err(|e| ErrorKind::InvalidResponse {
-            message: format!("Failed to read response_to: {}", e),
+        let response_to = ReadBytesExt::read_i32::<LittleEndian>(&mut cursor).map_err(|e| {
+            ErrorKind::InvalidResponse {
+                message: format!("Failed to read response_to: {}", e),
+            }
         })?;
 
-        let op_code = OpCode::from_i32(ReadBytesExt::read_i32::<LittleEndian>(&mut cursor).map_err(|e| ErrorKind::InvalidResponse {
-            message: format!("Failed to read op_code: {}", e),
-        })?)?;
+        let op_code =
+            OpCode::from_i32(ReadBytesExt::read_i32::<LittleEndian>(&mut cursor).map_err(
+                |e| ErrorKind::InvalidResponse {
+                    message: format!("Failed to read op_code: {}", e),
+                },
+            )?)?;
 
         Ok(Self {
             length,

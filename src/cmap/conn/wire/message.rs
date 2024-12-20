@@ -13,9 +13,6 @@ use crate::fuzz::{
 };
 
 #[cfg(not(feature = "fuzzing"))]
-use bitflags::bitflags;
-
-#[cfg(not(feature = "fuzzing"))]
 bitflags::bitflags! {
     pub struct MessageFlags: u32 {
         const NONE = 0;
@@ -29,7 +26,11 @@ use crate::{
     bson_util,
     checked::Checked,
     cmap::conn::{
-        wire::{header::Header, header::OpCode, next_request_id, util::SyncCountReader},
+        wire::{
+            header::{Header, OpCode},
+            next_request_id,
+            util::SyncCountReader,
+        },
         Command,
     },
     compression::decompress::decompress_message,
@@ -43,7 +44,9 @@ fn generate_raw_document(u: &mut arbitrary::Unstructured) -> arbitrary::Result<R
 }
 
 #[cfg(feature = "fuzzing")]
-fn generate_document_sequences(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Vec<DocumentSequence>> {
+fn generate_document_sequences(
+    u: &mut arbitrary::Unstructured,
+) -> arbitrary::Result<Vec<DocumentSequence>> {
     let seq = FuzzDocumentSequenceImpl::arbitrary(u)?;
     Ok(vec![DocumentSequence {
         identifier: String::arbitrary(u)?,
@@ -93,6 +96,7 @@ pub struct DocumentSequence {
     pub documents: Vec<RawDocumentBuf>,
 }
 
+#[derive(Clone, Debug)]
 #[cfg(not(feature = "fuzzing"))]
 pub(crate) struct DocumentSequence {
     pub(crate) identifier: String,
@@ -119,7 +123,11 @@ impl TryFrom<Command> for Message {
 
         Ok(Self {
             document_payload,
-            document_sequences: command.document_sequences.into_iter().map(Into::into).collect(),
+            document_sequences: command
+                .document_sequences
+                .into_iter()
+                .map(Into::into)
+                .collect(),
             response_to: 0,
             flags,
             checksum: None,
@@ -461,11 +469,6 @@ impl Message {
         Ok(sections)
     }
 }
-
-
-
-
-
 
 /// Represents a section as defined by the OP_MSG spec.
 #[derive(Debug)]
