@@ -160,7 +160,8 @@ fn num_decimal_digits(mut n: usize) -> usize {
 pub(crate) fn read_document_bytes<R: Read>(mut reader: R) -> Result<Vec<u8>> {
     let length = reader.read_i32_sync()?;
 
-    let mut bytes = Vec::with_capacity(length as usize);
+    let mut bytes = Vec::with_capacity(Checked::new(length).try_into()?);
+    // this is safe because the Checked::try_into would fail above if length was negative
     bytes.write_all(&length.to_le_bytes())?;
 
     reader.take(length as u64 - 4).read_to_end(&mut bytes)?;
