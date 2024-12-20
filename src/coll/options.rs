@@ -1118,6 +1118,7 @@ pub struct DropIndexOptions {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct ListIndexesOptions {
     /// The maximum amount of time to search for the index.
     ///
