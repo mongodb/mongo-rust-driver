@@ -1,5 +1,4 @@
 use bson::{Bson, Document};
-use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use crate::{
     coll::options::{DeleteOptions, Hint},
@@ -12,7 +11,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, deeplink, CollRef};
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc, CollRef};
 
 impl<T> Collection<T>
 where

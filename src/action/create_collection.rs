@@ -1,5 +1,4 @@
 use bson::{Bson, Document};
-use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 use std::time::Duration;
 
 use crate::{
@@ -18,7 +17,7 @@ use crate::{
     Database,
 };
 
-use crate::action::deeplink;
+use super::{deeplink, export_doc, option_setters, options_doc};
 
 impl Database {
     /// Creates a new collection in the database with the given `name`.

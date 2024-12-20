@@ -1,7 +1,6 @@
 use std::{marker::PhantomData, time::Duration};
 
 use bson::{Bson, Document};
-use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use crate::{
     coll::options::{AggregateOptions, Hint},
@@ -18,7 +17,16 @@ use crate::{
     SessionCursor,
 };
 
-use super::{action_impl, deeplink, CollRef, ExplicitSession, ImplicitSession};
+use super::{
+    action_impl,
+    deeplink,
+    export_doc,
+    option_setters,
+    options_doc,
+    CollRef,
+    ExplicitSession,
+    ImplicitSession,
+};
 
 impl Database {
     /// Runs an aggregation operation.

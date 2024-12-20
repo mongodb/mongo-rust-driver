@@ -1,9 +1,7 @@
 use std::time::Duration;
 
 use bson::Bson;
-use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
-use super::{action_impl, deeplink, CollRef};
 use crate::{
     coll::options::DropIndexOptions,
     error::{ErrorKind, Result},
@@ -12,6 +10,8 @@ use crate::{
     ClientSession,
     Collection,
 };
+
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc, CollRef};
 
 impl<T> Collection<T>
 where

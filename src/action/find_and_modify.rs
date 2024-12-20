@@ -1,7 +1,6 @@
 use std::{borrow::Borrow, time::Duration};
 
 use bson::{Bson, Document, RawDocumentBuf};
-use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -25,7 +24,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, deeplink};
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc};
 
 impl<T: DeserializeOwned + Send + Sync> Collection<T> {
     async fn find_and_modify<'a>(

@@ -1,10 +1,9 @@
 use std::time::Duration;
 
 use bson::{doc, Bson, Document};
-use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
-use super::super::action_impl;
 use crate::{
+    action::{action_impl, export_doc, option_setters, options_doc},
     client_encryption::{ClientEncryption, MasterKey},
     collation::Collation,
     concern::WriteConcern,

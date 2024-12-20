@@ -1,3 +1,6 @@
+#[cfg(feature = "in-use-encryption")]
+use bson::Document;
+
 use crate::{
     coll::options::DropCollectionOptions,
     db::options::DropDatabaseOptions,
@@ -8,11 +11,8 @@ use crate::{
     Collection,
     Database,
 };
-#[cfg(feature = "in-use-encryption")]
-use bson::Document;
-use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
-use super::{action_impl, deeplink, CollRef};
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc, CollRef};
 
 impl Database {
     /// Drops the database, deleting all data, collections, and indexes stored in it.

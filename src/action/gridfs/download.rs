@@ -1,8 +1,7 @@
 use bson::{doc, Bson};
-use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use crate::{
-    action::{action_impl, deeplink},
+    action::{action_impl, deeplink, export_doc, option_setters, options_doc},
     error::{ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
     gridfs::{
         FilesCollectionDocument,

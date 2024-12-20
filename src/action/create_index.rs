@@ -1,7 +1,6 @@
 use std::{marker::PhantomData, time::Duration};
 
 use bson::Bson;
-use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
 use crate::{
     coll::options::{CommitQuorum, CreateIndexOptions},
@@ -14,7 +13,16 @@ use crate::{
     IndexModel,
 };
 
-use super::{action_impl, deeplink, CollRef, Multiple, Single};
+use super::{
+    action_impl,
+    deeplink,
+    export_doc,
+    option_setters,
+    options_doc,
+    CollRef,
+    Multiple,
+    Single,
+};
 
 impl<T> Collection<T>
 where

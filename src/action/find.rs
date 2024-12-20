@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use bson::{Bson, Document};
-use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 use serde::de::DeserializeOwned;
 
 use crate::{
@@ -17,7 +16,15 @@ use crate::{
     SessionCursor,
 };
 
-use super::{action_impl, deeplink, ExplicitSession, ImplicitSession};
+use super::{
+    action_impl,
+    deeplink,
+    export_doc,
+    option_setters,
+    options_doc,
+    ExplicitSession,
+    ImplicitSession,
+};
 
 impl<T: Send + Sync> Collection<T> {
     /// Finds the documents in the collection matching `filter`.

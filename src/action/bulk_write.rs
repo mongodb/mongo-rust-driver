@@ -1,7 +1,5 @@
 use std::{collections::HashMap, marker::PhantomData};
 
-use mongodb_internal_macros::{export_doc, option_setters, options_doc};
-
 use crate::{
     bson::{Bson, Document},
     error::{BulkWriteError, Error, ErrorKind, Result},
@@ -12,7 +10,7 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_impl, deeplink};
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc};
 
 impl Client {
     /// Executes the provided list of write operations.

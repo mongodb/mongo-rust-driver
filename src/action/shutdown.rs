@@ -1,6 +1,6 @@
-use mongodb_internal_macros::{export_doc, options_doc};
-
 use crate::Client;
+
+use super::{export_doc, options_doc};
 
 impl Client {
     /// Shut down this `Client`, terminating background thread workers and closing connections.

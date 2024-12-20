@@ -1,9 +1,9 @@
 use macro_magic::export_tokens;
-use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 
-use crate::client_encryption::{ClientEncryption, MasterKey};
-
-use super::super::deeplink;
+use crate::{
+    action::{deeplink, export_doc, option_setters, options_doc},
+    client_encryption::{ClientEncryption, MasterKey},
+};
 
 impl ClientEncryption {
     /// Creates a new key document and inserts into the key vault collection.

@@ -1,13 +1,14 @@
 use bson::{Binary, Bson, RawDocumentBuf};
 use macro_magic::export_tokens;
 use mongocrypt::ctx::Algorithm;
-use mongodb_internal_macros::{export_doc, option_setters, options_doc};
 use serde::Serialize;
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
-use super::super::deeplink;
-use crate::client_encryption::ClientEncryption;
+use crate::{
+    action::{deeplink, export_doc, option_setters, options_doc},
+    client_encryption::ClientEncryption,
+};
 
 impl ClientEncryption {
     /// Encrypts a BsonValue with a given key and algorithm.
