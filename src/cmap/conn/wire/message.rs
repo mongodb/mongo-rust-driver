@@ -155,6 +155,9 @@ impl From<FuzzDocumentSequenceImpl> for Vec<DocumentSequence> {
 impl Message {
     #[cfg(feature = "fuzzing")]
     pub fn read_from_slice(data: &[u8], header: Header) -> Result<Self> {
+        // this case should not actually be hit during fuzzing since we create the Header
+        // from the data first, but this is a good sanity check, ensuring that we will
+        // not panic if we do hit this case.
         if data.len() < Header::LENGTH {
             return Err(ErrorKind::InvalidResponse {
                 message: format!("Message data too short: {} bytes", data.len()),
