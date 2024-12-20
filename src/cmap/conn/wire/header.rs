@@ -51,6 +51,8 @@ impl Header {
     #[cfg(not(feature = "fuzzing"))]
     pub(crate) const LENGTH: usize = 4 * std::mem::size_of::<i32>();
 
+    // generates a Header from a randomly generated slice of bytes, as long as the slice is at least
+    // 16 bytes long this is used for fuzzing
     #[cfg(feature = "fuzzing")]
     pub fn from_slice(data: &[u8]) -> Result<Self> {
         if data.len() < Self::LENGTH {
