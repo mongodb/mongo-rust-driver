@@ -2700,6 +2700,7 @@ impl SessionOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[export_tokens]
 pub struct TransactionOptions {
     /// The read concern to use for the transaction.
     #[builder(default)]

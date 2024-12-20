@@ -7,7 +7,7 @@ use crate::{
     ClientSession,
 };
 
-use super::option_setters;
+use super::{export_doc, option_setters_2, options_doc};
 
 impl ClientSession {
     /// Starts a new transaction on this session. If no options are set, the session's
@@ -37,6 +37,7 @@ impl ClientSession {
     /// ```
     ///
     /// `await` will return [`Result<()>`].
+    #[options_doc(start_transaction)]
     pub fn start_transaction(&mut self) -> StartTransaction<&mut Self> {
         StartTransaction {
             session: self,
@@ -134,6 +135,7 @@ impl crate::sync::ClientSession {
     /// ```
     ///
     /// [`run`](StartTransaction::run) will return [`Result<()>`].
+    #[options_doc(start_transaction, sync)]
     pub fn start_transaction(&mut self) -> StartTransaction<&mut Self> {
         StartTransaction {
             session: self,
@@ -210,14 +212,9 @@ pub struct StartTransaction<S> {
     pub(crate) options: Option<TransactionOptions>,
 }
 
-impl<S> StartTransaction<S> {
-    option_setters! { options: TransactionOptions;
-        read_concern: ReadConcern,
-        write_concern: WriteConcern,
-        selection_criteria: SelectionCriteria,
-        max_commit_time: Duration,
-    }
-}
+#[option_setters_2(crate::client::options::TransactionOptions)]
+#[export_doc(start_transaction)]
+impl<S> StartTransaction<S> {}
 
 /// Commits a currently-active transaction.  Construct with [`ClientSession::commit_transaction`].
 #[must_use]
