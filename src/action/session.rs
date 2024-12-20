@@ -5,13 +5,14 @@ use crate::{
     ClientSession,
 };
 
-use super::{action_impl, deeplink, option_setters};
+use super::{action_impl, deeplink, export_doc, option_setters_2, options_doc};
 
 impl Client {
     /// Starts a new [`ClientSession`].
     ///
     /// `await` will return d[`Result<ClientSession>`].
     #[deeplink]
+    #[options_doc(start_session)]
     pub fn start_session(&self) -> StartSession {
         StartSession {
             client: self,
@@ -26,6 +27,7 @@ impl crate::sync::Client {
     ///
     /// [run](StartSession::run) will return d[`Result<crate::sync::ClientSession>`].
     #[deeplink]
+    #[options_doc(start_session, sync)]
     pub fn start_session(&self) -> StartSession {
         self.async_client.start_session()
     }
@@ -38,13 +40,9 @@ pub struct StartSession<'a> {
     options: Option<SessionOptions>,
 }
 
-impl StartSession<'_> {
-    option_setters!(options: SessionOptions;
-        default_transaction_options: TransactionOptions,
-        causal_consistency: bool,
-        snapshot: bool,
-    );
-}
+#[option_setters_2(crate::client::options::SessionOptions)]
+#[export_doc(start_session)]
+impl StartSession<'_> {}
 
 #[action_impl(sync = crate::sync::ClientSession)]
 impl<'a> Action for StartSession<'a> {
