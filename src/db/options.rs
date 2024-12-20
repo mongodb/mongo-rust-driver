@@ -365,6 +365,7 @@ pub struct ChangeStreamPreAndPostImages {
 #[derive(Clone, Debug, Default, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct RunCommandOptions {
     /// The default read preference for operations.
     pub selection_criteria: Option<SelectionCriteria>,
@@ -377,6 +378,7 @@ pub struct RunCommandOptions {
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
 #[non_exhaustive]
+#[export_tokens]
 pub struct RunCursorCommandOptions {
     /// The default read preference for operations.
     pub selection_criteria: Option<SelectionCriteria>,
