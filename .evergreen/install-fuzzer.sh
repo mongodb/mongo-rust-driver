@@ -2,6 +2,6 @@
 
 set -o errexit
 
-. ~/.cargo/env
+source ./.evergreen/env.sh
 
 cargo install cargo-fuzz
