@@ -71,17 +71,17 @@ pub struct Message {
 
     /// OP_MSG payload type 0 (the main document)
     #[cfg_attr(feature = "fuzzing", arbitrary(with = generate_raw_document))]
-    pub document_payload: RawDocumentBuf,
+    pub(crate) document_payload: RawDocumentBuf,
 
     /// OP_MSG payload type 1 (document sequences)
     #[cfg_attr(feature = "fuzzing", arbitrary(with = generate_document_sequences))]
-    pub document_sequences: Vec<DocumentSequence>,
+    pub(crate) document_sequences: Vec<DocumentSequence>,
 
     /// Optional CRC32C checksum
-    pub checksum: Option<u32>,
+    pub(crate) checksum: Option<u32>,
 
     /// Request ID for the message
-    pub request_id: Option<i32>,
+    pub(crate) request_id: Option<i32>,
 
     /// Response to request ID
     pub response_to: i32,
@@ -92,7 +92,7 @@ pub struct Message {
         feature = "zlib-compression",
         feature = "snappy-compression"
     ))]
-    pub should_compress: bool,
+    pub(crate) should_compress: bool,
 }
 
 #[derive(Clone, Debug)]
