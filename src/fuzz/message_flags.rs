@@ -2,10 +2,9 @@ use arbitrary::Arbitrary;
 
 bitflags::bitflags! {
     pub struct MessageFlags: u32 {
-        const NONE = 0;
-        const CHECKSUM_PRESENT = 0x04;
-        const MORE_TO_COME = 0x02;
-        const EXHAUST_ALLOWED = 0x10000;
+         const CHECKSUM_PRESENT = 0b_0000_0000_0000_0000_0000_0000_0000_0001;
+         const MORE_TO_COME     = 0b_0000_0000_0000_0000_0000_0000_0000_0010;
+         const EXHAUST_ALLOWED  = 0b_0000_0000_0000_0001_0000_0000_0000_0000;
     }
 }
 

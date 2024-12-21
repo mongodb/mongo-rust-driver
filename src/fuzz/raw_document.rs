@@ -8,9 +8,8 @@ pub struct FuzzRawDocumentImpl {
 
 impl From<FuzzRawDocumentImpl> for RawDocumentBuf {
     fn from(doc: FuzzRawDocumentImpl) -> Self {
-        RawDocumentBuf::from_bytes(doc.bytes).unwrap_or_else(|_| {
-            RawDocumentBuf::from_bytes(vec![5, 0, 0, 0, 0]).unwrap()
-        })
+        RawDocumentBuf::from_bytes(doc.bytes)
+            .unwrap_or_else(|_| RawDocumentBuf::from_bytes(vec![5, 0, 0, 0, 0]).unwrap())
     }
 }
 
@@ -19,8 +18,6 @@ pub struct FuzzDocumentSequenceImpl(pub Vec<FuzzRawDocumentImpl>);
 
 impl From<FuzzDocumentSequenceImpl> for Vec<RawDocumentBuf> {
     fn from(seq: FuzzDocumentSequenceImpl) -> Self {
-        seq.0.into_iter()
-            .map(Into::into)
-            .collect()
+        seq.0.into_iter().map(Into::into).collect()
     }
 }
