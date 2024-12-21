@@ -1,7 +1,13 @@
 #[cfg(test)]
 pub(crate) mod test;
 
+#[cfg(feature = "fuzzing")]
+#[allow(missing_docs)]
+pub mod conn;
+
+#[cfg(not(feature = "fuzzing"))]
 pub(crate) mod conn;
+
 mod connection_requester;
 pub(crate) mod establish;
 mod manager;

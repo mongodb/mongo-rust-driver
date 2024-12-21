@@ -80,6 +80,7 @@ impl Action for ParseConnectionString {
                                 "srvMaxHosts and loadBalanced=true cannot both be present",
                             ));
                         }
+                        // max is u32, so this is safe.
                         config.hosts = crate::sdam::choose_n(&config.hosts, max as usize)
                             .cloned()
                             .collect();
