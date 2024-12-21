@@ -2,7 +2,7 @@
 
 set -o errexit
 
-. ~/.cargo/env
+source ./.evergreen/env.sh
 
 mkdir -p artifacts
 
