@@ -12,6 +12,7 @@ use crate::client::auth::{
     AZURE_ENVIRONMENT_VALUE_STR,
     ENVIRONMENT_PROP_STR,
     GCP_ENVIRONMENT_VALUE_STR,
+    K8S_ENVIRONMENT_VALUE_STR,
     TOKEN_RESOURCE_PROP_STR,
 };
 use crate::{
@@ -144,7 +145,7 @@ impl Callback {
 
     /// Create azure callback.
     #[cfg(feature = "azure-oidc")]
-    fn azure_callback(client_id: Option<&str>, resource: &str) -> CallbackInner {
+    fn azure_callback(client_id: Option<&str>, resource: &str) -> Function {
         use futures_util::FutureExt;
         let resource = resource.to_string();
         let client_id = client_id.map(|s| s.to_string());
@@ -155,104 +156,121 @@ impl Callback {
         if let Some(ref client_id) = client_id {
             url.push_str(&format!("&client_id={}", client_id));
         }
-        CallbackInner {
-            function: Self::new_function(
-                move |_| {
+        Self::new_function(
+            move |_| {
+                let url = url.clone();
+                async move {
                     let url = url.clone();
-                    async move {
-                        let url = url.clone();
-                        let response = crate::runtime::HttpClient::default()
-                            .get(&url)
-                            .headers(&[("Metadata", "true"), ("Accept", "application/json")])
-                            .send::<Document>()
-                            .await
-                            .map_err(|e| {
-                                Error::authentication_error(
-                                    MONGODB_OIDC_STR,
-                                    &format!("Failed to get access token from Azure IDMS: {}", e),
-                                )
-                            });
-                        let response = response?;
-                        let access_token = response
-                            .get_str("access_token")
-                            .map_err(|e| {
-                                Error::authentication_error(
-                                    MONGODB_OIDC_STR,
-                                    &format!("Failed to get access token from Azure IDMS: {}", e),
-                                )
-                            })?
-                            .to_string();
-                        let expires_in = response
-                            .get_str("expires_in")
-                            .map_err(|e| {
-                                Error::authentication_error(
-                                    MONGODB_OIDC_STR,
-                                    &format!("Failed to get expires_in from Azure IDMS: {}", e),
-                                )
-                            })?
-                            .parse::<u64>()
-                            .map_err(|e| {
-                                Error::authentication_error(
-                                    MONGODB_OIDC_STR,
-                                    &format!(
-                                        "Failed to parse expires_in from Azure IDMS as u64: {}",
-                                        e
-                                    ),
-                                )
-                            })?;
-                        let expires = Some(Instant::now() + Duration::from_secs(expires_in));
-                        Ok(IdpServerResponse {
-                            access_token,
-                            expires,
-                            refresh_token: None,
-                        })
-                    }
-                    .boxed()
-                },
-                CallbackKind::Machine,
-            ),
-            cache: Cache::new(),
-        }
+                    let response = crate::runtime::HttpClient::default()
+                        .get(&url)
+                        .headers(&[("Metadata", "true"), ("Accept", "application/json")])
+                        .send::<Document>()
+                        .await
+                        .map_err(|e| {
+                            Error::authentication_error(
+                                MONGODB_OIDC_STR,
+                                &format!("Failed to get access token from Azure IDMS: {}", e),
+                            )
+                        });
+                    let response = response?;
+                    let access_token = response
+                        .get_str("access_token")
+                        .map_err(|e| {
+                            Error::authentication_error(
+                                MONGODB_OIDC_STR,
+                                &format!("Failed to get access token from Azure IDMS: {}", e),
+                            )
+                        })?
+                        .to_string();
+                    let expires_in = response
+                        .get_str("expires_in")
+                        .map_err(|e| {
+                            Error::authentication_error(
+                                MONGODB_OIDC_STR,
+                                &format!("Failed to get expires_in from Azure IDMS: {}", e),
+                            )
+                        })?
+                        .parse::<u64>()
+                        .map_err(|e| {
+                            Error::authentication_error(
+                                MONGODB_OIDC_STR,
+                                &format!(
+                                    "Failed to parse expires_in from Azure IDMS as u64: {}",
+                                    e
+                                ),
+                            )
+                        })?;
+                    let expires = Some(Instant::now() + Duration::from_secs(expires_in));
+                    Ok(IdpServerResponse {
+                        access_token,
+                        expires,
+                        refresh_token: None,
+                    })
+                }
+                .boxed()
+            },
+            CallbackKind::Machine,
+        )
     }
 
     /// Create gcp callback.
     #[cfg(feature = "gcp-oidc")]
-    fn gcp_callback(resource: &str) -> CallbackInner {
+    fn gcp_callback(resource: &str) -> Function {
         use futures_util::FutureExt;
         let url = format!(
             "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity?audience={}",
             resource
         );
-        CallbackInner {
-            function: Self::new_function(
-                move |_| {
+        Self::new_function(
+            move |_| {
+                let url = url.clone();
+                async move {
                     let url = url.clone();
-                    async move {
-                        let url = url.clone();
-                        let response = crate::runtime::HttpClient::default()
-                            .get(&url)
-                            .headers(&[("Metadata-Flavor", "Google")])
-                            .send_and_get_string()
-                            .await
-                            .map_err(|e| {
-                                Error::authentication_error(
-                                    MONGODB_OIDC_STR,
-                                    &format!("Failed to get access token from GCP IDMS: {}", e),
-                                )
-                            });
-                        let access_token = response?;
-                        Ok(IdpServerResponse {
-                            access_token,
-                            expires: None,
-                            refresh_token: None,
-                        })
-                    }
-                    .boxed()
-                },
-                CallbackKind::Machine,
-            ),
-            cache: Cache::new(),
-        }
+                    let response = crate::runtime::HttpClient::default()
+                        .get(&url)
+                        .headers(&[("Metadata-Flavor", "Google")])
+                        .send_and_get_string()
+                        .await
+                        .map_err(|e| {
+                            Error::authentication_error(
+                                MONGODB_OIDC_STR,
+                                &format!("Failed to get access token from GCP IDMS: {}", e),
+                            )
+                        });
+                    let access_token = response?;
+                    Ok(IdpServerResponse {
+                        access_token,
+                        expires: None,
+                        refresh_token: None,
+                    })
+                }
+                .boxed()
+            },
+            CallbackKind::Machine,
+        )
+    }
+
+    fn k8s_callback() -> Function {
+        Self::new_function(
+            move |_| {
+                use futures_util::FutureExt;
+                async move {
+                    let path = std::env::var("AZURE_FEDERATED_TOKEN_FILE")
+                        .or_else(|_| std::env::var("AWS_WEB_IDENTITY_TOKEN_FILE"))
+                        .unwrap_or_else(|_| {
+                            "/var/run/secrets/kubernetes.io/serviceaccount/token".to_string()
+                        });
+                    let access_token = tokio::fs::read_to_string(path).await?;
+                    Ok(IdpServerResponse {
+                        access_token,
+                        expires: None,
+                        refresh_token: None,
+                    })
+                }
+                .boxed()
+            },
+            CallbackKind::Machine,
+        )
     }
 }
 
@@ -519,21 +537,22 @@ async fn setup_automatic_providers(credential: &Credential, callback: &mut Optio
     if let Some(ref p) = credential.mechanism_properties {
         let environment = p.get_str(ENVIRONMENT_PROP_STR).unwrap_or("");
         let resource = p.get_str(TOKEN_RESOURCE_PROP_STR).unwrap_or("");
-        match environment {
+        let function = match environment {
+            #[cfg(feature = "azure-oidc")]
             AZURE_ENVIRONMENT_VALUE_STR => {
-                #[cfg(feature = "azure-oidc")]
-                {
-                    let client_id = credential.username.as_deref();
-                    *callback = Some(Callback::azure_callback(client_id, resource))
-                }
+                let client_id = credential.username.as_deref();
+                Some(Callback::azure_callback(client_id, resource))
             }
-            GCP_ENVIRONMENT_VALUE_STR => {
-                #[cfg(feature = "gcp-oidc")]
-                {
-                    *callback = Some(Callback::gcp_callback(resource))
-                }
-            }
-            _ => {}
+            #[cfg(feature = "gcp-oidc")]
+            GCP_ENVIRONMENT_VALUE_STR => Some(Callback::gcp_callback(resource)),
+            K8S_ENVIRONMENT_VALUE_STR => Some(Callback::k8s_callback()),
+            _ => None,
+        };
+        if let Some(function) = function {
+            *callback = Some(CallbackInner {
+                function,
+                cache: Cache::new(),
+            })
         }
     }
 }

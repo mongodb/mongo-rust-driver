@@ -42,6 +42,7 @@ pub(crate) const ENVIRONMENT_PROP_STR: &str = "ENVIRONMENT";
 pub(crate) const ALLOWED_HOSTS_PROP_STR: &str = "ALLOWED_HOSTS";
 pub(crate) const AZURE_ENVIRONMENT_VALUE_STR: &str = "azure";
 pub(crate) const GCP_ENVIRONMENT_VALUE_STR: &str = "gcp";
+pub(crate) const K8S_ENVIRONMENT_VALUE_STR: &str = "k8s";
 
 /// The authentication mechanisms supported by MongoDB.
 ///
