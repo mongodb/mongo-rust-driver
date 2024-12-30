@@ -23,4 +23,4 @@ pub use self::message::Message;
 pub use crate::fuzz::message_flags::MessageFlags;
 
 #[cfg(not(feature = "fuzzing"))]
-pub use message::{Message, MessageFlags};
+pub(crate) use message::{Message, MessageFlags};

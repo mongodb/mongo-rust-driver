@@ -10,8 +10,19 @@ use std::io::Cursor;
 
 /// The wire protocol op codes.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[cfg(feature = "fuzzing")]
 #[cfg_attr(feature = "fuzzing", derive(Arbitrary))]
 pub enum OpCode {
+    Reply = 1,
+    Query = 2004,
+    Message = 2013,
+    Compressed = 2012,
+}
+
+/// The wire protocol op codes.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[cfg(not(feature = "fuzzing"))]
+pub(crate) enum OpCode {
     Reply = 1,
     Query = 2004,
     Message = 2013,
@@ -36,8 +47,19 @@ impl OpCode {
 
 /// The header for any wire protocol message.
 #[derive(Debug, Clone)]
+#[cfg(feature = "fuzzing")]
 #[cfg_attr(feature = "fuzzing", derive(Arbitrary))]
 pub struct Header {
+    pub length: i32,
+    pub request_id: i32,
+    pub response_to: i32,
+    pub op_code: OpCode,
+}
+
+/// The header for any wire protocol message.
+#[derive(Debug, Clone)]
+#[cfg(not(feature = "fuzzing"))]
+pub(crate) struct Header {
     pub length: i32,
     pub request_id: i32,
     pub response_to: i32,

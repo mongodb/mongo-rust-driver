@@ -21,7 +21,7 @@ use crate::fuzz::{
 
 #[cfg(not(feature = "fuzzing"))]
 bitflags::bitflags! {
-    pub struct MessageFlags: u32 {
+    pub(crate) struct MessageFlags: u32 {
         const CHECKSUM_PRESENT = 0b_0000_0000_0000_0000_0000_0000_0000_0001;
         const MORE_TO_COME =  0b_0000_0000_0000_0000_0000_0000_0000_0010;
         const EXHAUST_ALLOWED = 0b_0000_0000_0000_0001_0000_0000_0000_0000;
@@ -64,8 +64,42 @@ const DEFAULT_MAX_MESSAGE_SIZE_BYTES: i32 = 48 * 1024 * 1024;
 
 /// Represents an OP_MSG wire protocol operation.
 #[derive(Debug, Clone)]
+#[cfg(feature = "fuzzing")]
 #[cfg_attr(feature = "fuzzing", derive(Arbitrary))]
 pub struct Message {
+    /// OP_MSG flags
+    pub flags: MessageFlags,
+
+    /// OP_MSG payload type 0 (the main document)
+    #[cfg_attr(feature = "fuzzing", arbitrary(with = generate_raw_document))]
+    pub(crate) document_payload: RawDocumentBuf,
+
+    /// OP_MSG payload type 1 (document sequences)
+    #[cfg_attr(feature = "fuzzing", arbitrary(with = generate_document_sequences))]
+    pub(crate) document_sequences: Vec<DocumentSequence>,
+
+    /// Optional CRC32C checksum
+    pub(crate) checksum: Option<u32>,
+
+    /// Request ID for the message
+    pub(crate) request_id: Option<i32>,
+
+    /// Response to request ID
+    pub response_to: i32,
+
+    /// Whether the message should be compressed
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
+    pub(crate) should_compress: bool,
+}
+
+/// Represents an OP_MSG wire protocol operation.
+#[derive(Debug, Clone)]
+#[cfg(not(feature = "fuzzing"))]
+pub(crate) struct Message {
     /// OP_MSG flags
     pub flags: MessageFlags,
 
