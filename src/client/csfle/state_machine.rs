@@ -2,11 +2,12 @@ use std::{
     convert::TryInto,
     ops::DerefMut,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
-use mongocrypt::ctx::{Ctx, KmsProviderType, State};
+use mongocrypt::ctx::{Ctx, KmsCtx, KmsProviderType, State};
 use rayon::ThreadPool;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -14,7 +15,7 @@ use tokio::{
 };
 
 use crate::{
-    client::{options::ServerAddress, WeakClient},
+    client::{csfle::options::KmsProvidersTlsOptions, options::ServerAddress, WeakClient},
     error::{Error, Result},
     operation::{run_command::RunCommand, RawOutput},
     options::ReadConcern,
@@ -174,37 +175,62 @@ impl CryptExecutor {
                 State::NeedKms => {
                     let ctx = result_mut(&mut ctx)?;
                     let scope = ctx.kms_scope();
-                    let mut kms_ctxen: Vec<Result<_>> = vec![];
-                    while let Some(kms_ctx) = scope.next_kms_ctx() {
-                        kms_ctxen.push(Ok(kms_ctx));
+
+                    async fn execute(
+                        kms_ctx: &mut KmsCtx<'_>,
+                        tls_options: Option<&KmsProvidersTlsOptions>,
+                    ) -> Result<()> {
+                        let endpoint = kms_ctx.endpoint()?;
+                        let addr = ServerAddress::parse(endpoint)?;
+                        let provider = kms_ctx.kms_provider()?;
+                        let tls_options = tls_options
+                            .and_then(|tls| tls.get(&provider))
+                            .cloned()
+                            .unwrap_or_default();
+                        let mut stream =
+                            AsyncStream::connect(addr, Some(&TlsConfig::new(tls_options)?)).await?;
+                        stream.write_all(kms_ctx.message()?).await?;
+                        let mut buf = vec![0];
+                        while kms_ctx.bytes_needed() > 0 {
+                            let buf_size = kms_ctx.bytes_needed().try_into().map_err(|e| {
+                                Error::internal(format!("buffer size overflow: {}", e))
+                            })?;
+                            buf.resize(buf_size, 0);
+                            let count = stream.read(&mut buf).await?;
+                            kms_ctx.feed(&buf[0..count])?;
+                        }
+                        Ok(())
                     }
-                    stream::iter(kms_ctxen)
-                        .try_for_each_concurrent(None, |mut kms_ctx| async move {
-                            let endpoint = kms_ctx.endpoint()?;
-                            let addr = ServerAddress::parse(endpoint)?;
-                            let provider = kms_ctx.kms_provider()?;
-                            let tls_options = self
-                                .kms_providers
-                                .tls_options()
-                                .and_then(|tls| tls.get(&provider))
-                                .cloned()
-                                .unwrap_or_default();
-                            let mut stream =
-                                AsyncStream::connect(addr, Some(&TlsConfig::new(tls_options)?))
-                                    .await?;
-                            stream.write_all(kms_ctx.message()?).await?;
-                            let mut buf = vec![0];
-                            while kms_ctx.bytes_needed() > 0 {
-                                let buf_size = kms_ctx.bytes_needed().try_into().map_err(|e| {
-                                    Error::internal(format!("buffer size overflow: {}", e))
-                                })?;
-                                buf.resize(buf_size, 0);
-                                let count = stream.read(&mut buf).await?;
-                                kms_ctx.feed(&buf[0..count])?;
-                            }
-                            Ok(())
-                        })
-                        .await?;
+
+                    loop {
+                        let mut kms_contexts: Vec<Result<_>> = Vec::new();
+                        while let Some(kms_ctx) = scope.next_kms_ctx() {
+                            kms_contexts.push(Ok(kms_ctx));
+                        }
+                        if kms_contexts.is_empty() {
+                            break;
+                        }
+
+                        stream::iter(kms_contexts)
+                            .try_for_each_concurrent(None, |mut kms_ctx| async move {
+                                let sleep_micros =
+                                    u64::try_from(kms_ctx.sleep_micros()).unwrap_or(0);
+                                if sleep_micros > 0 {
+                                    tokio::time::sleep(Duration::from_micros(sleep_micros)).await;
+                                }
+
+                                if let Err(error) =
+                                    execute(&mut kms_ctx, self.kms_providers.tls_options()).await
+                                {
+                                    if !kms_ctx.retry_failure() {
+                                        return Err(error);
+                                    }
+                                }
+
+                                Ok(())
+                            })
+                            .await?;
+                    }
                 }
                 State::NeedKmsCredentials => {
                     let ctx = result_mut(&mut ctx)?;
