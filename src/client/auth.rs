@@ -43,6 +43,15 @@ pub(crate) const ALLOWED_HOSTS_PROP_STR: &str = "ALLOWED_HOSTS";
 pub(crate) const AZURE_ENVIRONMENT_VALUE_STR: &str = "azure";
 pub(crate) const GCP_ENVIRONMENT_VALUE_STR: &str = "gcp";
 pub(crate) const K8S_ENVIRONMENT_VALUE_STR: &str = "k8s";
+#[cfg(test)]
+const TEST_ENVIRONMENT_VALUE_STR: &str = "test";
+const VALID_ENVIRONMENTS: &[&str] = &[
+    AZURE_ENVIRONMENT_VALUE_STR,
+    GCP_ENVIRONMENT_VALUE_STR,
+    K8S_ENVIRONMENT_VALUE_STR,
+    #[cfg(test)]
+    TEST_ENVIRONMENT_VALUE_STR,
+];
 
 /// The authentication mechanisms supported by MongoDB.
 ///
@@ -203,6 +212,12 @@ impl AuthMechanism {
                         MONGODB_OIDC_STR, ENVIRONMENT_PROP_STR
                     )));
                 }
+                if environment.is_err() && !credential.oidc_callback.is_user_provided() {
+                    return Err(Error::invalid_argument(format!(
+                        "{} authentication requires either `{}` or callback set",
+                        MONGODB_OIDC_STR, ENVIRONMENT_PROP_STR
+                    )));
+                }
                 let has_token_resource = credential
                     .mechanism_properties
                     .as_ref()
@@ -245,11 +260,26 @@ impl AuthMechanism {
                         MONGODB_OIDC_STR, credential.source
                     )));
                 }
+                #[cfg(test)]
+                if environment == Ok(TEST_ENVIRONMENT_VALUE_STR) && credential.username.is_some() {
+                    return Err(Error::invalid_argument(format!(
+                        "username must not be set for {} authentication in the {} {}",
+                        MONGODB_OIDC_STR, TEST_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR,
+                    )));
+                }
                 if credential.password.is_some() {
                     return Err(Error::invalid_argument(format!(
                         "password must not be set for {} authentication",
                         MONGODB_OIDC_STR
                     )));
+                }
+                if let Ok(env) = environment {
+                    if VALID_ENVIRONMENTS.iter().all(|e| *e != env) {
+                        return Err(Error::invalid_argument(format!(
+                            "unsupported environment for {} authentication: {}",
+                            MONGODB_OIDC_STR, env,
+                        )));
+                    }
                 }
                 if let Some(allowed_hosts) = credential
                     .mechanism_properties
