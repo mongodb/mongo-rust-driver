@@ -239,7 +239,7 @@ mod basic {
     #[tokio::test]
     async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Result<()> {
         get_env_or_skip!("OIDC");
-        use crate::client::auth::{ENVIRONMENT_PROP_STR, TOKEN_RESOURCE_PROP_STR};
+        use crate::client::auth::oidc::{ENVIRONMENT_PROP_STR, TOKEN_RESOURCE_PROP_STR};
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
@@ -585,7 +585,7 @@ mod basic {
     #[tokio::test]
     async fn human_1_6_allowed_hosts_blocked() -> anyhow::Result<()> {
         get_env_or_skip!("OIDC");
-        use crate::client::auth::ALLOWED_HOSTS_PROP_STR;
+        use crate::client::auth::oidc::ALLOWED_HOSTS_PROP_STR;
         {
             // we need to assert the callback count
             let call_count = Arc::new(Mutex::new(0));
@@ -1220,7 +1220,7 @@ mod azure {
     #[tokio::test]
     async fn machine_5_3_token_resource_must_be_set_for_azure() -> anyhow::Result<()> {
         get_env_or_skip!("OIDC");
-        use crate::client::auth::{AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR};
+        use crate::client::auth::oidc::{AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR};
 
         let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
         opts.credential.as_mut().unwrap().mechanism_properties = Some(doc! {
@@ -1264,7 +1264,7 @@ mod gcp {
     #[tokio::test]
     async fn machine_5_5_token_resource_must_be_set_for_gcp() -> anyhow::Result<()> {
         get_env_or_skip!("OIDC");
-        use crate::client::auth::{ENVIRONMENT_PROP_STR, GCP_ENVIRONMENT_VALUE_STR};
+        use crate::client::auth::oidc::{ENVIRONMENT_PROP_STR, GCP_ENVIRONMENT_VALUE_STR};
 
         let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
         opts.credential.as_mut().unwrap().source = None;

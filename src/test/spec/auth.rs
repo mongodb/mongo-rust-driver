@@ -72,6 +72,13 @@ async fn run_auth_test(test_file: TestFile) {
         {
             continue;
         }
+        // Lack of callback can't be validated from just URI parsing, as it's set in code
+        if test_case
+            .description
+            .contains("should throw an exception if neither environment nor callbacks specified")
+        {
+            continue;
+        }
 
         match ClientOptions::parse(test_case.uri.as_str()).await {
             Ok(options) => {

@@ -37,21 +37,6 @@ const MONGODB_AWS_STR: &str = "MONGODB-AWS";
 const MONGODB_X509_STR: &str = "MONGODB-X509";
 const PLAIN_STR: &str = "PLAIN";
 const MONGODB_OIDC_STR: &str = "MONGODB-OIDC";
-pub(crate) const TOKEN_RESOURCE_PROP_STR: &str = "TOKEN_RESOURCE";
-pub(crate) const ENVIRONMENT_PROP_STR: &str = "ENVIRONMENT";
-pub(crate) const ALLOWED_HOSTS_PROP_STR: &str = "ALLOWED_HOSTS";
-pub(crate) const AZURE_ENVIRONMENT_VALUE_STR: &str = "azure";
-pub(crate) const GCP_ENVIRONMENT_VALUE_STR: &str = "gcp";
-pub(crate) const K8S_ENVIRONMENT_VALUE_STR: &str = "k8s";
-#[cfg(test)]
-const TEST_ENVIRONMENT_VALUE_STR: &str = "test";
-const VALID_ENVIRONMENTS: &[&str] = &[
-    AZURE_ENVIRONMENT_VALUE_STR,
-    GCP_ENVIRONMENT_VALUE_STR,
-    K8S_ENVIRONMENT_VALUE_STR,
-    #[cfg(test)]
-    TEST_ENVIRONMENT_VALUE_STR,
-];
 
 /// The authentication mechanisms supported by MongoDB.
 ///
@@ -199,102 +184,7 @@ impl AuthMechanism {
 
                 Ok(())
             }
-            AuthMechanism::MongoDbOidc => {
-                let default_document = &Document::new();
-                let environment = credential
-                    .mechanism_properties
-                    .as_ref()
-                    .unwrap_or(default_document)
-                    .get_str(ENVIRONMENT_PROP_STR);
-                if environment.is_ok() && credential.oidc_callback.is_user_provided() {
-                    return Err(Error::invalid_argument(format!(
-                        "OIDC callback cannot be set for {} authentication, if an `{}` is set",
-                        MONGODB_OIDC_STR, ENVIRONMENT_PROP_STR
-                    )));
-                }
-                if environment.is_err() && !credential.oidc_callback.is_user_provided() {
-                    return Err(Error::invalid_argument(format!(
-                        "{} authentication requires either `{}` or callback set",
-                        MONGODB_OIDC_STR, ENVIRONMENT_PROP_STR
-                    )));
-                }
-                let has_token_resource = credential
-                    .mechanism_properties
-                    .as_ref()
-                    .unwrap_or(default_document)
-                    .contains_key(TOKEN_RESOURCE_PROP_STR);
-                match environment {
-                    Ok(AZURE_ENVIRONMENT_VALUE_STR) | Ok(GCP_ENVIRONMENT_VALUE_STR) => {
-                        if !has_token_resource {
-                            return Err(Error::invalid_argument(format!(
-                                "`{}` must be set for {} authentication in the `{}` or `{}` `{}`",
-                                TOKEN_RESOURCE_PROP_STR,
-                                MONGODB_OIDC_STR,
-                                AZURE_ENVIRONMENT_VALUE_STR,
-                                GCP_ENVIRONMENT_VALUE_STR,
-                                ENVIRONMENT_PROP_STR,
-                            )));
-                        }
-                    }
-                    _ => {
-                        if has_token_resource {
-                            return Err(Error::invalid_argument(format!(
-                                "`{}` must not be set for {} authentication unless using the `{}` \
-                                 or `{}` `{}`",
-                                TOKEN_RESOURCE_PROP_STR,
-                                MONGODB_OIDC_STR,
-                                AZURE_ENVIRONMENT_VALUE_STR,
-                                GCP_ENVIRONMENT_VALUE_STR,
-                                ENVIRONMENT_PROP_STR,
-                            )));
-                        }
-                    }
-                }
-                if credential
-                    .source
-                    .as_ref()
-                    .map_or(false, |s| s != "$external")
-                {
-                    return Err(Error::invalid_argument(format!(
-                        "source must be $external for {} authentication, found: {:?}",
-                        MONGODB_OIDC_STR, credential.source
-                    )));
-                }
-                #[cfg(test)]
-                if environment == Ok(TEST_ENVIRONMENT_VALUE_STR) && credential.username.is_some() {
-                    return Err(Error::invalid_argument(format!(
-                        "username must not be set for {} authentication in the {} {}",
-                        MONGODB_OIDC_STR, TEST_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR,
-                    )));
-                }
-                if credential.password.is_some() {
-                    return Err(Error::invalid_argument(format!(
-                        "password must not be set for {} authentication",
-                        MONGODB_OIDC_STR
-                    )));
-                }
-                if let Ok(env) = environment {
-                    if VALID_ENVIRONMENTS.iter().all(|e| *e != env) {
-                        return Err(Error::invalid_argument(format!(
-                            "unsupported environment for {} authentication: {}",
-                            MONGODB_OIDC_STR, env,
-                        )));
-                    }
-                }
-                if let Some(allowed_hosts) = credential
-                    .mechanism_properties
-                    .as_ref()
-                    .and_then(|p| p.get(ALLOWED_HOSTS_PROP_STR))
-                {
-                    allowed_hosts.as_array().ok_or_else(|| {
-                        Error::invalid_argument(format!(
-                            "`{}` must be an array",
-                            ALLOWED_HOSTS_PROP_STR
-                        ))
-                    })?;
-                }
-                Ok(())
-            }
+            AuthMechanism::MongoDbOidc => oidc::validate_credential(credential),
             _ => Ok(()),
         }
     }
