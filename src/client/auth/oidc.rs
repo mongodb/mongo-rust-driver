@@ -7,20 +7,20 @@ use std::{
 use tokio::sync::Mutex;
 use typed_builder::TypedBuilder;
 
+#[cfg(feature = "azure-oidc")]
+use crate::client::auth::AZURE_ENVIRONMENT_VALUE_STR;
+#[cfg(feature = "gcp-oidc")]
+use crate::client::auth::GCP_ENVIRONMENT_VALUE_STR;
 #[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
-use crate::client::auth::{
-    AZURE_ENVIRONMENT_VALUE_STR,
-    ENVIRONMENT_PROP_STR,
-    GCP_ENVIRONMENT_VALUE_STR,
-    K8S_ENVIRONMENT_VALUE_STR,
-    TOKEN_RESOURCE_PROP_STR,
-};
+use crate::client::auth::TOKEN_RESOURCE_PROP_STR;
 use crate::{
     client::{
         auth::{
             sasl::{SaslResponse, SaslStart},
             AuthMechanism,
             ALLOWED_HOSTS_PROP_STR,
+            ENVIRONMENT_PROP_STR,
+            K8S_ENVIRONMENT_VALUE_STR,
         },
         options::{ServerAddress, ServerApi},
     },
@@ -525,7 +525,6 @@ pub(crate) async fn reauthenticate_stream(
     authenticate_stream(conn, credential, server_api, None).await
 }
 
-#[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
 async fn setup_automatic_providers(credential: &Credential, callback: &mut Option<CallbackInner>) {
     // If there is already a function, there is no need to set up an automatic provider
     // this could happen in the case of a reauthentication, or if the user has already set up
@@ -536,6 +535,7 @@ async fn setup_automatic_providers(credential: &Credential, callback: &mut Optio
     }
     if let Some(ref p) = credential.mechanism_properties {
         let environment = p.get_str(ENVIRONMENT_PROP_STR).unwrap_or("");
+        #[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
         let resource = p.get_str(TOKEN_RESOURCE_PROP_STR).unwrap_or("");
         let function = match environment {
             #[cfg(feature = "azure-oidc")]
@@ -568,7 +568,6 @@ pub(crate) async fn authenticate_stream(
     // always matches that in the Credential Cache.
     let mut guard = credential.oidc_callback.inner.lock().await;
 
-    #[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
     setup_automatic_providers(credential, &mut guard).await;
     let CallbackInner {
         cache,
