@@ -13,7 +13,7 @@ use crate::{
     Collection,
 };
 
-use super::{action_impl, deeplink, option_setters, CollRef};
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc, CollRef};
 
 impl<T: Serialize + Send + Sync> Collection<T> {
     /// Inserts the data in `docs` into the collection.
@@ -28,6 +28,7 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     ///
     /// `await` will return d[`Result<InsertManyResult>`].
     #[deeplink]
+    #[options_doc(insert_many)]
     pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
         InsertMany {
             coll: CollRef::new(self),
@@ -55,6 +56,7 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](InsertMany::run) will return d[`Result<InsertManyResult>`].
     #[deeplink]
+    #[options_doc(insert_many, sync)]
     pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
         self.async_collection.insert_many(docs)
     }
@@ -69,14 +71,9 @@ pub struct InsertMany<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
+#[option_setters(crate::coll::options::InsertManyOptions)]
+#[export_doc(insert_many)]
 impl<'a> InsertMany<'a> {
-    option_setters! { options: InsertManyOptions;
-        bypass_document_validation: bool,
-        ordered: bool,
-        write_concern: WriteConcern,
-        comment: Bson,
-    }
-
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());

@@ -1,4 +1,5 @@
 //! Contains options for ChangeStreams.
+use macro_magic::export_tokens;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::time::Duration;
@@ -20,6 +21,7 @@ use crate::{
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[export_tokens]
 pub struct ChangeStreamOptions {
     #[rustfmt::skip]
     /// Configures how the

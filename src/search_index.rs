@@ -37,6 +37,7 @@ pub enum SearchIndexType {
 pub mod options {
     #[cfg(docsrs)]
     use crate::Collection;
+    use macro_magic::export_tokens;
     use serde::Deserialize;
     use typed_builder::TypedBuilder;
 
@@ -45,6 +46,7 @@ pub mod options {
     #[derive(Clone, Debug, Default, TypedBuilder, Deserialize)]
     #[builder(field_defaults(default, setter(into)))]
     #[non_exhaustive]
+    #[export_tokens]
     pub struct CreateSearchIndexOptions {}
 
     /// Options for [Collection::update_search_index].  Present to allow additional options to be
@@ -52,6 +54,7 @@ pub mod options {
     #[derive(Clone, Debug, Default, TypedBuilder, Deserialize)]
     #[builder(field_defaults(default, setter(into)))]
     #[non_exhaustive]
+    #[export_tokens]
     pub struct UpdateSearchIndexOptions {}
 
     /// Options for [Collection::list_search_indexes].  Present to allow additional options to be
@@ -59,6 +62,7 @@ pub mod options {
     #[derive(Clone, Debug, Default, TypedBuilder, Deserialize)]
     #[builder(field_defaults(default, setter(into)))]
     #[non_exhaustive]
+    #[export_tokens]
     pub struct ListSearchIndexOptions {}
 
     /// Options for [Collection::drop_search_index].  Present to allow additional options to be
@@ -66,5 +70,6 @@ pub mod options {
     #[derive(Clone, Debug, Default, TypedBuilder, Deserialize)]
     #[builder(field_defaults(default, setter(into)))]
     #[non_exhaustive]
+    #[export_tokens]
     pub struct DropSearchIndexOptions {}
 }

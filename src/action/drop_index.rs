@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use bson::Bson;
 
-use super::{action_impl, deeplink, option_setters, CollRef};
 use crate::{
     coll::options::DropIndexOptions,
     error::{ErrorKind, Result},
@@ -12,6 +11,8 @@ use crate::{
     Collection,
 };
 
+use super::{action_impl, deeplink, export_doc, option_setters, options_doc, CollRef};
+
 impl<T> Collection<T>
 where
     T: Send + Sync,
@@ -20,6 +21,7 @@ where
     ///
     /// `await` will return d[`Result<()>`].
     #[deeplink]
+    #[options_doc(drop_index)]
     pub fn drop_index(&self, name: impl AsRef<str>) -> DropIndex {
         DropIndex {
             coll: CollRef::new(self),
@@ -33,6 +35,7 @@ where
     ///
     /// `await` will return d[`Result<()>`].
     #[deeplink]
+    #[options_doc(drop_index)]
     pub fn drop_indexes(&self) -> DropIndex {
         DropIndex {
             coll: CollRef::new(self),
@@ -52,6 +55,7 @@ where
     ///
     /// [`run`](DropIndex::run) will return d[`Result<()>`].
     #[deeplink]
+    #[options_doc(drop_index, sync)]
     pub fn drop_index(&self, name: impl AsRef<str>) -> DropIndex {
         self.async_collection.drop_index(name)
     }
@@ -60,6 +64,7 @@ where
     ///
     /// [`run`](DropIndex::run) will return d[`Result<()>`].
     #[deeplink]
+    #[options_doc(drop_index, sync)]
     pub fn drop_indexes(&self) -> DropIndex {
         self.async_collection.drop_indexes()
     }
@@ -75,13 +80,9 @@ pub struct DropIndex<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
+#[option_setters(crate::coll::options::DropIndexOptions)]
+#[export_doc(drop_index)]
 impl<'a> DropIndex<'a> {
-    option_setters!(options: DropIndexOptions;
-        max_time: Duration,
-        write_concern: WriteConcern,
-        comment: Bson,
-    );
-
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());

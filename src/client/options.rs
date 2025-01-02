@@ -19,6 +19,7 @@ use std::{
 
 use bson::UuidRepresentation;
 use derive_where::derive_where;
+use macro_magic::export_tokens;
 use once_cell::sync::Lazy;
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 use serde_with::skip_serializing_none;
@@ -2663,6 +2664,7 @@ mod tests {
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[export_tokens]
 pub struct SessionOptions {
     /// The default options to use for transactions started on this session.
     ///
@@ -2705,6 +2707,7 @@ impl SessionOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[export_tokens]
 pub struct TransactionOptions {
     /// The read concern to use for the transaction.
     #[builder(default)]

@@ -1,7 +1,7 @@
 use bson::{doc, Bson};
 
 use crate::{
-    action::{action_impl, deeplink, option_setters},
+    action::{action_impl, deeplink, export_doc, option_setters, options_doc},
     error::{ErrorKind, GridFsErrorKind, GridFsFileIdentifier, Result},
     gridfs::{
         FilesCollectionDocument,
@@ -31,6 +31,7 @@ impl GridFsBucket {
     ///
     /// `await` will return d[`Result<GridFsDownloadStream>`].
     #[deeplink]
+    #[options_doc(download_by_name)]
     pub fn open_download_stream_by_name(
         &self,
         filename: impl Into<String>,
@@ -114,6 +115,7 @@ impl crate::sync::gridfs::GridFsBucket {
     ///
     /// [`run`](OpenDownloadStreamByName::run) will return d[`Result<GridFsDownloadStream>`].
     #[deeplink]
+    #[options_doc(download_by_name, sync)]
     pub fn open_download_stream_by_name(
         &self,
         filename: impl Into<String>,
@@ -151,11 +153,9 @@ pub struct OpenDownloadStreamByName<'a> {
     options: Option<GridFsDownloadByNameOptions>,
 }
 
-impl OpenDownloadStreamByName<'_> {
-    option_setters! { options: GridFsDownloadByNameOptions;
-        revision: i32,
-    }
-}
+#[option_setters(crate::gridfs::GridFsDownloadByNameOptions)]
+#[export_doc(download_by_name)]
+impl OpenDownloadStreamByName<'_> {}
 
 #[action_impl(sync = crate::sync::gridfs::GridFsDownloadStream)]
 impl<'a> Action for OpenDownloadStreamByName<'a> {

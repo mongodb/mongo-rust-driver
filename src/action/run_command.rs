@@ -1,7 +1,10 @@
-use bson::Document;
+use std::time::Duration;
+
+use bson::{Bson, Document};
 
 use crate::{
     client::session::TransactionState,
+    coll::options::CursorType,
     db::options::{RunCommandOptions, RunCursorCommandOptions},
     error::{ErrorKind, Result},
     operation::{run_command, run_cursor_command},
@@ -12,7 +15,15 @@ use crate::{
     SessionCursor,
 };
 
-use super::{action_impl, deeplink, option_setters, ExplicitSession, ImplicitSession};
+use super::{
+    action_impl,
+    deeplink,
+    export_doc,
+    option_setters,
+    options_doc,
+    ExplicitSession,
+    ImplicitSession,
+};
 
 impl Database {
     /// Runs a database-level command.
@@ -25,6 +36,7 @@ impl Database {
     ///
     /// `await` will return d[`Result<Document>`].
     #[deeplink]
+    #[options_doc(run_command)]
     pub fn run_command(&self, command: Document) -> RunCommand {
         RunCommand {
             db: self,
@@ -39,6 +51,7 @@ impl Database {
     /// `await` will return d[`Result<Cursor<Document>>`] or a
     /// d[`Result<SessionCursor<Document>>`] if a [`ClientSession`] is provided.
     #[deeplink]
+    #[options_doc(run_cursor_command)]
     pub fn run_cursor_command(&self, command: Document) -> RunCursorCommand {
         RunCursorCommand {
             db: self,
@@ -61,6 +74,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](RunCommand::run) will return d[`Result<Document>`].
     #[deeplink]
+    #[options_doc(run_command, sync)]
     pub fn run_command(&self, command: Document) -> RunCommand {
         self.async_database.run_command(command)
     }
@@ -70,6 +84,7 @@ impl crate::sync::Database {
     /// [`run`](RunCursorCommand::run) will return d[`Result<crate::sync::Cursor<Document>>`] or a
     /// d[`Result<crate::sync::SessionCursor<Document>>`] if a [`ClientSession`] is provided.
     #[deeplink]
+    #[options_doc(run_cursor_command, sync)]
     pub fn run_cursor_command(&self, command: Document) -> RunCursorCommand {
         self.async_database.run_cursor_command(command)
     }
@@ -84,11 +99,9 @@ pub struct RunCommand<'a> {
     session: Option<&'a mut ClientSession>,
 }
 
+#[option_setters(crate::db::options::RunCommandOptions)]
+#[export_doc(run_command)]
 impl<'a> RunCommand<'a> {
-    option_setters!(options: RunCommandOptions;
-        selection_criteria: SelectionCriteria,
-    );
-
     /// Run the command using the provided [`ClientSession`].
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());
@@ -149,15 +162,9 @@ pub struct RunCursorCommand<'a, Session = ImplicitSession> {
     session: Session,
 }
 
-impl<Session> RunCursorCommand<'_, Session> {
-    option_setters!(options: RunCursorCommandOptions;
-        selection_criteria: SelectionCriteria,
-        cursor_type: crate::coll::options::CursorType,
-        batch_size: u32,
-        max_time: std::time::Duration,
-        comment: bson::Bson,
-    );
-}
+#[option_setters(crate::db::options::RunCursorCommandOptions)]
+#[export_doc(run_cursor_command, extra = [session])]
+impl<Session> RunCursorCommand<'_, Session> {}
 
 impl<'a> RunCursorCommand<'a, ImplicitSession> {
     /// Run the command using the provided [`ClientSession`].

@@ -17,7 +17,9 @@ use crate::{
 use super::{
     action_impl,
     deeplink,
+    export_doc,
     option_setters,
+    options_doc,
     ExplicitSession,
     ImplicitSession,
     ListNames,
@@ -29,6 +31,7 @@ impl Database {
     ///
     /// `await` will return d[`Result<Cursor<CollectionSpecification>>`].
     #[deeplink]
+    #[options_doc(list_collections)]
     pub fn list_collections(&self) -> ListCollections {
         ListCollections {
             db: self,
@@ -42,6 +45,7 @@ impl Database {
     ///
     /// `await` will return d[`Result<Vec<String>>`].
     #[deeplink]
+    #[options_doc(list_collections)]
     pub fn list_collection_names(&self) -> ListCollections<'_, ListNames> {
         ListCollections {
             db: self,
@@ -59,6 +63,7 @@ impl crate::sync::Database {
     /// [`run`](ListCollections::run) will return
     /// d[`Result<Cursor<CollectionSpecification>>`].
     #[deeplink]
+    #[options_doc(list_collections, sync)]
     pub fn list_collections(&self) -> ListCollections {
         self.async_database.list_collections()
     }
@@ -67,6 +72,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](ListCollections::run) will return d[`Result<Vec<String>>`].
     #[deeplink]
+    #[options_doc(list_collections, sync)]
     pub fn list_collection_names(&self) -> ListCollections<'_, ListNames> {
         self.async_database.list_collection_names()
     }
@@ -82,14 +88,9 @@ pub struct ListCollections<'a, M = ListSpecifications, S = ImplicitSession> {
     session: S,
 }
 
-impl<M, S> ListCollections<'_, M, S> {
-    option_setters!(options: ListCollectionsOptions;
-        filter: Document,
-        batch_size: u32,
-        comment: Bson,
-        authorized_collections: bool,
-    );
-}
+#[option_setters(crate::db::options::ListCollectionsOptions)]
+#[export_doc(list_collections, extra = [session])]
+impl<M, S> ListCollections<'_, M, S> {}
 
 impl<'a, M> ListCollections<'a, M, ImplicitSession> {
     /// Use the provided session when running the operation.

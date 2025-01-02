@@ -13,7 +13,16 @@ use crate::{
     IndexModel,
 };
 
-use super::{action_impl, deeplink, option_setters, CollRef, Multiple, Single};
+use super::{
+    action_impl,
+    deeplink,
+    export_doc,
+    option_setters,
+    options_doc,
+    CollRef,
+    Multiple,
+    Single,
+};
 
 impl<T> Collection<T>
 where
@@ -23,6 +32,7 @@ where
     ///
     /// `await` will return d[`Result<CreateIndexResult>`].
     #[deeplink]
+    #[options_doc(create_index)]
     pub fn create_index(&self, index: IndexModel) -> CreateIndex {
         CreateIndex {
             coll: CollRef::new(self),
@@ -37,6 +47,7 @@ where
     ///
     /// `await` will return d[`Result<CreateIndexesResult>`].
     #[deeplink]
+    #[options_doc(create_index)]
     pub fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
@@ -60,6 +71,7 @@ where
     ///
     /// [`run`](CreateIndex::run) will return d[`Result<CreateIndexResult>`].
     #[deeplink]
+    #[options_doc(create_index, sync)]
     pub fn create_index(&self, index: IndexModel) -> CreateIndex {
         self.async_collection.create_index(index)
     }
@@ -68,6 +80,7 @@ where
     ///
     /// [`run`](CreateIndex::run) will return d[`Result<CreateIndexesResult>`].
     #[deeplink]
+    #[options_doc(create_index, sync)]
     pub fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
@@ -87,14 +100,9 @@ pub struct CreateIndex<'a, M = Single> {
     _mode: PhantomData<M>,
 }
 
+#[option_setters(crate::coll::options::CreateIndexOptions)]
+#[export_doc(create_index)]
 impl<'a, M> CreateIndex<'a, M> {
-    option_setters!(options: CreateIndexOptions;
-        commit_quorum: CommitQuorum,
-        max_time: Duration,
-        write_concern: WriteConcern,
-        comment: Bson,
-    );
-
     /// Use the provided session when running the operation.
     pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
         self.session = Some(value.into());

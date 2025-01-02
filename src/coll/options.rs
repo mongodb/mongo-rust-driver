@@ -111,6 +111,7 @@ pub enum CursorType {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct InsertOneOptions {
     /// Opt out of document-level validation.
     pub bypass_document_validation: Option<bool>,
@@ -132,6 +133,7 @@ pub struct InsertOneOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[export_tokens]
 pub struct InsertManyOptions {
     /// Opt out of document-level validation.
     pub bypass_document_validation: Option<bool>,
@@ -199,6 +201,7 @@ impl From<Vec<Document>> for UpdateModifications {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct UpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
     ///
@@ -271,6 +274,7 @@ impl UpdateOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct ReplaceOptions {
     /// Opt out of document-level validation.
     pub bypass_document_validation: Option<bool>,
@@ -322,6 +326,7 @@ pub struct ReplaceOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct DeleteOptions {
     /// The collation to use for the operation.
     ///
@@ -359,6 +364,7 @@ pub struct DeleteOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct FindOneAndDeleteOptions {
     /// The maximum amount of time to allow the query to run.
     ///
@@ -408,6 +414,7 @@ pub struct FindOneAndDeleteOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[export_tokens]
 pub struct FindOneAndReplaceOptions {
     /// Opt out of document-level validation.
     pub bypass_document_validation: Option<bool>,
@@ -466,6 +473,7 @@ pub struct FindOneAndReplaceOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct FindOneAndUpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
     ///
@@ -721,6 +729,7 @@ pub struct EstimatedDocumentCountOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
+#[export_tokens]
 pub struct DistinctOptions {
     /// The maximum amount of time to allow the query to run.
     ///
@@ -1025,6 +1034,7 @@ pub struct FindOneOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[non_exhaustive]
+#[export_tokens]
 pub struct CreateIndexOptions {
     /// Specify the commit quorum needed to mark an `index` as ready.
     pub commit_quorum: Option<CommitQuorum>,
@@ -1058,6 +1068,7 @@ pub struct CreateIndexOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct DropCollectionOptions {
     /// The write concern for the operation.
     pub write_concern: Option<WriteConcern>,
@@ -1078,6 +1089,7 @@ pub struct DropCollectionOptions {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct DropIndexOptions {
     /// The maximum amount of time to allow the index to drop.
     ///
@@ -1108,6 +1120,7 @@ pub struct DropIndexOptions {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[export_tokens]
 pub struct ListIndexesOptions {
     /// The maximum amount of time to search for the index.
     ///

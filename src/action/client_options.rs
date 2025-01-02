@@ -1,10 +1,11 @@
 use macro_magic::export_tokens;
-use mongodb_internal_macros::options_doc;
 
 use crate::{
     client::options::{ClientOptions, ConnectionString, ResolverConfig},
     error::{Error, Result},
 };
+
+use super::options_doc;
 
 impl ClientOptions {
     /// Parses a MongoDB connection string (as either a `&str` or a [`ConnectionString`]) into a
