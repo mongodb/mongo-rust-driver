@@ -1719,6 +1719,7 @@ functions:
         script: |
           ${PREPARE_SHELL}
           export OIDC="oidc"
+          export OIDC_ENV="test"
           .evergreen/run-mongodb-oidc-test.sh
 
   "start happy eyeballs server":

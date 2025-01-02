@@ -5,8 +5,6 @@ set -o errexit  # Exit the script with error if any of the commands fail
 
 echo "Running MONGODB-OIDC authentication tests"
 
-OIDC_ENV=${OIDC_ENV:-"test"}
-
 export TEST_AUTH_OIDC=1
 export COVERAGE=1
 export AUTH="auth"
@@ -35,8 +33,10 @@ elif [ $OIDC_ENV == "gcp" ]; then
 
     $TEST_FILE test::spec::oidc::gcp --nocapture
     RESULT=$?
+elif [[ -z $OIDC_ENV && -n $K8S_VARIANT ]]; then
+    echo placeholder
 else
-    echo "Unrecognized OIDC_ENV $OIDC_ENV"
+    echo "Unrecognized OIDC_ENV '${OIDC_ENV}'"
     exit 1
 fi
 
