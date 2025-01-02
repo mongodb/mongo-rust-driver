@@ -3,8 +3,7 @@ macro_rules! get_env_or_skip {
         match std::env::var($env_var) {
             Ok(val) => val,
             Err(_) => {
-                use crate::test::log_uncaptured;
-                log_uncaptured(&format!("Skipping test, {} not set", $env_var));
+                crate::test::log_uncaptured(&format!("Skipping test, {} not set", $env_var));
                 return Ok(());
             }
         }
@@ -1283,6 +1282,28 @@ mod gcp {
             *res.unwrap_err().kind,
             crate::error::ErrorKind::InvalidArgument { .. },
         ));
+        Ok(())
+    }
+}
+
+mod k8s {
+    use crate::{
+        bson::{doc, Document},
+        Client,
+    };
+
+    // There's no spec test for K8s, so we run this simple sanity check.
+    #[tokio::test]
+    async fn successfully_authenticates() -> anyhow::Result<()> {
+        get_env_or_skip!("OIDC");
+
+        let client = Client::with_uri_str(mongodb_uri_single!()).await?;
+        client
+            .database("test")
+            .collection::<Document>("test")
+            .find_one(doc! {})
+            .await?;
+
         Ok(())
     }
 }

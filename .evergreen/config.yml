@@ -673,6 +673,7 @@ task_groups:
       - func: fix absolute paths
       - func: init test-results
       - func: make files executable
+      - func: install rust
       - command: subprocess.exec
         params:
           binary: bash
@@ -1156,6 +1157,7 @@ tasks:
 
   - name: "oidc-auth-test-azure-latest"
     commands:
+    - func: "build static test binary"
     - command: shell.exec
       params:
         working_dir: src
@@ -1163,15 +1165,9 @@ tasks:
         script: |-
           set -o errexit
           ${PREPARE_SHELL}
-           ./.evergreen/install-dependencies.sh rust
-          source .cargo/env
           export AZUREOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tar
-          rustup default stable
-          export RUSTFLAGS="-C target-feature=+crt-static"
-          cargo test --features azure-oidc --target x86_64-unknown-linux-gnu get_exe_name -- --ignored
-          export TEST_FILE=$(cat exe_name.txt)
           rm "$AZUREOIDC_DRIVERS_TAR_FILE" || true
-          tar -cf $AZUREOIDC_DRIVERS_TAR_FILE $TEST_FILE
+          tar -cf $AZUREOIDC_DRIVERS_TAR_FILE ${STATIC_TEST_BINARY}
           tar -uf $AZUREOIDC_DRIVERS_TAR_FILE ./.evergreen
           rm "$AZUREOIDC_DRIVERS_TAR_FILE".gz || true
           gzip $AZUREOIDC_DRIVERS_TAR_FILE
@@ -1179,7 +1175,7 @@ tasks:
           # Define the command to run on the azure VM.
           # Ensure that we source the environment file created for us, set up any other variables we need,
           # and then run our test suite on the vm.
-          export AZUREOIDC_TEST_CMD="ls -laR data && PROJECT_DIRECTORY='.' OIDC_ENV=azure OIDC=oidc TEST_FILE=./$TEST_FILE ./.evergreen/run-mongodb-oidc-test.sh"
+          export AZUREOIDC_TEST_CMD="ls -laR data && PROJECT_DIRECTORY='.' OIDC_ENV=azure OIDC=oidc TEST_FILE=./${STATIC_TEST_BINARY} ./.evergreen/run-mongodb-oidc-test.sh"
           bash $DRIVERS_TOOLS/.evergreen/auth_oidc/azure/run-driver-test.sh
 
   - name: "oidc-auth-test-gcp-latest"
@@ -1719,7 +1715,6 @@ functions:
         script: |
           ${PREPARE_SHELL}
           export OIDC="oidc"
-          export OIDC_ENV="test"
           .evergreen/run-mongodb-oidc-test.sh
 
   "start happy eyeballs server":
@@ -1926,3 +1921,16 @@ functions:
     - command: attach.xunit_results
       params:
         file: src/results.xml
+
+  "build static test binary":
+    - command: subprocess.exec
+      params:
+      working_dir: src
+      binary: bash
+      args:
+        - .evergreen/build-static-test-binary.sh
+      include_expansions_in_env:
+        - PROJECT_DIRECTORY
+    - command: expansions.update
+      params:
+        file: src/static-test-binary-expansion.yml
