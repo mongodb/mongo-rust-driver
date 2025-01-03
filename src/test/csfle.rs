@@ -48,6 +48,7 @@ use crate::{
     options::{
         CollectionOptions,
         Credential,
+        EncryptOptions,
         FindOptions,
         IndexOptions,
         ReadConcern,
@@ -3601,4 +3602,52 @@ async fn fle2_example() -> Result<()> {
     );
 
     Ok(())
+}
+
+#[tokio::test]
+async fn encrypt_expression_with_options() {
+    let key_vault_client = Client::for_test().await.into_client();
+    let client_encryption = ClientEncryption::new(
+        key_vault_client,
+        KV_NAMESPACE.clone(),
+        vec![LOCAL_KMS.clone()],
+    )
+    .unwrap();
+    let data_key = client_encryption
+        .create_data_key(LocalMasterKey::builder().build())
+        .await
+        .unwrap();
+
+    let expression = rawdoc! {
+        "$and": [
+            { "a": { "$gt": 0 } },
+            { "a": { "$lt": 10 } },
+        ]
+    };
+    let range_options = RangeOptions::builder()
+        .min(Bson::from(0))
+        .max(Bson::from(10))
+        .build();
+
+    let invalid_encrypt_options = EncryptOptions::builder()
+        .contention_factor(0)
+        .range_options(range_options.clone())
+        .query_type("bad".to_string())
+        .build();
+    let error = client_encryption
+        .encrypt_expression(expression.clone(), data_key.clone())
+        .with_options(invalid_encrypt_options)
+        .await
+        .unwrap_err();
+    assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
+
+    let valid_encrypt_options = EncryptOptions::builder()
+        .contention_factor(0)
+        .range_options(range_options)
+        .build();
+    client_encryption
+        .encrypt_expression(expression, data_key)
+        .with_options(valid_encrypt_options)
+        .await
+        .unwrap();
 }
