@@ -40,13 +40,15 @@ impl ClientEncryption {
     /// Encrypts a Match Expression or Aggregate Expression to query a range index.
     /// `expression` is expected to be a BSON document of one of the following forms:
     /// 1. A Match Expression of this form:
-    ///   {$and: [{<field>: {$gt: <value1>}}, {<field>: {$lt: <value2> }}]}
+    ///   `{$and: [{<field>: {$gt: <value1>}}, {<field>: {$lt: <value2> }}]}`
     /// 2. An Aggregate Expression of this form:
-    ///   {$and: [{$gt: [<fieldpath>, <value1>]}, {$lt: [<fieldpath>, <value2>]}]
-    /// $gt may also be $gte. $lt may also be $lte.
+    ///   `{$and: [{$gt: [<fieldpath>, <value1>]}, {$lt: [<fieldpath>, <value2>]}]`
+    ///
+    /// For either expression, `$gt` may also be `$gte`, and `$lt` may also be `$lte`.
     ///
     /// The expression will be encrypted using the [`Algorithm::Range`] algorithm and the
-    /// "range" query type.
+    /// "range" query type. It is not valid to set a query type in [`EncryptOptions`] when calling
+    /// this method.
     ///
     /// `await` will return a d[`Result<Document>`] containing the encrypted expression.
     #[deeplink]
@@ -61,10 +63,7 @@ impl ClientEncryption {
             mode: Expression { value: expression },
             key: key.into(),
             algorithm: Algorithm::Range,
-            options: Some(EncryptOptions {
-                query_type: Some("range".into()),
-                ..Default::default()
-            }),
+            options: None,
         }
     }
 }
@@ -110,14 +109,17 @@ pub struct Expression {
 }
 
 /// Options for encrypting a value.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 #[export_tokens]
 pub struct EncryptOptions {
     /// The contention factor.
     pub contention_factor: Option<i64>,
+
     /// The query type.
     pub query_type: Option<String>,
+
     /// Set the range options. This should only be set when the algorithm is
     /// [`Algorithm::Range`].
     pub range_options: Option<RangeOptions>,

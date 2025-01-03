@@ -15,6 +15,8 @@
 //!                   .build();
 //! ```
 
+#[cfg(feature = "in-use-encryption")]
+pub use crate::action::csfle::{DataKeyOptions, EncryptOptions};
 #[cfg(any(
     feature = "zstd-compression",
     feature = "zlib-compression",
