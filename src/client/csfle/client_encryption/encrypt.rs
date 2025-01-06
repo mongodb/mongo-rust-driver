@@ -33,25 +33,17 @@ impl<'a> Action for Encrypt<'a, Expression> {
     type Future = EncryptExpressionFuture;
 
     async fn execute(mut self) -> Result<Document> {
-        match self.options.as_mut() {
-            Some(options) => match options.query_type {
-                Some(ref query_type) => {
-                    if query_type != "range" {
-                        return Err(Error::invalid_argument(format!(
-                            "query_type cannot be set for encrypt_expression, got {}",
-                            query_type
-                        )));
-                    }
+        let options = self.options.get_or_insert_with(Default::default);
+        match options.query_type {
+            Some(ref query_type) => {
+                if query_type != "range" {
+                    return Err(Error::invalid_argument(format!(
+                        "query_type cannot be set for encrypt_expression, got {}",
+                        query_type
+                    )));
                 }
-                None => options.query_type = Some("range".to_string()),
-            },
-            None => {
-                self.options = Some(
-                    EncryptOptions::builder()
-                        .query_type("range".to_string())
-                        .build(),
-                );
             }
+            None => options.query_type = Some("range".to_string()),
         }
 
         let ctx = self
