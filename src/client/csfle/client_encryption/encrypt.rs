@@ -32,7 +32,20 @@ impl<'a> Action for Encrypt<'a, Value> {
 impl<'a> Action for Encrypt<'a, Expression> {
     type Future = EncryptExpressionFuture;
 
-    async fn execute(self) -> Result<Document> {
+    async fn execute(mut self) -> Result<Document> {
+        let options = self.options.get_or_insert_with(Default::default);
+        match options.query_type {
+            Some(ref query_type) => {
+                if query_type != "range" {
+                    return Err(Error::invalid_argument(format!(
+                        "query_type cannot be set for encrypt_expression, got {}",
+                        query_type
+                    )));
+                }
+            }
+            None => options.query_type = Some("range".to_string()),
+        }
+
         let ctx = self
             .client_enc
             .get_ctx_builder(self.key, self.algorithm, self.options.unwrap_or_default())?
