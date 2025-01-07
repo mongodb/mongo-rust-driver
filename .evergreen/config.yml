@@ -291,9 +291,10 @@ buildvariants:
       AUTH: auth
       SSL: ssl
     tasks:
-      - testoidc_task_group
-      - testazureoidc_task_group
-      - testgcpoidc_task_group
+      - test-oidc-task-group
+      - test-azure-oidc-task-group
+      - test-gcp-oidc-task-group
+      - test-k8s-oidc-task-group
 
   - name: oidc-macos
     display_name: "OIDC Macos"
@@ -304,7 +305,7 @@ buildvariants:
       AUTH: auth
       SSL: ssl
     tasks:
-      - testoidc_task_group
+      - test-oidc-task-group
 
   - name: oidc-windows
     disable: true
@@ -316,9 +317,9 @@ buildvariants:
       AUTH: auth
       SSL: ssl
     tasks:
-      - testoidc_task_group
-      - testazureoidc_task_group
-      - testgcpoidc_task_group
+      - test-oidc-task-group
+      - test-azure-oidc-task-group
+      - test-gcp-oidc-task-group
 
   - name: in-use-encryption
     display_name: "In-Use Encryption"
@@ -636,7 +637,7 @@ task_groups:
     tasks:
       - test-aws-lambda-deployed
 
-  - name: testoidc_task_group
+  - name: test-oidc-task-group
     setup_group:
       - func: fetch source
       - func: create expansions
@@ -665,7 +666,7 @@ task_groups:
     tasks:
       - oidc-auth-test-latest
 
-  - name: testazureoidc_task_group
+  - name: test-azure-oidc-task-group
     setup_group:
       - func: fetch source
       - func: create expansions
@@ -692,7 +693,7 @@ task_groups:
     tasks:
       - oidc-auth-test-azure-latest
 
-  - name: testgcpoidc_task_group
+  - name: test-gcp-oidc-task-group
     setup_group:
       - func: fetch source
       - func: create expansions
@@ -718,6 +719,31 @@ task_groups:
     setup_group_timeout_secs: 1800
     tasks:
       - oidc-auth-test-gcp-latest
+
+  - name: test-k8s-oidc-task-group
+    setup_group:
+      - func: fetch source
+      - func: create expansions
+      - func: prepare resources
+      - func: fix absolute paths
+      - func: init test-results
+      - func: make files executable
+      - func: install rust
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/setup.sh
+    teardown_task:
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/teardown.sh
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800
+    tasks:
+      - oidc-auth-test-k8s-latest
 
   - name: happy-eyeballs-task-group
     setup_group_can_fail_task: true
@@ -1187,6 +1213,23 @@ tasks:
         env:
           GCPOIDC_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
           GCPOIDC_TEST_CMD: "ls -la && PROJECT_DIRECTORY='.' OIDC_ENV=gcp OIDC=oidc TEST_FILE=./${STATIC_TEST_BINARY} ./.evergreen/run-mongodb-oidc-test.sh"
+
+  - name: "oidc-auth-test-k8s-latest"
+    commands:
+    - func: "build static test tarball"
+    - command: ec2.assume_role
+      params:
+          role_arn: ${aws_test_secrets_role}
+          duration_seconds: 1800
+    - func: "run oidc k8s test"
+      vars:
+        VARIANT: eks
+    - func: "run oidc k8s test"
+      vars:
+        VARIANT: gke
+    - func: "run oidc k8s test"
+      vars:
+        VARIANT: aks
 
   - name: "test-happy-eyeballs"
     commands:
@@ -1917,3 +1960,42 @@ functions:
     - command: expansions.update
       params:
         file: src/static-test-tarball-expansion.yml
+  
+  "run oidc k8s test":
+  - command: subprocess.exec
+    params:
+      working_dir: src
+      binary: bash
+      args:
+        - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/setup-pod.sh
+      env:
+        K8S_VARIANT: ${VARIANT}
+      include_expansions_in_env:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - AWS_SESSION_TOKEN
+        - DRIVERS_TOOLS
+  - command: subprocess.exec
+    type: test
+    params:
+      working_dir: src
+      binary: bash
+      args:
+        - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/run-driver-test.sh
+      env:
+        K8S_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
+        K8S_TEST_CMD: "ls -la && PROJECT_DIRECTORY='.' OIDC_ENV=k8s OIDC=oidc TEST_FILE=./${STATIC_TEST_BINARY} ./.evergreen/run-mongodb-oidc-test.sh"
+      include_expansions_in_env:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - AWS_SESSION_TOKEN
+  - command: subprocess.exec
+    params:
+      working_dir: src
+      binary: bash
+      args:
+        - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/teardown-pod.sh
+      include_expansions_in_env:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - AWS_SESSION_TOKEN

@@ -36,7 +36,8 @@ elif [ $OIDC_ENV == "gcp" ]; then
     $TEST_FILE test::spec::oidc::gcp --nocapture
     RESULT=$?
 elif [ $OIDC_ENV == "k8s" ]; then
-    echo placeholder
+    $TEST_FILE test::spec::oidc::k8s --nocapture
+    RESULT=$?
 else
     echo "Unrecognized OIDC_ENV '${OIDC_ENV}'"
     exit 1
