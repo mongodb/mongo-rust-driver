@@ -143,6 +143,11 @@ impl Transaction {
         self.recovery_token = None;
     }
 
+    #[cfg(test)]
+    pub(crate) fn is_pinned(&self) -> bool {
+        self.pinned.is_some()
+    }
+
     pub(crate) fn pinned_mongos(&self) -> Option<&SelectionCriteria> {
         match &self.pinned {
             Some(TransactionPin::Mongos(s)) => Some(s),
