@@ -312,12 +312,11 @@ async fn cursor_iteration_in_a_transaction() {
 #[tokio::test(flavor = "multi_thread")]
 async fn failed_cursor_iteration() {
     let mut options = get_client_options().await.clone();
-    let test_client = Client::for_test().await;
-    if test_client.is_load_balanced() {
-        log_uncaptured("skipping failed_cursor_iteration: RUST-2131");
+    if options.load_balanced.unwrap_or(false) {
+        log_uncaptured("skipping failed_cursor_iteration: load-balanced topology");
         return;
     }
-    if test_client.is_sharded() {
+    if Client::for_test().await.is_sharded() {
         options.hosts.drain(1..);
     }
     let client = Client::for_test().options(options).monitor_events().await;
