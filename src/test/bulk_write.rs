@@ -230,6 +230,11 @@ async fn successful_cursor_iteration() {
         log_uncaptured("skipping successful_cursor_iteration: bulkWrite requires 8.0+");
         return;
     }
+    // TODO RUST-2131
+    if client.is_load_balanced() {
+        log_uncaptured("skipping successful_cursor_iteration: load-balanced topology");
+        return;
+    }
 
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
 
@@ -312,10 +317,6 @@ async fn cursor_iteration_in_a_transaction() {
 #[tokio::test(flavor = "multi_thread")]
 async fn failed_cursor_iteration() {
     let mut options = get_client_options().await.clone();
-    if options.load_balanced.unwrap_or(false) {
-        log_uncaptured("skipping failed_cursor_iteration: load-balanced topology");
-        return;
-    }
     if Client::for_test().await.is_sharded() {
         options.hosts.drain(1..);
     }
@@ -323,6 +324,11 @@ async fn failed_cursor_iteration() {
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping failed_cursor_iteration: bulkWrite requires 8.0+");
+        return;
+    }
+    // TODO RUST-2131
+    if client.is_load_balanced() {
+        log_uncaptured("skipping failed_cursor_iteration: load-balanced topology");
         return;
     }
 
