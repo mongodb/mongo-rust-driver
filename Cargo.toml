@@ -143,7 +143,7 @@ version = "0.11.5"
 
 [dependencies.tokio]
 version = "1.17.0"
-features = ["io-util", "sync", "macros", "net", "process", "rt", "time"]
+features = ["io-util", "sync", "macros", "net", "process", "rt", "time", "fs"]
 
 [dependencies.tokio-rustls]
 version = "0.24.1"
