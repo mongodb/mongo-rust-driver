@@ -260,7 +260,7 @@ where
     fn handle_response_async<'b>(
         &'b self,
         response: RawCommandResponse,
-        context: ExecutionContext<'b>,
+        mut context: ExecutionContext<'b>,
     ) -> BoxFuture<'b, Result<Self::O>> {
         async move {
             let response: WriteResponseBody<Response> = response.body()?;
@@ -293,13 +293,13 @@ where
                 self.options.and_then(|options| options.comment.clone()),
             );
 
+            let pinned_connection = self.client.pin_connection_for_cursor(
+                &specification,
+                context.connection,
+                context.session.as_deref_mut(),
+            )?;
             let iteration_result = match context.session {
                 Some(session) => {
-                    let pinned_connection = self.client.pin_connection_for_session(
-                        &specification,
-                        context.connection,
-                        session,
-                    )?;
                     let mut session_cursor =
                         SessionCursor::new(self.client.clone(), specification, pinned_connection);
                     self.iterate_results_cursor(
@@ -310,9 +310,6 @@ where
                     .await
                 }
                 None => {
-                    let pinned_connection = self
-                        .client
-                        .pin_connection_for_cursor(&specification, context.connection)?;
                     let cursor =
                         Cursor::new(self.client.clone(), specification, None, pinned_connection);
                     self.iterate_results_cursor(cursor, &mut result, &mut error)
