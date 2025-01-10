@@ -3618,7 +3618,7 @@ async fn kms_retry() {
         .await
         .unwrap();
 
-    // // GCP
+    // GCP
     set_failpoint("http", 1).await.unwrap();
     let key_id = client_encryption
         .create_data_key(gcp_master_key.clone())

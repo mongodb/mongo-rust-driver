@@ -65,7 +65,7 @@ impl ClientEncryption {
             .kms_providers(&kms_providers.credentials_doc()?)?
             .use_need_kms_credentials_state()
             .retry_kms(true)?
-            // .use_range_v2()?
+            .use_range_v2()?
             .build()?;
         let exec = CryptExecutor::new_explicit(
             key_vault_client.weak(),
