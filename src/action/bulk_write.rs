@@ -148,8 +148,7 @@ where
                 &self.models[total_attempted..],
                 total_attempted,
                 self.options.as_ref(),
-            )
-            .await;
+            );
             let result = self
                 .client
                 .execute_operation::<BulkWriteOperation<R>>(

@@ -51,7 +51,7 @@ impl<'a, R> BulkWrite<'a, R>
 where
     R: BulkWriteResult,
 {
-    pub(crate) async fn new(
+    pub(crate) fn new(
         client: Client,
         models: &'a [WriteModel],
         offset: usize,
@@ -292,11 +292,14 @@ where
                 None,
                 self.options.and_then(|options| options.comment.clone()),
             );
-            let pinned_connection = self
-                .client
-                .pin_connection_for_cursor(&specification, context.connection)?;
+
             let iteration_result = match context.session {
                 Some(session) => {
+                    let pinned_connection = self.client.pin_connection_for_session(
+                        &specification,
+                        context.connection,
+                        session,
+                    )?;
                     let mut session_cursor =
                         SessionCursor::new(self.client.clone(), specification, pinned_connection);
                     self.iterate_results_cursor(
@@ -307,6 +310,9 @@ where
                     .await
                 }
                 None => {
+                    let pinned_connection = self
+                        .client
+                        .pin_connection_for_cursor(&specification, context.connection)?;
                     let cursor =
                         Cursor::new(self.client.clone(), specification, None, pinned_connection);
                     self.iterate_results_cursor(cursor, &mut result, &mut error)

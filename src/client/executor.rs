@@ -202,7 +202,7 @@ impl Client {
         }
     }
 
-    fn pin_connection_for_session(
+    pub(crate) fn pin_connection_for_session(
         &self,
         spec: &CursorSpecification,
         conn: &mut PooledConnection,
@@ -1063,6 +1063,7 @@ struct ExecutionDetails<T: Operation> {
     implicit_session: Option<ClientSession>,
 }
 
+#[derive(Debug)]
 struct ExecutionRetry {
     prior_txn_number: Option<i64>,
     first_error: Error,
