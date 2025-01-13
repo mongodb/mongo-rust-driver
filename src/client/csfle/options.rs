@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use bson::Array;
 use mongocrypt::ctx::KmsProvider;
@@ -8,6 +8,7 @@ use crate::{
     bson::{Bson, Document},
     client::options::TlsOptions,
     error::{Error, Result},
+    serde_util,
     Namespace,
 };
 
@@ -59,6 +60,14 @@ pub(crate) struct AutoEncryptionOptions {
     #[cfg(test)]
     #[serde(skip)]
     pub(crate) disable_crypt_shared: Option<bool>,
+    /// The duration after which the data encryption key cache expires. Defaults to 60 seconds if
+    /// unset.
+    #[serde(
+        default,
+        rename = "keyExpirationMS",
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis"
+    )]
+    pub(crate) key_cache_expiration: Option<Duration>,
 }
 
 fn default_key_vault_namespace() -> Namespace {
@@ -81,6 +90,7 @@ impl AutoEncryptionOptions {
             bypass_query_analysis: None,
             #[cfg(test)]
             disable_crypt_shared: None,
+            key_cache_expiration: None,
         }
     }
 }

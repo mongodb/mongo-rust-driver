@@ -67,7 +67,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
 ];
 
 static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
-static MAX_SPEC_VERSION: Version = Version::new(1, 21, 0);
+static MAX_SPEC_VERSION: Version = Version::new(1, 22, 0);
 
 pub(crate) type EntityMap = HashMap<String, Entity>;
 
@@ -616,13 +616,15 @@ impl TestRunner {
                         .unwrap()
                         .clone();
                     let kms_providers = fill_kms_placeholders(opts.kms_providers.clone());
-                    let client_enc = crate::client_encryption::ClientEncryption::new(
+                    let client_encryption = crate::client_encryption::ClientEncryption::builder(
                         kv_client,
                         opts.key_vault_namespace.clone(),
                         kms_providers,
                     )
+                    .key_cache_expiration(opts.key_cache_expiration)
+                    .build()
                     .unwrap();
-                    (id, Entity::ClientEncryption(Arc::new(client_enc)))
+                    (id, Entity::ClientEncryption(Arc::new(client_encryption)))
                 }
             };
             self.insert_entity(&id, entity).await;

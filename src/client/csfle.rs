@@ -122,6 +122,16 @@ impl ClientState {
         if opts.bypass_query_analysis == Some(true) {
             builder = builder.bypass_query_analysis();
         }
+        if let Some(key_cache_expiration) = opts.key_cache_expiration {
+            let expiration_ms: u64 = key_cache_expiration.as_millis().try_into().map_err(|_| {
+                Error::invalid_argument(format!(
+                    "key_cache_expiration must not exceed {} milliseconds, got {:?}",
+                    u64::MAX,
+                    key_cache_expiration
+                ))
+            })?;
+            builder = builder.key_cache_expiration(expiration_ms)?;
+        }
         let crypt = builder.build()?;
         if opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? == Some(true)
             && crypt.shared_lib_version().is_none()

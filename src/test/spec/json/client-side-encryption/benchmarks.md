@@ -10,7 +10,7 @@ due to the cost of calling between the native language and the C library.
 A handle to libmongocrypt (`mongocrypt_t`) is needed for the benchmark. In the public driver API, `mongocrypt_t` is an
 implementation detail contained in a `MongoClient`. The bindings API may more directly interface `mongocrypt_t`.
 Example: the Java bindings API contains a
-[MongoCrypt class](https://github.com/mongodb/libmongocrypt/blob/master/bindings/java/mongocrypt/src/main/java/com/mongodb/crypt/capi/MongoCrypt.java)
+[MongoCrypt class](https://github.com/mongodb/mongo-java-driver/blob/main/mongodb-crypt/src/main/com/mongodb/internal/crypt/capi/MongoCrypt.java)
 closely wrapping the `mongocrypt_t`.
 
 If possible, drivers are encouraged to use the bindings API and mock responses from the MongoDB server. This may help to
@@ -25,11 +25,11 @@ Set up the benchmark data:
 
 - Create a data key with the "local" KMS provider.
 - Encrypt 1500 string values of the form `value 0001`, `value 0002`, `value 0003`, ... with the algorithm
-  `AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic`.
+    `AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic`.
 - Create a document of the form:
-  `{ "key0001": <encrypted "value 0001">, "key0002": <encrypted "value 0002">, "key0003": <encrypted "value 0003"> }`.
+    `{ "key0001": <encrypted "value 0001">, "key0002": <encrypted "value 0002">, "key0003": <encrypted "value 0003"> }`.
 - Create a handle to `mongocrypt_t`. This may be through the bindings API (preferred) or through a `MongoClient`
-  configured with `AutoEncryptionOpts`.
+    configured with `AutoEncryptionOpts`.
 
 Warm up the benchmark:
 
