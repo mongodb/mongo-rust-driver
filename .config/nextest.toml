@@ -1,6 +1,6 @@
 [profile.default]
 test-threads = 1
-default-filter = 'not test(test::happy_eyeballs)'
+default-filter = 'not test(test::happy_eyeballs) and not test(kms_retry)'
 
 [profile.ci]
 failure-output = "final"

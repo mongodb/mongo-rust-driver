@@ -99,6 +99,7 @@ impl ClientState {
         let mut builder = Crypt::builder()
             .kms_providers(&opts.kms_providers.credentials_doc()?)?
             .use_need_kms_credentials_state()
+            .retry_kms(true)?
             .use_range_v2()?;
         if let Some(m) = &opts.schema_map {
             builder = builder.schema_map(&bson::to_document(m)?)?;
