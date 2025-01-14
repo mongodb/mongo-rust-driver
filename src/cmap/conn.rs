@@ -327,16 +327,26 @@ impl PinnedConnectionHandle {
         }
     }
 
-    /// Retrieve the pinned connection, blocking until it's available for use.  Will fail if the
-    /// connection has been unpinned.
+    /// Retrieve the pinned connection.  Will fail if the connection has been unpinned or is still in
+    /// use.
     pub(crate) async fn take_connection(&self) -> Result<PooledConnection> {
+        use tokio::sync::mpsc::error::TryRecvError;
         let mut receiver = self.receiver.lock().await;
-        let mut connection = receiver.recv().await.ok_or_else(|| {
-            Error::internal(format!(
-                "cannot take connection after unpin (id={})",
-                self.id
-            ))
-        })?;
+        let mut connection = match receiver.try_recv() {
+            Ok(conn) => conn,
+            Err(TryRecvError::Disconnected) => {
+                return Err(Error::internal(format!(
+                    "cannot take connection after unpin (id={})",
+                    self.id
+                )))
+            }
+            Err(TryRecvError::Empty) => {
+                return Err(Error::internal(format!(
+                    "cannot take in-use connection (id={})",
+                    self.id
+                )))
+            }
+        };
         connection.mark_pinned_in_use();
         Ok(connection)
     }

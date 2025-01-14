@@ -1531,6 +1531,8 @@ functions:
         include_expansions_in_env:
           - PROJECT_DIRECTORY
           - OPENSSL
+          - SINGLE_MONGOS_LB_URI
+          - MULTI_MONGOS_LB_URI
           - MONGODB_URI
           - MONGODB_API_VERSION
           - PATH

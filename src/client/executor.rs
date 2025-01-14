@@ -158,7 +158,7 @@ impl Client {
                 .execute_operation_with_details(op.borrow_mut(), None)
                 .await?;
             let pinned =
-                self.pin_connection_for_cursor(&details.output, &mut details.connection)?;
+                self.pin_connection_for_cursor(&details.output, &mut details.connection, None)?;
             Ok(Cursor::new(
                 self.clone(),
                 details.output,
@@ -181,8 +181,11 @@ impl Client {
             .execute_operation_with_details(op.borrow_mut(), &mut *session)
             .await?;
 
-        let pinned =
-            self.pin_connection_for_session(&details.output, &mut details.connection, session)?;
+        let pinned = self.pin_connection_for_cursor(
+            &details.output,
+            &mut details.connection,
+            Some(session),
+        )?;
         Ok(SessionCursor::new(self.clone(), details.output, pinned))
     }
 
@@ -194,25 +197,16 @@ impl Client {
         &self,
         spec: &CursorSpecification,
         conn: &mut PooledConnection,
+        session: Option<&mut ClientSession>,
     ) -> Result<Option<PinnedConnectionHandle>> {
-        if self.is_load_balanced() && spec.info.id != 0 {
+        if let Some(handle) = session.and_then(|s| s.transaction.pinned_connection()) {
+            // Cursor operations on a transaction share the same pinned connection.
+            Ok(Some(handle.replicate()))
+        } else if self.is_load_balanced() && spec.info.id != 0 {
+            // Cursor operations on load balanced topologies always pin connections.
             Ok(Some(conn.pin()?))
         } else {
             Ok(None)
-        }
-    }
-
-    fn pin_connection_for_session(
-        &self,
-        spec: &CursorSpecification,
-        conn: &mut PooledConnection,
-        session: &mut ClientSession,
-    ) -> Result<Option<PinnedConnectionHandle>> {
-        if let Some(handle) = session.transaction.pinned_connection() {
-            // Cursor operations on a transaction share the same pinned connection.
-            Ok(Some(handle.replicate()))
-        } else {
-            self.pin_connection_for_cursor(spec, conn)
         }
     }
 
@@ -245,7 +239,8 @@ impl Client {
                 details.implicit_session = Some(session);
             }
             let (cursor_spec, cs_data) = details.output;
-            let pinned = self.pin_connection_for_cursor(&cursor_spec, &mut details.connection)?;
+            let pinned =
+                self.pin_connection_for_cursor(&cursor_spec, &mut details.connection, None)?;
             let cursor = Cursor::new(self.clone(), cursor_spec, details.implicit_session, pinned);
 
             Ok(ChangeStream::new(cursor, args, cs_data))
@@ -277,8 +272,11 @@ impl Client {
                 .execute_operation_with_details(&mut op, &mut *session)
                 .await?;
             let (cursor_spec, cs_data) = details.output;
-            let pinned =
-                self.pin_connection_for_session(&cursor_spec, &mut details.connection, session)?;
+            let pinned = self.pin_connection_for_cursor(
+                &cursor_spec,
+                &mut details.connection,
+                Some(session),
+            )?;
             let cursor = SessionCursor::new(self.clone(), cursor_spec, pinned);
 
             Ok(SessionChangeStream::new(cursor, args, cs_data))
@@ -1063,6 +1061,7 @@ struct ExecutionDetails<T: Operation> {
     implicit_session: Option<ClientSession>,
 }
 
+#[derive(Debug)]
 struct ExecutionRetry {
     prior_txn_number: Option<i64>,
     first_error: Error,
