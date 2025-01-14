@@ -387,6 +387,13 @@ buildvariants:
     tasks:
       - happy-eyeballs-task-group
 
+  - name: tls-cert-password
+    display_name: "TLS Certificate File Password"
+    run_on:
+      - rhel87-small
+    tasks:
+      - name: test-tls-cert-password
+
 ###############
 # Task Groups #
 ###############
@@ -1242,6 +1249,25 @@ tasks:
           - .evergreen/run-happy-eyeballs-tests.sh
         include_expansions_in_env:
           - PROJECT_DIRECTORY
+
+  - name: "test-tls-cert-password"
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: latest
+          TOPOLOGY: server
+          SSL: ssl
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          binary: bash
+          args:
+            - .evergreen/run-tls-cert-password-test.sh
+          include_expansions_in_env:
+            - PROJECT_DIRECTORY
+            - MONGODB_URI
+            - DRIVERS_TOOLS
 
 #############
 # Functions #
