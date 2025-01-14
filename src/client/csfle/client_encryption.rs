@@ -22,6 +22,7 @@ use crate::{
 
 use super::{options::KmsProviders, state_machine::CryptExecutor};
 
+pub use super::client_builder::EncryptedClientBuilder;
 pub use crate::action::csfle::encrypt::{EncryptKey, RangeOptions};
 
 /// A handle to the key vault.  Used to create data encryption keys, and to explicitly encrypt and
