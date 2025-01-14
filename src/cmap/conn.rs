@@ -327,7 +327,7 @@ impl PinnedConnectionHandle {
         }
     }
 
-    /// Retrieve the pinned connection  Will fail if the connection has been unpinned or is still in
+    /// Retrieve the pinned connection.  Will fail if the connection has been unpinned or is still in
     /// use.
     pub(crate) async fn take_connection(&self) -> Result<PooledConnection> {
         use tokio::sync::mpsc::error::TryRecvError;
