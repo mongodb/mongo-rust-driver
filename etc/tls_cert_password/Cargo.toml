@@ -1,9 +1,0 @@
-[package]
-name = "tls_cert_password"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-mongodb = { path = "../..", features = ["openssl-tls", "cert-key-password"] }
-pkcs8 = { version = "0.10.2", features = ["3des", "des-insecure", "sha1-insecure"] }
-tokio = "1.43.0"

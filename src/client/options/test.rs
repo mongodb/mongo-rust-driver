@@ -361,3 +361,39 @@ fn unix_domain_socket_not_allowed() {
         "{message}"
     );
 }
+
+#[cfg(feature = "cert-key-password")]
+#[tokio::test]
+async fn tls_cert_key_password_connect() {
+    use std::path::PathBuf;
+
+    use bson::doc;
+
+    use crate::{
+        options::TlsOptions,
+        test::{get_client_options, log_uncaptured},
+    };
+
+    use super::Tls;
+
+    let mut options = get_client_options().await.clone();
+    if !matches!(options.tls, Some(Tls::Enabled(_))) {
+        log_uncaptured("Skipping tls_cert_key_password_connect: tls not enabled");
+        return;
+    }
+    let mut certpath = PathBuf::from(std::env::var("DRIVERS_TOOLS").unwrap());
+    certpath.push(".evergreen/x509gen");
+    options.tls = Some(Tls::Enabled(
+        TlsOptions::builder()
+            .ca_file_path(certpath.join("ca.pem"))
+            .cert_key_file_path(certpath.join("client-pkcs8-encrypted.pem"))
+            .tls_certificate_key_file_password(b"password".to_vec())
+            .build(),
+    ));
+    let client = Client::with_options(options).unwrap();
+    client
+        .database("test")
+        .run_command(doc! {"ping": 1})
+        .await
+        .unwrap();
+}
