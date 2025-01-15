@@ -3498,6 +3498,11 @@ async fn range_explicit_encryption_defaults() -> Result<()> {
 // using openssl causes errors after configuring a network failpoint
 #[cfg(not(feature = "openssl-tls"))]
 async fn kms_retry() {
+    if *super::SERVERLESS {
+        log_uncaptured("skipping kms_retry on serverless");
+        return;
+    }
+
     use reqwest::{Certificate, Client as HttpClient};
 
     let endpoint = "127.0.0.1:9003";
