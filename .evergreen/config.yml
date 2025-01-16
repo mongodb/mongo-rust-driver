@@ -1529,6 +1529,7 @@ functions:
         args:
           - .evergreen/run-tests.sh
         include_expansions_in_env:
+          - DRIVERS_TOOLS
           - PROJECT_DIRECTORY
           - OPENSSL
           - SINGLE_MONGOS_LB_URI
