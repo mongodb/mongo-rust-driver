@@ -18,7 +18,7 @@ The driver tests against Linux, MacOS, and Windows in CI.
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`.
 ```toml
 [dependencies]
-mongodb = "3.1.0"
+mongodb = "3.2.0"
 ```
 
 Version 1 of this crate has reached end of life and will no longer be receiving any updates or bug fixes, so all users are recommended to always depend on the latest 2.x release. See the [2.0.0 release notes](https://github.com/mongodb/mongo-rust-driver/releases/tag/v2.0.0) for migration information if upgrading from a 1.x version.
@@ -27,7 +27,7 @@ Version 1 of this crate has reached end of life and will no longer be receiving 
 The driver also provides a blocking sync API. To enable this, add the `"sync"` feature to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "3.1.0"
+version = "3.2.0"
 features = ["sync"]
 ```
 **Note:** The sync-specific types can be imported from `mongodb::sync` (e.g. `mongodb::sync::Client`).
