@@ -38,7 +38,8 @@ impl ResumeToken {
         }
     }
 
-    pub(crate) fn from_raw(doc: Option<RawDocumentBuf>) -> Option<ResumeToken> {
+    /// A utility method to create a `ResumeToken` from a raw BSON document.
+    pub fn from_raw(doc: Option<RawDocumentBuf>) -> Option<ResumeToken> {
         doc.map(|doc| ResumeToken(RawBson::Document(doc)))
     }
 
