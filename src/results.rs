@@ -112,7 +112,7 @@ pub(crate) struct GetMoreResult {
 
 /// Describes the type of data store returned when executing
 /// [`Database::list_collections`](../struct.Database.html#method.list_collections).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum CollectionType {
@@ -120,6 +120,7 @@ pub enum CollectionType {
     View,
 
     /// Indicates that the data store is a collection.
+    #[default]
     Collection,
 
     /// Indicates that the data store is a timeseries.
@@ -147,7 +148,7 @@ pub struct CollectionSpecificationInfo {
 
 /// Information about a collection as reported by
 /// [`Database::list_collections`](../struct.Database.html#method.list_collections).
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CollectionSpecification {
