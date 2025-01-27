@@ -20,6 +20,7 @@ pub(crate) struct LookupHosts {
 }
 
 impl LookupHosts {
+    #[cfg(feature = "dns-resolver")]
     pub(crate) fn validate(mut self, original_hostname: &str, dm: DomainMismatch) -> Result<Self> {
         let original_hostname_parts: Vec<_> = original_hostname.split('.').collect();
         let original_domain_name = if original_hostname_parts.len() >= 3 {
@@ -261,7 +262,10 @@ pub(crate) struct SrvResolver {}
 
 #[cfg(not(feature = "dns-resolver"))]
 impl SrvResolver {
-    pub(crate) async fn new(_config: Option<ResolverConfig>) -> Result<Self> {
+    pub(crate) async fn new(
+        _config: Option<ResolverConfig>,
+        _srv_service_name: Option<String>,
+    ) -> Result<Self> {
         Ok(Self {})
     }
 
