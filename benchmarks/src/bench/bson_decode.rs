@@ -38,7 +38,7 @@ impl Benchmark for BsonDecodeBenchmark {
         })
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&mut self) -> Result<()> {
         for _ in 0..self.num_iter {
             // `&[u8]` implements `Read`, and `from_reader` needs a `&mut R: Read`, so we need a
             // `&mut &[u8]`.

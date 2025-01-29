@@ -46,7 +46,7 @@ impl Benchmark for GridFsDownloadBenchmark {
         })
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&mut self) -> Result<()> {
         let mut buf = vec![];
         let mut download = self
             .bucket

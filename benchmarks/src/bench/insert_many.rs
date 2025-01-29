@@ -71,7 +71,7 @@ impl Benchmark for InsertManyBenchmark {
         Ok(())
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&mut self) -> Result<()> {
         let insertions = vec![&self.doc; self.num_copies];
         self.coll
             .insert_many(insertions)

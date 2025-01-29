@@ -61,7 +61,7 @@ impl Benchmark for FindOneBenchmark {
         })
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&mut self) -> Result<()> {
         for i in 0..self.num_iter {
             self.coll.find_one(doc! { "_id": i as i32 }).await?;
         }

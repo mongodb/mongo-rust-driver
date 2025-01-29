@@ -69,7 +69,7 @@ impl Benchmark for FindManyBenchmark {
         })
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&mut self) -> Result<()> {
         async fn execute<T: DeserializeOwned + Unpin + Send + Sync + std::fmt::Debug>(
             bench: &FindManyBenchmark,
         ) -> Result<()> {

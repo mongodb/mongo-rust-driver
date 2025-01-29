@@ -75,7 +75,7 @@ impl Benchmark for GridFsMultiDownloadBenchmark {
         Ok(())
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&mut self) -> Result<()> {
         let mut tasks = vec![];
 
         for id in &self.ids {

@@ -1,5 +1,6 @@
 pub mod bson_decode;
 pub mod bson_encode;
+pub mod bulk_write;
 pub mod find_many;
 pub mod find_one;
 pub mod gridfs_download;
@@ -69,7 +70,7 @@ pub trait Benchmark: Sized {
         Ok(())
     }
 
-    async fn do_task(&self) -> Result<()>;
+    async fn do_task(&mut self) -> Result<()>;
 
     /// execute at the end of every iteration
     async fn after_task(&self) -> Result<()> {

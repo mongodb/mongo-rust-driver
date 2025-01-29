@@ -74,7 +74,7 @@ impl Benchmark for JsonMultiExportBenchmark {
         })
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&mut self) -> Result<()> {
         let mut tasks = Vec::new();
 
         for i in 0..TOTAL_FILES {

@@ -35,7 +35,7 @@ impl Benchmark for BsonEncodeBenchmark {
         })
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&mut self) -> Result<()> {
         for _ in 0..self.num_iter {
             let mut bytes: Vec<u8> = Vec::new();
             self.doc.to_writer(&mut bytes)?;

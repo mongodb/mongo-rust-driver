@@ -47,7 +47,7 @@ impl Benchmark for GridFsMultiUploadBenchmark {
         Ok(())
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&mut self) -> Result<()> {
         let mut tasks = vec![];
 
         for entry in read_dir(&self.path)? {

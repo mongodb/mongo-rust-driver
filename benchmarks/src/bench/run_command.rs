@@ -53,7 +53,7 @@ impl Benchmark for RunCommandBenchmark {
         })
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&mut self) -> Result<()> {
         for _ in 0..self.num_iter {
             let _doc = self
                 .get_db()

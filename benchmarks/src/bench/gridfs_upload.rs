@@ -51,7 +51,7 @@ impl Benchmark for GridFsUploadBenchmark {
         Ok(())
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&mut self) -> Result<()> {
         let mut upload = self.bucket.open_upload_stream("gridfstest").await?;
         upload.write_all(&self.bytes[..]).await?;
         upload.close().await?;
