@@ -30,6 +30,7 @@ impl File {
     pub(crate) async fn open_write(name: &Path) -> Result<Self> {
         let inner = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(name)
             .await?;

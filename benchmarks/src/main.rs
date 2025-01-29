@@ -55,31 +55,31 @@ use crate::{
 static DATA_PATH: Lazy<PathBuf> = Lazy::new(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("data"));
 
 // benchmark names
-const FLAT_BSON_ENCODING: &'static str = "Flat BSON Encoding";
-const FLAT_BSON_DECODING: &'static str = "Flat BSON Decoding";
-const DEEP_BSON_ENCODING: &'static str = "Deep BSON Encoding";
-const DEEP_BSON_DECODING: &'static str = "Deep BSON Decoding";
-const FULL_BSON_ENCODING: &'static str = "Full BSON Encoding";
-const FULL_BSON_DECODING: &'static str = "Full BSON Decoding";
-const RUN_COMMAND_BENCH: &'static str = "Run Command";
-const RUN_COMMAND_COLD_START_BENCH: &'static str = "Run Command (cold start)";
-const FIND_ONE_BENCH: &'static str = "Find one";
-const FIND_MANY_BENCH: &'static str = "Find many and empty cursor";
-const FIND_MANY_BENCH_RAW: &'static str = "Find many and empty cursor (raw BSON)";
-const FIND_MANY_BENCH_SERDE: &'static str = "Find many and empty cursor (serde structs)";
-const GRIDFS_DOWNLOAD_BENCH: &'static str = "GridFS download";
-const LDJSON_MULTI_EXPORT_BENCH: &'static str = "LDJSON multi-file export";
-const GRIDFS_MULTI_DOWNLOAD_BENCH: &'static str = "GridFS multi-file download";
-const SMALL_DOC_INSERT_ONE_BENCH: &'static str = "Small doc insertOne";
-const LARGE_DOC_INSERT_ONE_BENCH: &'static str = "Large doc insertOne";
-const SMALL_DOC_INSERT_MANY_BENCH: &'static str = "Small doc insertMany";
-const LARGE_DOC_INSERT_MANY_BENCH: &'static str = "Large doc insertMany";
-const GRIDFS_UPLOAD_BENCH: &'static str = "GridFS upload";
-const LDJSON_MULTI_IMPORT_BENCH: &'static str = "LDJSON multi-file import";
-const GRIDFS_MULTI_UPLOAD_BENCH: &'static str = "GridFS multi-file upload";
-const SMALL_DOC_INSERT_BULK_WRITE_BENCH: &'static str = "Small doc insert-only bulkWrite";
-const LARGE_DOC_INSERT_BULK_WRITE_BENCH: &'static str = "Large doc insert-only bulkWrite";
-const MIXED_BULK_WRITE_BENCH: &'static str = "Mixed bulkWrite";
+const FLAT_BSON_ENCODING: &str = "Flat BSON Encoding";
+const FLAT_BSON_DECODING: &str = "Flat BSON Decoding";
+const DEEP_BSON_ENCODING: &str = "Deep BSON Encoding";
+const DEEP_BSON_DECODING: &str = "Deep BSON Decoding";
+const FULL_BSON_ENCODING: &str = "Full BSON Encoding";
+const FULL_BSON_DECODING: &str = "Full BSON Decoding";
+const RUN_COMMAND_BENCH: &str = "Run Command";
+const RUN_COMMAND_COLD_START_BENCH: &str = "Run Command (cold start)";
+const FIND_ONE_BENCH: &str = "Find one";
+const FIND_MANY_BENCH: &str = "Find many and empty cursor";
+const FIND_MANY_BENCH_RAW: &str = "Find many and empty cursor (raw BSON)";
+const FIND_MANY_BENCH_SERDE: &str = "Find many and empty cursor (serde structs)";
+const GRIDFS_DOWNLOAD_BENCH: &str = "GridFS download";
+const LDJSON_MULTI_EXPORT_BENCH: &str = "LDJSON multi-file export";
+const GRIDFS_MULTI_DOWNLOAD_BENCH: &str = "GridFS multi-file download";
+const SMALL_DOC_INSERT_ONE_BENCH: &str = "Small doc insertOne";
+const LARGE_DOC_INSERT_ONE_BENCH: &str = "Large doc insertOne";
+const SMALL_DOC_INSERT_MANY_BENCH: &str = "Small doc insertMany";
+const LARGE_DOC_INSERT_MANY_BENCH: &str = "Large doc insertMany";
+const GRIDFS_UPLOAD_BENCH: &str = "GridFS upload";
+const LDJSON_MULTI_IMPORT_BENCH: &str = "LDJSON multi-file import";
+const GRIDFS_MULTI_UPLOAD_BENCH: &str = "GridFS multi-file upload";
+const SMALL_DOC_INSERT_BULK_WRITE_BENCH: &str = "Small doc insert-only bulkWrite";
+const LARGE_DOC_INSERT_BULK_WRITE_BENCH: &str = "Large doc insert-only bulkWrite";
+const MIXED_BULK_WRITE_BENCH: &str = "Mixed bulkWrite";
 
 #[derive(Copy, Clone, num_enum::TryFromPrimitive, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(u8)]
@@ -144,7 +144,7 @@ impl BenchmarkId {
 }
 
 /// Benchmarks included in the "BSONBench" composite.
-const BSON_BENCHES: &[&'static str] = &[
+const BSON_BENCHES: &[&str] = &[
     FLAT_BSON_ENCODING,
     FLAT_BSON_DECODING,
     DEEP_BSON_ENCODING,
@@ -155,14 +155,14 @@ const BSON_BENCHES: &[&'static str] = &[
 
 /// Benchmarkes included in the "SingleBench" composite.
 /// This consists of all the single-doc benchmarks except Run Command.
-const SINGLE_BENCHES: &[&'static str] = &[
+const SINGLE_BENCHES: &[&str] = &[
     FIND_ONE_BENCH,
     SMALL_DOC_INSERT_ONE_BENCH,
     LARGE_DOC_INSERT_ONE_BENCH,
 ];
 
 /// Benchmarks included in the "MultiBench" composite.
-const MULTI_BENCHES: &[&'static str] = &[
+const MULTI_BENCHES: &[&str] = &[
     FIND_MANY_BENCH_RAW,
     SMALL_DOC_INSERT_MANY_BENCH,
     LARGE_DOC_INSERT_MANY_BENCH,
@@ -174,7 +174,7 @@ const MULTI_BENCHES: &[&'static str] = &[
 ];
 
 /// Benchmarks included in the "ParallelBench" composite.
-const PARALLEL_BENCHES: &[&'static str] = &[
+const PARALLEL_BENCHES: &[&str] = &[
     LDJSON_MULTI_IMPORT_BENCH,
     LDJSON_MULTI_EXPORT_BENCH,
     GRIDFS_MULTI_UPLOAD_BENCH,
@@ -182,7 +182,7 @@ const PARALLEL_BENCHES: &[&'static str] = &[
 ];
 
 /// Benchmarks included in the "ReadBench" composite.
-const READ_BENCHES: &[&'static str] = &[
+const READ_BENCHES: &[&str] = &[
     FIND_ONE_BENCH,
     FIND_MANY_BENCH_RAW,
     GRIDFS_DOWNLOAD_BENCH,
@@ -191,7 +191,7 @@ const READ_BENCHES: &[&'static str] = &[
 ];
 
 /// Benchmarks included in the "WriteBench" composite.
-const WRITE_BENCHES: &[&'static str] = &[
+const WRITE_BENCHES: &[&str] = &[
     SMALL_DOC_INSERT_ONE_BENCH,
     LARGE_DOC_INSERT_ONE_BENCH,
     SMALL_DOC_INSERT_MANY_BENCH,
@@ -586,7 +586,7 @@ async fn run_benchmarks(
 fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
     let mut ids: HashSet<BenchmarkId> = match matches.value_of("ids") {
         Some("all") => (1..=MAX_ID)
-            .map(|id| BenchmarkId::try_from(id as u8).unwrap())
+            .map(|id| BenchmarkId::try_from(id).unwrap())
             .collect(),
         Some(id_list) => id_list
             .split(',')
@@ -655,7 +655,7 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
     // if none were enabled, that means no arguments were provided and all should be enabled.
     if ids.is_empty() {
         ids = (1..=MAX_ID)
-            .map(|id| BenchmarkId::try_from(id as u8).unwrap())
+            .map(|id| BenchmarkId::try_from(id).unwrap())
             // TODO RUST-2010 Re-enable this benchmark
             .filter(|id| *id != BenchmarkId::GridFsMultiUpload)
             .collect()

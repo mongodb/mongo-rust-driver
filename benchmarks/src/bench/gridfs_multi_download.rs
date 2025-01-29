@@ -66,7 +66,7 @@ impl Benchmark for GridFsMultiDownloadBenchmark {
 
     async fn before_task(&mut self) -> Result<()> {
         for id in &self.ids {
-            let path = get_filename(&id);
+            let path = get_filename(id);
             if Path::try_exists(&path)? {
                 remove_file(path)?;
             }

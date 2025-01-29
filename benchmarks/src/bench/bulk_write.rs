@@ -84,7 +84,6 @@ impl Benchmark for InsertBulkWriteBenchmark {
 
 static COLLECTION_NAMES: Lazy<Vec<String>> = Lazy::new(|| {
     (1..=10)
-        .into_iter()
         .map(|i| format!("corpus_{}", i))
         .collect()
 });

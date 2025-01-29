@@ -39,9 +39,9 @@ impl Benchmark for FindOneBenchmark {
 
         let num_iter = options.num_iter;
 
-        let mut file = read_to_string(&options.path).await?;
+        let file = read_to_string(&options.path).await?;
 
-        let json: Value = serde_json::from_str(&mut file)?;
+        let json: Value = serde_json::from_str(&file)?;
         let mut doc = match json.try_into()? {
             Bson::Document(doc) => doc,
             _ => bail!("invalid json test file"),

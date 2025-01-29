@@ -21,9 +21,9 @@ impl Benchmark for BsonEncodeBenchmark {
     type Options = Options;
 
     async fn setup(options: Self::Options) -> Result<Self> {
-        let mut file = read_to_string(&options.path).await?;
+        let file = read_to_string(&options.path).await?;
 
-        let json: Value = serde_json::from_str(&mut file)?;
+        let json: Value = serde_json::from_str(&file)?;
         let doc = match json.try_into()? {
             Bson::Document(doc) => doc,
             _ => bail!("invalid json test file"),
