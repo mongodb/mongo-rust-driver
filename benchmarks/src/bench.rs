@@ -29,8 +29,12 @@ use mongodb::{
 };
 use once_cell::sync::Lazy;
 use serde_json::Value;
+use tokio::sync::OnceCell;
 
-use crate::fs::{BufReader, File};
+use crate::{
+    fs::{BufReader, File},
+    DATA_PATH,
+};
 
 static DATABASE_NAME: Lazy<String> = Lazy::new(|| {
     option_env!("DATABASE_NAME")
@@ -57,6 +61,38 @@ pub static TARGET_ITERATION_COUNT: Lazy<usize> = Lazy::new(|| {
         .parse::<usize>()
         .expect("invalid TARGET_ITERATION_COUNT")
 });
+
+static SMALL_DOC: OnceCell<Document> = OnceCell::const_new();
+pub async fn get_small_doc() -> Document {
+    SMALL_DOC
+        .get_or_init(|| async {
+            let data_path = DATA_PATH
+                .join("single_and_multi_document")
+                .join("small_doc.json");
+            let mut file = spawn_blocking_and_await!(std::fs::File::open(data_path))
+                .expect("failed to open small doc file");
+            spawn_blocking_and_await!(serde_json::from_reader(&mut file))
+                .expect("failed to parse small document from json")
+        })
+        .await
+        .clone()
+}
+
+static LARGE_DOC: OnceCell<Document> = OnceCell::const_new();
+pub async fn get_large_doc() -> Document {
+    LARGE_DOC
+        .get_or_init(|| async {
+            let data_path = DATA_PATH
+                .join("single_and_multi_document")
+                .join("large_doc.json");
+            let mut file = spawn_blocking_and_await!(std::fs::File::open(data_path))
+                .expect("failed to open large doc file");
+            spawn_blocking_and_await!(serde_json::from_reader(&mut file))
+                .expect("failed to parse large document from json")
+        })
+        .await
+        .clone()
+}
 
 #[async_trait::async_trait]
 pub trait Benchmark: Sized {

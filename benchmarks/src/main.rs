@@ -38,6 +38,8 @@ use crate::{
         bulk_write::{InsertBulkWriteBenchmark, MixedBulkWriteBenchmark},
         find_many::FindManyBenchmark,
         find_one::FindOneBenchmark,
+        get_large_doc,
+        get_small_doc,
         gridfs_download::GridFsDownloadBenchmark,
         gridfs_multi_download::GridFsMultiDownloadBenchmark,
         gridfs_multi_upload::GridFsMultiUploadBenchmark,
@@ -249,9 +251,7 @@ async fn run_benchmarks(
             BenchmarkId::SmallDocInsertOne => {
                 let small_insert_one_options = bench::insert_one::Options {
                     num_iter: 10000,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("small_doc.json"),
+                    doc: get_small_doc().await,
                     uri: uri.to_string(),
                 };
                 let small_insert_one =
@@ -269,9 +269,7 @@ async fn run_benchmarks(
             BenchmarkId::LargeDocInsertOne => {
                 let large_insert_one_options = bench::insert_one::Options {
                     num_iter: 10,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("large_doc.json"),
+                    doc: get_large_doc().await,
                     uri: uri.to_string(),
                 };
                 let large_insert_one =
@@ -289,9 +287,7 @@ async fn run_benchmarks(
             BenchmarkId::SmallDocInsertMany => {
                 let small_insert_many_options = bench::insert_many::Options {
                     num_copies: 10000,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("small_doc.json"),
+                    doc: get_small_doc().await,
                     uri: uri.to_string(),
                 };
                 let small_insert_many =
@@ -309,9 +305,7 @@ async fn run_benchmarks(
             BenchmarkId::LargeDocInsertMany => {
                 let large_insert_many_options = bench::insert_many::Options {
                     num_copies: 10,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("large_doc.json"),
+                    doc: get_large_doc().await,
                     uri: uri.to_string(),
                 };
                 let large_insert_many =
@@ -540,9 +534,7 @@ async fn run_benchmarks(
             BenchmarkId::SmallDocInsertBulkWrite => {
                 let bulk_write_options = bench::bulk_write::Options {
                     uri: uri.to_string(),
-                    data_path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("small_doc.json"),
+                    doc: get_small_doc().await,
                     num_models: 10_000,
                 };
                 let small_doc_insert_bulk_write =
@@ -554,9 +546,7 @@ async fn run_benchmarks(
             BenchmarkId::LargeDocInsertBulkWrite => {
                 let bulk_write_options = bench::bulk_write::Options {
                     uri: uri.to_string(),
-                    data_path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("large_doc.json"),
+                    doc: get_large_doc().await,
                     num_models: 10,
                 };
                 let large_doc_insert_bulk_write =
@@ -568,9 +558,7 @@ async fn run_benchmarks(
             BenchmarkId::MixedBulkWrite => {
                 let bulk_write_options = bench::bulk_write::Options {
                     uri: uri.to_string(),
-                    data_path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("small_doc.json"),
+                    doc: get_small_doc().await,
                     num_models: 30_000,
                 };
                 let mixed_bulk_write =

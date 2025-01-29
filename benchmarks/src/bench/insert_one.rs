@@ -1,13 +1,5 @@
-use std::{convert::TryInto, fs::File, path::PathBuf};
-
-use anyhow::{bail, Context, Result};
-use mongodb::{
-    bson::{Bson, Document},
-    Client,
-    Collection,
-    Database,
-};
-use serde_json::Value;
+use anyhow::{Context, Result};
+use mongodb::{bson::Document, Client, Collection, Database};
 
 use crate::bench::{drop_database, Benchmark, COLL_NAME, DATABASE_NAME};
 
@@ -22,7 +14,7 @@ pub struct InsertOneBenchmark {
 /// Specifies the options to a `InsertOneBenchmark::setup` operation.
 pub struct Options {
     pub num_iter: usize,
-    pub path: PathBuf,
+    pub doc: Document,
     pub uri: String,
 }
 
@@ -35,29 +27,14 @@ impl Benchmark for InsertOneBenchmark {
         let db = client.database(&DATABASE_NAME);
         drop_database(&options.uri, &DATABASE_NAME).await?;
 
-        let num_iter = options.num_iter;
-        let uri = options.uri.clone();
-
-        // This benchmark uses a file that's quite large, and unfortunately `serde_json` has no
-        // async version of `from_reader`, so rather than read the whole file into memory at once,
-        // we use the runtime's `spawn_blocking` functionality to do this efficiently.
-        //
-        // Note that the setup is _not_ measured as part of the benchmark runtime, so even if
-        // `spawn_blocking` turned out not to be super efficient, it wouldn't be a big deal.
-        let mut file = spawn_blocking_and_await!(File::open(options.path))?;
-        let json: Value = spawn_blocking_and_await!(serde_json::from_reader(&mut file))?;
-
         let coll = db.collection(&COLL_NAME);
 
         Ok(InsertOneBenchmark {
             db,
-            num_iter,
+            num_iter: options.num_iter,
             coll,
-            doc: match json.try_into()? {
-                Bson::Document(doc) => doc,
-                _ => bail!("invalid json test file"),
-            },
-            uri,
+            doc: options.doc,
+            uri: options.uri,
         })
     }
 

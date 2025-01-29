@@ -1,5 +1,3 @@
-use std::{fs::File, path::PathBuf};
-
 use anyhow::Result;
 use mongodb::{
     bson::{doc, Document},
@@ -21,8 +19,8 @@ pub struct InsertBulkWriteBenchmark {
 }
 
 pub struct Options {
-    pub data_path: PathBuf,
     pub uri: String,
+    pub doc: Document,
     pub num_models: usize,
 }
 
@@ -34,15 +32,11 @@ impl Benchmark for InsertBulkWriteBenchmark {
         let client = Client::with_uri_str(&options.uri).await?;
         drop_database(options.uri.as_str(), DATABASE_NAME.as_str()).await?;
 
-        let data_path = options.data_path.clone();
-        let mut file = spawn_blocking_and_await!(File::open(data_path))?;
-        let document: Document = spawn_blocking_and_await!(serde_json::from_reader(&mut file))?;
-
         let write_models = vec![
             WriteModel::InsertOne(
                 InsertOneModel::builder()
                     .namespace(Namespace::new(DATABASE_NAME.as_str(), COLL_NAME.as_str()))
-                    .document(document.clone())
+                    .document(options.doc.clone())
                     .build()
             );
             options.num_models
@@ -82,11 +76,8 @@ impl Benchmark for InsertBulkWriteBenchmark {
     }
 }
 
-static COLLECTION_NAMES: Lazy<Vec<String>> = Lazy::new(|| {
-    (1..=10)
-        .map(|i| format!("corpus_{}", i))
-        .collect()
-});
+static COLLECTION_NAMES: Lazy<Vec<String>> =
+    Lazy::new(|| (1..=10).map(|i| format!("corpus_{}", i)).collect());
 
 pub struct MixedBulkWriteBenchmark {
     client: Client,
@@ -103,21 +94,15 @@ impl Benchmark for MixedBulkWriteBenchmark {
         let client = Client::with_uri_str(&options.uri).await?;
         drop_database(options.uri.as_str(), DATABASE_NAME.as_str()).await?;
 
-        let num_models = options.num_models;
-        let uri = options.uri.clone();
-
-        let mut file = spawn_blocking_and_await!(File::open(options.data_path))?;
-        let document: Document = spawn_blocking_and_await!(serde_json::from_reader(&mut file))?;
-
         let mut write_models = Vec::new();
-        for i in 0..num_models {
+        for i in 0..options.num_models {
             let collection_name = COLLECTION_NAMES.get(i % 10).unwrap();
             let namespace = Namespace::new(DATABASE_NAME.as_str(), collection_name);
             if i % 3 == 0 {
                 write_models.push(
                     InsertOneModel::builder()
                         .namespace(namespace)
-                        .document(document.clone())
+                        .document(options.doc.clone())
                         .build()
                         .into(),
                 );
@@ -126,7 +111,7 @@ impl Benchmark for MixedBulkWriteBenchmark {
                     ReplaceOneModel::builder()
                         .namespace(namespace)
                         .filter(doc! {})
-                        .replacement(document.clone())
+                        .replacement(options.doc.clone())
                         .build()
                         .into(),
                 );
@@ -143,7 +128,7 @@ impl Benchmark for MixedBulkWriteBenchmark {
 
         Ok(Self {
             client,
-            uri,
+            uri: options.uri,
             write_models,
             write_models_copy: None,
         })
