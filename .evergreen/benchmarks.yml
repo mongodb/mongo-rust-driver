@@ -290,7 +290,7 @@ tasks:
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
-          MONGODB_VERSION: "v6.0-perf"
+          MONGODB_VERSION: "v8.0-perf"
           # Note that drivers-evergreen-tools expects `SSL` as the environmental
           # variable, not `TLS`, so we have to use that for the actual value used in the
           # script; we use `TLS` for the metadata that isn't used by the actual shell
@@ -364,4 +364,3 @@ buildvariants:
   display_name: "Compile"
   tasks:
     - "benchmark-compile"
-
