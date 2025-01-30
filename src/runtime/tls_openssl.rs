@@ -113,7 +113,11 @@ fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
 
 fn init_trust() {
     static ONCE: Once = Once::new();
-    ONCE.call_once(openssl_probe::init_ssl_cert_env_vars);
+    // nosemgrep: unsafe-usage
+    ONCE.call_once(|| unsafe {
+        // mongodb rating: No Fix Needed
+        openssl_probe::init_openssl_env_vars()
+    })
 }
 
 fn make_ssl_stream(
