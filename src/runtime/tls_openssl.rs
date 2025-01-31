@@ -1,4 +1,4 @@
-use std::{pin::Pin, sync::Once};
+use std::pin::Pin;
 
 use openssl::{
     error::ErrorStack,
@@ -70,7 +70,9 @@ fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
     let mut builder = SslConnector::builder(SslMethod::tls_client()).map_err(openssl_err)?;
 
     let probe = openssl_probe::probe();
-    builder.load_verify_locations(probe.cert_file.as_deref(), probe.cert_dir.as_deref())?;
+    builder
+        .load_verify_locations(probe.cert_file.as_deref(), probe.cert_dir.as_deref())
+        .map_err(openssl_err)?;
 
     let TlsOptions {
         allow_invalid_certificates,
