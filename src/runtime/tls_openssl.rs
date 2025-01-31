@@ -45,8 +45,6 @@ pub(super) async fn tls_connect(
     tcp_stream: TcpStream,
     cfg: &TlsConfig,
 ) -> Result<TlsStream> {
-    init_trust();
-
     let mut stream = make_ssl_stream(host, tcp_stream, cfg).map_err(|err| {
         Error::from(ErrorKind::InvalidTlsConfig {
             message: err.to_string(),
@@ -70,6 +68,9 @@ fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
     };
 
     let mut builder = SslConnector::builder(SslMethod::tls_client()).map_err(openssl_err)?;
+
+    let probe = openssl_probe::probe();
+    builder.load_verify_locations(probe.cert_file.as_deref(), probe.cert_dir.as_deref())?;
 
     let TlsOptions {
         allow_invalid_certificates,
@@ -109,15 +110,6 @@ fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
     }
 
     Ok(builder.build())
-}
-
-fn init_trust() {
-    static ONCE: Once = Once::new();
-    // nosemgrep: unsafe-usage
-    ONCE.call_once(|| unsafe {
-        // mongodb rating: No Fix Needed
-        openssl_probe::init_openssl_env_vars()
-    })
 }
 
 fn make_ssl_stream(
