@@ -17,3 +17,6 @@ cargo $TOOLCHAIN build
 
 # Test with all features.
 cargo $TOOLCHAIN build --all-features
+
+# Test with no default features.
+cargo $TOOLCHAIN build --no-default-features --features compat-3-0-0,rustls-tls
