@@ -3,7 +3,7 @@ use std::time::Duration;
 use mongodb::bson::Document;
 use serde::Serialize;
 
-const SCORE_VALUE_NAME: &'static str = "score";
+const SCORE_VALUE_NAME: &str = "score";
 
 #[derive(Debug, Clone)]
 pub(crate) struct BenchmarkScore {

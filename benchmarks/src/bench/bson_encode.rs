@@ -1,10 +1,7 @@
-use std::{convert::TryInto, path::PathBuf};
+use anyhow::Result;
+use mongodb::bson::Document;
 
-use anyhow::{bail, Result};
-use mongodb::bson::{Bson, Document};
-use serde_json::Value;
-
-use crate::{bench::Benchmark, fs::read_to_string};
+use crate::bench::Benchmark;
 
 pub struct BsonEncodeBenchmark {
     num_iter: usize,
@@ -13,29 +10,22 @@ pub struct BsonEncodeBenchmark {
 
 pub struct Options {
     pub num_iter: usize,
-    pub path: PathBuf,
+    pub doc: Document,
 }
 
 #[async_trait::async_trait]
 impl Benchmark for BsonEncodeBenchmark {
     type Options = Options;
+    type TaskState = ();
 
     async fn setup(options: Self::Options) -> Result<Self> {
-        let mut file = read_to_string(&options.path).await?;
-
-        let json: Value = serde_json::from_str(&mut file)?;
-        let doc = match json.try_into()? {
-            Bson::Document(doc) => doc,
-            _ => bail!("invalid json test file"),
-        };
-
         Ok(BsonEncodeBenchmark {
             num_iter: options.num_iter,
-            doc,
+            doc: options.doc,
         })
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&self, _state: Self::TaskState) -> Result<()> {
         for _ in 0..self.num_iter {
             let mut bytes: Vec<u8> = Vec::new();
             self.doc.to_writer(&mut bytes)?;

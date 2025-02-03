@@ -1,19 +1,15 @@
-use std::{convert::TryInto, path::PathBuf};
-
-use anyhow::{bail, Result};
+use anyhow::Result;
 use futures::stream::StreamExt;
 use mongodb::{
-    bson::{doc, Bson, Document, RawDocumentBuf},
+    bson::{doc, Document, RawDocumentBuf},
     Client,
     Collection,
     Database,
 };
 use serde::de::DeserializeOwned;
-use serde_json::Value;
 
 use crate::{
     bench::{drop_database, Benchmark, COLL_NAME, DATABASE_NAME},
-    fs::read_to_string,
     models::tweet::Tweet,
 };
 
@@ -27,7 +23,7 @@ pub struct FindManyBenchmark {
 // Specifies the options to `FindManyBenchmark::setup` operation.
 pub struct Options {
     pub num_iter: usize,
-    pub path: PathBuf,
+    pub doc: Document,
     pub uri: String,
     pub mode: Mode,
 }
@@ -41,24 +37,15 @@ pub enum Mode {
 #[async_trait::async_trait]
 impl Benchmark for FindManyBenchmark {
     type Options = Options;
+    type TaskState = ();
 
     async fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri).await?;
         let db = client.database(&DATABASE_NAME);
         drop_database(options.uri.as_str(), DATABASE_NAME.as_str()).await?;
 
-        let num_iter = options.num_iter;
-
-        let mut file = read_to_string(&options.path).await?;
-
-        let json: Value = serde_json::from_str(&mut file)?;
-        let doc = match json.try_into()? {
-            Bson::Document(doc) => doc,
-            _ => bail!("invalid json test file"),
-        };
-
         let coll = db.collection(&COLL_NAME);
-        let docs = vec![doc.clone(); num_iter];
+        let docs = vec![options.doc.clone(); options.num_iter];
         coll.insert_many(docs).await?;
 
         Ok(FindManyBenchmark {
@@ -69,7 +56,7 @@ impl Benchmark for FindManyBenchmark {
         })
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&self, _state: Self::TaskState) -> Result<()> {
         async fn execute<T: DeserializeOwned + Unpin + Send + Sync + std::fmt::Debug>(
             bench: &FindManyBenchmark,
         ) -> Result<()> {

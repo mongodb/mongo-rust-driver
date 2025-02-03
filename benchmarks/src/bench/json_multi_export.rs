@@ -33,6 +33,7 @@ pub struct Options {
 #[async_trait::async_trait]
 impl Benchmark for JsonMultiExportBenchmark {
     type Options = Options;
+    type TaskState = ();
 
     async fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri).await?;
@@ -74,7 +75,7 @@ impl Benchmark for JsonMultiExportBenchmark {
         })
     }
 
-    async fn do_task(&self) -> Result<()> {
+    async fn do_task(&self, _state: Self::TaskState) -> Result<()> {
         let mut tasks = Vec::new();
 
         for i in 0..TOTAL_FILES {
