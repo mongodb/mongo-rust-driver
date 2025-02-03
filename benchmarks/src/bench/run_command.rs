@@ -37,6 +37,7 @@ impl RunCommandBenchmark {
 #[async_trait::async_trait]
 impl Benchmark for RunCommandBenchmark {
     type Options = Options;
+    type TaskState = ();
 
     async fn setup(options: Self::Options) -> Result<Self> {
         let db = if options.cold_start {
@@ -53,7 +54,7 @@ impl Benchmark for RunCommandBenchmark {
         })
     }
 
-    async fn do_task(&mut self) -> Result<()> {
+    async fn do_task(&self, _state: Self::TaskState) -> Result<()> {
         for _ in 0..self.num_iter {
             let _doc = self
                 .get_db()

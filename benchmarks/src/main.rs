@@ -1,11 +1,3 @@
-macro_rules! spawn_blocking_and_await {
-    ($blocking_call:expr) => {{
-        tokio::task::spawn_blocking(move || $blocking_call)
-            .await
-            .unwrap()
-    }};
-}
-
 fn spawn<T>(future: T) -> impl Future<Output = <T as Future>::Output>
 where
     T: Future + Send + 'static,
@@ -15,21 +7,18 @@ where
 }
 
 mod bench;
+mod data;
 mod fs;
 mod models;
 mod score;
 
-use std::{
-    collections::HashSet,
-    convert::TryFrom,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet, convert::TryFrom, path::PathBuf};
 
 use anyhow::Result;
 use clap::{App, Arg, ArgMatches};
+use data::{get_deep_bson, get_flat_bson, get_full_bson, get_tweet};
 use futures::{Future, FutureExt};
 use mongodb::options::ClientOptions;
-use once_cell::sync::Lazy;
 
 use crate::{
     bench::{
@@ -38,8 +27,6 @@ use crate::{
         bulk_write::{InsertBulkWriteBenchmark, MixedBulkWriteBenchmark},
         find_many::FindManyBenchmark,
         find_one::FindOneBenchmark,
-        get_large_doc,
-        get_small_doc,
         gridfs_download::GridFsDownloadBenchmark,
         gridfs_multi_download::GridFsMultiDownloadBenchmark,
         gridfs_multi_upload::GridFsMultiUploadBenchmark,
@@ -50,11 +37,10 @@ use crate::{
         json_multi_import::JsonMultiImportBenchmark,
         run_command::RunCommandBenchmark,
     },
+    data::{get_large_doc, get_small_doc, DATA_PATH},
     fs::File,
     score::{score_test, BenchmarkResult, CompositeScore},
 };
-
-static DATA_PATH: Lazy<PathBuf> = Lazy::new(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("data"));
 
 // benchmark names
 const FLAT_BSON_ENCODING: &str = "Flat BSON Encoding";
@@ -373,7 +359,7 @@ async fn run_benchmarks(
             BenchmarkId::BsonFlatDocumentDecode => {
                 let bson_flat_decode_options = bench::bson_decode::Options {
                     num_iter: 10_000,
-                    path: DATA_PATH.join("extended_bson").join("flat_bson.json"),
+                    doc: get_flat_bson().await,
                 };
                 let bson_flat_decode =
                     bench::run_benchmark::<BsonDecodeBenchmark>(bson_flat_decode_options).await?;
@@ -385,7 +371,7 @@ async fn run_benchmarks(
             BenchmarkId::BsonFlatDocumentEncode => {
                 let bson_flat_encode_options = bench::bson_encode::Options {
                     num_iter: 10_000,
-                    path: DATA_PATH.join("extended_bson").join("flat_bson.json"),
+                    doc: get_flat_bson().await,
                 };
                 let bson_flat_encode =
                     bench::run_benchmark::<BsonEncodeBenchmark>(bson_flat_encode_options).await?;
@@ -397,7 +383,7 @@ async fn run_benchmarks(
             BenchmarkId::BsonDeepDocumentDecode => {
                 let bson_deep_decode_options = bench::bson_decode::Options {
                     num_iter: 10_000,
-                    path: DATA_PATH.join("extended_bson").join("deep_bson.json"),
+                    doc: get_deep_bson().await,
                 };
                 let bson_deep_decode =
                     bench::run_benchmark::<BsonDecodeBenchmark>(bson_deep_decode_options).await?;
@@ -409,7 +395,7 @@ async fn run_benchmarks(
             BenchmarkId::BsonDeepDocumentEncode => {
                 let bson_deep_encode_options = bench::bson_encode::Options {
                     num_iter: 10_000,
-                    path: DATA_PATH.join("extended_bson").join("deep_bson.json"),
+                    doc: get_deep_bson().await,
                 };
                 let bson_deep_encode =
                     bench::run_benchmark::<BsonEncodeBenchmark>(bson_deep_encode_options).await?;
@@ -421,7 +407,7 @@ async fn run_benchmarks(
             BenchmarkId::BsonFullDocumentDecode => {
                 let bson_full_decode_options = bench::bson_decode::Options {
                     num_iter: 10_000,
-                    path: DATA_PATH.join("extended_bson").join("full_bson.json"),
+                    doc: get_full_bson().await,
                 };
                 let bson_full_decode =
                     bench::run_benchmark::<BsonDecodeBenchmark>(bson_full_decode_options).await?;
@@ -433,7 +419,7 @@ async fn run_benchmarks(
             BenchmarkId::BsonFullDocumentEncode => {
                 let bson_full_encode_options = bench::bson_encode::Options {
                     num_iter: 10_000,
-                    path: DATA_PATH.join("extended_bson").join("full_bson.json"),
+                    doc: get_full_bson().await,
                 };
                 let bson_full_encode =
                     bench::run_benchmark::<BsonEncodeBenchmark>(bson_full_encode_options).await?;
@@ -445,9 +431,7 @@ async fn run_benchmarks(
             BenchmarkId::FindOneById => {
                 let find_one_options = bench::find_one::Options {
                     num_iter: 10000,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("tweet.json"),
+                    doc: get_tweet().await,
                     uri: uri.to_string(),
                 };
                 let find_one = bench::run_benchmark::<FindOneBenchmark>(find_one_options).await?;
@@ -465,9 +449,7 @@ async fn run_benchmarks(
                 };
                 let find_many_options = bench::find_many::Options {
                     num_iter: 10000,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("tweet.json"),
+                    doc: get_tweet().await,
                     uri: uri.to_string(),
                     mode,
                 };

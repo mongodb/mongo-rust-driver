@@ -7,9 +7,8 @@ use tokio::{
 };
 use tokio_util::compat::TokioAsyncReadCompatExt;
 
-pub(crate) async fn read_to_string(path: &Path) -> Result<String> {
-    let s = fs::read_to_string(path).await?;
-    Ok(s)
+pub(crate) struct File {
+    inner: fs::File,
 }
 
 pub(crate) async fn open_async_read_compat(path: &Path) -> Result<impl futures::io::AsyncRead> {
@@ -20,10 +19,6 @@ pub(crate) async fn open_async_read_compat(path: &Path) -> Result<impl futures::
 pub(crate) async fn open_async_write_compat(path: &Path) -> Result<impl futures::io::AsyncWrite> {
     let file = File::open_write(path).await?;
     Ok(file.inner.compat())
-}
-
-pub(crate) struct File {
-    inner: fs::File,
 }
 
 impl File {

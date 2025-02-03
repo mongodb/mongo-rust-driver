@@ -30,6 +30,7 @@ pub struct Options {
 #[async_trait::async_trait]
 impl Benchmark for GridFsMultiDownloadBenchmark {
     type Options = Options;
+    type TaskState = ();
 
     async fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri).await?;
@@ -64,7 +65,7 @@ impl Benchmark for GridFsMultiDownloadBenchmark {
         })
     }
 
-    async fn before_task(&mut self) -> Result<()> {
+    async fn before_task(&self) -> Result<Self::TaskState> {
         for id in &self.ids {
             let path = get_filename(id);
             if Path::try_exists(&path)? {
@@ -75,7 +76,7 @@ impl Benchmark for GridFsMultiDownloadBenchmark {
         Ok(())
     }
 
-    async fn do_task(&mut self) -> Result<()> {
+    async fn do_task(&self, _state: Self::TaskState) -> Result<()> {
         let mut tasks = vec![];
 
         for id in &self.ids {

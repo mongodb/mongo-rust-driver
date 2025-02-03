@@ -21,6 +21,7 @@ pub struct Options {
 #[async_trait::async_trait]
 impl Benchmark for InsertManyBenchmark {
     type Options = Options;
+    type TaskState = ();
 
     async fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri).await?;
@@ -38,7 +39,7 @@ impl Benchmark for InsertManyBenchmark {
         })
     }
 
-    async fn before_task(&mut self) -> Result<()> {
+    async fn before_task(&self) -> Result<Self::TaskState> {
         self.coll.drop().await?;
         self.db
             .create_collection(COLL_NAME.as_str())
@@ -48,7 +49,7 @@ impl Benchmark for InsertManyBenchmark {
         Ok(())
     }
 
-    async fn do_task(&mut self) -> Result<()> {
+    async fn do_task(&self, _state: Self::TaskState) -> Result<()> {
         let insertions = vec![&self.doc; self.num_copies];
         self.coll
             .insert_many(insertions)

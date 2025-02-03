@@ -23,6 +23,7 @@ pub struct Options {
 #[async_trait::async_trait]
 impl Benchmark for GridFsDownloadBenchmark {
     type Options = Options;
+    type TaskState = ();
 
     async fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri).await?;
@@ -46,7 +47,7 @@ impl Benchmark for GridFsDownloadBenchmark {
         })
     }
 
-    async fn do_task(&mut self) -> Result<()> {
+    async fn do_task(&self, _state: Self::TaskState) -> Result<()> {
         let mut buf = vec![];
         let mut download = self
             .bucket

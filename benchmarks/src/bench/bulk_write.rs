@@ -13,9 +13,6 @@ pub struct InsertBulkWriteBenchmark {
     client: Client,
     uri: String,
     write_models: Vec<WriteModel>,
-    // create a fresh copy of the write models in before_task to avoid any noise from cloning a
-    // large list of write models in do_task
-    write_models_copy: Option<Vec<WriteModel>>,
 }
 
 pub struct Options {
@@ -27,6 +24,7 @@ pub struct Options {
 #[async_trait::async_trait]
 impl Benchmark for InsertBulkWriteBenchmark {
     type Options = Options;
+    type TaskState = Vec<WriteModel>;
 
     async fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri).await?;
@@ -46,11 +44,10 @@ impl Benchmark for InsertBulkWriteBenchmark {
             client,
             uri: options.uri,
             write_models,
-            write_models_copy: None,
         })
     }
 
-    async fn before_task(&mut self) -> Result<()> {
+    async fn before_task(&self) -> Result<Self::TaskState> {
         self.client
             .database(&DATABASE_NAME)
             .collection::<Document>(&COLL_NAME)
@@ -60,12 +57,10 @@ impl Benchmark for InsertBulkWriteBenchmark {
             .database(&DATABASE_NAME)
             .create_collection(COLL_NAME.as_str())
             .await?;
-        self.write_models_copy = Some(self.write_models.clone());
-        Ok(())
+        Ok(self.write_models.clone())
     }
 
-    async fn do_task(&mut self) -> Result<()> {
-        let write_models = self.write_models_copy.take().unwrap();
+    async fn do_task(&self, write_models: Self::TaskState) -> Result<()> {
         self.client.bulk_write(write_models).await?;
         Ok(())
     }
@@ -83,12 +78,12 @@ pub struct MixedBulkWriteBenchmark {
     client: Client,
     uri: String,
     write_models: Vec<WriteModel>,
-    write_models_copy: Option<Vec<WriteModel>>,
 }
 
 #[async_trait::async_trait]
 impl Benchmark for MixedBulkWriteBenchmark {
     type Options = Options;
+    type TaskState = Vec<WriteModel>;
 
     async fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri).await?;
@@ -130,22 +125,19 @@ impl Benchmark for MixedBulkWriteBenchmark {
             client,
             uri: options.uri,
             write_models,
-            write_models_copy: None,
         })
     }
 
-    async fn before_task(&mut self) -> Result<()> {
+    async fn before_task(&self) -> Result<Self::TaskState> {
         let database = self.client.database(&DATABASE_NAME);
         database.drop().await?;
         for collection_name in COLLECTION_NAMES.iter() {
             database.create_collection(collection_name).await?;
         }
-        self.write_models_copy = Some(self.write_models.clone());
-        Ok(())
+        Ok(self.write_models.clone())
     }
 
-    async fn do_task(&mut self) -> Result<()> {
-        let write_models = self.write_models_copy.take().unwrap();
+    async fn do_task(&self, write_models: Self::TaskState) -> Result<()> {
         self.client.bulk_write(write_models).await?;
         Ok(())
     }
