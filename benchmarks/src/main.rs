@@ -16,7 +16,6 @@ use std::{collections::HashSet, convert::TryFrom, path::PathBuf};
 
 use anyhow::Result;
 use clap::{App, Arg, ArgMatches};
-use data::{get_deep_bson, get_flat_bson, get_full_bson, get_tweet};
 use futures::{Future, FutureExt};
 use mongodb::options::ClientOptions;
 
@@ -37,7 +36,15 @@ use crate::{
         json_multi_import::JsonMultiImportBenchmark,
         run_command::RunCommandBenchmark,
     },
-    data::{get_large_doc, get_small_doc, DATA_PATH},
+    data::{
+        get_deep_bson,
+        get_flat_bson,
+        get_full_bson,
+        get_large_doc,
+        get_small_doc,
+        get_tweet,
+        DATA_PATH,
+    },
     fs::File,
     score::{score_test, BenchmarkResult, CompositeScore},
 };
