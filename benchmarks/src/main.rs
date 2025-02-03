@@ -628,6 +628,9 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         ids.insert(BenchmarkId::GridFsDownload);
         ids.insert(BenchmarkId::GridFsUpload);
         ids.insert(BenchmarkId::GridFsMultiDownload);
+        ids.insert(BenchmarkId::SmallDocInsertBulkWrite);
+        ids.insert(BenchmarkId::LargeDocInsertBulkWrite);
+        ids.insert(BenchmarkId::MixedBulkWrite);
         // TODO RUST-2010 Re-enable this benchmark
         //ids.insert(BenchmarkId::GridFsMultiUpload);
     }
