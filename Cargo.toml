@@ -16,7 +16,7 @@ homepage = "https://www.mongodb.com/docs/drivers/rust/"
 license = "Apache-2.0"
 readme = "README.md"
 name = "mongodb"
-version = "3.2.0"
+version = "3.2.1"
 
 exclude = [
     "etc/**",
@@ -92,7 +92,7 @@ once_cell = "1.19.0"
 log = { version = "0.4.17", optional = true }
 md-5 = "0.10.1"
 mongocrypt = { git = "https://github.com/mongodb/libmongocrypt-rust.git", branch = "main", optional = true, version = "0.2.1" }
-mongodb-internal-macros = { path = "macros", version = "3.2.0" }
+mongodb-internal-macros = { path = "macros", version = "3.2.1" }
 num_cpus = { version = "1.13.1", optional = true }
 openssl = { version = "0.10.38", optional = true }
 openssl-probe = { version = "0.1.5", optional = true }
