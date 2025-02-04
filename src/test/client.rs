@@ -8,7 +8,7 @@ use crate::{
     error::{CommandError, Error, ErrorKind},
     event::{cmap::CmapEvent, sdam::SdamEvent},
     hello::LEGACY_HELLO_COMMAND_NAME,
-    options::{AuthMechanism, ClientOptions, Credential, ServerAddress},
+    options::{AuthMechanism, Credential, ServerAddress},
     runtime,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{
@@ -608,49 +608,6 @@ async fn x509_auth() {
         .find_one(doc! {})
         .await
         .unwrap();
-}
-
-#[tokio::test]
-async fn plain_auth() {
-    if std::env::var("MONGO_PLAIN_AUTH_TEST").is_err() {
-        log_uncaptured("skipping plain_auth due to environment variable MONGO_PLAIN_AUTH_TEST");
-        return;
-    }
-
-    let options = ClientOptions::builder()
-        .hosts(vec![ServerAddress::Tcp {
-            host: "ldaptest.10gen.cc".into(),
-            port: None,
-        }])
-        .credential(
-            Credential::builder()
-                .mechanism(AuthMechanism::Plain)
-                .username("drivers-team".to_string())
-                .password("mongor0x$xgen".to_string())
-                .build(),
-        )
-        .build();
-
-    let client = Client::with_options(options).unwrap();
-    let coll = client.database("ldap").collection("test");
-
-    let doc = coll.find_one(doc! {}).await.unwrap().unwrap();
-
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct TestDocument {
-        ldap: bool,
-        authenticated: String,
-    }
-
-    let doc: TestDocument = bson::from_document(doc).unwrap();
-
-    assert_eq!(
-        doc,
-        TestDocument {
-            ldap: true,
-            authenticated: "yeah".into()
-        }
-    );
 }
 
 /// Test verifies that retrying a commitTransaction operation after a checkOut

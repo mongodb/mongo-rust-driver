@@ -6,8 +6,10 @@ set -o xtrace
 source .evergreen/env.sh
 source .evergreen/cargo-test.sh
 
+CARGO_OPTIONS+=("--ignore-default-filter")
+
 set +o errexit
 
-MONGO_PLAIN_AUTH_TEST=1 cargo_test plain
+cargo_test plain_auth
 
 exit $CARGO_RESULT
