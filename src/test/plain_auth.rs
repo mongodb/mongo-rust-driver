@@ -3,7 +3,6 @@ use serde::Deserialize;
 use crate::{
     bson::doc,
     options::{AuthMechanism, ClientOptions, Credential, ServerAddress},
-    test::log_uncaptured,
     Client,
 };
 
