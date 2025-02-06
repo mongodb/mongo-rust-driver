@@ -6,8 +6,7 @@ use crate::{
 };
 
 async fn run_test(uri_env_var: &str, resolver_config: Option<ResolverConfig>) {
-    let uri =
-        std::env::var(uri_env_var).expect(&format!("could not find variable {}", uri_env_var));
+    let uri = std::env::var(uri_env_var).expect(uri_env_var);
 
     let options = match resolver_config {
         Some(resolver_config) => {

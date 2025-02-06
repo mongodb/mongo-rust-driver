@@ -1,389 +1,340 @@
-use std::{
-    env,
-    time::{Duration, Instant},
-};
+mod search_index;
 
-use bson::{doc, oid::ObjectId, Document};
-use futures_util::TryStreamExt;
+use futures::stream::TryStreamExt;
 
 use crate::{
-    search_index::SearchIndexType,
+    bson::doc,
+    error::ErrorKind,
+    options::{CommitQuorum, IndexOptions},
     test::{log_uncaptured, spec::unified_runner::run_unified_tests},
     Client,
-    Collection,
-    SearchIndexModel,
+    IndexModel,
 };
 
 #[tokio::test]
-async fn run() {
-    if env::var("INDEX_MANAGEMENT_TEST_UNIFIED").is_err() {
-        log_uncaptured(
-            "Skipping index management unified tests: INDEX_MANAGEMENT_TEST_UNIFIED not set",
-        );
-        return;
-    }
+async fn run_unified() {
     run_unified_tests(&["index-management"]).await;
 }
 
-/// Search Index Case 1: Driver can successfully create and list search indexes
+// Test that creating indexes works as expected.
 #[tokio::test]
-async fn search_index_create_list() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
-    let start = Instant::now();
-    let deadline = start + Duration::from_secs(60 * 5);
-
+#[function_name::named]
+async fn index_management_creates() {
     let client = Client::for_test().await;
-    let db = client.database("search_index_test");
-    let coll_name = ObjectId::new().to_hex();
-    db.create_collection(&coll_name).await.unwrap();
-    let coll0 = db.collection::<Document>(&coll_name);
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
 
-    let name = coll0
-        .create_search_index(
-            SearchIndexModel::builder()
-                .name(String::from("test-search-index"))
-                .definition(doc! { "mappings": { "dynamic": false } })
-                .build(),
-        )
+    // Test creating a single index with driver-generated name.
+    let result = coll
+        .create_index(IndexModel::builder().keys(doc! { "a": 1, "b": -1 }).build())
         .await
-        .unwrap();
-    assert_eq!(name, "test-search-index");
+        .expect("Test failed to create index");
 
-    let found = 'outer: loop {
-        let mut cursor = coll0.list_search_indexes().await.unwrap();
-        while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) {
-                break 'outer d;
-            }
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        if Instant::now() > deadline {
-            panic!("timed out");
-        }
-    };
+    assert_eq!(result.index_name, "a_1_b_-1".to_string());
 
-    assert_eq!(
-        found.get_document("latestDefinition"),
-        Ok(&doc! { "mappings": { "dynamic": false } })
-    );
-}
-
-/// Search Index Case 2: Driver can successfully create multiple indexes in batch
-#[tokio::test]
-async fn search_index_create_multiple() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
-    let start = Instant::now();
-    let deadline = start + Duration::from_secs(60 * 5);
-
-    let client = Client::for_test().await;
-    let db = client.database("search_index_test");
-    let coll_name = ObjectId::new().to_hex();
-    db.create_collection(&coll_name).await.unwrap();
-    let coll0 = db.collection::<Document>(&coll_name);
-
-    let names = coll0
-        .create_search_indexes([
-            SearchIndexModel::builder()
-                .name(String::from("test-search-index-1"))
-                .definition(doc! { "mappings": { "dynamic": false } })
-                .build(),
-            SearchIndexModel::builder()
-                .name(String::from("test-search-index-2"))
-                .definition(doc! { "mappings": { "dynamic": false } })
+    // Test creating several indexes, with both specified and unspecified names.
+    let result = coll
+        .create_indexes(vec![
+            IndexModel::builder().keys(doc! { "c": 1 }).build(),
+            IndexModel::builder()
+                .keys(doc! { "d": 1 })
+                .options(
+                    IndexOptions::builder()
+                        .name("customname".to_string())
+                        .build(),
+                )
                 .build(),
         ])
         .await
-        .unwrap();
-    assert_eq!(names, ["test-search-index-1", "test-search-index-2"]);
-
-    let mut index1 = None;
-    let mut index2 = None;
-    loop {
-        let mut cursor = coll0.list_search_indexes().await.unwrap();
-        while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name") == Ok("test-search-index-1") && d.get_bool("queryable") == Ok(true)
-            {
-                index1 = Some(d);
-            } else if d.get_str("name") == Ok("test-search-index-2")
-                && d.get_bool("queryable") == Ok(true)
-            {
-                index2 = Some(d);
-            }
-        }
-        if index1.is_some() && index2.is_some() {
-            break;
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        if Instant::now() > deadline {
-            panic!("timed out");
-        }
-    }
+        .expect("Test failed to create indexes");
 
     assert_eq!(
-        index1.unwrap().get_document("latestDefinition"),
-        Ok(&doc! { "mappings": { "dynamic": false } })
+        result.index_names,
+        vec!["c_1".to_string(), "customname".to_string()]
     );
-    assert_eq!(
-        index2.unwrap().get_document("latestDefinition"),
-        Ok(&doc! { "mappings": { "dynamic": false } })
-    );
+
+    // Pull all index names from db to verify the _id_ index.
+    let names = coll
+        .list_index_names()
+        .await
+        .expect("Test failed to list index names");
+    assert_eq!(names, vec!["_id_", "a_1_b_-1", "c_1", "customname"]);
 }
 
-/// Search Index Case 3: Driver can successfully drop search indexes
+// Test that creating indexes with string field types produces correct names.
 #[tokio::test]
-async fn search_index_drop() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
-    let start = Instant::now();
-    let deadline = start + Duration::from_secs(60 * 5);
-
+async fn index_management_string_names() {
     let client = Client::for_test().await;
-    let db = client.database("search_index_test");
-    let coll_name = ObjectId::new().to_hex();
-    db.create_collection(&coll_name).await.unwrap();
-    let coll0 = db.collection::<Document>(&coll_name);
-
-    let name = coll0
-        .create_search_index(
-            SearchIndexModel::builder()
-                .name(String::from("test-search-index"))
-                .definition(doc! { "mappings": { "dynamic": false } })
-                .build(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(name, "test-search-index");
-
-    'outer: loop {
-        let mut cursor = coll0.list_search_indexes().await.unwrap();
-        while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) {
-                break 'outer;
-            }
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        if Instant::now() > deadline {
-            panic!("search index creation timed out");
-        }
-    }
-
-    coll0.drop_search_index("test-search-index").await.unwrap();
-
-    loop {
-        let cursor = coll0.list_search_indexes().await.unwrap();
-        if !cursor.has_next() {
-            break;
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        if Instant::now() > deadline {
-            panic!("search index drop timed out");
-        }
-    }
-}
-
-/// Search Index Case 4: Driver can update a search index
-#[tokio::test]
-async fn search_index_update() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
-    let start = Instant::now();
-    let deadline = start + Duration::from_secs(60 * 5);
-
-    let client = Client::for_test().await;
-    let db = client.database("search_index_test");
-    let coll_name = ObjectId::new().to_hex();
-    db.create_collection(&coll_name).await.unwrap();
-    let coll0 = db.collection::<Document>(&coll_name);
-
-    let name = coll0
-        .create_search_index(
-            SearchIndexModel::builder()
-                .name(String::from("test-search-index"))
-                .definition(doc! { "mappings": { "dynamic": false } })
-                .build(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(name, "test-search-index");
-
-    'outer: loop {
-        let mut cursor = coll0.list_search_indexes().await.unwrap();
-        while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) {
-                break 'outer;
-            }
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        if Instant::now() > deadline {
-            panic!("search index creation timed out");
-        }
-    }
-
-    coll0
-        .update_search_index(
-            "test-search-index",
-            doc! { "mappings": { "dynamic": true } },
-        )
-        .await
-        .unwrap();
-
-    let found = 'find: loop {
-        let mut cursor = coll0.list_search_indexes().await.unwrap();
-        while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name") == Ok("test-search-index")
-                && d.get_bool("queryable") == Ok(true)
-                && d.get_str("status") == Ok("READY")
-            {
-                break 'find d;
-            }
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        if Instant::now() > deadline {
-            panic!("search index update timed out");
-        }
-    };
-
-    assert_eq!(
-        found.get_document("latestDefinition"),
-        Ok(&doc! { "mappings": { "dynamic": true } })
-    );
-}
-
-/// Search Index Case 5: dropSearchIndex suppresses namespace not found errors
-#[tokio::test]
-async fn search_index_drop_not_found() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
-    let client = Client::for_test().await;
-    let coll_name = ObjectId::new().to_hex();
-    let coll0 = client
-        .database("search_index_test")
-        .collection::<Document>(&coll_name);
-
-    coll0.drop_search_index("test-search-index").await.unwrap();
-}
-
-async fn wait_for_index(coll: &Collection<Document>, name: &str) -> Document {
-    let deadline = Instant::now() + Duration::from_secs(60 * 5);
-    while Instant::now() < deadline {
-        let mut cursor = coll.list_search_indexes().name(name).await.unwrap();
-        while let Some(def) = cursor.try_next().await.unwrap() {
-            if def.get_str("name") == Ok(name) && def.get_bool("queryable") == Ok(true) {
-                return def;
-            }
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-    }
-    panic!("search index creation timed out");
-}
-
-// SearchIndex Case 7: Driver can successfully handle search index types when creating indexes
-#[tokio::test]
-async fn search_index_create_with_type() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
-    let client = Client::for_test().await;
-    let coll_name = ObjectId::new().to_hex();
-    let db = client.database("search_index_test");
-    db.create_collection(&coll_name).await.unwrap();
-    let coll0 = db.collection::<Document>(&coll_name);
-
-    let name = coll0
-        .create_search_index(
-            SearchIndexModel::builder()
-                .name(String::from("test-search-index-case7-implicit"))
-                .definition(doc! { "mappings": { "dynamic": false } })
-                .build(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(name, "test-search-index-case7-implicit");
-    let index1 = wait_for_index(&coll0, &name).await;
-    assert_eq!(index1.get_str("type"), Ok("search"));
-
-    let name = coll0
-        .create_search_index(
-            SearchIndexModel::builder()
-                .name(String::from("test-search-index-case7-explicit"))
-                .index_type(SearchIndexType::Search)
-                .definition(doc! { "mappings": { "dynamic": false } })
-                .build(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(name, "test-search-index-case7-explicit");
-    let index2 = wait_for_index(&coll0, &name).await;
-    assert_eq!(index2.get_str("type"), Ok("search"));
-
-    let name = coll0
-        .create_search_index(
-            SearchIndexModel::builder()
-                .name(String::from("test-search-index-case7-vector"))
-                .index_type(SearchIndexType::VectorSearch)
-                .definition(doc! {
-                    "fields": [{
-                        "type": "vector",
-                        "path": "plot_embedding",
-                        "numDimensions": 1536,
-                        "similarity": "euclidean",
-                    }]
-                })
-                .build(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(name, "test-search-index-case7-vector");
-    let index3 = wait_for_index(&coll0, &name).await;
-    assert_eq!(index3.get_str("type"), Ok("vectorSearch"));
-}
-
-// SearchIndex Case 8: Driver requires explicit type to create a vector search index
-#[tokio::test]
-async fn search_index_requires_explicit_vector() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
-    let client = Client::for_test().await;
-    let coll_name = ObjectId::new().to_hex();
-    let db = client.database("search_index_test");
-    db.create_collection(&coll_name).await.unwrap();
-    let coll0 = db.collection::<Document>(&coll_name);
-
-    let result = coll0
-        .create_search_index(
-            SearchIndexModel::builder()
-                .name(String::from("test-search-index-case8-error"))
-                .definition(doc! {
-                    "fields": [{
-                        "type": "vector",
-                        "path": "plot_embedding",
-                        "numDimensions": 1536,
-                        "similarity": "euclidean",
-                    }]
-                })
-                .build(),
-        )
+    let coll = client
+        .init_db_and_coll("index_management", "string_names")
         .await;
-    assert!(
-        result
-            .as_ref()
-            .is_err_and(|e| e.to_string().contains("Attribute mappings missing")),
-        "invalid result: {:?}",
-        result
+    let result = coll
+        .create_index(IndexModel::builder().keys(doc! { "field": "2d" }).build())
+        .await
+        .expect("Test failed to create index");
+    assert_eq!(result.index_name, "field_2d");
+}
+
+// Test that creating a duplicate index works as expected.
+#[tokio::test]
+#[function_name::named]
+async fn index_management_handles_duplicates() {
+    let client = Client::for_test().await;
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+
+    let result = coll
+        .create_index(IndexModel::builder().keys(doc! { "a": 1 }).build())
+        .await
+        .expect("Test failed to create index");
+
+    assert_eq!(result.index_name, "a_1".to_string());
+
+    // Insert duplicate.
+    let result = coll
+        .create_index(IndexModel::builder().keys(doc! { "a": 1 }).build())
+        .await
+        .expect("Test failed to create index");
+
+    assert_eq!(result.index_name, "a_1".to_string());
+
+    // Test partial duplication.
+    let result = coll
+        .create_indexes(vec![
+            IndexModel::builder().keys(doc! { "a": 1 }).build(), // Duplicate
+            IndexModel::builder().keys(doc! { "b": 1 }).build(), // Not duplicate
+        ])
+        .await
+        .expect("Test failed to create indexes");
+
+    assert_eq!(
+        result.index_names,
+        vec!["a_1".to_string(), "b_1".to_string()]
     );
+}
+
+// Test that listing indexes works as expected.
+#[tokio::test]
+#[function_name::named]
+async fn index_management_lists() {
+    let client = Client::for_test().await;
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+
+    let insert_data = vec![
+        IndexModel::builder().keys(doc! { "a": 1 }).build(),
+        IndexModel::builder().keys(doc! { "b": 1, "c": 1 }).build(),
+        IndexModel::builder()
+            .keys(doc! { "d": 1 })
+            .options(IndexOptions::builder().unique(Some(true)).build())
+            .build(),
+    ];
+
+    coll.create_indexes(insert_data.clone())
+        .await
+        .expect("Test failed to create indexes");
+
+    let expected_names = vec![
+        "_id_".to_string(),
+        "a_1".to_string(),
+        "b_1_c_1".to_string(),
+        "d_1".to_string(),
+    ];
+
+    let mut indexes = coll
+        .list_indexes()
+        .await
+        .expect("Test failed to list indexes");
+
+    let id = indexes.try_next().await.unwrap().unwrap();
+    assert_eq!(id.get_name().unwrap(), expected_names[0]);
+    assert!(!id.is_unique());
+
+    let a = indexes.try_next().await.unwrap().unwrap();
+    assert_eq!(a.get_name().unwrap(), expected_names[1]);
+    assert!(!a.is_unique());
+
+    let b_c = indexes.try_next().await.unwrap().unwrap();
+    assert_eq!(b_c.get_name().unwrap(), expected_names[2]);
+    assert!(!b_c.is_unique());
+
+    // Unique index.
+    let d = indexes.try_next().await.unwrap().unwrap();
+    assert_eq!(d.get_name().unwrap(), expected_names[3]);
+    assert!(d.is_unique());
+
+    assert!(indexes.try_next().await.unwrap().is_none());
+
+    let names = coll
+        .list_index_names()
+        .await
+        .expect("Test failed to list index names");
+
+    assert_eq!(names, expected_names);
+}
+
+// Test that dropping indexes works as expected.
+#[tokio::test]
+#[function_name::named]
+async fn index_management_drops() {
+    let client = Client::for_test().await;
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+
+    let result = coll
+        .create_indexes(vec![
+            IndexModel::builder().keys(doc! { "a": 1 }).build(),
+            IndexModel::builder().keys(doc! { "b": 1 }).build(),
+            IndexModel::builder().keys(doc! { "c": 1 }).build(),
+        ])
+        .await
+        .expect("Test failed to create multiple indexes");
+
+    assert_eq!(
+        result.index_names,
+        vec!["a_1".to_string(), "b_1".to_string(), "c_1".to_string()]
+    );
+
+    // Test dropping single index.
+    coll.drop_index("a_1")
+        .await
+        .expect("Test failed to drop index");
+    let names = coll
+        .list_index_names()
+        .await
+        .expect("Test failed to list index names");
+    assert_eq!(names, vec!["_id_", "b_1", "c_1"]);
+
+    // Test dropping several indexes.
+    coll.drop_indexes()
+        .await
+        .expect("Test failed to drop indexes");
+    let names = coll
+        .list_index_names()
+        .await
+        .expect("Test failed to list index names");
+    assert_eq!(names, vec!["_id_"]);
+}
+
+// Test that index management commands execute the expected database commands.
+#[tokio::test]
+#[function_name::named]
+async fn index_management_executes_commands() {
+    let client = Client::for_test().monitor_events().await;
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+
+    // Collection::create_index and Collection::create_indexes execute createIndexes.
+    assert_eq!(
+        client
+            .events
+            .get_command_started_events(&["createIndexes"])
+            .len(),
+        0
+    );
+    coll.create_index(IndexModel::builder().keys(doc! { "a": 1 }).build())
+        .await
+        .expect("Create Index op failed");
+    assert_eq!(
+        client
+            .events
+            .get_command_started_events(&["createIndexes"])
+            .len(),
+        1
+    );
+    coll.create_indexes(vec![
+        IndexModel::builder().keys(doc! { "b": 1 }).build(),
+        IndexModel::builder().keys(doc! { "c": 1 }).build(),
+    ])
+    .await
+    .expect("Create Indexes op failed");
+    assert_eq!(
+        client
+            .events
+            .get_command_started_events(&["createIndexes"])
+            .len(),
+        2
+    );
+
+    // Collection::list_indexes and Collection::list_index_names execute listIndexes.
+    assert_eq!(
+        client
+            .events
+            .get_command_started_events(&["listIndexes"])
+            .len(),
+        0
+    );
+    coll.list_indexes().await.expect("List index op failed");
+    assert_eq!(
+        client
+            .events
+            .get_command_started_events(&["listIndexes"])
+            .len(),
+        1
+    );
+    coll.list_index_names().await.expect("List index op failed");
+    assert_eq!(
+        client
+            .events
+            .get_command_started_events(&["listIndexes"])
+            .len(),
+        2
+    );
+
+    // Collection::drop_index and Collection::drop_indexes execute dropIndexes.
+    assert_eq!(
+        client
+            .events
+            .get_command_started_events(&["dropIndexes"])
+            .len(),
+        0
+    );
+    coll.drop_index("a_1").await.expect("Drop index op failed");
+    assert_eq!(
+        client
+            .events
+            .get_command_started_events(&["dropIndexes"])
+            .len(),
+        1
+    );
+    coll.drop_indexes().await.expect("Drop indexes op failed");
+    assert_eq!(
+        client
+            .events
+            .get_command_started_events(&["dropIndexes"])
+            .len(),
+        2
+    );
+}
+
+#[tokio::test]
+#[function_name::named]
+async fn commit_quorum_error() {
+    let client = Client::for_test().await;
+    if client.is_standalone() {
+        log_uncaptured("skipping commit_quorum_error due to standalone topology");
+        return;
+    }
+
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+
+    let model = IndexModel::builder().keys(doc! { "x": 1 }).build();
+    let result = coll
+        .create_index(model)
+        .commit_quorum(CommitQuorum::Majority)
+        .await;
+
+    if client.server_version_lt(4, 4) {
+        let err = result.unwrap_err();
+        assert!(matches!(*err.kind, ErrorKind::InvalidArgument { .. }));
+    } else {
+        assert!(result.is_ok());
+    }
 }

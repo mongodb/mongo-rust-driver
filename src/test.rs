@@ -22,7 +22,6 @@ mod cursor;
 mod db;
 mod documentation_examples;
 mod happy_eyeballs;
-mod index_management;
 mod lambda_examples;
 mod plain_auth;
 pub(crate) mod spec;
