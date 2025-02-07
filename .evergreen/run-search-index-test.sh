@@ -12,6 +12,6 @@ set -o xtrace
 
 set +o errexit
 
-cargo_test test::spec::index_management::search_index
+cargo_test test::index_management::search_index
 
 exit ${CARGO_RESULT}
