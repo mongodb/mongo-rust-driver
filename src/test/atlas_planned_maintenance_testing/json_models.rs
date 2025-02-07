@@ -3,19 +3,10 @@ use serde_json::Number;
 
 use crate::bson::Bson;
 
-#[derive(Serialize)]
+#[derive(Default, Serialize)]
 pub(crate) struct Events {
     pub(crate) errors: Vec<Bson>,
     pub(crate) failures: Vec<Bson>,
-}
-
-impl Events {
-    pub(crate) fn new_empty() -> Self {
-        Self {
-            errors: vec![],
-            failures: vec![],
-        }
-    }
 }
 
 #[derive(Serialize)]

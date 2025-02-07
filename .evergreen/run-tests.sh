@@ -24,8 +24,6 @@ if [ "$SNAPPY" = true ]; then
   FEATURE_FLAGS+=("snappy-compression")
 fi
 
-export SESSION_TEST_REQUIRE_MONGOCRYPTD=true
-
 echo "cargo test options: $(cargo_test_options)"
 
 set +o errexit

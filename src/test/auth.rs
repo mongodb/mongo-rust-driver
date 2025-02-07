@@ -1,3 +1,6 @@
+#[cfg(feature = "aws-auth")]
+mod aws;
+
 use serde::Deserialize;
 
 use crate::{
