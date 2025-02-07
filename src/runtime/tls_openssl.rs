@@ -98,9 +98,15 @@ fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
             #[cfg(feature = "cert-key-password")]
             if let Some(key_pw) = tls_certificate_key_file_password {
                 let contents = std::fs::read(&path)?;
+
+                /*
                 let key_bytes = super::pem::decrypt_private_key(&contents, &key_pw)?;
                 let key =
                     openssl::pkey::PKey::private_key_from_der(&key_bytes).map_err(openssl_err)?;
+                    */
+
+                let key = openssl::pkey::PKey::private_key_from_pem_passphrase(&contents, &key_pw)
+                    .map_err(openssl_err)?;
                 builder.set_private_key(&key).map_err(openssl_err)?;
                 return Ok(());
             }
