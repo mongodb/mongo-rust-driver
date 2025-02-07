@@ -1,8 +1,11 @@
 use std::env::{remove_var, set_var, var};
 
-use bson::doc;
-
-use crate::{bson::Document, client::auth::aws::test_utils::*, test::DEFAULT_URI, Client};
+use crate::{
+    bson::{doc, Document},
+    client::auth::aws::test_utils::*,
+    test::DEFAULT_URI,
+    Client,
+};
 
 #[tokio::test]
 async fn auth_aws() {

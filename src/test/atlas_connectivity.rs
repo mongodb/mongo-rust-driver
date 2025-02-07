@@ -1,31 +1,20 @@
-use crate::{bson::doc, client::options::ResolverConfig, options::ClientOptions, Client};
-use bson::Document;
-
-use super::log_uncaptured;
+use crate::{
+    bson::{doc, Document},
+    client::options::ResolverConfig,
+    options::ClientOptions,
+    Client,
+};
 
 async fn run_test(uri_env_var: &str, resolver_config: Option<ResolverConfig>) {
-    if std::env::var_os("MONGO_ATLAS_TESTS").is_none() {
-        log_uncaptured(
-            "skipping atlas_connectivity test due to undefined environment variable \
-             MONGO_ATLAS_TESTS",
-        );
-        return;
-    }
+    let uri = std::env::var(uri_env_var).expect(uri_env_var);
 
-    let uri = if let Some(uri) = std::env::var_os(uri_env_var) {
-        uri
-    } else {
-        panic!("could not find variable {}", uri_env_var);
-    };
-
-    let uri_string = uri.to_string_lossy();
     let options = match resolver_config {
         Some(resolver_config) => {
-            ClientOptions::parse(uri_string.as_ref())
+            ClientOptions::parse(uri)
                 .resolver_config(resolver_config)
                 .await
         }
-        None => ClientOptions::parse(uri_string.as_ref()).await,
+        None => ClientOptions::parse(uri).await,
     }
     .expect("uri parsing should succeed");
     let client = Client::with_options(options).expect("option validation should succeed");

@@ -1,13 +1,21 @@
+#[path = "index_management/search_index.rs"]
+mod search_index_skip_ci;
+
 use futures::stream::TryStreamExt;
 
 use crate::{
     bson::doc,
     error::ErrorKind,
     options::{CommitQuorum, IndexOptions},
-    test::log_uncaptured,
+    test::{log_uncaptured, spec::unified_runner::run_unified_tests},
     Client,
     IndexModel,
 };
+
+#[tokio::test]
+async fn run_unified() {
+    run_unified_tests(&["index-management"]).await;
+}
 
 // Test that creating indexes works as expected.
 #[tokio::test]
