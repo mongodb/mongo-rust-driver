@@ -1,4 +1,5 @@
-mod search_index;
+#[path = "index_management/search_index.rs"]
+mod search_index_skip_ci;
 
 use futures::stream::TryStreamExt;
 
