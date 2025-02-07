@@ -260,17 +260,6 @@ buildvariants:
     tasks:
       - name: test-x509-auth
 
-  - name: plain-auth
-    display_name: "Plain Authentication"
-    patchable: false
-    run_on:
-      - rhel87-small
-    expansions:
-      AUTH: auth
-      SSL: ssl
-    tasks:
-      - test-plain-auth
-
   - name: serverless
     display_name: "Serverless"
     run_on:
@@ -972,14 +961,6 @@ tasks:
           TOPOLOGY: server
       - func: "run x509 tests"
 
-  - name: test-plain-auth
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          MONGODB_VERSION: rapid
-          TOPOLOGY: server
-      - func: "run plain tests"
-
   - name: test-serverless
     commands:
       - func: "run serverless tests"
@@ -1417,17 +1398,6 @@ functions:
 
           .evergreen/run-x509-tests.sh
 
-  "run plain tests":
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${PREPARE_SHELL}
-
-          .evergreen/run-plain-tests.sh
-
   "prepare resources":
     - command: subprocess.exec
       params:
@@ -1694,7 +1664,7 @@ functions:
 
           echo "Building test ... begin"
           . ${PROJECT_DIRECTORY}/.evergreen/env.sh
-          cargo test get_exe_name --features in-use-encryption,gcp-kms -- --ignored
+          cargo test get_exe_name --features in-use-encryption,gcp-kms
           cp $(cat exe_name.txt) test-contents/test-exe
           echo "Building test ... end"
 
@@ -1963,7 +1933,7 @@ functions:
     - command: expansions.update
       params:
         file: src/static-test-tarball-expansion.yml
-  
+
   "run oidc k8s test":
   - command: subprocess.exec
     params:

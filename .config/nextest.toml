@@ -1,12 +1,12 @@
 [profile.default]
 test-threads = 1
-default-filter = 'not test(test::happy_eyeballs) and not test(kms_retry) and not test(atlas_connectivity)'
+default-filter = 'not test(skip_local) and not test(skip_ci)'
 
 [profile.ci]
 failure-output = "final"
 test-threads = 1
 fail-fast = false
-default-filter = 'not test(test::happy_eyeballs) and not test(atlas_connectivity)'
+default-filter = 'not test(skip_ci)'
 
 [profile.ci.junit]
 path = "junit.xml"
