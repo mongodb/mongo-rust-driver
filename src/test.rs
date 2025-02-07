@@ -24,6 +24,7 @@ mod db;
 mod documentation_examples;
 #[path = "test/happy_eyeballs.rs"]
 mod happy_eyeballs_skip_ci; // requires happy eyeballs server
+mod index_management;
 mod lambda_examples;
 pub(crate) mod spec;
 mod timeseries;
