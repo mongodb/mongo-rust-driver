@@ -1,7 +1,3 @@
-#[path = "csfle/mock_server.rs"]
-#[cfg(feature = "openssl-tls")]
-mod mock_server_skip_local; // requires mock servers (see https://github.com/mongodb-labs/drivers-evergreen-tools/tree/master/.evergreen/csfle for details)
-
 use std::{
     collections::BTreeMap,
     env,
@@ -32,12 +28,14 @@ use once_cell::sync::Lazy;
 use tokio::net::TcpListener;
 
 use crate::{
+    action::Action,
     client_encryption::{
         AwsMasterKey,
         AzureMasterKey,
         ClientEncryption,
         EncryptKey,
         GcpMasterKey,
+        KmipMasterKey,
         LocalMasterKey,
         MasterKey,
         RangeOptions,
@@ -49,6 +47,7 @@ use crate::{
     },
     options::{
         CollectionOptions,
+        Credential,
         EncryptOptions,
         FindOptions,
         IndexOptions,
@@ -73,31 +72,29 @@ use crate::{
 use super::{get_client_options, log_uncaptured, EventClient, TestClient};
 
 type Result<T> = anyhow::Result<T>;
+
+async fn init_client() -> Result<(EventClient, Collection<Document>)> {
+    let client = Client::for_test().monitor_events().await;
+    let datakeys = client
+        .database("keyvault")
+        .collection_with_options::<Document>(
+            "datakeys",
+            CollectionOptions::builder()
+                .read_concern(ReadConcern::majority())
+                .write_concern(WriteConcern::majority())
+                .build(),
+        );
+    datakeys.drop().await?;
+    client
+        .database("db")
+        .collection::<Document>("coll")
+        .drop()
+        .await?;
+    Ok((client, datakeys))
+}
+
 pub(crate) type KmsInfo = (KmsProvider, Document, Option<TlsOptions>);
 pub(crate) type KmsProviderList = Vec<KmsInfo>;
-
-// The environment variables needed to run the CSFLE tests. These values can be retrieved from the
-// AWS secrets manager by running the setup-secrets.sh script in drivers-evergreen-tools.
-static CSFLE_LOCAL_KEY: Lazy<String> = Lazy::new(|| get_env_var("CSFLE_LOCAL_KEY"));
-static FLE_AWS_KEY: Lazy<String> = Lazy::new(|| get_env_var("FLE_AWS_KEY"));
-static FLE_AWS_SECRET: Lazy<String> = Lazy::new(|| get_env_var("FLE_AWS_SECRET"));
-static FLE_AZURE_TENANTID: Lazy<String> = Lazy::new(|| get_env_var("FLE_AZURE_TENANTID"));
-static FLE_AZURE_CLIENTID: Lazy<String> = Lazy::new(|| get_env_var("FLE_AZURE_CLIENTID"));
-static FLE_AZURE_CLIENTSECRET: Lazy<String> = Lazy::new(|| get_env_var("FLE_AZURE_CLIENTSECRET"));
-static FLE_GCP_EMAIL: Lazy<String> = Lazy::new(|| get_env_var("FLE_GCP_EMAIL"));
-static FLE_GCP_PRIVATEKEY: Lazy<String> = Lazy::new(|| get_env_var("FLE_GCP_PRIVATEKEY"));
-
-// Additional environment variables. These values should be set to the relevant local paths.
-static CSFLE_TLS_CERT_DIR: Lazy<String> = Lazy::new(|| get_env_var("CSFLE_TLS_CERT_DIR"));
-static CRYPT_SHARED_LIB_PATH: Lazy<String> = Lazy::new(|| get_env_var("CRYPT_SHARED_LIB_PATH"));
-
-fn get_env_var(name: &str) -> String {
-    std::env::var(name).expect(&format!(
-        "Missing environment variable for {}. See src/test/csfle.rs for the list of required \
-         variables and instructions for retrieving them.",
-        name
-    ))
-}
 
 fn add_name_to_info(kms_info: KmsInfo, name: &str) -> KmsInfo {
     (kms_info.0.with_name(name), kms_info.1, kms_info.2)
@@ -107,9 +104,8 @@ pub(crate) static AWS_KMS: Lazy<KmsInfo> = Lazy::new(|| {
     (
         KmsProvider::aws(),
         doc! {
-            "accessKeyId": FLE_AWS_KEY.clone(),
-            "secretAccessKey": FLE_AWS_SECRET.clone(),
-        },
+        "accessKeyId": env::var("FLE_AWS_KEY").unwrap(),
+        "secretAccessKey": env::var("FLE_AWS_SECRET").unwrap()},
         None,
     )
 });
@@ -121,8 +117,8 @@ pub(crate) static AWS_KMS_NAME2: Lazy<KmsInfo> = Lazy::new(|| {
     (
         KmsProvider::aws().with_name("name2"),
         doc! {
-            "accessKeyId": FLE_AWS_KEY.clone(),
-            "secretAccessKey": FLE_AWS_SECRET.clone(),
+            "accessKeyId": env::var("FLE_AWS_KEY").unwrap(),
+            "secretAccessKey": env::var("FLE_AWS_SECRET").unwrap()
         },
         None,
     )
@@ -131,9 +127,9 @@ pub(crate) static AZURE_KMS: Lazy<KmsInfo> = Lazy::new(|| {
     (
         KmsProvider::azure(),
         doc! {
-            "tenantId": FLE_AZURE_TENANTID.clone(),
-            "clientId": FLE_AZURE_CLIENTID.clone(),
-            "clientSecret": FLE_AZURE_CLIENTSECRET.clone(),
+            "tenantId": env::var("FLE_AZURE_TENANTID").unwrap(),
+            "clientId": env::var("FLE_AZURE_CLIENTID").unwrap(),
+            "clientSecret": env::var("FLE_AZURE_CLIENTSECRET").unwrap(),
         },
         None,
     )
@@ -146,8 +142,8 @@ pub(crate) static GCP_KMS: Lazy<KmsInfo> = Lazy::new(|| {
     (
         KmsProvider::gcp(),
         doc! {
-            "email": FLE_GCP_EMAIL.clone(),
-            "privateKey": FLE_GCP_PRIVATEKEY.clone(),
+            "email": env::var("FLE_GCP_EMAIL").unwrap(),
+            "privateKey": env::var("FLE_GCP_PRIVATEKEY").unwrap(),
         },
         None,
     )
@@ -162,7 +158,7 @@ pub(crate) static LOCAL_KMS: Lazy<KmsInfo> = Lazy::new(|| {
         doc! {
             "key": bson::Binary {
                 subtype: bson::spec::BinarySubtype::Generic,
-                bytes: base64::decode(&*CSFLE_LOCAL_KEY).unwrap(),
+                bytes: base64::decode(env::var("CSFLE_LOCAL_KEY").unwrap()).unwrap(),
             },
         },
         None,
@@ -173,7 +169,7 @@ pub(crate) static LOCAL_KMS_NAME1: Lazy<KmsInfo> = Lazy::new(|| {
     (local_info.0.with_name("name1"), local_info.1, local_info.2)
 });
 pub(crate) static KMIP_KMS: Lazy<KmsInfo> = Lazy::new(|| {
-    let cert_dir = PathBuf::from(&*CSFLE_TLS_CERT_DIR);
+    let cert_dir = PathBuf::from(env::var("CSFLE_TLS_CERT_DIR").unwrap());
     let tls_options = TlsOptions::builder()
         .ca_file_path(cert_dir.join("ca.pem"))
         .cert_key_file_path(cert_dir.join("client.pem"))
@@ -217,35 +213,38 @@ pub(crate) static ALL_KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
 });
 
 static EXTRA_OPTIONS: Lazy<Document> =
-    Lazy::new(|| doc! { "cryptSharedLibPath": CRYPT_SHARED_LIB_PATH.clone() });
+    Lazy::new(|| doc! { "cryptSharedLibPath": env::var("CRYPT_SHARED_LIB_PATH").unwrap() });
 static KV_NAMESPACE: Lazy<Namespace> =
     Lazy::new(|| Namespace::from_str("keyvault.datakeys").unwrap());
 static DISABLE_CRYPT_SHARED: Lazy<bool> =
     Lazy::new(|| env::var("DISABLE_CRYPT_SHARED").map_or(false, |s| s == "true"));
 
-async fn init_client() -> Result<(EventClient, Collection<Document>)> {
-    let client = Client::for_test().monitor_events().await;
-    let datakeys = client
-        .database("keyvault")
-        .collection_with_options::<Document>(
-            "datakeys",
-            CollectionOptions::builder()
-                .read_concern(ReadConcern::majority())
-                .write_concern(WriteConcern::majority())
-                .build(),
-        );
-    datakeys.drop().await?;
-    client
-        .database("db")
-        .collection::<Document>("coll")
-        .drop()
-        .await?;
-    Ok((client, datakeys))
+fn check_env(name: &str, kmip: bool) -> bool {
+    if env::var("CSFLE_LOCAL_KEY").is_err() {
+        log_uncaptured(format!(
+            "skipping csfle test {}: no kms providers configured",
+            name
+        ));
+        return false;
+    }
+    if kmip {
+        #[cfg(not(feature = "openssl-tls"))]
+        {
+            // rustls is incompatible with the driver-tools kmip server.
+            log_uncaptured(format!("skipping {}: KMIP requires openssl", name));
+            return false;
+        }
+    }
+    true
 }
 
 // Prose test 1. Custom Key Material Test
 #[tokio::test]
 async fn custom_key_material() -> Result<()> {
+    if !check_env("custom_key_material", false) {
+        return Ok(());
+    }
+
     let (client, datakeys) = init_client().await?;
     let enc = ClientEncryption::new(
         client.into_client(),
@@ -284,6 +283,177 @@ async fn custom_key_material() -> Result<()> {
     Ok(())
 }
 
+// Prose test 2. Data Key and Double Encryption
+#[tokio::test]
+async fn data_key_double_encryption() -> Result<()> {
+    if !check_env("data_key_double_encryption", true) {
+        return Ok(());
+    }
+
+    // Setup: drop stale data.
+    let (client, _) = init_client().await?;
+
+    // Setup: client with auto encryption.
+    let schema_map = [(
+        "db.coll",
+        doc! {
+            "bsonType": "object",
+            "properties": {
+                "encrypted_placeholder": {
+                    "encrypt": {
+                        "keyId": "/placeholder",
+                        "bsonType": "string",
+                        "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
+                    }
+                }
+            }
+        },
+    )];
+    let client_encrypted = Client::encrypted_builder(
+        get_client_options().await.clone(),
+        KV_NAMESPACE.clone(),
+        UNNAMED_KMS_PROVIDERS.clone(),
+    )?
+    .schema_map(schema_map)
+    .extra_options(EXTRA_OPTIONS.clone())
+    .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+    .build()
+    .await?;
+
+    // Setup: manual encryption.
+    let client_encryption = ClientEncryption::new(
+        client.clone().into_client(),
+        KV_NAMESPACE.clone(),
+        UNNAMED_KMS_PROVIDERS.clone(),
+    )?;
+
+    // Testing each provider:
+
+    let mut events = client.events.stream();
+    let provider_keys: [(KmsProvider, MasterKey); 5] = [
+        (
+            KmsProvider::aws(),
+            AwsMasterKey::builder()
+                .region("us-east-1")
+                .key("arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0")
+                .build()
+                .into(),
+        ),
+        (
+            KmsProvider::azure(),
+            AzureMasterKey::builder()
+                .key_vault_endpoint("key-vault-csfle.vault.azure.net")
+                .key_name("key-name-csfle")
+                .build()
+                .into(),
+        ),
+        (
+            KmsProvider::gcp(),
+            GcpMasterKey::builder()
+                .project_id("devprod-drivers")
+                .location("global")
+                .key_ring("key-ring-csfle")
+                .key_name("key-name-csfle")
+                .build()
+                .into(),
+        ),
+        (
+            KmsProvider::local(),
+            LocalMasterKey::builder().build().into(),
+        ),
+        (KmsProvider::kmip(), KmipMasterKey::builder().build().into()),
+    ];
+    for (provider, master_key) in provider_keys {
+        // Create a data key
+        let datakey_id = client_encryption
+            .create_data_key(master_key)
+            .key_alt_names([format!("{}_altname", provider.as_string())])
+            .await?;
+        assert_eq!(datakey_id.subtype, BinarySubtype::Uuid);
+        let docs: Vec<_> = client
+            .database("keyvault")
+            .collection::<Document>("datakeys")
+            .find(doc! { "_id": datakey_id.clone() })
+            .await?
+            .try_collect()
+            .await?;
+        assert_eq!(docs.len(), 1);
+        assert_eq!(
+            docs[0].get_document("masterKey")?.get_str("provider")?,
+            provider.as_string()
+        );
+        let found = events
+            .next_match(
+                Duration::from_millis(500),
+                ok_pred(|ev| {
+                    let ev = match ev.as_command_started_event() {
+                        Some(e) => e,
+                        None => return Ok(false),
+                    };
+                    if ev.command_name != "insert" {
+                        return Ok(false);
+                    }
+                    let cmd = &ev.command;
+                    if cmd.get_document("writeConcern")?.get_str("w")? != "majority" {
+                        return Ok(false);
+                    }
+                    Ok(cmd.get_array("documents")?.iter().any(|doc| {
+                        matches!(
+                            doc.as_document().and_then(|d| d.get("_id")),
+                            Some(Bson::Binary(id)) if id == &datakey_id
+                        )
+                    }))
+                }),
+            )
+            .await;
+        assert!(found.is_some(), "no valid event found");
+
+        // Manually encrypt a value and automatically decrypt it.
+        let encrypted = client_encryption
+            .encrypt(
+                format!("hello {}", provider.as_string()),
+                EncryptKey::Id(datakey_id),
+                Algorithm::Deterministic,
+            )
+            .await?;
+        assert_eq!(encrypted.subtype, BinarySubtype::Encrypted);
+        let coll = client_encrypted
+            .database("db")
+            .collection::<Document>("coll");
+        coll.insert_one(doc! { "_id": provider.as_string(), "value": encrypted.clone() })
+            .await?;
+        let found = coll.find_one(doc! { "_id": provider.as_string() }).await?;
+        assert_eq!(
+            found.as_ref().and_then(|doc| doc.get("value")),
+            Some(&Bson::String(format!("hello {}", provider.as_string()))),
+        );
+
+        // Manually encrypt a value via key alt name.
+        let other_encrypted = client_encryption
+            .encrypt(
+                format!("hello {}", provider.as_string()),
+                EncryptKey::AltName(format!("{}_altname", provider.as_string())),
+                Algorithm::Deterministic,
+            )
+            .await?;
+        assert_eq!(other_encrypted.subtype, BinarySubtype::Encrypted);
+        assert_eq!(other_encrypted.bytes, encrypted.bytes);
+
+        // Attempt to auto-encrypt an already encrypted field.
+        let result = coll
+            .insert_one(doc! { "encrypted_placeholder": encrypted })
+            .await;
+        let err = result.unwrap_err();
+        assert!(
+            matches!(*err.kind, ErrorKind::Encryption(..)) || err.is_command_error(),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    Ok(())
+}
+
 fn ok_pred(mut f: impl FnMut(&Event) -> Result<bool>) -> impl FnMut(&Event) -> bool {
     move |ev| f(ev).unwrap_or(false)
 }
@@ -294,6 +464,92 @@ fn base64_uuid(bytes: impl AsRef<str>) -> Result<bson::Binary> {
         subtype: BinarySubtype::Uuid,
         bytes: base64::decode(bytes.as_ref())?,
     })
+}
+
+// Prose test 3. External Key Vault Test
+#[tokio::test]
+async fn external_key_vault() -> Result<()> {
+    if !check_env("external_key_vault", true) {
+        return Ok(());
+    }
+
+    for with_external_key_vault in [false, true] {
+        // Setup: initialize db.
+        let (client, datakeys) = init_client().await?;
+        datakeys
+            .insert_one(load_testdata("external/external-key.json")?)
+            .await?;
+
+        // Setup: test options.
+        let kv_client = if with_external_key_vault {
+            let mut opts = get_client_options().await.clone();
+            opts.credential = Some(
+                Credential::builder()
+                    .username("fake-user".to_string())
+                    .password("fake-pwd".to_string())
+                    .build(),
+            );
+            Some(Client::with_options(opts)?)
+        } else {
+            None
+        };
+
+        // Setup: encrypted client.
+        let client_encrypted = Client::encrypted_builder(
+            get_client_options().await.clone(),
+            KV_NAMESPACE.clone(),
+            vec![LOCAL_KMS.clone()],
+        )?
+        .key_vault_client(kv_client.clone())
+        .schema_map([("db.coll", load_testdata("external/external-schema.json")?)])
+        .extra_options(EXTRA_OPTIONS.clone())
+        .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+        .build()
+        .await?;
+        // Setup: manual encryption.
+        let client_encryption = ClientEncryption::new(
+            kv_client.unwrap_or_else(|| client.into_client()),
+            KV_NAMESPACE.clone(),
+            vec![LOCAL_KMS.clone()],
+        )?;
+
+        // Test: encrypted client.
+        let result = client_encrypted
+            .database("db")
+            .collection::<Document>("coll")
+            .insert_one(doc! { "encrypted": "test" })
+            .await;
+        if with_external_key_vault {
+            let err = result.unwrap_err();
+            assert!(err.is_auth_error(), "unexpected error: {}", err);
+        } else {
+            assert!(
+                result.is_ok(),
+                "unexpected error: {}",
+                result.err().unwrap()
+            );
+        }
+        // Test: manual encryption.
+        let result = client_encryption
+            .encrypt(
+                "test",
+                EncryptKey::Id(base64_uuid("LOCALAAAAAAAAAAAAAAAAA==")?),
+                Algorithm::Deterministic,
+            )
+            .await;
+        if with_external_key_vault {
+            let err = result.unwrap_err();
+            assert!(err.is_auth_error(), "unexpected error: {}", err);
+        } else {
+            assert!(
+                result.is_ok(),
+                "unexpected error: {}",
+                result.err().unwrap()
+            );
+        }
+    }
+
+    Ok(())
 }
 
 fn load_testdata_raw(name: &str) -> Result<String> {
@@ -314,6 +570,10 @@ fn load_testdata(name: &str) -> Result<Document> {
 // Prose test 4. BSON Size Limits and Batch Splitting
 #[tokio::test]
 async fn bson_size_limits() -> Result<()> {
+    if !check_env("bson_size_limits", false) {
+        return Ok(());
+    }
+
     // Setup: db initialization.
     let (client, datakeys) = init_client().await?;
     client
@@ -423,6 +683,10 @@ async fn bson_size_limits() -> Result<()> {
 // Prose test 5. Views Are Prohibited
 #[tokio::test]
 async fn views_prohibited() -> Result<()> {
+    if !check_env("views_prohibited", false) {
+        return Ok(());
+    }
+
     // Setup: db initialization.
     let (client, _) = init_client().await?;
     client
@@ -468,7 +732,6 @@ macro_rules! failure {
         crate::error::Error::internal(format!($($arg)*)).into()
     }}
 }
-use failure;
 
 // TODO RUST-36: use the full corpus with decimal128.
 fn load_corpus_nodecimal128(name: &str) -> Result<Document> {
@@ -486,6 +749,211 @@ fn load_corpus_nodecimal128(name: &str) -> Result<Document> {
         bson::Bson::Document(d) => Ok(d),
         _ => Err(failure!("expected document, got {:?}", bson)),
     }
+}
+
+// Prose test 6. Corpus Test (collection schema)
+#[tokio::test]
+async fn corpus_coll_schema() -> Result<()> {
+    if !check_env("corpus_coll_schema", true) {
+        return Ok(());
+    }
+    run_corpus_test(false).await?;
+    Ok(())
+}
+
+// Prose test 6. Corpus Test (local schema)
+#[tokio::test]
+async fn corpus_local_schema() -> Result<()> {
+    if !check_env("corpus_local_schema", true) {
+        return Ok(());
+    }
+    run_corpus_test(true).await?;
+    Ok(())
+}
+
+async fn run_corpus_test(local_schema: bool) -> Result<()> {
+    // Setup: db initialization.
+    let (client, datakeys) = init_client().await?;
+    let schema = load_testdata("corpus/corpus-schema.json")?;
+    let validator = if local_schema {
+        None
+    } else {
+        Some(doc! { "$jsonSchema": schema.clone() })
+    };
+    client
+        .database("db")
+        .create_collection("coll")
+        .optional(validator, |b, v| b.validator(v))
+        .await?;
+    for f in [
+        "corpus/corpus-key-local.json",
+        "corpus/corpus-key-aws.json",
+        "corpus/corpus-key-azure.json",
+        "corpus/corpus-key-gcp.json",
+        "corpus/corpus-key-kmip.json",
+    ] {
+        datakeys.insert_one(load_testdata(f)?).await?;
+    }
+
+    // Setup: encrypted client and manual encryption.
+    let client_encrypted = {
+        let mut enc_builder = Client::encrypted_builder(
+            get_client_options().await.clone(),
+            KV_NAMESPACE.clone(),
+            UNNAMED_KMS_PROVIDERS.clone(),
+        )?
+        .extra_options(EXTRA_OPTIONS.clone())
+        .disable_crypt_shared(*DISABLE_CRYPT_SHARED);
+        if local_schema {
+            enc_builder = enc_builder.schema_map([("db.coll", schema)]);
+        }
+        enc_builder.build().await?
+    };
+    let client_encryption = ClientEncryption::new(
+        client.clone().into_client(),
+        KV_NAMESPACE.clone(),
+        UNNAMED_KMS_PROVIDERS.clone(),
+    )?;
+
+    // Test: build corpus.
+    let corpus = load_corpus_nodecimal128("corpus/corpus.json")?;
+    let mut corpus_copied = doc! {};
+    for (name, field) in &corpus {
+        // Copy simple fields
+        if [
+            "_id",
+            "altname_aws",
+            "altname_local",
+            "altname_azure",
+            "altname_gcp",
+            "altname_kmip",
+        ]
+        .contains(&name.as_str())
+        {
+            corpus_copied.insert(name, field);
+            continue;
+        }
+        // Encrypt `value` field in subdocuments.
+        let subdoc = match field.as_document() {
+            Some(d) => d,
+            None => {
+                return Err(failure!(
+                    "unexpected field type for {:?}: {:?}",
+                    name,
+                    field.element_type()
+                ))
+            }
+        };
+        let method = subdoc.get_str("method")?;
+        if method == "auto" {
+            corpus_copied.insert(name, subdoc);
+            continue;
+        }
+        if method != "explicit" {
+            return Err(failure!("Invalid method {:?}", method));
+        }
+        let algo = match subdoc.get_str("algo")? {
+            "rand" => Algorithm::Random,
+            "det" => Algorithm::Deterministic,
+            s => return Err(failure!("Invalid algorithm {:?}", s)),
+        };
+        let kms = KmsProvider::from_string(subdoc.get_str("kms")?);
+        let key = match subdoc.get_str("identifier")? {
+            "id" => EncryptKey::Id(base64_uuid(match kms.provider_type() {
+                KmsProviderType::Local => "LOCALAAAAAAAAAAAAAAAAA==",
+                KmsProviderType::Aws => "AWSAAAAAAAAAAAAAAAAAAA==",
+                KmsProviderType::Azure => "AZUREAAAAAAAAAAAAAAAAA==",
+                KmsProviderType::Gcp => "GCPAAAAAAAAAAAAAAAAAAA==",
+                KmsProviderType::Kmip => "KMIPAAAAAAAAAAAAAAAAAA==",
+                _ => return Err(failure!("Invalid kms provider {:?}", kms)),
+            })?),
+            "altname" => EncryptKey::AltName(kms.as_string()),
+            s => return Err(failure!("Invalid identifier {:?}", s)),
+        };
+        let value: RawBson = subdoc
+            .get("value")
+            .expect("no value to encrypt")
+            .clone()
+            .try_into()?;
+        let result = client_encryption.encrypt(value, key, algo).await;
+        let mut subdoc_copied = subdoc.clone();
+        if subdoc.get_bool("allowed")? {
+            subdoc_copied.insert("value", result?);
+        } else {
+            result.expect_err("expected encryption to be disallowed");
+        }
+        corpus_copied.insert(name, subdoc_copied);
+    }
+
+    // Test: insert into and find from collection, with automatic encryption.
+    let coll = client_encrypted
+        .database("db")
+        .collection::<Document>("coll");
+    let id = coll.insert_one(corpus_copied).await?.inserted_id;
+    let corpus_decrypted = coll
+        .find_one(doc! { "_id": id.clone() })
+        .await?
+        .expect("document lookup failed");
+    assert_eq!(corpus, corpus_decrypted);
+
+    // Test: validate encrypted form.
+    let corpus_encrypted_expected = load_corpus_nodecimal128("corpus/corpus-encrypted.json")?;
+    let corpus_encrypted_actual = client
+        .database("db")
+        .collection::<Document>("coll")
+        .find_one(doc! { "_id": id })
+        .await?
+        .expect("encrypted document lookup failed");
+    for (name, field) in &corpus_encrypted_expected {
+        let subdoc = match field.as_document() {
+            Some(d) => d,
+            None => continue,
+        };
+        let value = subdoc.get("value").expect("no expected value");
+        let actual_value = corpus_encrypted_actual
+            .get_document(name)?
+            .get("value")
+            .expect("no actual value");
+        let algo = subdoc.get_str("algo")?;
+        if algo == "det" {
+            assert_eq!(value, actual_value);
+        }
+        let allowed = subdoc.get_bool("allowed")?;
+        if algo == "rand" && allowed {
+            assert_ne!(value, actual_value);
+        }
+        if allowed {
+            let bin = match value {
+                bson::Bson::Binary(b) => b,
+                _ => {
+                    return Err(failure!(
+                        "expected value {:?} should be Binary, got {:?}",
+                        name,
+                        value
+                    ))
+                }
+            };
+            let actual_bin = match actual_value {
+                bson::Bson::Binary(b) => b,
+                _ => {
+                    return Err(failure!(
+                        "actual value {:?} should be Binary, got {:?}",
+                        name,
+                        actual_value
+                    ))
+                }
+            };
+            let dec = client_encryption.decrypt(bin.as_raw_binary()).await?;
+            let actual_dec = client_encryption
+                .decrypt(actual_bin.as_raw_binary())
+                .await?;
+            assert_eq!(dec, actual_dec);
+        } else {
+            assert_eq!(Some(value), corpus.get_document(name)?.get("value"));
+        }
+    }
+
+    Ok(())
 }
 
 async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
@@ -575,24 +1043,40 @@ async fn custom_endpoint_aws_ok(endpoint: Option<String>) -> Result<()> {
 // Prose test 7. Custom Endpoint Test (case 1. aws, no endpoint)
 #[tokio::test]
 async fn custom_endpoint_aws_no_endpoint() -> Result<()> {
+    if !check_env("custom_endpoint_aws_no_endpoint", false) {
+        return Ok(());
+    }
+
     custom_endpoint_aws_ok(None).await
 }
 
 // Prose test 7. Custom Endpoint Test (case 2. aws, endpoint without port)
 #[tokio::test]
 async fn custom_endpoint_aws_no_port() -> Result<()> {
+    if !check_env("custom_endpoint_aws_no_port", false) {
+        return Ok(());
+    }
+
     custom_endpoint_aws_ok(Some("kms.us-east-1.amazonaws.com".to_string())).await
 }
 
 // Prose test 7. Custom Endpoint Test (case 3. aws, endpoint with port)
 #[tokio::test]
 async fn custom_endpoint_aws_with_port() -> Result<()> {
+    if !check_env("custom_endpoint_aws_with_port", false) {
+        return Ok(());
+    }
+
     custom_endpoint_aws_ok(Some("kms.us-east-1.amazonaws.com:443".to_string())).await
 }
 
 // Prose test 7. Custom Endpoint Test (case 4. aws, endpoint with invalid port)
 #[tokio::test]
 async fn custom_endpoint_aws_invalid_port() -> Result<()> {
+    if !check_env("custom_endpoint_aws_invalid_port", false) {
+        return Ok(());
+    }
+
     let client_encryption = custom_endpoint_setup(true).await?;
 
     let result = client_encryption
@@ -612,6 +1096,10 @@ async fn custom_endpoint_aws_invalid_port() -> Result<()> {
 // Prose test 7. Custom Endpoint Test (case 5. aws, invalid region)
 #[tokio::test]
 async fn custom_endpoint_aws_invalid_region() -> Result<()> {
+    if !check_env("custom_endpoint_aws_invalid_region", false) {
+        return Ok(());
+    }
+
     let client_encryption = custom_endpoint_setup(true).await?;
 
     let result = client_encryption
@@ -631,6 +1119,10 @@ async fn custom_endpoint_aws_invalid_region() -> Result<()> {
 // Prose test 7. Custom Endpoint Test (case 6. aws, invalid domain)
 #[tokio::test]
 async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
+    if !check_env("custom_endpoint_aws_invalid_domain", false) {
+        return Ok(());
+    }
+
     let client_encryption = custom_endpoint_setup(true).await?;
 
     let result = client_encryption
@@ -650,6 +1142,10 @@ async fn custom_endpoint_aws_invalid_domain() -> Result<()> {
 // Prose test 7. Custom Endpoint Test (case 7. azure)
 #[tokio::test]
 async fn custom_endpoint_azure() -> Result<()> {
+    if !check_env("custom_endpoint_azure", false) {
+        return Ok(());
+    }
+
     let master_key = AzureMasterKey::builder()
         .key_vault_endpoint("key-vault-csfle.vault.azure.net")
         .key_name("key-name-csfle")
@@ -671,6 +1167,10 @@ async fn custom_endpoint_azure() -> Result<()> {
 // Prose test 7. Custom Endpoint Test (case 8. gcp)
 #[tokio::test]
 async fn custom_endpoint_gcp_valid() -> Result<()> {
+    if !check_env("custom_endpoint_gcp_valid", false) {
+        return Ok(());
+    }
+
     let master_key = GcpMasterKey::builder()
         .project_id("devprod-drivers")
         .location("global")
@@ -695,6 +1195,10 @@ async fn custom_endpoint_gcp_valid() -> Result<()> {
 // Prose test 7. Custom Endpoint Test (case 9. gcp, invalid endpoint)
 #[tokio::test]
 async fn custom_endpoint_gcp_invalid() -> Result<()> {
+    if !check_env("custom_endpoint_gcp_invalid", false) {
+        return Ok(());
+    }
+
     let master_key = GcpMasterKey::builder()
         .project_id("devprod-drivers")
         .location("global")
@@ -716,9 +1220,73 @@ async fn custom_endpoint_gcp_invalid() -> Result<()> {
     Ok(())
 }
 
+// Prose test 7. Custom Endpoint Test (case 10. kmip, no endpoint)
+#[tokio::test]
+async fn custom_endpoint_kmip_no_endpoint() -> Result<()> {
+    if !check_env("custom_endpoint_kmip_no_endpoint", true) {
+        return Ok(());
+    }
+
+    let master_key = KmipMasterKey::builder()
+        .key_id(Some("1".to_string()))
+        .build();
+
+    let client_encryption = custom_endpoint_setup(true).await?;
+    let key_id = client_encryption
+        .create_data_key(master_key.clone())
+        .await?;
+    validate_roundtrip(&client_encryption, key_id).await?;
+
+    let client_encryption_invalid = custom_endpoint_setup(false).await?;
+    let result = client_encryption_invalid.create_data_key(master_key).await;
+    assert!(result.unwrap_err().is_network_error());
+
+    Ok(())
+}
+
+// Prose test 7. Custom Endpoint Test (case 11. kmip, valid endpoint)
+#[tokio::test]
+async fn custom_endpoint_kmip_valid_endpoint() -> Result<()> {
+    if !check_env("custom_endpoint_kmip_valid_endpoint", true) {
+        return Ok(());
+    }
+
+    let master_key = KmipMasterKey::builder()
+        .key_id(Some("1".to_string()))
+        .endpoint(Some("localhost:5698".to_string()))
+        .build();
+
+    let client_encryption = custom_endpoint_setup(true).await?;
+    let key_id = client_encryption.create_data_key(master_key).await?;
+    validate_roundtrip(&client_encryption, key_id).await
+}
+
+// Prose test 7. Custom Endpoint Test (case 12. kmip, invalid endpoint)
+#[tokio::test]
+async fn custom_endpoint_kmip_invalid_endpoint() -> Result<()> {
+    if !check_env("custom_endpoint_kmip_invalid_endpoint", true) {
+        return Ok(());
+    }
+
+    let master_key = KmipMasterKey::builder()
+        .key_id(Some("1".to_string()))
+        .endpoint(Some("doesnotexist.local:5698".to_string()))
+        .build();
+
+    let client_encryption = custom_endpoint_setup(true).await?;
+    let result = client_encryption.create_data_key(master_key).await;
+    assert!(result.unwrap_err().is_network_error());
+
+    Ok(())
+}
+
 // Prose test 8. Bypass Spawning mongocryptd (Via loading shared library)
 #[tokio::test]
 async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
+    if !check_env("bypass_mongocryptd_via_shared_library", false) {
+        return Ok(());
+    }
+
     if *DISABLE_CRYPT_SHARED {
         log_uncaptured(
             "Skipping bypass mongocryptd via shared library test: crypt_shared is disabled.",
@@ -762,6 +1330,10 @@ async fn bypass_mongocryptd_via_shared_library() -> Result<()> {
 // Prose test 8. Bypass Spawning mongocryptd (Via mongocryptdBypassSpawn)
 #[tokio::test]
 async fn bypass_mongocryptd_via_bypass_spawn() -> Result<()> {
+    if !check_env("bypass_mongocryptd_via_bypass_spawn", false) {
+        return Ok(());
+    }
+
     // Setup: encrypted client.
     let extra_options = doc! {
         "mongocryptdBypassSpawn": true,
@@ -834,18 +1406,28 @@ async fn bypass_mongocryptd_unencrypted_insert(bypass: Bypass) -> Result<()> {
 // Prose test 8. Bypass Spawning mongocryptd (Via bypassAutoEncryption)
 #[tokio::test]
 async fn bypass_mongocryptd_via_bypass_auto_encryption() -> Result<()> {
+    if !check_env("bypass_mongocryptd_via_bypass_auto_encryption", false) {
+        return Ok(());
+    }
     bypass_mongocryptd_unencrypted_insert(Bypass::AutoEncryption).await
 }
 
 // Prose test 8. Bypass Spawning mongocryptd (Via bypassQueryAnalysis)
 #[tokio::test]
 async fn bypass_mongocryptd_via_bypass_query_analysis() -> Result<()> {
+    if !check_env("bypass_mongocryptd_via_bypass_query_analysis", false) {
+        return Ok(());
+    }
     bypass_mongocryptd_unencrypted_insert(Bypass::QueryAnalysis).await
 }
 
 // Prose test 9. Deadlock Tests
 #[tokio::test]
 async fn deadlock() -> Result<()> {
+    if !check_env("deadlock", false) {
+        return Ok(());
+    }
+
     // Case 1
     DeadlockTestCase {
         max_pool_size: 1,
@@ -1101,6 +1683,394 @@ impl DeadlockExpectation {
     }
 }
 
+const KMS_EXPIRED: &str = "127.0.0.1:9000";
+const KMS_WRONG_HOST: &str = "127.0.0.1:9001";
+const KMS_CORRECT: &str = "127.0.0.1:9002";
+
+// Prose test 10. KMS TLS Tests
+#[tokio::test]
+async fn kms_tls() -> Result<()> {
+    if !check_env("kms_tls", true) {
+        return Ok(());
+    }
+
+    // Invalid KMS Certificate
+    let err = run_kms_tls_test(KMS_EXPIRED).await.unwrap_err();
+    assert!(
+        err.to_string().contains("certificate verify failed"),
+        "unexpected error: {}",
+        err
+    );
+
+    // Invalid Hostname in KMS Certificate
+    let err = run_kms_tls_test(KMS_WRONG_HOST).await.unwrap_err();
+    assert!(
+        err.to_string().contains("certificate verify failed"),
+        "unexpected error: {}",
+        err
+    );
+
+    Ok(())
+}
+
+async fn run_kms_tls_test(endpoint: impl Into<String>) -> crate::error::Result<()> {
+    // Setup
+    let kv_client = Client::for_test().await;
+    let client_encryption = ClientEncryption::new(
+        kv_client.clone().into_client(),
+        KV_NAMESPACE.clone(),
+        UNNAMED_KMS_PROVIDERS.clone(),
+    )?;
+
+    // Test
+    client_encryption
+        .create_data_key(
+            AwsMasterKey::builder()
+                .region("us-east-1")
+                .key("arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0")
+                .endpoint(Some(endpoint.into()))
+                .build(),
+        )
+        .await
+        .map(|_| ())
+}
+
+// Prose test 11. KMS TLS Options Tests
+#[tokio::test]
+async fn kms_tls_options() -> Result<()> {
+    if !check_env("kms_tls_options", true) {
+        return Ok(());
+    }
+
+    fn update_providers(
+        mut base_providers: KmsProviderList,
+        new_tls_options: TlsOptions,
+        mut update_credentials: impl FnMut(&KmsProvider, &mut Document),
+    ) -> KmsProviderList {
+        for (provider, credentials, tls_options) in base_providers.iter_mut() {
+            if provider != &KmsProvider::local() {
+                *tls_options = Some(new_tls_options.clone());
+            }
+            update_credentials(provider, credentials);
+        }
+        base_providers
+    }
+
+    let cert_dir = PathBuf::from(env::var("CSFLE_TLS_CERT_DIR").unwrap());
+    let ca_path = cert_dir.join("ca.pem");
+    let key_path = cert_dir.join("client.pem");
+
+    let add_correct_credentials =
+        |provider: &KmsProvider, credentials: &mut Document| match provider.provider_type() {
+            KmsProviderType::Azure => {
+                credentials.insert("identityPlatformEndpoint", KMS_CORRECT);
+            }
+            KmsProviderType::Gcp => {
+                credentials.insert("endpoint", KMS_CORRECT);
+            }
+            _ => {}
+        };
+    let add_expired_credentials =
+        |provider: &KmsProvider, credentials: &mut Document| match provider.provider_type() {
+            KmsProviderType::Azure => {
+                credentials.insert("identityPlatformEndpoint", KMS_EXPIRED);
+            }
+            KmsProviderType::Gcp | KmsProviderType::Kmip => {
+                credentials.insert("endpoint", KMS_EXPIRED);
+            }
+            _ => {}
+        };
+    let add_wrong_host_credentials =
+        |provider: &KmsProvider, credentials: &mut Document| match provider.provider_type() {
+            KmsProviderType::Azure => {
+                credentials.insert("identityPlatformEndpoint", KMS_WRONG_HOST);
+            }
+            KmsProviderType::Gcp | KmsProviderType::Kmip => {
+                credentials.insert("endpoint", KMS_WRONG_HOST);
+            }
+            _ => {}
+        };
+
+    let providers_no_client_cert = update_providers(
+        UNNAMED_KMS_PROVIDERS.clone(),
+        TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
+        add_correct_credentials,
+    );
+    let client_encryption_no_client_cert = ClientEncryption::new(
+        Client::for_test().await.into_client(),
+        KV_NAMESPACE.clone(),
+        providers_no_client_cert.clone(),
+    )?;
+
+    let providers_with_tls = update_providers(
+        UNNAMED_KMS_PROVIDERS.clone(),
+        TlsOptions::builder()
+            .ca_file_path(ca_path.clone())
+            .cert_key_file_path(key_path.clone())
+            .build(),
+        add_correct_credentials,
+    );
+    let client_encryption_with_tls = ClientEncryption::new(
+        Client::for_test().await.into_client(),
+        KV_NAMESPACE.clone(),
+        providers_with_tls.clone(),
+    )?;
+
+    let client_encryption_expired = ClientEncryption::new(
+        Client::for_test().await.into_client(),
+        KV_NAMESPACE.clone(),
+        update_providers(
+            UNNAMED_KMS_PROVIDERS.clone(),
+            TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
+            add_expired_credentials,
+        ),
+    )?;
+
+    let client_encryption_invalid_hostname = ClientEncryption::new(
+        Client::for_test().await.into_client(),
+        KV_NAMESPACE.clone(),
+        update_providers(
+            UNNAMED_KMS_PROVIDERS.clone(),
+            TlsOptions::builder().ca_file_path(ca_path.clone()).build(),
+            add_wrong_host_credentials,
+        ),
+    )?;
+
+    let mut named_providers = providers_no_client_cert
+        .into_iter()
+        .filter_map(|info| {
+            if !matches!(info.0.provider_type(), KmsProviderType::Local) {
+                Some(add_name_to_info(info, "no_client_cert"))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    named_providers.extend(providers_with_tls.into_iter().filter_map(|info| {
+        if !matches!(info.0.provider_type(), KmsProviderType::Local) {
+            Some(add_name_to_info(info, "with_tls"))
+        } else {
+            None
+        }
+    }));
+    let client_encryption_with_names = ClientEncryption::new(
+        Client::for_test().await.into_client(),
+        KV_NAMESPACE.clone(),
+        named_providers,
+    )?;
+
+    async fn provider_test(
+        client_encryption: &ClientEncryption,
+        master_key: impl Into<MasterKey>,
+        expected_errs: &[&str],
+    ) -> Result<()> {
+        let err = client_encryption
+            .create_data_key(master_key)
+            .await
+            .unwrap_err();
+        let err_str = err.to_string();
+        if !expected_errs.iter().any(|s| err_str.contains(s)) {
+            Err(err)?
+        }
+        Ok(())
+    }
+
+    // Case 1: AWS
+    fn aws_key(endpoint: impl Into<String>) -> AwsMasterKey {
+        AwsMasterKey::builder()
+            .region("us-east-1")
+            .key("arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0")
+            .endpoint(Some(endpoint.into()))
+            .build()
+    }
+
+    provider_test(
+        &client_encryption_no_client_cert,
+        aws_key(KMS_CORRECT),
+        &["SSL routines", "connection was forcibly closed"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_with_tls,
+        aws_key(KMS_CORRECT),
+        &["parse error"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_expired,
+        aws_key(KMS_EXPIRED),
+        &["certificate verify failed"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_invalid_hostname,
+        aws_key(KMS_WRONG_HOST),
+        &["certificate verify failed"],
+    )
+    .await?;
+
+    // Case 2: Azure
+    let azure_key = AzureMasterKey::builder()
+        .key_vault_endpoint("doesnotexist.local")
+        .key_name("foo")
+        .build();
+
+    provider_test(
+        &client_encryption_no_client_cert,
+        azure_key.clone(),
+        &["SSL routines", "connection was forcibly closed"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_with_tls,
+        azure_key.clone(),
+        &["HTTP status=404"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_expired,
+        azure_key.clone(),
+        &["certificate verify failed"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_invalid_hostname,
+        azure_key.clone(),
+        &["certificate verify failed"],
+    )
+    .await?;
+
+    // Case 3: GCP
+    let gcp_key = GcpMasterKey::builder()
+        .project_id("foo")
+        .location("bar")
+        .key_ring("baz")
+        .key_name("foo")
+        .build();
+
+    provider_test(
+        &client_encryption_no_client_cert,
+        gcp_key.clone(),
+        &["SSL routines", "connection was forcibly closed"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_with_tls,
+        gcp_key.clone(),
+        &["HTTP status=404"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_expired,
+        gcp_key.clone(),
+        &["certificate verify failed"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_invalid_hostname,
+        gcp_key.clone(),
+        &["certificate verify failed"],
+    )
+    .await?;
+
+    // Case 4: KMIP
+    let kmip_key = KmipMasterKey::builder().build();
+
+    provider_test(
+        &client_encryption_no_client_cert,
+        kmip_key.clone(),
+        &["SSL routines", "connection was forcibly closed"],
+    )
+    .await?;
+    // This one succeeds!
+    client_encryption_with_tls
+        .create_data_key(kmip_key.clone())
+        .await?;
+    provider_test(
+        &client_encryption_expired,
+        kmip_key.clone(),
+        &["certificate verify failed"],
+    )
+    .await?;
+    provider_test(
+        &client_encryption_invalid_hostname,
+        kmip_key.clone(),
+        &["certificate verify failed"],
+    )
+    .await?;
+
+    // Case 6: named KMS providers apply TLS options
+    // Named AWS
+    let mut master_key = aws_key("127.0.0.1:9002");
+    master_key.name = Some("no_client_cert".to_string());
+    provider_test(
+        &client_encryption_with_names,
+        master_key,
+        &["SSL routines", "connection was forcibly closed"],
+    )
+    .await?;
+
+    let mut master_key = aws_key("127.0.0.1:9002");
+    master_key.name = Some("with_tls".to_string());
+    provider_test(&client_encryption_with_names, master_key, &["parse error"]).await?;
+
+    // Named Azure
+    let mut master_key = azure_key.clone();
+    master_key.name = Some("no_client_cert".to_string());
+    provider_test(
+        &client_encryption_with_names,
+        master_key,
+        &["SSL routines", "connection was forcibly closed"],
+    )
+    .await?;
+
+    let mut master_key = azure_key.clone();
+    master_key.name = Some("with_tls".to_string());
+    provider_test(
+        &client_encryption_with_names,
+        master_key,
+        &["HTTP status=404"],
+    )
+    .await?;
+
+    // Named GCP
+    let mut master_key = gcp_key.clone();
+    master_key.name = Some("no_client_cert".to_string());
+    provider_test(
+        &client_encryption_with_names,
+        master_key,
+        &["SSL routines", "connection was forcibly closed"],
+    )
+    .await?;
+
+    let mut master_key = gcp_key.clone();
+    master_key.name = Some("with_tls".to_string());
+    provider_test(
+        &client_encryption_with_names,
+        master_key,
+        &["HTTP status=404"],
+    )
+    .await?;
+
+    // Named KMIP
+    let mut master_key = kmip_key.clone();
+    master_key.name = Some("no_client_cert".to_string());
+    provider_test(
+        &client_encryption_with_names,
+        master_key,
+        &["SSL routines", "connection was forcibly closed"],
+    )
+    .await?;
+
+    let mut master_key = kmip_key.clone();
+    master_key.name = Some("with_tls".to_string());
+    client_encryption_with_names
+        .create_data_key(master_key)
+        .await?;
+
+    Ok(())
+}
+
 async fn fle2v2_ok(name: &str) -> bool {
     let setup_client = Client::for_test().await;
     if setup_client.server_version_lt(7, 0) {
@@ -1117,6 +2087,9 @@ async fn fle2v2_ok(name: &str) -> bool {
 // Prose test 12. Explicit Encryption (Case 1: can insert encrypted indexed and find)
 #[tokio::test]
 async fn explicit_encryption_case_1() -> Result<()> {
+    if !check_env("explicit_encryption_case_1", false) {
+        return Ok(());
+    }
     if !fle2v2_ok("explicit_encryption_case_1").await {
         return Ok(());
     }
@@ -1171,6 +2144,9 @@ async fn explicit_encryption_case_1() -> Result<()> {
 // contention)
 #[tokio::test]
 async fn explicit_encryption_case_2() -> Result<()> {
+    if !check_env("explicit_encryption_case_2", false) {
+        return Ok(());
+    }
     if !fle2v2_ok("explicit_encryption_case_2").await {
         return Ok(());
     }
@@ -1245,6 +2221,9 @@ async fn explicit_encryption_case_2() -> Result<()> {
 // Prose test 12. Explicit Encryption (Case 3: can insert encrypted unindexed)
 #[tokio::test]
 async fn explicit_encryption_case_3() -> Result<()> {
+    if !check_env("explicit_encryption_case_3", false) {
+        return Ok(());
+    }
     if !fle2v2_ok("explicit_encryption_case_3").await {
         return Ok(());
     }
@@ -1287,6 +2266,9 @@ async fn explicit_encryption_case_3() -> Result<()> {
 // Prose test 12. Explicit Encryption (Case 4: can roundtrip encrypted indexed)
 #[tokio::test]
 async fn explicit_encryption_case_4() -> Result<()> {
+    if !check_env("explicit_encryption_case_4", false) {
+        return Ok(());
+    }
     if !fle2v2_ok("explicit_encryption_case_4").await {
         return Ok(());
     }
@@ -1318,6 +2300,9 @@ async fn explicit_encryption_case_4() -> Result<()> {
 // Prose test 12. Explicit Encryption (Case 5: can roundtrip encrypted unindexed)
 #[tokio::test]
 async fn explicit_encryption_case_5() -> Result<()> {
+    if !check_env("explicit_encryption_case_5", false) {
+        return Ok(());
+    }
     if !fle2v2_ok("explicit_encryption_case_5").await {
         return Ok(());
     }
@@ -1412,6 +2397,10 @@ async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData
 // Prose test 13. Unique Index on keyAltNames (Case 1: createDataKey())
 #[tokio::test]
 async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
+    if !check_env("unique_index_keyaltnames_create_data_key", false) {
+        return Ok(());
+    }
+
     let (client_encryption, _) = unique_index_keyaltnames_setup().await?;
 
     // Succeeds
@@ -1450,6 +2439,10 @@ async fn unique_index_keyaltnames_create_data_key() -> Result<()> {
 // Prose test 13. Unique Index on keyAltNames (Case 2: addKeyAltName())
 #[tokio::test]
 async fn unique_index_keyaltnames_add_key_alt_name() -> Result<()> {
+    if !check_env("unique_index_keyaltnames_add_key_alt_name", false) {
+        return Ok(());
+    }
+
     let (client_encryption, key) = unique_index_keyaltnames_setup().await?;
 
     // Succeeds
@@ -1529,6 +2522,10 @@ async fn unique_index_keyaltnames_setup() -> Result<(ClientEncryption, Binary)> 
 // Prose test 14. Decryption Events (Case 1: Command Error)
 #[tokio::test(flavor = "multi_thread")]
 async fn decryption_events_command_error() -> Result<()> {
+    if !check_env("decryption_events_command_error", false) {
+        return Ok(());
+    }
+
     let td = match DecryptionEventsTestdata::setup().await? {
         Some(v) => v,
         None => return Ok(()),
@@ -1551,6 +2548,10 @@ async fn decryption_events_command_error() -> Result<()> {
 // Prose test 14. Decryption Events (Case 2: Network Error)
 #[tokio::test(flavor = "multi_thread")]
 async fn decryption_events_network_error() -> Result<()> {
+    if !check_env("decryption_events_network_error", false) {
+        return Ok(());
+    }
+
     let td = match DecryptionEventsTestdata::setup().await? {
         Some(v) => v,
         None => return Ok(()),
@@ -1574,6 +2575,10 @@ async fn decryption_events_network_error() -> Result<()> {
 // Prose test 14. Decryption Events (Case 3: Decrypt Error)
 #[tokio::test]
 async fn decryption_events_decrypt_error() -> Result<()> {
+    if !check_env("decryption_events_decrypt_error", false) {
+        return Ok(());
+    }
+
     let td = match DecryptionEventsTestdata::setup().await? {
         Some(v) => v,
         None => return Ok(()),
@@ -1601,6 +2606,10 @@ async fn decryption_events_decrypt_error() -> Result<()> {
 // Prose test 14. Decryption Events (Case 4: Decrypt Success)
 #[tokio::test]
 async fn decryption_events_decrypt_success() -> Result<()> {
+    if !check_env("decryption_events_decrypt_success", false) {
+        return Ok(());
+    }
+
     let td = match DecryptionEventsTestdata::setup().await? {
         Some(v) => v,
         None => return Ok(()),
@@ -1715,9 +2724,17 @@ impl crate::event::command::CommandEventHandler for DecryptionEventsHandler {
 }
 
 // Prose test 15. On-demand AWS Credentials (failure)
-#[cfg(feature = "aws-auth")] // isabeltodo make sure this is being run
+#[cfg(feature = "aws-auth")]
 #[tokio::test]
 async fn on_demand_aws_failure() -> Result<()> {
+    if !check_env("on_demand_aws_failure", false) {
+        return Ok(());
+    }
+    if env::var("AWS_ACCESS_KEY_ID").is_ok() && env::var("AWS_SECRET_ACCESS_KEY").is_ok() {
+        log_uncaptured("Skipping on_demand_aws_failure: credentials set");
+        return Ok(());
+    }
+
     let ce = ClientEncryption::new(
         Client::for_test().await.into_client(),
         KV_NAMESPACE.clone(),
@@ -1737,9 +2754,13 @@ async fn on_demand_aws_failure() -> Result<()> {
 }
 
 // Prose test 15. On-demand AWS Credentials (success)
-#[cfg(feature = "aws-auth")] // isabeltodo make sure this is being run
+#[cfg(feature = "aws-auth")]
 #[tokio::test]
 async fn on_demand_aws_success() -> Result<()> {
+    if !check_env("on_demand_aws_success", false) {
+        return Ok(());
+    }
+
     let ce = ClientEncryption::new(
         Client::for_test().await.into_client(),
         KV_NAMESPACE.clone(),
@@ -1759,7 +2780,7 @@ async fn on_demand_aws_success() -> Result<()> {
 // TODO RUST-1441: implement prose test 16. Rewrap
 
 // Prose test 17. On-demand GCP Credentials
-#[cfg(feature = "gcp-kms")] // isabeltodo figure out when this is being run
+#[cfg(feature = "gcp-kms")]
 #[tokio::test]
 async fn on_demand_gcp_credentials() -> Result<()> {
     let util_client = Client::for_test().await.into_client();
@@ -1800,6 +2821,10 @@ async fn on_demand_gcp_credentials() -> Result<()> {
 #[cfg(feature = "azure-kms")]
 #[tokio::test]
 async fn azure_imds() -> Result<()> {
+    if !check_env("azure_imds", false) {
+        return Ok(());
+    }
+
     let mut azure_exec = crate::client::csfle::state_machine::azure::ExecutorState::new()?;
     azure_exec.test_host = Some((
         "localhost",
@@ -1864,6 +2889,10 @@ async fn azure_imds() -> Result<()> {
 #[cfg(feature = "azure-kms")]
 #[tokio::test]
 async fn azure_imds_integration_failure() -> Result<()> {
+    if !check_env("azure_imds_integration_failure", false) {
+        return Ok(());
+    }
+
     let c = ClientEncryption::new(
         Client::for_test().await.into_client(),
         KV_NAMESPACE.clone(),
@@ -1888,6 +2917,10 @@ async fn azure_imds_integration_failure() -> Result<()> {
 // Prose test 20. Bypass creating mongocryptd client when shared library is loaded
 #[tokio::test]
 async fn bypass_mongocryptd_client() -> Result<()> {
+    if !check_env("bypass_mongocryptd_client", false) {
+        return Ok(());
+    }
+
     if *DISABLE_CRYPT_SHARED {
         log_uncaptured("Skipping bypass mongocryptd client test: crypt_shared is disabled.");
         return Ok(());
@@ -1948,6 +2981,9 @@ async fn auto_encryption_keys_aws() -> Result<()> {
 async fn auto_encryption_keys(master_key: impl Into<MasterKey>) -> Result<()> {
     let master_key = master_key.into();
 
+    if !check_env("custom_key_material", false) {
+        return Ok(());
+    }
     if !fle2v2_ok("auto_encryption_keys").await {
         return Ok(());
     }
@@ -2399,6 +3435,11 @@ async fn bind(addr: &str) -> Result<TcpListener> {
 // Prose test 23. Range explicit encryption applies defaults
 #[tokio::test]
 async fn range_explicit_encryption_defaults() -> Result<()> {
+    let name = "range_explicit_encryption_defaults";
+    if !check_env(name, false) {
+        return Ok(());
+    }
+
     // Setup
     let key_vault_client = Client::for_test().await;
     let client_encryption = ClientEncryption::new(
@@ -2466,7 +3507,7 @@ async fn kms_retry() {
 
     let endpoint = "127.0.0.1:9003";
 
-    let mut certificate_file_path = PathBuf::from(&*CSFLE_TLS_CERT_DIR);
+    let mut certificate_file_path = PathBuf::from(std::env::var("CSFLE_TLS_CERT_DIR").unwrap());
     certificate_file_path.push("ca.pem");
     let certificate_file = std::fs::read(&certificate_file_path).unwrap();
 
@@ -2621,6 +3662,10 @@ async fn kms_retry() {
 // FLE 2.0 Documentation Example
 #[tokio::test]
 async fn fle2_example() -> Result<()> {
+    if !check_env("fle2_example", false) {
+        return Ok(());
+    }
+
     // FLE 2 is not supported on Standalone topology.
     let test_client = Client::for_test().await;
     if test_client.server_version_lt(7, 0) {
