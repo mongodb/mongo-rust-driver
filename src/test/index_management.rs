@@ -17,13 +17,16 @@ async fn run_unified() {
     let client = Client::for_test().await;
 
     let mut skipped_files = Vec::new();
-    // TODO DRIVERS-2794: unskip this file
+    let mut skipped_tests = Vec::new();
+    // TODO DRIVERS-2794: unskip these tests
     if client.server_version_lt(7, 2) && (client.is_sharded() || client.is_load_balanced()) {
         skipped_files.push("listSearchIndexes.json");
+        skipped_tests.push("listSearchIndexes ignores read and write concern");
     }
 
     run_unified_tests(&["index-management"])
         .skip_files(&skipped_files)
+        .skip_tests(&skipped_tests)
         .await;
 }
 
