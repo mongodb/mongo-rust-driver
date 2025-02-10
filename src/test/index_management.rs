@@ -18,7 +18,7 @@ async fn run_unified() {
 
     let mut skipped_files = Vec::new();
     // TODO DRIVERS-2794: unskip this file
-    if client.server_version_lt(7, 2) && client.is_sharded() {
+    if client.server_version_lt(7, 2) && (client.is_sharded() || client.is_load_balanced()) {
         skipped_files.push("listSearchIndexes.json");
     }
 
