@@ -18,7 +18,7 @@ FEATURE_FLAGS+=("aws-auth")
 
 set +o errexit
 
-cargo_test auth_aws
+cargo_test test::auth::aws
 cargo_test lambda_examples::auth::test_handler
 cargo_test spec::auth
 cargo_test uri_options

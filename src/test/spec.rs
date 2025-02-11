@@ -9,7 +9,6 @@ mod crud;
 mod faas;
 mod gridfs;
 mod handshake;
-mod index_management;
 #[cfg(feature = "dns-resolver")]
 mod initial_dns_seedlist_discovery;
 mod load_balancers;
