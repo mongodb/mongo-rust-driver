@@ -265,7 +265,7 @@ async fn views_prohibited() -> Result<()> {
     Ok(())
 }
 
-// Prose test 12. Custom Endpoint
+// Prose test 7. Custom Endpoint
 mod custom_endpoint {
     use super::*;
 

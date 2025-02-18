@@ -523,7 +523,7 @@ mod corpus {
     }
 }
 
-// Prose test 12. Custom Endpoint
+// Prose test 7. Custom Endpoint
 mod custom_endpoint {
     use super::*;
 
@@ -576,7 +576,7 @@ mod custom_endpoint {
     }
 }
 
-// Prose tests 10. KMS TLS Tests
+// Prose test 10. KMS TLS Tests
 mod kms_tls {
     use super::*;
 
