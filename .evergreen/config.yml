@@ -238,7 +238,7 @@ buildvariants:
 
   - name: gcp-kms
     display_name: "GCP KMS"
-    patchable: false
+    # patchable: false
     run_on:
       # The GCP CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
@@ -1678,25 +1678,21 @@ functions:
           echo "Untarring test contents ... end"
 
   "run gcp kms test":
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${PREPARE_SHELL}
-
-          set +o xtrace
-          export GCPKMS_GCLOUD=${GCPKMS_GCLOUD}
-          export GCPKMS_PROJECT=${GCPKMS_PROJECT}
-          export GCPKMS_ZONE=${GCPKMS_ZONE}
-          export GCPKMS_INSTANCENAME=${GCPKMS_INSTANCENAME}
-          set -o xtrace
-
-          export GCPKMS_CMD="ON_DEMAND_GCP_CREDS_SHOULD_SUCCEED=1 \
-            RUST_BACKTRACE=1 LD_LIBRARY_PATH=./test-contents/lib \
-            ./test-contents/test-exe on_demand_gcp_credentials --nocapture"
-          $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/run-command.sh
+        working_dir: ${DRIVERS_TOOLS}
+        binary: bash
+        include_expansions_in_env:
+          - GCPKMS_GCLOUD
+          - GCPKMS_PROJECT
+          - GCPKMS_ZONE
+          - GCPKMS_INSTANCENAME
+          - DRIVERS_TOOLS
+        env:
+          GCPKMS_CMD: "RUST_BACKTRACE=1 LD_LIBRARY_PATH=./test-contents/lib ./test-contents/test-exe test::csfle::on_demand_gcp_kms::success -- --no-capture"
+        args:
+          - .evergreen/csfle/gcpkms/run-command.sh
 
   "assume ec2 role":
     - command: ec2.assume_role
