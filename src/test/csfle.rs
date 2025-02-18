@@ -3,78 +3,22 @@
 mod kmip_skip_local;
 mod prose;
 
-use std::{
-    collections::BTreeMap,
-    env,
-    path::PathBuf,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-        Mutex,
-    },
-    time::Duration,
-};
+use std::{env, path::PathBuf};
 
 use anyhow::Context;
-use bson::{
-    doc,
-    rawdoc,
-    spec::{BinarySubtype, ElementType},
-    Binary,
-    Bson,
-    DateTime,
-    Document,
-    RawBson,
-    RawDocumentBuf,
-};
-use futures_util::TryStreamExt;
+use bson::{doc, Document, RawBson};
 use mongocrypt::ctx::{Algorithm, KmsProvider, KmsProviderType};
 use once_cell::sync::Lazy;
-use tokio::net::TcpListener;
 
 use crate::{
-    action::Action,
-    client_encryption::{
-        AwsMasterKey,
-        AzureMasterKey,
-        ClientEncryption,
-        EncryptKey,
-        GcpMasterKey,
-        KmipMasterKey,
-        LocalMasterKey,
-        MasterKey,
-        RangeOptions,
-    },
-    error::{ErrorKind, WriteError, WriteFailure},
-    event::{
-        command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-        sdam::SdamEvent,
-    },
-    options::{
-        CollectionOptions,
-        Credential,
-        EncryptOptions,
-        FindOptions,
-        IndexOptions,
-        ReadConcern,
-        TlsOptions,
-        WriteConcern,
-    },
-    runtime,
-    test::{
-        util::{
-            event_buffer::EventBuffer,
-            fail_point::{FailPoint, FailPointMode},
-        },
-        Event,
-    },
+    client_encryption::{ClientEncryption, EncryptKey},
+    options::{CollectionOptions, ReadConcern, TlsOptions, WriteConcern},
     Client,
     Collection,
-    IndexModel,
     Namespace,
 };
 
-use super::{get_client_options, log_uncaptured, EventClient, TestClient};
+use super::{log_uncaptured, EventClient};
 
 type Result<T> = anyhow::Result<T>;
 pub(crate) type KmsInfo = (KmsProvider, Document, Option<TlsOptions>);
@@ -317,10 +261,6 @@ async fn validate_roundtrip(
     Ok(())
 }
 
-fn ok_pred(mut f: impl FnMut(&Event) -> Result<bool>) -> impl FnMut(&Event) -> bool {
-    move |ev| f(ev).unwrap_or(false)
-}
-
 fn load_testdata_raw(name: &str) -> Result<String> {
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
@@ -342,24 +282,6 @@ macro_rules! failure {
     }}
 }
 use failure;
-
-// TODO RUST-36: use the full corpus with decimal128.
-fn load_corpus_nodecimal128(name: &str) -> Result<Document> {
-    let json: serde_json::Value = serde_json::from_str(&load_testdata_raw(name)?)?;
-    let mut new_obj = serde_json::Map::new();
-    let decimal = serde_json::Value::String("decimal".to_string());
-    for (name, value) in json.as_object().expect("expected object") {
-        if value["type"] == decimal {
-            continue;
-        }
-        new_obj.insert(name.clone(), value.clone());
-    }
-    let bson: bson::Bson = serde_json::Value::Object(new_obj).try_into()?;
-    match bson {
-        bson::Bson::Document(d) => Ok(d),
-        _ => Err(failure!("expected document, got {:?}", bson)),
-    }
-}
 
 async fn fle2v2_ok(name: &str) -> bool {
     let setup_client = Client::for_test().await;

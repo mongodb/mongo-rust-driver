@@ -1,4 +1,44 @@
-use super::*;
+use std::{path::PathBuf, time::Duration};
+
+use futures_util::TryStreamExt;
+use mongocrypt::ctx::{Algorithm, KmsProvider, KmsProviderType};
+
+use crate::{
+    action::Action,
+    bson::{doc, spec::BinarySubtype, Binary, Bson, Document, RawBson},
+    client_encryption::{
+        AwsMasterKey,
+        AzureMasterKey,
+        ClientEncryption,
+        EncryptKey,
+        GcpMasterKey,
+        KmipMasterKey,
+        LocalMasterKey,
+        MasterKey,
+    },
+    error::ErrorKind,
+    options::{Credential, TlsOptions},
+    test::{get_client_options, util::Event},
+    Client,
+};
+
+use super::{
+    custom_endpoint_setup,
+    failure,
+    init_client,
+    load_testdata,
+    load_testdata_raw,
+    validate_roundtrip,
+    KmsInfo,
+    KmsProviderList,
+    Result,
+    CSFLE_TLS_CERT_DIR,
+    DISABLE_CRYPT_SHARED,
+    EXTRA_OPTIONS,
+    KV_NAMESPACE,
+    LOCAL_KMS,
+    UNNAMED_KMS_PROVIDERS,
+};
 
 const KMS_EXPIRED: &str = "127.0.0.1:9000";
 const KMS_WRONG_HOST: &str = "127.0.0.1:9001";
@@ -7,6 +47,10 @@ const KMS_CORRECT: &str = "127.0.0.1:9002";
 // Prose test 2. Data Key and Double Encryption
 #[tokio::test]
 async fn data_key_double_encryption() -> Result<()> {
+    fn ok_pred(mut f: impl FnMut(&Event) -> Result<bool>) -> impl FnMut(&Event) -> bool {
+        move |ev| f(ev).unwrap_or(false)
+    }
+
     // Setup: drop stale data.
     let (client, _) = init_client().await?;
 
@@ -446,6 +490,24 @@ mod corpus {
         }
 
         Ok(())
+    }
+
+    // TODO RUST-36: use the full corpus with decimal128.
+    fn load_corpus_nodecimal128(name: &str) -> Result<Document> {
+        let json: serde_json::Value = serde_json::from_str(&load_testdata_raw(name)?)?;
+        let mut new_obj = serde_json::Map::new();
+        let decimal = serde_json::Value::String("decimal".to_string());
+        for (name, value) in json.as_object().expect("expected object") {
+            if value["type"] == decimal {
+                continue;
+            }
+            new_obj.insert(name.clone(), value.clone());
+        }
+        let bson: bson::Bson = serde_json::Value::Object(new_obj).try_into()?;
+        match bson {
+            bson::Bson::Document(d) => Ok(d),
+            _ => Err(failure!("expected document, got {:?}", bson)),
+        }
     }
 
     #[tokio::test]

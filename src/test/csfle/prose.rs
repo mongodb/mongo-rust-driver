@@ -1,4 +1,76 @@
-use super::*;
+use std::{
+    collections::BTreeMap,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+        Mutex,
+    },
+    time::Duration,
+};
+
+use futures_util::TryStreamExt;
+use mongocrypt::ctx::{Algorithm, KmsProvider};
+use tokio::net::TcpListener;
+
+use crate::{
+    bson::{
+        doc,
+        rawdoc,
+        spec::ElementType,
+        Binary,
+        Bson,
+        DateTime,
+        Document,
+        RawBson,
+        RawDocumentBuf,
+    },
+    client_encryption::{
+        AwsMasterKey,
+        AzureMasterKey,
+        ClientEncryption,
+        EncryptKey,
+        GcpMasterKey,
+        LocalMasterKey,
+        MasterKey,
+        RangeOptions,
+    },
+    error::{ErrorKind, WriteError, WriteFailure},
+    event::{
+        command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
+        sdam::SdamEvent,
+    },
+    options::{EncryptOptions, FindOptions, IndexOptions, WriteConcern},
+    runtime,
+    test::{
+        get_client_options,
+        log_uncaptured,
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
+        Event,
+        TestClient,
+    },
+    Client,
+    Collection,
+    IndexModel,
+};
+
+use super::{
+    custom_endpoint_setup,
+    failure,
+    fle2v2_ok,
+    init_client,
+    load_testdata,
+    validate_roundtrip,
+    Result,
+    AWS_KMS,
+    AZURE_IMDS_MOCK_PORT,
+    DISABLE_CRYPT_SHARED,
+    EXTRA_OPTIONS,
+    KV_NAMESPACE,
+    LOCAL_KMS,
+};
 
 // Prose test 1. Custom Key Material Test
 #[tokio::test]
@@ -2141,12 +2213,15 @@ async fn range_explicit_encryption_defaults() -> Result<()> {
 #[cfg(not(feature = "openssl-tls"))]
 #[tokio::test]
 async fn kms_retry_skip_local() {
-    if *super::SERVERLESS {
+    use super::{AZURE_KMS, CSFLE_TLS_CERT_DIR, GCP_KMS};
+    use crate::{test::SERVERLESS, Namespace};
+    use reqwest::{Certificate, Client as HttpClient};
+    use std::path::PathBuf;
+
+    if *SERVERLESS {
         log_uncaptured("skipping kms_retry on serverless");
         return;
     }
-
-    use reqwest::{Certificate, Client as HttpClient};
 
     let endpoint = "127.0.0.1:9003";
 
