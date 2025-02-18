@@ -61,7 +61,7 @@ impl OperationWithDefaults for ChangeStreamAggregate {
                     .start_at_operation_time
                     .as_ref()
                     .or(data.initial_operation_time.as_ref());
-                if saved_time.is_some() && description.max_wire_version.map_or(false, |v| v >= 7) {
+                if saved_time.is_some() && description.max_wire_version.is_some_and(|v| v >= 7) {
                     new_opts.start_at_operation_time = saved_time.cloned();
                 }
             }
@@ -109,7 +109,7 @@ impl OperationWithDefaults for ChangeStreamAggregate {
 
         let description = context.connection.stream_description()?;
         if self.args.options.as_ref().map_or(true, has_no_time)
-            && description.max_wire_version.map_or(false, |v| v >= 7)
+            && description.max_wire_version.is_some_and(|v| v >= 7)
             && spec.initial_buffer.is_empty()
             && spec.post_batch_resume_token.is_none()
         {

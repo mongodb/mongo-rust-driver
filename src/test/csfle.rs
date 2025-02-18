@@ -217,7 +217,7 @@ static EXTRA_OPTIONS: Lazy<Document> =
 static KV_NAMESPACE: Lazy<Namespace> =
     Lazy::new(|| Namespace::from_str("keyvault.datakeys").unwrap());
 static DISABLE_CRYPT_SHARED: Lazy<bool> =
-    Lazy::new(|| env::var("DISABLE_CRYPT_SHARED").map_or(false, |s| s == "true"));
+    Lazy::new(|| env::var("DISABLE_CRYPT_SHARED").is_ok_and(|s| s == "true"));
 
 fn check_env(name: &str, kmip: bool) -> bool {
     if env::var("CSFLE_LOCAL_KEY").is_err() {
