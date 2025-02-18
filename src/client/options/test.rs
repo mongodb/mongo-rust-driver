@@ -154,9 +154,7 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
 
                         let (_, actual_value) = actual_options
                             .iter()
-                            .find(|(actual_key, _)| {
-                                actual_key.eq_ignore_ascii_case(expected_key)
-                            })
+                            .find(|(actual_key, _)| actual_key.eq_ignore_ascii_case(expected_key))
                             .unwrap_or_else(|| {
                                 panic!(
                                     "{}: parsed options missing {} key",
