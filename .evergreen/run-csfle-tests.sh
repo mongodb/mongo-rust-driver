@@ -33,11 +33,11 @@ cargo_test test::csfle
 cargo_test test::spec::client_side_encryption
 
 feature_flags+=("aws-auth")
-cargo_test test::csfle::on_demand_aws::success
+cargo_test test::csfle::prose::on_demand_aws::success
 
 # Unset variables for on-demand credential failure tests.
 unset AWS_ACCESS_KEY_ID
 unset AWS_SECRET_ACCESS_KEY
-cargo_test test::csfle::on_demand_aws::failure
+cargo_test test::csfle::prose::on_demand_aws::failure
 
 exit ${CARGO_RESULT}
