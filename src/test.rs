@@ -18,7 +18,8 @@ mod coll;
 ))]
 mod compression;
 #[cfg(feature = "in-use-encryption")]
-pub(crate) mod csfle;
+#[path = "test/csfle.rs"]
+pub(crate) mod csfle_skip_local; // see modules for requirements
 mod cursor;
 mod db;
 mod documentation_examples;

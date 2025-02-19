@@ -1,7 +1,14 @@
+#[cfg(feature = "azure-kms")]
+mod azure_imds; // requires mock IMDS server
+#[cfg(feature = "gcp-kms")]
+mod gcp_kms; // requires GCP
 #[cfg(feature = "openssl-tls")]
-#[path = "csfle/kmip.rs"]
-mod kmip_skip_local;
-mod prose;
+mod kmip; // requires KMIP server
+#[cfg(not(feature = "openssl-tls"))]
+mod kms_retry; // requires mock HTTP server
+#[cfg(feature = "aws-auth")]
+mod on_demand_aws; // requires AWS credentials to be set or unset
+mod prose; // requires environment variables listed below
 
 use std::{env, path::PathBuf};
 
@@ -36,13 +43,14 @@ static FLE_GCP_EMAIL: Lazy<String> = Lazy::new(|| get_env_var("FLE_GCP_EMAIL"));
 static FLE_GCP_PRIVATEKEY: Lazy<String> = Lazy::new(|| get_env_var("FLE_GCP_PRIVATEKEY"));
 
 // Additional environment variables. These values should be set to the relevant local paths/ports.
-static CSFLE_TLS_CERT_DIR: Lazy<String> = Lazy::new(|| get_env_var("CSFLE_TLS_CERT_DIR"));
-static CRYPT_SHARED_LIB_PATH: Lazy<String> = Lazy::new(|| get_env_var("CRYPT_SHARED_LIB_PATH"));
+#[cfg(feature = "azure-kms")]
 static AZURE_IMDS_MOCK_PORT: Lazy<u16> = Lazy::new(|| {
     get_env_var("AZURE_IMDS_MOCK_PORT")
         .parse()
         .expect("AZURE_IMDS_MOCK_PORT")
 });
+static CSFLE_TLS_CERT_DIR: Lazy<String> = Lazy::new(|| get_env_var("CSFLE_TLS_CERT_DIR"));
+static CRYPT_SHARED_LIB_PATH: Lazy<String> = Lazy::new(|| get_env_var("CRYPT_SHARED_LIB_PATH"));
 
 fn get_env_var(name: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| {
