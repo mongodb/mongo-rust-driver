@@ -75,10 +75,7 @@ struct TestServerDescription {
 
 impl TestServerDescription {
     fn into_server_description(self) -> Option<ServerDescription> {
-        let server_type = match self.server_type.into_server_type() {
-            Some(server_type) => server_type,
-            None => return None,
-        };
+        let server_type = self.server_type.into_server_type()?;
 
         let server_address = ServerAddress::parse(self.address).ok()?;
         let tags = self.tags;

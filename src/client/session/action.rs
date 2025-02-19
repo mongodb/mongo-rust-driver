@@ -99,7 +99,7 @@ impl<'a> Action for StartTransaction<&'a mut ClientSession> {
     }
 }
 
-impl<'a> StartTransaction<&'a mut ClientSession> {
+impl StartTransaction<&mut ClientSession> {
     /// Starts a transaction, runs the given callback, and commits or aborts the transaction.
     /// Transient transaction errors will cause the callback or the commit to be retried;
     /// other errors will cause the transaction to be aborted and the error returned to the

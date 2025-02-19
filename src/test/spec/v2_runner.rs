@@ -351,11 +351,11 @@ pub(crate) struct OpRunner<'a> {
     fail_point_guards: &'a mut Vec<FailPointGuard>,
 }
 
-impl<'a> OpRunner<'a> {
-    pub(crate) async fn run_operation<'b>(
+impl OpRunner<'_> {
+    pub(crate) async fn run_operation(
         &mut self,
         operation: &Operation,
-        mut sessions: OpSessions<'b>,
+        mut sessions: OpSessions<'_>,
     ) -> Option<Result<Option<bson::Bson>, crate::error::Error>> {
         if operation.name == "withTransaction" {
             if !matches!(&operation.object, Some(OperationObject::Session0)) {

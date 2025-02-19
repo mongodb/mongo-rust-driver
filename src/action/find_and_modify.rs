@@ -27,12 +27,12 @@ use crate::{
 use super::{action_impl, deeplink, export_doc, option_setters, options_doc};
 
 impl<T: DeserializeOwned + Send + Sync> Collection<T> {
-    async fn find_and_modify<'a>(
+    async fn find_and_modify(
         &self,
         filter: Document,
         modification: Modification,
         mut options: Option<FindAndModifyOptions>,
-        session: Option<&'a mut ClientSession>,
+        session: Option<&mut ClientSession>,
     ) -> Result<Option<T>> {
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 

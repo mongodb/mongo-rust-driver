@@ -33,10 +33,7 @@ impl SrvPollingMonitor {
         topology_watcher: TopologyWatcher,
         mut client_options: ClientOptions,
     ) -> Option<Self> {
-        let initial_info = match client_options.original_srv_info.take() {
-            Some(info) => info,
-            None => return None,
-        };
+        let initial_info = client_options.original_srv_info.take()?;
 
         Some(Self {
             initial_hostname: initial_info.hostname,

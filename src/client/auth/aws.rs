@@ -542,7 +542,7 @@ impl ServerFirst {
                 MECH_NAME,
                 "sts host must be non-empty",
             ))
-        } else if self.sts_host.as_bytes().len() > 255 {
+        } else if self.sts_host.len() > 255 {
             Err(Error::authentication_error(
                 MECH_NAME,
                 "sts host cannot be more than 255 bytes",

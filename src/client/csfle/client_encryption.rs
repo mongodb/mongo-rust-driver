@@ -183,7 +183,7 @@ impl ClientEncryption {
 
     /// Decrypts an encrypted value (BSON binary of subtype 6).
     /// Returns the original BSON value.
-    pub async fn decrypt<'a>(&self, value: RawBinaryRef<'a>) -> Result<bson::RawBson> {
+    pub async fn decrypt(&self, value: RawBinaryRef<'_>) -> Result<bson::RawBson> {
         if value.subtype != BinarySubtype::Encrypted {
             return Err(Error::invalid_argument(format!(
                 "Invalid binary subtype for decrypt: expected {:?}, got {:?}",
