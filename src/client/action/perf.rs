@@ -10,7 +10,7 @@ impl<'a> Action for crate::action::WarmConnectionPool<'a> {
             .inner
             .options
             .min_pool_size
-            .map_or(false, |s| s > 0)
+            .is_some_and(|size| size > 0)
         {
             // No-op when min_pool_size is zero.
             return;

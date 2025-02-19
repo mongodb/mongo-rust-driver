@@ -968,7 +968,7 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
     if credential
         .source
         .as_ref()
-        .map_or(false, |s| s != "$external")
+        .is_some_and(|source| source != "$external")
     {
         return Err(Error::invalid_argument(format!(
             "source must be $external for {} authentication, found: {:?}",

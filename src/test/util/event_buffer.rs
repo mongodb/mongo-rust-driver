@@ -261,7 +261,7 @@ pub(crate) struct EventStream<'a, T> {
     generation: Generation,
 }
 
-impl<'a, T: Clone> EventStream<'a, T> {
+impl<T: Clone> EventStream<'_, T> {
     fn try_next(&mut self) -> Option<T> {
         let events = self.buffer.inner.events.lock().unwrap();
         if events.generation != self.generation {
@@ -372,7 +372,7 @@ impl<'a, T: Clone> EventStream<'a, T> {
     }
 }
 
-impl<'a> EventStream<'a, Event> {
+impl EventStream<'_, Event> {
     /// Gets the next unread CommandStartedEvent/CommandFailedEvent pair.
     /// If the next CommandStartedEvent is associated with a CommandFailedEvent, this method will
     /// panic.

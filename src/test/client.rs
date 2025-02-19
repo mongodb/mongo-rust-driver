@@ -888,7 +888,7 @@ async fn warm_connection_pool() {
     client.list_database_names().await.unwrap();
 }
 
-async fn get_end_session_event_count<'a>(event_stream: &mut EventStream<'a, Event>) -> usize {
+async fn get_end_session_event_count(event_stream: &mut EventStream<'_, Event>) -> usize {
     // Use collect_successful_command_execution to assert that the call to endSessions succeeded.
     event_stream
         .collect_successful_command_execution(Duration::from_millis(500), "endSessions")
