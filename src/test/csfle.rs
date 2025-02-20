@@ -1,13 +1,19 @@
 #[cfg(feature = "azure-kms")]
+#[path = "csfle/azure_imds.rs"]
 mod azure_imds; // requires mock IMDS server
-#[cfg(feature = "gcp-kms")]
-mod gcp_kms; // requires GCP
 #[cfg(feature = "openssl-tls")]
+#[path = "csfle/kmip.rs"]
 mod kmip; // requires KMIP server
 #[cfg(not(feature = "openssl-tls"))]
+#[path = "csfle/kms_retry.rs"]
 mod kms_retry; // requires mock HTTP server
 #[cfg(feature = "aws-auth")]
+#[path = "csfle/on_demand_aws.rs"]
 mod on_demand_aws; // requires AWS credentials to be set or unset
+#[cfg(feature = "gcp-kms")]
+#[path = "csfle/on_demand_gcp.rs"]
+mod on_demand_gcp; // requires GCP
+#[path = "csfle/prose.rs"]
 mod prose; // requires environment variables listed below
 
 use std::{env, path::PathBuf};
