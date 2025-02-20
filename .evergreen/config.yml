@@ -1690,7 +1690,7 @@ functions:
           - GCPKMS_INSTANCENAME
           - DRIVERS_TOOLS
         env:
-          GCPKMS_CMD: "RUST_BACKTRACE=1 LD_LIBRARY_PATH=./test-contents/lib ./test-contents/test-exe test::csfle::on_demand_gcp::success -- --no-capture"
+          GCPKMS_CMD: "RUST_BACKTRACE=1 LD_LIBRARY_PATH=./test-contents/lib ./test-contents/test-exe on_demand_gcp::success -- --no-capture"
         args:
           - .evergreen/csfle/gcpkms/run-command.sh
 
