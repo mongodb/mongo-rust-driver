@@ -31,6 +31,8 @@ pub(crate) mod spec;
 mod timeseries;
 pub(crate) mod util;
 
+#[cfg(feature = "in-use-encryption")]
+pub(crate) use self::csfle_skip_local as csfle;
 pub(crate) use self::{
     spec::{run_spec_test, RunOn, Serverless, Topology},
     util::{
