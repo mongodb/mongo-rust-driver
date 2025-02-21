@@ -1,7 +1,5 @@
 mod auth;
 mod change_streams;
-#[cfg(feature = "in-use-encryption")]
-mod client_side_encryption;
 mod collection_management;
 mod command_monitoring;
 mod connection_stepdown;
@@ -23,7 +21,7 @@ mod sessions;
 mod trace;
 mod transactions;
 pub(crate) mod unified_runner;
-mod v2_runner;
+pub(crate) mod v2_runner;
 mod versioned_api;
 mod write_error;
 

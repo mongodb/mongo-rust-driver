@@ -144,10 +144,8 @@ impl RunOnRequirement {
                 return Err("requires auth".to_string());
             }
         }
-        if let Some(csfle) = &self.csfle {
-            if *csfle && std::env::var("CSFLE_LOCAL_KEY").is_err() {
-                return Err("requires csfle env".to_string());
-            }
+        if self.csfle == Some(true) && !cfg!(feature = "in-use-encryption") {
+            return Err("requires csfle but in-use-encryption feature not enabled".to_string());
         }
         Ok(())
     }
