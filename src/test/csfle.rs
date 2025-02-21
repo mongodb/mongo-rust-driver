@@ -15,6 +15,8 @@ mod on_demand_aws; // requires AWS credentials to be set or unset
 mod on_demand_gcp; // requires GCP
 #[path = "csfle/prose.rs"]
 mod prose; // requires environment variables listed below
+#[path = "csfle/spec.rs"]
+mod spec; // requires environment variables listed below
 
 use std::{env, path::PathBuf};
 

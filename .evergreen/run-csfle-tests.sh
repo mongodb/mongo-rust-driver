@@ -31,7 +31,6 @@ PATH=${PATH}:${DRIVERS_TOOLS}/mongodb/bin
 set +o errexit
 
 cargo_test test::csfle
-cargo_test test::spec::client_side_encryption
 
 FEATURE_FLAGS+=("aws-auth")
 cargo_test on_demand_aws::success

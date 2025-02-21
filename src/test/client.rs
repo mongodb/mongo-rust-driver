@@ -564,11 +564,8 @@ async fn saslprep() {
 
 #[tokio::test]
 #[function_name::named]
-async fn x509_auth() {
-    let username = match std::env::var("MONGO_X509_USER") {
-        Ok(user) => user,
-        Err(_) => return,
-    };
+async fn x509_auth_skip_ci() {
+    let username = std::env::var("MONGO_X509_USER").expect("MONGO_X509_USER");
 
     let client = Client::for_test().await;
     let drop_user_result = client
