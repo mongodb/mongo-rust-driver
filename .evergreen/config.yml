@@ -238,7 +238,7 @@ buildvariants:
 
   - name: gcp-kms
     display_name: "GCP KMS"
-    # patchable: false
+    patchable: false
     run_on:
       # The GCP CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
