@@ -152,7 +152,7 @@ buildvariants:
 
   - name: openssl-windows
     display_name: "OpenSSL (Windows)"
-    #patchable: false
+    patchable: false
     run_on:
       - windows-64-vs2017-small
     expansions:
