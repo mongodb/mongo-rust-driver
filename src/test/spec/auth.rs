@@ -79,6 +79,7 @@ async fn run_auth_test(test_file: TestFile) {
         {
             continue;
         }
+        dbg!("{}", &test_case.description);
 
         match ClientOptions::parse(test_case.uri.as_str()).await {
             Ok(options) => {
@@ -106,6 +107,8 @@ async fn run_auth_test(test_file: TestFile) {
 }
 
 #[tokio::test]
-async fn run() {
-    run_spec_test(&["auth"], run_auth_test).await;
+async fn run_legacy() {
+    run_spec_test(&["auth", "legacy"], run_auth_test).await;
 }
+
+// TODO RUST-1665: run unified tests
