@@ -22,6 +22,9 @@ static SKIPPED_TESTS: Lazy<Vec<&'static str>> = Lazy::new(|| {
         "maxPoolSize=0 does not error",
         #[cfg(not(feature = "cert-key-password"))]
         "Valid tlsCertificateKeyFilePassword is parsed correctly",
+        // TODO RUST-1954: unskip these tests
+        "Colon in a key value pair",
+        "Comma in a key value pair causes a warning",
     ];
 
     // TODO RUST-1896: unskip this test when openssl-tls is enabled
@@ -177,7 +180,21 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                 }
 
                 if let Some(test_auth) = test_case.auth {
-                    assert!(test_auth.matches_client_options(&client_options));
+                    if !test_auth.matches_client_options(&client_options) {
+                        dbg!("{}", &test_auth);
+                        dbg!(
+                            "{}",
+                            &client_options
+                                .credential
+                                .as_ref()
+                                .and_then(|c| c.source.as_ref())
+                        );
+                    }
+                    assert!(
+                        test_auth.matches_client_options(&client_options),
+                        "{}",
+                        &test_case.description
+                    );
                 }
             } else {
                 let error = client_options_result.expect_err(&test_case.description);

@@ -1317,6 +1317,34 @@ impl ClientOptions {
     }
 }
 
+/// Splits the string once on the first instance of the given delimiter. If the delimiter is not
+/// present, returns the entire string as the "left" side.
+///
+/// e.g.
+/// "abc.def" split on "." -> ("abc", Some("def"))
+/// "ab.cd.ef" split on "." -> ("ab", Some("cd.ef"))
+/// "abcdef" split on "." -> ("abcdef", None)
+fn split_once_left<'a>(s: &'a str, delimiter: &str) -> (&'a str, Option<&'a str>) {
+    match s.split_once(delimiter) {
+        Some((l, r)) => (l, Some(r)),
+        None => (s, None),
+    }
+}
+
+/// Splits the string once on the last instance of the given delimiter. If the delimiter is not
+/// present, returns the entire string as the "right" side.
+///
+/// e.g.
+/// "abd.def" split on "." -> (Some("abc"), "def")
+/// "ab.cd.ef" split on "." -> (Some("ab.cd"), "ef")
+/// "abcdef" split on "." -> (None, "abcdef")
+fn split_once_right<'a>(s: &'a str, delimiter: &str) -> (Option<&'a str>, &'a str) {
+    match s.rsplit_once(delimiter) {
+        Some((l, r)) => (Some(l), r),
+        None => (None, s),
+    }
+}
+
 /// Splits a string into a section before a given index and a section exclusively after the index.
 /// Empty portions are returned as `None`.
 fn exclusive_split_at(s: &str, i: usize) -> (Option<&str>, Option<&str>) {
@@ -1390,116 +1418,51 @@ impl ConnectionString {
     /// malformed or one of the options has an invalid value, an error will be returned.
     pub fn parse(s: impl AsRef<str>) -> Result<Self> {
         let s = s.as_ref();
-        let end_of_scheme = match s.find("://") {
-            Some(index) => index,
-            None => {
-                return Err(ErrorKind::InvalidArgument {
-                    message: "connection string contains no scheme".to_string(),
-                }
-                .into())
-            }
-        };
 
-        let srv = match &s[..end_of_scheme] {
-            "mongodb" => false,
-            "mongodb+srv" => true,
-            _ => {
-                return Err(ErrorKind::InvalidArgument {
-                    message: format!("invalid connection string scheme: {}", &s[..end_of_scheme]),
-                }
-                .into())
-            }
-        };
-        #[cfg(not(feature = "dns-resolver"))]
-        if srv {
+        let Some((scheme, after_scheme)) = s.split_once("://") else {
             return Err(Error::invalid_argument(
-                "mongodb+srv connection strings cannot be used when the 'dns-resolver' feature is \
-                 disabled",
+                "connection string contains no scheme",
             ));
-        }
+        };
 
-        let after_scheme = &s[end_of_scheme + 3..];
-
-        let (pre_slash, post_slash) = match after_scheme.find('/') {
-            Some(slash_index) => match exclusive_split_at(after_scheme, slash_index) {
-                (Some(section), o) => (section, o),
-                (None, _) => {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "missing hosts".to_string(),
-                    }
-                    .into())
-                }
-            },
-            None => {
-                if after_scheme.find('?').is_some() {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "Missing delimiting slash between hosts and options".to_string(),
-                    }
-                    .into());
-                }
-                (after_scheme, None)
+        let srv = match scheme {
+            "mongodb" => false,
+            #[cfg(feature = "dns-resolver")]
+            "mongodb+srv" => true,
+            #[cfg(not(feature = "dns-resolver"))]
+            "mongodb+srv" => {
+                return Err(Error::invalid_argument(
+                    "mongodb+srv connection strings cannot be used when the 'dns-resolver' \
+                     feature is disabled",
+                ))
+            }
+            other => {
+                return Err(Error::invalid_argument(format!(
+                    "unsupported connection string scheme: {}",
+                    other
+                )))
             }
         };
 
-        let (database, options_section) = match post_slash {
-            Some(section) => match section.find('?') {
-                Some(index) => exclusive_split_at(section, index),
-                None => (post_slash, None),
-            },
+        let (pre_options, options) = split_once_left(after_scheme, "?");
+        let (user_info, hosts_and_auth_db) = split_once_right(pre_options, "@");
+
+        // if '@' is in the host section, it MUST be interpreted as a request for authentication
+        let authentication_requested = user_info.is_some();
+        let (username, password) = match user_info {
+            Some(user_info) => {
+                let (username, password) = split_once_left(user_info, ":");
+                (Some(username), password)
+            }
             None => (None, None),
         };
 
-        let db = match database {
-            Some(db) => {
-                let decoded = percent_decode(db, "database name must be URL encoded")?;
-                if decoded
-                    .chars()
-                    .any(|c| ILLEGAL_DATABASE_CHARACTERS.contains(&c))
-                {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "illegal character in database name".to_string(),
-                    }
-                    .into());
-                }
-                Some(decoded)
-            }
-            None => None,
-        };
+        let (hosts, auth_db) = split_once_left(hosts_and_auth_db, "/");
 
-        let (authentication_requested, cred_section, hosts_section) = match pre_slash.rfind('@') {
-            Some(index) => {
-                // if '@' is in the host section, it MUST be interpreted as a request for
-                // authentication, even if the credentials are empty.
-                let (creds, hosts) = exclusive_split_at(pre_slash, index);
-                match hosts {
-                    Some(hs) => (true, creds, hs),
-                    None => {
-                        return Err(ErrorKind::InvalidArgument {
-                            message: "missing hosts".to_string(),
-                        }
-                        .into())
-                    }
-                }
-            }
-            None => (false, None, pre_slash),
-        };
-
-        let (username, password) = match cred_section {
-            Some(creds) => match creds.find(':') {
-                Some(index) => match exclusive_split_at(creds, index) {
-                    (username, None) => (username, Some("")),
-                    (username, password) => (username, password),
-                },
-                None => (Some(creds), None), // Lack of ":" implies whole string is username
-            },
-            None => (None, None),
-        };
-
-        let hosts = hosts_section
-            .split(',')
+        let hosts = hosts
+            .split(",")
             .map(ServerAddress::parse)
             .collect::<Result<Vec<ServerAddress>>>()?;
-
         let host_info = if !srv {
             HostInfo::HostIdentifiers(hosts)
         } else {
@@ -1527,6 +1490,23 @@ impl ConnectionString {
             }
         };
 
+        let db = match auth_db {
+            Some("") => None,
+            Some(db) => {
+                let decoded = percent_decode(db, "database name must be URL encoded")?;
+                for c in decoded.chars() {
+                    if ILLEGAL_DATABASE_CHARACTERS.contains(&c) {
+                        return Err(Error::invalid_argument(format!(
+                            "illegal character in database name: {}",
+                            c
+                        )));
+                    }
+                }
+                Some(decoded)
+            }
+            None => None,
+        };
+
         let mut conn_str = ConnectionString {
             host_info,
             #[cfg(test)]
@@ -1534,10 +1514,9 @@ impl ConnectionString {
             ..Default::default()
         };
 
-        let mut parts = if let Some(opts) = options_section {
-            conn_str.parse_options(opts)?
-        } else {
-            ConnectionStringParts::default()
+        let mut parts = match options {
+            Some(options) => conn_str.parse_options(options)?,
+            None => ConnectionStringParts::default(),
         };
 
         if conn_str.srv_service_name.is_some() && !srv {
