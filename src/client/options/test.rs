@@ -180,16 +180,6 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                 }
 
                 if let Some(test_auth) = test_case.auth {
-                    if !test_auth.matches_client_options(&client_options) {
-                        dbg!("{}", &test_auth);
-                        dbg!(
-                            "{}",
-                            &client_options
-                                .credential
-                                .as_ref()
-                                .and_then(|c| c.source.as_ref())
-                        );
-                    }
                     assert!(
                         test_auth.matches_client_options(&client_options),
                         "{}",
