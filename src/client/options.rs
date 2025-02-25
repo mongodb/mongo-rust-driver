@@ -1366,12 +1366,16 @@ fn percent_decode(s: &str, err_message: &str) -> Result<String> {
     }
 }
 
-fn validate_userinfo(s: &str, userinfo_type: &str) -> Result<()> {
+fn validate_and_parse_userinfo(s: &str, userinfo_type: &str) -> Result<Option<String>> {
+    if s.is_empty() {
+        return Ok(None);
+    }
+
     if s.chars().any(|c| USERINFO_RESERVED_CHARACTERS.contains(&c)) {
-        return Err(ErrorKind::InvalidArgument {
-            message: format!("{} must be URL encoded", userinfo_type),
-        }
-        .into());
+        return Err(Error::invalid_argument(format!(
+            "{} must be URL encoded",
+            userinfo_type
+        )));
     }
 
     // All instances of '%' in the username must be part of an percent-encoded substring. This means
@@ -1380,13 +1384,17 @@ fn validate_userinfo(s: &str, userinfo_type: &str) -> Result<()> {
         .skip(1)
         .any(|part| part.len() < 2 || part[0..2].chars().any(|c| !c.is_ascii_hexdigit()))
     {
-        return Err(ErrorKind::InvalidArgument {
-            message: "username/password cannot contain unescaped %".to_string(),
-        }
-        .into());
+        return Err(Error::invalid_argument(format!(
+            "{} cannot contain unescaped %",
+            userinfo_type
+        )));
     }
 
-    Ok(())
+    Some(percent_decode(
+        s,
+        &format!("{} must be URL encoded", userinfo_type),
+    ))
+    .transpose()
 }
 
 impl TryFrom<&str> for ConnectionString {
@@ -1452,7 +1460,12 @@ impl ConnectionString {
         let (username, password) = match user_info {
             Some(user_info) => {
                 let (username, password) = split_once_left(user_info, ":");
-                (Some(username), password)
+                let username = validate_and_parse_userinfo(username, "username")?;
+                let password = match password {
+                    Some(password) => validate_and_parse_userinfo(password, "password")?,
+                    None => None,
+                };
+                (username, password)
             }
             None => (None, None),
         };
@@ -1545,18 +1558,11 @@ impl ConnectionString {
             }
         }
 
-        // Set username and password.
-        if let Some(u) = username {
+        if let Some(username) = username {
             let credential = conn_str.credential.get_or_insert_with(Default::default);
-            validate_userinfo(u, "username")?;
-            let decoded_u = percent_decode(u, "username must be URL encoded")?;
-
-            credential.username = Some(decoded_u);
-
-            if let Some(pass) = password {
-                validate_userinfo(pass, "password")?;
-                let decoded_p = percent_decode(pass, "password must be URL encoded")?;
-                credential.password = Some(decoded_p)
+            credential.username = Some(username);
+            if let Some(password) = password {
+                credential.password = Some(password)
             }
         }
 
