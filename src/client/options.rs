@@ -1556,9 +1556,7 @@ impl ConnectionString {
         if let Some(username) = username {
             let credential = conn_str.credential.get_or_insert_with(Default::default);
             credential.username = Some(username);
-            if let Some(password) = password {
-                credential.password = Some(password)
-            }
+            credential.password = password;
         }
 
         if parts.auth_source.as_deref() == Some("") {
