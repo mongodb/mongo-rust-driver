@@ -1367,10 +1367,6 @@ fn percent_decode(s: &str, err_message: &str) -> Result<String> {
 }
 
 fn validate_and_parse_userinfo(s: &str, userinfo_type: &str) -> Result<Option<String>> {
-    if s.is_empty() {
-        return Ok(None);
-    }
-
     if s.chars().any(|c| USERINFO_RESERVED_CHARACTERS.contains(&c)) {
         return Err(Error::invalid_argument(format!(
             "{} must be URL encoded",
@@ -1460,7 +1456,11 @@ impl ConnectionString {
         let (username, password) = match user_info {
             Some(user_info) => {
                 let (username, password) = split_once_left(user_info, ":");
-                let username = validate_and_parse_userinfo(username, "username")?;
+                let username = if username.is_empty() {
+                    None
+                } else {
+                    validate_and_parse_userinfo(username, "username")?
+                };
                 let password = match password {
                     Some(password) => validate_and_parse_userinfo(password, "password")?,
                     None => None,
