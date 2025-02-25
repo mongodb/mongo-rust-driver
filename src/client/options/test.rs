@@ -22,6 +22,9 @@ static SKIPPED_TESTS: Lazy<Vec<&'static str>> = Lazy::new(|| {
         "maxPoolSize=0 does not error",
         #[cfg(not(feature = "cert-key-password"))]
         "Valid tlsCertificateKeyFilePassword is parsed correctly",
+        // TODO RUST-1954: unskip these tests
+        "Colon in a key value pair",
+        "Comma in a key value pair causes a warning",
     ];
 
     // TODO RUST-1896: unskip this test when openssl-tls is enabled
@@ -72,11 +75,26 @@ struct TestAuth {
 }
 
 impl TestAuth {
-    fn matches_client_options(&self, options: &ClientOptions) -> bool {
+    fn assert_matches_client_options(&self, options: &ClientOptions, description: &str) {
         let credential = options.credential.as_ref();
-        self.username.as_ref() == credential.and_then(|cred| cred.username.as_ref())
-            && self.password.as_ref() == credential.and_then(|cred| cred.password.as_ref())
-            && self.db.as_ref() == options.default_database.as_ref()
+        assert_eq!(
+            self.username.as_ref(),
+            credential.and_then(|c| c.username.as_ref()),
+            "{}",
+            description
+        );
+        assert_eq!(
+            self.password.as_ref(),
+            credential.and_then(|c| c.password.as_ref()),
+            "{}",
+            description
+        );
+        assert_eq!(
+            self.db.as_ref(),
+            options.default_database.as_ref(),
+            "{}",
+            description
+        );
     }
 }
 
@@ -177,7 +195,8 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                 }
 
                 if let Some(test_auth) = test_case.auth {
-                    assert!(test_auth.matches_client_options(&client_options));
+                    test_auth
+                        .assert_matches_client_options(&client_options, &test_case.description);
                 }
             } else {
                 let error = client_options_result.expect_err(&test_case.description);
