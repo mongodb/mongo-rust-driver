@@ -1366,7 +1366,7 @@ fn percent_decode(s: &str, err_message: &str) -> Result<String> {
     }
 }
 
-fn validate_and_parse_userinfo(s: &str, userinfo_type: &str) -> Result<Option<String>> {
+fn validate_and_parse_userinfo(s: &str, userinfo_type: &str) -> Result<String> {
     if s.chars().any(|c| USERINFO_RESERVED_CHARACTERS.contains(&c)) {
         return Err(Error::invalid_argument(format!(
             "{} must be URL encoded",
@@ -1386,11 +1386,7 @@ fn validate_and_parse_userinfo(s: &str, userinfo_type: &str) -> Result<Option<St
         )));
     }
 
-    Some(percent_decode(
-        s,
-        &format!("{} must be URL encoded", userinfo_type),
-    ))
-    .transpose()
+    percent_decode(s, &format!("{} must be URL encoded", userinfo_type))
 }
 
 impl TryFrom<&str> for ConnectionString {
@@ -1459,10 +1455,10 @@ impl ConnectionString {
                 let username = if username.is_empty() {
                     None
                 } else {
-                    validate_and_parse_userinfo(username, "username")?
+                    Some(validate_and_parse_userinfo(username, "username")?)
                 };
                 let password = match password {
-                    Some(password) => validate_and_parse_userinfo(password, "password")?,
+                    Some(password) => Some(validate_and_parse_userinfo(password, "password")?),
                     None => None,
                 };
                 (username, password)
@@ -1504,7 +1500,7 @@ impl ConnectionString {
         };
 
         let db = match auth_db {
-            Some("") => None,
+            Some("") | None => None,
             Some(db) => {
                 let decoded = percent_decode(db, "database name must be URL encoded")?;
                 for c in decoded.chars() {
@@ -1517,7 +1513,6 @@ impl ConnectionString {
                 }
                 Some(decoded)
             }
-            None => None,
         };
 
         let mut conn_str = ConnectionString {
