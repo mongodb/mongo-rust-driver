@@ -22,9 +22,6 @@ static SKIPPED_TESTS: Lazy<Vec<&'static str>> = Lazy::new(|| {
         "maxPoolSize=0 does not error",
         #[cfg(not(feature = "cert-key-password"))]
         "Valid tlsCertificateKeyFilePassword is parsed correctly",
-        // TODO RUST-1954: unskip these tests
-        "Colon in a key value pair",
-        "Comma in a key value pair causes a warning",
     ];
 
     // TODO RUST-1896: unskip this test when openssl-tls is enabled

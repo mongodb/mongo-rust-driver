@@ -1345,17 +1345,6 @@ fn split_once_right<'a>(s: &'a str, delimiter: &str) -> (Option<&'a str>, &'a st
     }
 }
 
-/// Splits a string into a section before a given index and a section exclusively after the index.
-/// Empty portions are returned as `None`.
-fn exclusive_split_at(s: &str, i: usize) -> (Option<&str>, Option<&str>) {
-    let (l, r) = s.split_at(i);
-
-    let lout = if !l.is_empty() { Some(l) } else { None };
-    let rout = if r.len() > 1 { Some(&r[1..]) } else { None };
-
-    (lout, rout)
-}
-
 fn percent_decode(s: &str, err_message: &str) -> Result<String> {
     match percent_encoding::percent_decode_str(s).decode_utf8() {
         Ok(result) => Ok(result.to_string()),
@@ -1817,47 +1806,26 @@ impl ConnectionString {
             }
             "authsource" => parts.auth_source = Some(value.to_string()),
             "authmechanismproperties" => {
-                let mut doc = Document::new();
-                let err_func = || {
-                    ErrorKind::InvalidArgument {
-                        message: "improperly formatted authMechanismProperties".to_string(),
-                    }
-                    .into()
-                };
+                let mut properties = Document::new();
 
-                for kvp in value.split(',') {
-                    match kvp.find(':') {
-                        Some(index) => {
-                            let (k, v) = exclusive_split_at(kvp, index);
-                            let key = k.ok_or_else(err_func)?;
-                            match key {
-                                "ALLOWED_HOSTS" => {
-                                    return Err(Error::invalid_argument(
-                                        "ALLOWED_HOSTS must only be specified through client \
-                                         options",
-                                    ));
-                                }
-                                "OIDC_CALLBACK" => {
-                                    return Err(Error::invalid_argument(
-                                        "OIDC_CALLBACK must only be specified through client \
-                                         options",
-                                    ));
-                                }
-                                "OIDC_HUMAN_CALLBACK" => {
-                                    return Err(Error::invalid_argument(
-                                        "OIDC_HUMAN_CALLBACK must only be specified through \
-                                         client options",
-                                    ));
-                                }
-                                _ => {}
-                            }
-                            let value = v.ok_or_else(err_func)?;
-                            doc.insert(key, value);
-                        }
-                        None => return Err(err_func()),
+                for property in value.split(",") {
+                    let Some((k, v)) = property.split_once(":") else {
+                        return Err(Error::invalid_argument(format!(
+                            "each entry in authMechanismProperties must be a colon-separated \
+                             key-value pair, got {}",
+                            property
+                        )));
                     };
+                    if k == "ALLOWED_HOSTS" || k == "OIDC_CALLBACK" || k == "OIDC_HUMAN_CALLBACK" {
+                        return Err(Error::invalid_argument(format!(
+                            "{} must only be specified through client options",
+                            k
+                        )));
+                    }
+                    properties.insert(k, v);
                 }
-                parts.auth_mechanism_properties = Some(doc);
+
+                parts.auth_mechanism_properties = Some(properties);
             }
             #[cfg(any(
                 feature = "zstd-compression",
