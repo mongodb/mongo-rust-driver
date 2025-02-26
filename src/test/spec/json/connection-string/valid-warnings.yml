@@ -86,6 +86,3 @@ tests:
         auth: ~
         options:
             authMechanism: MONGODB-OIDC
-            authmechanismProperties:
-                TOKEN_RESOURCE: 'mongodb://test-cluster'
-                ENVIRONMENT: azure
