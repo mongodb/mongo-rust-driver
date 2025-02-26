@@ -3,18 +3,16 @@
 set +x          # Disable debug trace
 set -o errexit  # Exit the script with error if any of the commands fail
 
+source .evergreen/env.sh
+source .evergreen/cargo-test.sh
+
+CARGO_OPTIONS+=("--ignore-default-filter")
+
 echo "Running MONGODB-OIDC authentication tests"
 
 OIDC_ENV=${OIDC_ENV:-"test"}
 
-export TEST_AUTH_OIDC=1
-export COVERAGE=1
-export AUTH="auth"
-
 if [ $OIDC_ENV == "test" ]; then
-
-    source .evergreen/env.sh
-    source .evergreen/cargo-test.sh
     # Make sure DRIVERS_TOOLS is set.
     if [ -z "$DRIVERS_TOOLS" ]; then
         echo "Must specify DRIVERS_TOOLS"
@@ -22,9 +20,8 @@ if [ $OIDC_ENV == "test" ]; then
     fi
     source ${DRIVERS_TOOLS}/.evergreen/auth_oidc/secrets-export.sh
 
-    cargo nextest run test::spec::oidc::basic --no-capture --profile ci
-    RESULT=$?
-    cp target/nextest/ci/junit.xml results.xml
+    cargo_test test::spec::oidc::basic
+    RESULT=$CARGO_RESULT
 elif [ $OIDC_ENV == "azure" ]; then
     source ./env.sh
 
