@@ -71,6 +71,9 @@ pub struct ChangeStreamEvent<T> {
     /// Identifies the collection or database on which the event occurred.
     pub ns: Option<ChangeNamespace>,
 
+    /// The type of the newly created object.  Only included for `OperationType::Create`.
+    pub ns_type: Option<ChangeNamespaceType>,
+
     /// The new name for the `ns` collection.  Only included for `OperationType::Rename`.
     pub to: Option<ChangeNamespace>,
 
@@ -267,4 +270,19 @@ pub struct ChangeNamespace {
 
     /// The name of the collection in which the change occurred.
     pub coll: Option<String>,
+}
+
+/// Identifies the type of object for a `create` event.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ChangeNamespaceType {
+    /// A collection with no special options set.
+    Collection,
+    /// A timeseries collection.
+    Timeseries,
+    /// A view collection.
+    View,
+    /// Forward compatibility fallthrough.
+    #[serde(untagged)]
+    Other(String),
 }
