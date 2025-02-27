@@ -286,7 +286,7 @@ buildvariants:
       - test-k8s-oidc-task-group
 
   - name: oidc-macos
-    display_name: "OIDC Macos"
+    display_name: "OIDC MacOS"
     patchable: true
     run_on:
       - macos-14
