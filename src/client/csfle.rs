@@ -99,6 +99,7 @@ impl ClientState {
         let mut builder = Crypt::builder()
             .kms_providers(&opts.kms_providers.credentials_doc()?)?
             .use_need_kms_credentials_state()
+            .retry_kms(true)?
             .use_range_v2()?;
         if let Some(m) = &opts.schema_map {
             builder = builder.schema_map(&bson::to_document(m)?)?;
@@ -120,6 +121,16 @@ impl ClientState {
         }
         if opts.bypass_query_analysis == Some(true) {
             builder = builder.bypass_query_analysis();
+        }
+        if let Some(key_cache_expiration) = opts.key_cache_expiration {
+            let expiration_ms: u64 = key_cache_expiration.as_millis().try_into().map_err(|_| {
+                Error::invalid_argument(format!(
+                    "key_cache_expiration must not exceed {} milliseconds, got {:?}",
+                    u64::MAX,
+                    key_cache_expiration
+                ))
+            })?;
+            builder = builder.key_cache_expiration(expiration_ms)?;
         }
         let crypt = builder.build()?;
         if opts.extra_option(&EO_CRYPT_SHARED_REQUIRED)? == Some(true)

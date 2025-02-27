@@ -345,6 +345,12 @@ pub(crate) struct ClientEncryptionOpts {
     pub(crate) key_vault_client: String,
     pub(crate) key_vault_namespace: crate::Namespace,
     pub(crate) kms_providers: HashMap<mongocrypt::ctx::KmsProvider, Document>,
+    #[serde(
+        default,
+        rename = "keyExpirationMS",
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis"
+    )]
+    pub(crate) key_cache_expiration: Option<Duration>,
 }
 
 /// Messages used for communicating with test runner "threads".

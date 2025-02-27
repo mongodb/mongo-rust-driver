@@ -173,6 +173,11 @@ async fn write_error_batches() {
         log_uncaptured("skipping write_error_batches: bulkWrite requires 8.0+");
         return;
     }
+    // TODO RUST-2131
+    if client.is_load_balanced() {
+        log_uncaptured("skipping write_error_batches: load-balanced topology");
+        return;
+    }
 
     let max_write_batch_size = client.server_info.max_write_batch_size.unwrap() as usize;
 
@@ -230,6 +235,11 @@ async fn successful_cursor_iteration() {
         log_uncaptured("skipping successful_cursor_iteration: bulkWrite requires 8.0+");
         return;
     }
+    // TODO RUST-2131
+    if client.is_load_balanced() {
+        log_uncaptured("skipping successful_cursor_iteration: load-balanced topology");
+        return;
+    }
 
     let max_bson_object_size = client.server_info.max_bson_object_size as usize;
 
@@ -269,6 +279,11 @@ async fn cursor_iteration_in_a_transaction() {
             "skipping cursor_iteration_in_a_transaction: bulkWrite requires 8.0+, transactions \
              require a non-standalone topology",
         );
+        return;
+    }
+    // TODO RUST-2131
+    if client.is_load_balanced() {
+        log_uncaptured("skipping cursor_iteration_in_a_transaction: load-balanced topology");
         return;
     }
 
@@ -319,6 +334,11 @@ async fn failed_cursor_iteration() {
 
     if client.server_version_lt(8, 0) {
         log_uncaptured("skipping failed_cursor_iteration: bulkWrite requires 8.0+");
+        return;
+    }
+    // TODO RUST-2131
+    if client.is_load_balanced() {
+        log_uncaptured("skipping failed_cursor_iteration: load-balanced topology");
         return;
     }
 

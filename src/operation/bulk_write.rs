@@ -51,7 +51,7 @@ impl<'a, R> BulkWrite<'a, R>
 where
     R: BulkWriteResult,
 {
-    pub(crate) async fn new(
+    pub(crate) fn new(
         client: Client,
         models: &'a [WriteModel],
         offset: usize,
@@ -260,7 +260,7 @@ where
     fn handle_response_async<'b>(
         &'b self,
         response: RawCommandResponse,
-        context: ExecutionContext<'b>,
+        mut context: ExecutionContext<'b>,
     ) -> BoxFuture<'b, Result<Self::O>> {
         async move {
             let response: WriteResponseBody<Response> = response.body()?;
@@ -292,9 +292,12 @@ where
                 None,
                 self.options.and_then(|options| options.comment.clone()),
             );
-            let pinned_connection = self
-                .client
-                .pin_connection_for_cursor(&specification, context.connection)?;
+
+            let pinned_connection = self.client.pin_connection_for_cursor(
+                &specification,
+                context.connection,
+                context.session.as_deref_mut(),
+            )?;
             let iteration_result = match context.session {
                 Some(session) => {
                     let mut session_cursor =

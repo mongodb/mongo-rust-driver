@@ -3,6 +3,8 @@
 mod create_data_key;
 mod encrypt;
 
+use std::time::Duration;
+
 use mongocrypt::{ctx::KmsProvider, Crypt};
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
@@ -22,6 +24,7 @@ use crate::{
 
 use super::{options::KmsProviders, state_machine::CryptExecutor};
 
+pub use super::client_builder::EncryptedClientBuilder;
 pub use crate::action::csfle::encrypt::{EncryptKey, RangeOptions};
 
 /// A handle to the key vault.  Used to create data encryption keys, and to explicitly encrypt and
@@ -60,31 +63,44 @@ impl ClientEncryption {
         key_vault_namespace: Namespace,
         kms_providers: impl IntoIterator<Item = (KmsProvider, bson::Document, Option<TlsOptions>)>,
     ) -> Result<Self> {
-        let kms_providers = KmsProviders::new(kms_providers)?;
-        let crypt = Crypt::builder()
-            .kms_providers(&kms_providers.credentials_doc()?)?
-            .use_need_kms_credentials_state()
-            .use_range_v2()?
-            .build()?;
-        let exec = CryptExecutor::new_explicit(
-            key_vault_client.weak(),
-            key_vault_namespace.clone(),
-            kms_providers,
-        )?;
-        let key_vault = key_vault_client
-            .database(&key_vault_namespace.db)
-            .collection_with_options(
-                &key_vault_namespace.coll,
-                CollectionOptions::builder()
-                    .write_concern(WriteConcern::majority())
-                    .read_concern(ReadConcern::majority())
-                    .build(),
-            );
-        Ok(ClientEncryption {
-            crypt,
-            exec,
-            key_vault,
-        })
+        Self::builder(key_vault_client, key_vault_namespace, kms_providers).build()
+    }
+
+    /// Initialize a builder to construct a [`ClientEncryption`]. Methods on
+    /// [`ClientEncryptionBuilder`] can be chained to set options.
+    ///
+    /// ```no_run
+    /// # use bson::doc;
+    /// # use mongocrypt::ctx::KmsProvider;
+    /// # use mongodb::client_encryption::ClientEncryption;
+    /// # use mongodb::error::Result;
+    /// # fn func() -> Result<()> {
+    /// # let kv_client = todo!();
+    /// # let kv_namespace = todo!();
+    /// # let local_key = doc! { };
+    /// let enc = ClientEncryption::builder(
+    ///     kv_client,
+    ///     kv_namespace,
+    ///     [
+    ///         (KmsProvider::Local, doc! { "key": local_key }, None),
+    ///         (KmsProvider::Kmip, doc! { "endpoint": "localhost:5698" }, None),
+    ///     ]
+    /// )
+    /// .build()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn builder(
+        key_vault_client: Client,
+        key_vault_namespace: Namespace,
+        kms_providers: impl IntoIterator<Item = (KmsProvider, bson::Document, Option<TlsOptions>)>,
+    ) -> ClientEncryptionBuilder {
+        ClientEncryptionBuilder {
+            key_vault_client,
+            key_vault_namespace,
+            kms_providers: kms_providers.into_iter().collect(),
+            key_cache_expiration: None,
+        }
     }
 
     // pub async fn rewrap_many_data_key(&self, _filter: Document, _opts: impl
@@ -184,6 +200,68 @@ impl ClientEncryption {
             .get("v")?
             .ok_or_else(|| Error::internal("invalid decryption result"))?
             .to_raw_bson())
+    }
+}
+
+/// Builder for constructing a [`ClientEncryption`]. Construct by calling
+/// [`ClientEncryption::builder`].
+pub struct ClientEncryptionBuilder {
+    key_vault_client: Client,
+    key_vault_namespace: Namespace,
+    kms_providers: Vec<(KmsProvider, bson::Document, Option<TlsOptions>)>,
+    key_cache_expiration: Option<Duration>,
+}
+
+impl ClientEncryptionBuilder {
+    /// Set the duration of time after which the data encryption key cache should expire. Defaults
+    /// to 60 seconds if unset.
+    pub fn key_cache_expiration(mut self, expiration: impl Into<Option<Duration>>) -> Self {
+        self.key_cache_expiration = expiration.into();
+        self
+    }
+
+    /// Build the [`ClientEncryption`].
+    pub fn build(self) -> Result<ClientEncryption> {
+        let kms_providers = KmsProviders::new(self.kms_providers)?;
+
+        let mut crypt_builder = Crypt::builder()
+            .kms_providers(&kms_providers.credentials_doc()?)?
+            .use_need_kms_credentials_state()
+            .use_range_v2()?
+            .retry_kms(true)?;
+        if let Some(key_cache_expiration) = self.key_cache_expiration {
+            let expiration_ms: u64 = key_cache_expiration.as_millis().try_into().map_err(|_| {
+                Error::invalid_argument(format!(
+                    "key_cache_expiration must not exceed {} milliseconds, got {:?}",
+                    u64::MAX,
+                    key_cache_expiration
+                ))
+            })?;
+            crypt_builder = crypt_builder.key_cache_expiration(expiration_ms)?;
+        }
+        let crypt = crypt_builder.build()?;
+
+        let exec = CryptExecutor::new_explicit(
+            self.key_vault_client.weak(),
+            self.key_vault_namespace.clone(),
+            kms_providers,
+        )?;
+        let key_vault = self
+            .key_vault_client
+            .database(&self.key_vault_namespace.db)
+            .collection_with_options(
+                &self.key_vault_namespace.coll,
+                CollectionOptions::builder()
+                    .write_concern(WriteConcern::majority())
+                    .read_concern(ReadConcern::majority())
+                    .build(),
+            );
+
+        Ok(ClientEncryption {
+            crypt,
+            exec,
+            key_vault,
+        })
     }
 }
 

@@ -291,9 +291,10 @@ buildvariants:
       AUTH: auth
       SSL: ssl
     tasks:
-      - testoidc_task_group
-      - testazureoidc_task_group
-      - testgcpoidc_task_group
+      - test-oidc-task-group
+      - test-azure-oidc-task-group
+      - test-gcp-oidc-task-group
+      - test-k8s-oidc-task-group
 
   - name: oidc-macos
     display_name: "OIDC Macos"
@@ -304,7 +305,7 @@ buildvariants:
       AUTH: auth
       SSL: ssl
     tasks:
-      - testoidc_task_group
+      - test-oidc-task-group
 
   - name: oidc-windows
     disable: true
@@ -316,9 +317,9 @@ buildvariants:
       AUTH: auth
       SSL: ssl
     tasks:
-      - testoidc_task_group
-      - testazureoidc_task_group
-      - testgcpoidc_task_group
+      - test-oidc-task-group
+      - test-azure-oidc-task-group
+      - test-gcp-oidc-task-group
 
   - name: in-use-encryption
     display_name: "In-Use Encryption"
@@ -636,7 +637,7 @@ task_groups:
     tasks:
       - test-aws-lambda-deployed
 
-  - name: testoidc_task_group
+  - name: test-oidc-task-group
     setup_group:
       - func: fetch source
       - func: create expansions
@@ -665,7 +666,7 @@ task_groups:
     tasks:
       - oidc-auth-test-latest
 
-  - name: testazureoidc_task_group
+  - name: test-azure-oidc-task-group
     setup_group:
       - func: fetch source
       - func: create expansions
@@ -673,6 +674,7 @@ task_groups:
       - func: fix absolute paths
       - func: init test-results
       - func: make files executable
+      - func: install rust
       - command: subprocess.exec
         params:
           binary: bash
@@ -691,7 +693,7 @@ task_groups:
     tasks:
       - oidc-auth-test-azure-latest
 
-  - name: testgcpoidc_task_group
+  - name: test-gcp-oidc-task-group
     setup_group:
       - func: fetch source
       - func: create expansions
@@ -699,6 +701,7 @@ task_groups:
       - func: fix absolute paths
       - func: init test-results
       - func: make files executable
+      - func: install rust
       - command: subprocess.exec
         params:
           binary: bash
@@ -716,6 +719,31 @@ task_groups:
     setup_group_timeout_secs: 1800
     tasks:
       - oidc-auth-test-gcp-latest
+
+  - name: test-k8s-oidc-task-group
+    setup_group:
+      - func: fetch source
+      - func: create expansions
+      - func: prepare resources
+      - func: fix absolute paths
+      - func: init test-results
+      - func: make files executable
+      - func: install rust
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/setup.sh
+    teardown_task:
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/teardown.sh
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800
+    tasks:
+      - oidc-auth-test-k8s-latest
 
   - name: happy-eyeballs-task-group
     setup_group_can_fail_task: true
@@ -1156,59 +1184,52 @@ tasks:
 
   - name: "oidc-auth-test-azure-latest"
     commands:
-    - command: shell.exec
+    - func: "build static test tarball"
+      vars:
+        BUILD_FEATURES: "--features azure-oidc"
+    - command: subprocess.exec
+      type: test
       params:
         working_dir: src
-        shell: bash
-        script: |-
-          set -o errexit
-          ${PREPARE_SHELL}
-           ./.evergreen/install-dependencies.sh rust
-          source .cargo/env
-          export AZUREOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tar
-          rustup default stable
-          export RUSTFLAGS="-C target-feature=+crt-static"
-          cargo test --features azure-oidc --target x86_64-unknown-linux-gnu get_exe_name -- --ignored
-          export TEST_FILE=$(cat exe_name.txt)
-          rm "$AZUREOIDC_DRIVERS_TAR_FILE" || true
-          tar -cf $AZUREOIDC_DRIVERS_TAR_FILE $TEST_FILE
-          tar -uf $AZUREOIDC_DRIVERS_TAR_FILE ./.evergreen
-          rm "$AZUREOIDC_DRIVERS_TAR_FILE".gz || true
-          gzip $AZUREOIDC_DRIVERS_TAR_FILE
-          export AZUREOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tar.gz
-          # Define the command to run on the azure VM.
-          # Ensure that we source the environment file created for us, set up any other variables we need,
-          # and then run our test suite on the vm.
-          export AZUREOIDC_TEST_CMD="ls -laR data && PROJECT_DIRECTORY='.' OIDC_ENV=azure OIDC=oidc TEST_FILE=./$TEST_FILE ./.evergreen/run-mongodb-oidc-test.sh"
-          bash $DRIVERS_TOOLS/.evergreen/auth_oidc/azure/run-driver-test.sh
+        binary: bash
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/azure/run-driver-test.sh
+        env:
+          AZUREOIDC_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
+          AZUREOIDC_TEST_CMD: "ls -laR data && PROJECT_DIRECTORY='.' OIDC_ENV=azure OIDC=oidc TEST_FILE=./${STATIC_TEST_BINARY} ./.evergreen/run-mongodb-oidc-test.sh"
 
   - name: "oidc-auth-test-gcp-latest"
     commands:
-    - command: shell.exec
+    - func: "build static test tarball"
+      vars:
+        BUILD_FEATURES: "--features gcp-oidc"
+    - command: subprocess.exec
+      type: test
       params:
         working_dir: src
-        shell: bash
-        script: |-
-          set -o errexit
-          ${PREPARE_SHELL}
-          ./.evergreen/install-dependencies.sh rust
-          source .cargo/env
-          export GCPOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tar
-          rustup default stable
-          export RUSTFLAGS="-C target-feature=+crt-static"
-          cargo test --features gcp-oidc --target x86_64-unknown-linux-gnu test::atlas_planned_maintenance_testing::get_exe_name -- --ignored
-          export TEST_FILE=$(cat exe_name.txt)
-          rm "$GCPOIDC_DRIVERS_TAR_FILE" || true
-          tar -cf $GCPOIDC_DRIVERS_TAR_FILE $TEST_FILE
-          tar -uf $GCPOIDC_DRIVERS_TAR_FILE ./.evergreen
-          rm "$GCPOIDC_DRIVERS_TAR_FILE".gz || true
-          gzip $GCPOIDC_DRIVERS_TAR_FILE
-          export GCPOIDC_DRIVERS_TAR_FILE=/tmp/mongo-rust-driver.tar.gz
-          # Define the command to run on the gcp VM.
-          # Ensure that we source the environment file created for us, set up any other variables we need,
-          # and then run our test suite on the vm.
-          export GCPOIDC_TEST_CMD="ls -la && PROJECT_DIRECTORY='.' OIDC_ENV=gcp OIDC=oidc TEST_FILE=./$TEST_FILE ./.evergreen/run-mongodb-oidc-test.sh"
-          bash $DRIVERS_TOOLS/.evergreen/auth_oidc/gcp/run-driver-test.sh
+        binary: bash
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/gcp/run-driver-test.sh
+        env:
+          GCPOIDC_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
+          GCPOIDC_TEST_CMD: "ls -la && PROJECT_DIRECTORY='.' OIDC_ENV=gcp OIDC=oidc TEST_FILE=./${STATIC_TEST_BINARY} ./.evergreen/run-mongodb-oidc-test.sh"
+
+  - name: "oidc-auth-test-k8s-latest"
+    commands:
+    - func: "build static test tarball"
+    - command: ec2.assume_role
+      params:
+          role_arn: ${aws_test_secrets_role}
+          duration_seconds: 1800
+    - func: "run oidc k8s test"
+      vars:
+        VARIANT: eks
+    - func: "run oidc k8s test"
+      vars:
+        VARIANT: gke
+    - func: "run oidc k8s test"
+      vars:
+        VARIANT: aks
 
   - name: "test-happy-eyeballs"
     commands:
@@ -1510,6 +1531,8 @@ functions:
         include_expansions_in_env:
           - PROJECT_DIRECTORY
           - OPENSSL
+          - SINGLE_MONGOS_LB_URI
+          - MULTI_MONGOS_LB_URI
           - MONGODB_URI
           - MONGODB_API_VERSION
           - PATH
@@ -1925,3 +1948,56 @@ functions:
     - command: attach.xunit_results
       params:
         file: src/results.xml
+
+  "build static test tarball":
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/build-static-test-tarball.sh
+        include_expansions_in_env:
+          - PROJECT_DIRECTORY
+          - BUILD_FEATURES
+    - command: expansions.update
+      params:
+        file: src/static-test-tarball-expansion.yml
+  
+  "run oidc k8s test":
+  - command: subprocess.exec
+    params:
+      working_dir: src
+      binary: bash
+      args:
+        - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/setup-pod.sh
+      env:
+        K8S_VARIANT: ${VARIANT}
+      include_expansions_in_env:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - AWS_SESSION_TOKEN
+        - DRIVERS_TOOLS
+  - command: subprocess.exec
+    type: test
+    params:
+      working_dir: src
+      binary: bash
+      args:
+        - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/run-driver-test.sh
+      env:
+        K8S_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
+        K8S_TEST_CMD: "ls -la && PROJECT_DIRECTORY='.' OIDC_ENV=k8s OIDC=oidc TEST_FILE=./${STATIC_TEST_BINARY} ./.evergreen/run-mongodb-oidc-test.sh"
+      include_expansions_in_env:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - AWS_SESSION_TOKEN
+  - command: subprocess.exec
+    params:
+      working_dir: src
+      binary: bash
+      args:
+        - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/teardown-pod.sh
+      include_expansions_in_env:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - AWS_SESSION_TOKEN

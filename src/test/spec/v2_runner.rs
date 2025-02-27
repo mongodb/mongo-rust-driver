@@ -462,6 +462,7 @@ impl<'a> OpRunner<'a> {
                             .unwrap();
                         self.fail_point_guards.push(guard);
                     }
+                    "wait" => operation.execute().await,
                     other => panic!("unknown operation: {}", other),
                 }
                 return None;

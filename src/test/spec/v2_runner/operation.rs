@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::TryInto, fmt::Debug, ops::Deref};
+use std::{collections::HashMap, convert::TryInto, fmt::Debug, ops::Deref, time::Duration};
 
 use futures::{future::BoxFuture, stream::TryStreamExt, FutureExt};
 use serde::{de::Deserializer, Deserialize};
@@ -46,6 +46,10 @@ use crate::{
 use super::{OpRunner, OpSessions};
 
 pub(crate) trait TestOperation: Debug + Send + Sync {
+    fn execute(&self) -> BoxFuture<'_, ()> {
+        todo!()
+    }
+
     fn execute_on_collection<'a>(
         &'a self,
         _collection: &'a Collection<Document>,
@@ -287,6 +291,7 @@ impl<'de> Deserialize<'de> for Operation {
             "assertIndexNotExists" => deserialize_op::<AssertIndexNotExists>(definition.arguments),
             "watch" => deserialize_op::<Watch>(definition.arguments),
             "withTransaction" => deserialize_op::<WithTransaction>(definition.arguments),
+            "wait" => deserialize_op::<Wait>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -1445,6 +1450,21 @@ impl TestOperation for WithTransaction {
                 )
                 .await?;
             Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct Wait {
+    ms: u64,
+}
+
+impl TestOperation for Wait {
+    fn execute(&self) -> BoxFuture<'_, ()> {
+        async move {
+            let duration = Duration::from_millis(self.ms);
+            tokio::time::sleep(duration).await;
         }
         .boxed()
     }

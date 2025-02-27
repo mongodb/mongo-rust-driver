@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::{bson::Document, error::Result, options::ClientOptions, Client};
 
 use super::options::AutoEncryptionOptions;
@@ -98,6 +100,13 @@ impl EncryptedClientBuilder {
     #[cfg(test)]
     pub(crate) fn disable_crypt_shared(mut self, disable: bool) -> Self {
         self.enc_opts.disable_crypt_shared = Some(disable);
+        self
+    }
+
+    /// Set the duration of time after which the data encryption key cache should expire. Defaults
+    /// to 60 seconds if unset.
+    pub fn key_cache_expiration(mut self, expiration: impl Into<Option<Duration>>) -> Self {
+        self.enc_opts.key_cache_expiration = expiration.into();
         self
     }
 

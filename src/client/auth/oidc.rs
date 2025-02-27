@@ -7,29 +7,42 @@ use std::{
 use tokio::sync::Mutex;
 use typed_builder::TypedBuilder;
 
-#[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
-use crate::client::auth::{
-    AZURE_ENVIRONMENT_VALUE_STR,
-    ENVIRONMENT_PROP_STR,
-    GCP_ENVIRONMENT_VALUE_STR,
-    TOKEN_RESOURCE_PROP_STR,
-};
 use crate::{
-    client::{
-        auth::{
-            sasl::{SaslResponse, SaslStart},
-            AuthMechanism,
-            ALLOWED_HOSTS_PROP_STR,
-        },
-        options::{ServerAddress, ServerApi},
-    },
+    client::options::{ServerAddress, ServerApi},
     cmap::{Command, Connection},
     error::{Error, Result},
     BoxFuture,
 };
 use bson::{doc, rawdoc, spec::BinarySubtype, Binary, Document};
 
-use super::{sasl::SaslContinue, Credential, MONGODB_OIDC_STR};
+use super::{
+    sasl::{SaslContinue, SaslResponse, SaslStart},
+    AuthMechanism,
+    Credential,
+    MONGODB_OIDC_STR,
+};
+
+pub(crate) const TOKEN_RESOURCE_PROP_STR: &str = "TOKEN_RESOURCE";
+pub(crate) const ENVIRONMENT_PROP_STR: &str = "ENVIRONMENT";
+pub(crate) const ALLOWED_HOSTS_PROP_STR: &str = "ALLOWED_HOSTS";
+const VALID_PROPERTIES: &[&str] = &[
+    TOKEN_RESOURCE_PROP_STR,
+    ENVIRONMENT_PROP_STR,
+    ALLOWED_HOSTS_PROP_STR,
+];
+
+pub(crate) const AZURE_ENVIRONMENT_VALUE_STR: &str = "azure";
+pub(crate) const GCP_ENVIRONMENT_VALUE_STR: &str = "gcp";
+const K8S_ENVIRONMENT_VALUE_STR: &str = "k8s";
+#[cfg(test)]
+const TEST_ENVIRONMENT_VALUE_STR: &str = "test";
+const VALID_ENVIRONMENTS: &[&str] = &[
+    AZURE_ENVIRONMENT_VALUE_STR,
+    GCP_ENVIRONMENT_VALUE_STR,
+    K8S_ENVIRONMENT_VALUE_STR,
+    #[cfg(test)]
+    TEST_ENVIRONMENT_VALUE_STR,
+];
 
 const HUMAN_CALLBACK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const MACHINE_CALLBACK_TIMEOUT: Duration = Duration::from_secs(60);
@@ -144,7 +157,7 @@ impl Callback {
 
     /// Create azure callback.
     #[cfg(feature = "azure-oidc")]
-    fn azure_callback(client_id: Option<&str>, resource: &str) -> CallbackInner {
+    fn azure_callback(client_id: Option<&str>, resource: &str) -> Function {
         use futures_util::FutureExt;
         let resource = resource.to_string();
         let client_id = client_id.map(|s| s.to_string());
@@ -155,104 +168,121 @@ impl Callback {
         if let Some(ref client_id) = client_id {
             url.push_str(&format!("&client_id={}", client_id));
         }
-        CallbackInner {
-            function: Self::new_function(
-                move |_| {
+        Self::new_function(
+            move |_| {
+                let url = url.clone();
+                async move {
                     let url = url.clone();
-                    async move {
-                        let url = url.clone();
-                        let response = crate::runtime::HttpClient::default()
-                            .get(&url)
-                            .headers(&[("Metadata", "true"), ("Accept", "application/json")])
-                            .send::<Document>()
-                            .await
-                            .map_err(|e| {
-                                Error::authentication_error(
-                                    MONGODB_OIDC_STR,
-                                    &format!("Failed to get access token from Azure IDMS: {}", e),
-                                )
-                            });
-                        let response = response?;
-                        let access_token = response
-                            .get_str("access_token")
-                            .map_err(|e| {
-                                Error::authentication_error(
-                                    MONGODB_OIDC_STR,
-                                    &format!("Failed to get access token from Azure IDMS: {}", e),
-                                )
-                            })?
-                            .to_string();
-                        let expires_in = response
-                            .get_str("expires_in")
-                            .map_err(|e| {
-                                Error::authentication_error(
-                                    MONGODB_OIDC_STR,
-                                    &format!("Failed to get expires_in from Azure IDMS: {}", e),
-                                )
-                            })?
-                            .parse::<u64>()
-                            .map_err(|e| {
-                                Error::authentication_error(
-                                    MONGODB_OIDC_STR,
-                                    &format!(
-                                        "Failed to parse expires_in from Azure IDMS as u64: {}",
-                                        e
-                                    ),
-                                )
-                            })?;
-                        let expires = Some(Instant::now() + Duration::from_secs(expires_in));
-                        Ok(IdpServerResponse {
-                            access_token,
-                            expires,
-                            refresh_token: None,
-                        })
-                    }
-                    .boxed()
-                },
-                CallbackKind::Machine,
-            ),
-            cache: Cache::new(),
-        }
+                    let response = crate::runtime::HttpClient::default()
+                        .get(&url)
+                        .headers(&[("Metadata", "true"), ("Accept", "application/json")])
+                        .send::<Document>()
+                        .await
+                        .map_err(|e| {
+                            Error::authentication_error(
+                                MONGODB_OIDC_STR,
+                                &format!("Failed to get access token from Azure IDMS: {}", e),
+                            )
+                        });
+                    let response = response?;
+                    let access_token = response
+                        .get_str("access_token")
+                        .map_err(|e| {
+                            Error::authentication_error(
+                                MONGODB_OIDC_STR,
+                                &format!("Failed to get access token from Azure IDMS: {}", e),
+                            )
+                        })?
+                        .to_string();
+                    let expires_in = response
+                        .get_str("expires_in")
+                        .map_err(|e| {
+                            Error::authentication_error(
+                                MONGODB_OIDC_STR,
+                                &format!("Failed to get expires_in from Azure IDMS: {}", e),
+                            )
+                        })?
+                        .parse::<u64>()
+                        .map_err(|e| {
+                            Error::authentication_error(
+                                MONGODB_OIDC_STR,
+                                &format!(
+                                    "Failed to parse expires_in from Azure IDMS as u64: {}",
+                                    e
+                                ),
+                            )
+                        })?;
+                    let expires = Some(Instant::now() + Duration::from_secs(expires_in));
+                    Ok(IdpServerResponse {
+                        access_token,
+                        expires,
+                        refresh_token: None,
+                    })
+                }
+                .boxed()
+            },
+            CallbackKind::Machine,
+        )
     }
 
     /// Create gcp callback.
     #[cfg(feature = "gcp-oidc")]
-    fn gcp_callback(resource: &str) -> CallbackInner {
+    fn gcp_callback(resource: &str) -> Function {
         use futures_util::FutureExt;
         let url = format!(
             "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity?audience={}",
             resource
         );
-        CallbackInner {
-            function: Self::new_function(
-                move |_| {
+        Self::new_function(
+            move |_| {
+                let url = url.clone();
+                async move {
                     let url = url.clone();
-                    async move {
-                        let url = url.clone();
-                        let response = crate::runtime::HttpClient::default()
-                            .get(&url)
-                            .headers(&[("Metadata-Flavor", "Google")])
-                            .send_and_get_string()
-                            .await
-                            .map_err(|e| {
-                                Error::authentication_error(
-                                    MONGODB_OIDC_STR,
-                                    &format!("Failed to get access token from GCP IDMS: {}", e),
-                                )
-                            });
-                        let access_token = response?;
-                        Ok(IdpServerResponse {
-                            access_token,
-                            expires: None,
-                            refresh_token: None,
-                        })
-                    }
-                    .boxed()
-                },
-                CallbackKind::Machine,
-            ),
-            cache: Cache::new(),
-        }
+                    let response = crate::runtime::HttpClient::default()
+                        .get(&url)
+                        .headers(&[("Metadata-Flavor", "Google")])
+                        .send_and_get_string()
+                        .await
+                        .map_err(|e| {
+                            Error::authentication_error(
+                                MONGODB_OIDC_STR,
+                                &format!("Failed to get access token from GCP IDMS: {}", e),
+                            )
+                        });
+                    let access_token = response?;
+                    Ok(IdpServerResponse {
+                        access_token,
+                        expires: None,
+                        refresh_token: None,
+                    })
+                }
+                .boxed()
+            },
+            CallbackKind::Machine,
+        )
+    }
+
+    fn k8s_callback() -> Function {
+        Self::new_function(
+            move |_| {
+                use futures_util::FutureExt;
+                async move {
+                    let path = std::env::var("AZURE_FEDERATED_TOKEN_FILE")
+                        .or_else(|_| std::env::var("AWS_WEB_IDENTITY_TOKEN_FILE"))
+                        .unwrap_or_else(|_| {
+                            "/var/run/secrets/kubernetes.io/serviceaccount/token".to_string()
+                        });
+                    let access_token = tokio::fs::read_to_string(path).await?;
+                    Ok(IdpServerResponse {
+                        access_token,
+                        expires: None,
+                        refresh_token: None,
+                    })
+                }
+                .boxed()
+            },
+            CallbackKind::Machine,
+        )
     }
 }
 
@@ -507,7 +537,6 @@ pub(crate) async fn reauthenticate_stream(
     authenticate_stream(conn, credential, server_api, None).await
 }
 
-#[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
 async fn setup_automatic_providers(credential: &Credential, callback: &mut Option<CallbackInner>) {
     // If there is already a function, there is no need to set up an automatic provider
     // this could happen in the case of a reauthentication, or if the user has already set up
@@ -518,22 +547,24 @@ async fn setup_automatic_providers(credential: &Credential, callback: &mut Optio
     }
     if let Some(ref p) = credential.mechanism_properties {
         let environment = p.get_str(ENVIRONMENT_PROP_STR).unwrap_or("");
+        #[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
         let resource = p.get_str(TOKEN_RESOURCE_PROP_STR).unwrap_or("");
-        match environment {
+        let function = match environment {
+            #[cfg(feature = "azure-oidc")]
             AZURE_ENVIRONMENT_VALUE_STR => {
-                #[cfg(feature = "azure-oidc")]
-                {
-                    let client_id = credential.username.as_deref();
-                    *callback = Some(Callback::azure_callback(client_id, resource))
-                }
+                let client_id = credential.username.as_deref();
+                Some(Callback::azure_callback(client_id, resource))
             }
-            GCP_ENVIRONMENT_VALUE_STR => {
-                #[cfg(feature = "gcp-oidc")]
-                {
-                    *callback = Some(Callback::gcp_callback(resource))
-                }
-            }
-            _ => {}
+            #[cfg(feature = "gcp-oidc")]
+            GCP_ENVIRONMENT_VALUE_STR => Some(Callback::gcp_callback(resource)),
+            K8S_ENVIRONMENT_VALUE_STR => Some(Callback::k8s_callback()),
+            _ => None,
+        };
+        if let Some(function) = function {
+            *callback = Some(CallbackInner {
+                function,
+                cache: Cache::new(),
+            })
         }
     }
 }
@@ -549,7 +580,6 @@ pub(crate) async fn authenticate_stream(
     // always matches that in the Credential Cache.
     let mut guard = credential.oidc_callback.inner.lock().await;
 
-    #[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
     setup_automatic_providers(credential, &mut guard).await;
     let CallbackInner {
         cache,
@@ -885,4 +915,91 @@ async fn send_sasl_command(
         MONGODB_OIDC_STR,
         response.auth_response_body(MONGODB_OIDC_STR)?,
     )
+}
+
+pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
+    let default_document = &Document::new();
+    let properties = credential
+        .mechanism_properties
+        .as_ref()
+        .unwrap_or(default_document);
+    for k in properties.keys() {
+        if VALID_PROPERTIES.iter().all(|p| *p != k) {
+            return Err(Error::invalid_argument(format!(
+                "'{}' is not a valid property for {} authentication",
+                k, MONGODB_OIDC_STR,
+            )));
+        }
+    }
+    let environment = properties.get_str(ENVIRONMENT_PROP_STR);
+    if environment.is_ok() && credential.oidc_callback.is_user_provided() {
+        return Err(Error::invalid_argument(format!(
+            "OIDC callback cannot be set for {} authentication, if an `{}` is set",
+            MONGODB_OIDC_STR, ENVIRONMENT_PROP_STR
+        )));
+    }
+    let has_token_resource = properties.contains_key(TOKEN_RESOURCE_PROP_STR);
+    match environment {
+        Ok(AZURE_ENVIRONMENT_VALUE_STR) | Ok(GCP_ENVIRONMENT_VALUE_STR) => {
+            if !has_token_resource {
+                return Err(Error::invalid_argument(format!(
+                    "`{}` must be set for {} authentication in the `{}` or `{}` `{}`",
+                    TOKEN_RESOURCE_PROP_STR,
+                    MONGODB_OIDC_STR,
+                    AZURE_ENVIRONMENT_VALUE_STR,
+                    GCP_ENVIRONMENT_VALUE_STR,
+                    ENVIRONMENT_PROP_STR,
+                )));
+            }
+        }
+        _ => {
+            if has_token_resource {
+                return Err(Error::invalid_argument(format!(
+                    "`{}` must not be set for {} authentication unless using the `{}` or `{}` `{}`",
+                    TOKEN_RESOURCE_PROP_STR,
+                    MONGODB_OIDC_STR,
+                    AZURE_ENVIRONMENT_VALUE_STR,
+                    GCP_ENVIRONMENT_VALUE_STR,
+                    ENVIRONMENT_PROP_STR,
+                )));
+            }
+        }
+    }
+    if credential
+        .source
+        .as_ref()
+        .map_or(false, |s| s != "$external")
+    {
+        return Err(Error::invalid_argument(format!(
+            "source must be $external for {} authentication, found: {:?}",
+            MONGODB_OIDC_STR, credential.source
+        )));
+    }
+    #[cfg(test)]
+    if environment == Ok(TEST_ENVIRONMENT_VALUE_STR) && credential.username.is_some() {
+        return Err(Error::invalid_argument(format!(
+            "username must not be set for {} authentication in the {} {}",
+            MONGODB_OIDC_STR, TEST_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR,
+        )));
+    }
+    if credential.password.is_some() {
+        return Err(Error::invalid_argument(format!(
+            "password must not be set for {} authentication",
+            MONGODB_OIDC_STR
+        )));
+    }
+    if let Ok(env) = environment {
+        if VALID_ENVIRONMENTS.iter().all(|e| *e != env) {
+            return Err(Error::invalid_argument(format!(
+                "unsupported environment for {} authentication: {}",
+                MONGODB_OIDC_STR, env,
+            )));
+        }
+    }
+    if let Some(allowed_hosts) = properties.get(ALLOWED_HOSTS_PROP_STR) {
+        allowed_hosts.as_array().ok_or_else(|| {
+            Error::invalid_argument(format!("`{}` must be an array", ALLOWED_HOSTS_PROP_STR))
+        })?;
+    }
+    Ok(())
 }

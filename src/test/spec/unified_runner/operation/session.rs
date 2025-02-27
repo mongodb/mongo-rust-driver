@@ -78,7 +78,7 @@ impl TestOperation for AssertSessionPinned {
         async move {
             let is_pinned =
                 with_mut_session!(test_runner, self.session.as_str(), |session| async {
-                    session.transaction.pinned_mongos().is_some()
+                    session.transaction.is_pinned()
                 })
                 .await;
             assert!(is_pinned);
