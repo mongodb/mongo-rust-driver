@@ -14,9 +14,9 @@ static OIDC_TOKEN_DIR: Lazy<PathBuf> = Lazy::new(|| {
 });
 static OIDC_TOKEN_FILE: Lazy<String> = Lazy::new(|| get_env_var("OIDC_TOKEN_FILE"));
 static TEST_USER_1_USERNAME: Lazy<String> =
-    Lazy::new(|| format!("{}@{}", *OIDC_DOMAIN, "test_user1"));
+    Lazy::new(|| format!("{}@{}", "test_user1", *OIDC_DOMAIN));
 static TEST_USER_2_USERNAME: Lazy<String> =
-    Lazy::new(|| format!("{}@{}", *OIDC_DOMAIN, "test_user2"));
+    Lazy::new(|| format!("{}@{}", "test_user2", *OIDC_DOMAIN,));
 
 async fn get_access_token_test_user(once_cell: &'static OnceCell<String>, user_n: u8) -> String {
     once_cell
