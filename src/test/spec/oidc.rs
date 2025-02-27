@@ -47,12 +47,8 @@ fn get_env_var(var: &str) -> String {
 mod basic {
     use crate::{
         client::auth::{oidc, AuthMechanism, Credential},
-        event::command::CommandEvent,
         options::ClientOptions,
-        test::util::{
-            event_buffer::EventBuffer,
-            fail_point::{FailPoint, FailPointMode},
-        },
+        test::util::fail_point::{FailPoint, FailPointMode},
         Client,
     };
     use bson::{doc, Document};
@@ -402,7 +398,7 @@ mod basic {
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
+        let mut options = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         let credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::machine(move |_| {
@@ -422,10 +418,9 @@ mod basic {
             .oidc_callback
             .set_access_token(Some(get_access_token_test_user_1().await))
             .await;
-        opts.credential = Some(credential);
-        let buffer: EventBuffer<CommandEvent> = EventBuffer::new();
-        opts.command_event_handler = Some(buffer.handler());
-        let client = Client::with_options(opts)?;
+        options.credential = Some(credential);
+        let client = Client::for_test().options(options).monitor_events().await;
+        let event_buffer = &client.events;
 
         client
             .database("db")
@@ -434,14 +429,7 @@ mod basic {
             .await?;
 
         assert_eq!(*call_count.lock().await, 0);
-        let sasl_start_events = buffer.filter_map(|event| match event {
-            CommandEvent::Started(command_started_event)
-                if command_started_event.command_name == "saslStart" =>
-            {
-                Some(event.clone())
-            }
-            _ => None,
-        });
+        let sasl_start_events = event_buffer.get_command_started_events(&["saslStart"]);
         assert!(sasl_start_events.is_empty());
 
         let fail_point =
@@ -455,15 +443,8 @@ mod basic {
             .await?;
 
         assert_eq!(*call_count.lock().await, 1);
-        let sasl_start_events = buffer.filter_map(|event| match event {
-            CommandEvent::Started(command_started_event)
-                if command_started_event.command_name == "saslStart" =>
-            {
-                Some(event.clone())
-            }
-            _ => None,
-        });
-        assert!(!sasl_start_events.is_empty());
+        let sasl_start_events = event_buffer.get_command_started_events(&["saslStart"]);
+        assert!(sasl_start_events.is_empty());
 
         Ok(())
     }
