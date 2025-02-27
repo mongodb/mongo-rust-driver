@@ -1954,7 +1954,7 @@ functions:
         - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/run-driver-test.sh
       env:
         K8S_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
-        K8S_TEST_CMD: "ls -la && PROJECT_DIRECTORY='.' OIDC_ENV=k8s OIDC=oidc TEST_FILE=./${STATIC_TEST_BINARY} ./.evergreen/run-mongodb-oidc-test.sh"
+        K8S_TEST_CMD: "RUST_BACKTRACE=1 ./${STATIC_TEST_BINARY} test::spec::oidc_skip_ci::k8s -- --no-capture"
       include_expansions_in_env:
         - AWS_ACCESS_KEY_ID
         - AWS_SECRET_ACCESS_KEY
