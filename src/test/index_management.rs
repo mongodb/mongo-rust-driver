@@ -1,13 +1,34 @@
+#[path = "index_management/search_index.rs"]
+mod search_index_skip_ci;
+
 use futures::stream::TryStreamExt;
 
 use crate::{
     bson::doc,
     error::ErrorKind,
     options::{CommitQuorum, IndexOptions},
-    test::log_uncaptured,
+    test::{log_uncaptured, spec::unified_runner::run_unified_tests},
     Client,
     IndexModel,
 };
+
+#[tokio::test]
+async fn run_unified() {
+    let client = Client::for_test().await;
+
+    let mut skipped_files = Vec::new();
+    let mut skipped_tests = Vec::new();
+    // TODO DRIVERS-2794: unskip these tests
+    if client.server_version_lt(7, 2) && (client.is_sharded() || client.is_load_balanced()) {
+        skipped_files.push("listSearchIndexes.json");
+        skipped_tests.push("listSearchIndexes ignores read and write concern");
+    }
+
+    run_unified_tests(&["index-management"])
+        .skip_files(&skipped_files)
+        .skip_tests(&skipped_tests)
+        .await;
+}
 
 // Test that creating indexes works as expected.
 #[tokio::test]

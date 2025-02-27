@@ -401,6 +401,10 @@ pub struct Credential {
     pub mechanism: Option<AuthMechanism>,
 
     /// Additional properties for the given mechanism.
+    ///
+    /// If any value in the properties contains a comma, this field must be set directly on
+    /// [`ClientOptions`](crate::options::ClientOptions) and cannot be parsed from a connection
+    /// string.
     pub mechanism_properties: Option<Document>,
 
     /// The token callback for OIDC authentication.

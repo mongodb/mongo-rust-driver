@@ -24,12 +24,14 @@ if [ "$SNAPPY" = true ]; then
   FEATURE_FLAGS+=("snappy-compression")
 fi
 
-export SESSION_TEST_REQUIRE_MONGOCRYPTD=true
-export INDEX_MANAGEMENT_TEST_UNIFIED=1
-
 echo "cargo test options: $(cargo_test_options)"
 
 set +o errexit
+
+if [ "Windows_NT" == "$OS" ]; then
+  export SSL_CERT_FILE=$(cygpath /etc/ssl/certs/ca-bundle.crt --windows)
+  export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
+fi
 
 cargo_test ""
 

@@ -106,6 +106,8 @@ async fn run_auth_test(test_file: TestFile) {
 }
 
 #[tokio::test]
-async fn run() {
-    run_spec_test(&["auth"], run_auth_test).await;
+async fn run_legacy() {
+    run_spec_test(&["auth", "legacy"], run_auth_test).await;
 }
+
+// TODO RUST-1665: run unified tests

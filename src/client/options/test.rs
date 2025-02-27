@@ -72,11 +72,26 @@ struct TestAuth {
 }
 
 impl TestAuth {
-    fn matches_client_options(&self, options: &ClientOptions) -> bool {
+    fn assert_matches_client_options(&self, options: &ClientOptions, description: &str) {
         let credential = options.credential.as_ref();
-        self.username.as_ref() == credential.and_then(|cred| cred.username.as_ref())
-            && self.password.as_ref() == credential.and_then(|cred| cred.password.as_ref())
-            && self.db.as_ref() == options.default_database.as_ref()
+        assert_eq!(
+            self.username.as_ref(),
+            credential.and_then(|c| c.username.as_ref()),
+            "{}",
+            description
+        );
+        assert_eq!(
+            self.password.as_ref(),
+            credential.and_then(|c| c.password.as_ref()),
+            "{}",
+            description
+        );
+        assert_eq!(
+            self.db.as_ref(),
+            options.default_database.as_ref(),
+            "{}",
+            description
+        );
     }
 }
 
@@ -154,9 +169,7 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
 
                         let (_, actual_value) = actual_options
                             .iter()
-                            .find(|(actual_key, _)| {
-                                actual_key.to_ascii_lowercase() == expected_key.to_ascii_lowercase()
-                            })
+                            .find(|(actual_key, _)| actual_key.eq_ignore_ascii_case(expected_key))
                             .unwrap_or_else(|| {
                                 panic!(
                                     "{}: parsed options missing {} key",
@@ -179,7 +192,8 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                 }
 
                 if let Some(test_auth) = test_case.auth {
-                    assert!(test_auth.matches_client_options(&client_options));
+                    test_auth
+                        .assert_matches_client_options(&client_options, &test_case.description);
                 }
             } else {
                 let error = client_options_result.expect_err(&test_case.description);
@@ -360,4 +374,40 @@ fn unix_domain_socket_not_allowed() {
         message.contains("not supported on this platform"),
         "{message}"
     );
+}
+
+#[cfg(feature = "cert-key-password")]
+#[tokio::test]
+async fn tls_cert_key_password_connect() {
+    use std::path::PathBuf;
+
+    use bson::doc;
+
+    use crate::{
+        options::TlsOptions,
+        test::{get_client_options, log_uncaptured},
+    };
+
+    use super::Tls;
+
+    let mut options = get_client_options().await.clone();
+    if !matches!(options.tls, Some(Tls::Enabled(_))) {
+        log_uncaptured("Skipping tls_cert_key_password_connect: tls not enabled");
+        return;
+    }
+    let mut certpath = PathBuf::from(std::env::var("DRIVERS_TOOLS").unwrap());
+    certpath.push(".evergreen/x509gen");
+    options.tls = Some(Tls::Enabled(
+        TlsOptions::builder()
+            .ca_file_path(certpath.join("ca.pem"))
+            .cert_key_file_path(certpath.join("client-pkcs8-encrypted.pem"))
+            .tls_certificate_key_file_password(b"password".to_vec())
+            .build(),
+    ));
+    let client = Client::with_options(options).unwrap();
+    client
+        .database("test")
+        .run_command(doc! {"ping": 1})
+        .await
+        .unwrap();
 }

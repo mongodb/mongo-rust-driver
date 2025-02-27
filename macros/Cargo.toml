@@ -1,6 +1,6 @@
 [package]
 name = "mongodb-internal-macros"
-version = "3.1.0"
+version = "3.2.1"
 description = "Internal macros for the mongodb crate"
 edition = "2021"
 license = "Apache-2.0"

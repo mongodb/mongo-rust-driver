@@ -1,11 +1,3 @@
-macro_rules! spawn_blocking_and_await {
-    ($blocking_call:expr) => {{
-        tokio::task::spawn_blocking(move || $blocking_call)
-            .await
-            .unwrap()
-    }};
-}
-
 fn spawn<T>(future: T) -> impl Future<Output = <T as Future>::Output>
 where
     T: Future + Send + 'static,
@@ -15,26 +7,23 @@ where
 }
 
 mod bench;
+mod data;
 mod fs;
 mod models;
 mod score;
 
-use std::{
-    collections::HashSet,
-    convert::TryFrom,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet, convert::TryFrom, path::PathBuf};
 
 use anyhow::Result;
 use clap::{App, Arg, ArgMatches};
 use futures::{Future, FutureExt};
 use mongodb::options::ClientOptions;
-use once_cell::sync::Lazy;
 
 use crate::{
     bench::{
         bson_decode::BsonDecodeBenchmark,
         bson_encode::BsonEncodeBenchmark,
+        bulk_write::{InsertBulkWriteBenchmark, MixedBulkWriteBenchmark},
         find_many::FindManyBenchmark,
         find_one::FindOneBenchmark,
         gridfs_download::GridFsDownloadBenchmark,
@@ -47,61 +36,74 @@ use crate::{
         json_multi_import::JsonMultiImportBenchmark,
         run_command::RunCommandBenchmark,
     },
+    data::{
+        get_deep_bson,
+        get_flat_bson,
+        get_full_bson,
+        get_large_doc,
+        get_small_doc,
+        get_tweet,
+        DATA_PATH,
+    },
     fs::File,
     score::{score_test, BenchmarkResult, CompositeScore},
 };
 
-static DATA_PATH: Lazy<PathBuf> = Lazy::new(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("data"));
-
 // benchmark names
-const FLAT_BSON_ENCODING: &'static str = "Flat BSON Encoding";
-const FLAT_BSON_DECODING: &'static str = "Flat BSON Decoding";
-const DEEP_BSON_ENCODING: &'static str = "Deep BSON Encoding";
-const DEEP_BSON_DECODING: &'static str = "Deep BSON Decoding";
-const FULL_BSON_ENCODING: &'static str = "Full BSON Encoding";
-const FULL_BSON_DECODING: &'static str = "Full BSON Decoding";
-const RUN_COMMAND_BENCH: &'static str = "Run Command";
-const RUN_COMMAND_COLD_START_BENCH: &'static str = "Run Command (cold start)";
-const FIND_ONE_BENCH: &'static str = "Find one";
-const FIND_MANY_BENCH: &'static str = "Find many and empty cursor";
-const FIND_MANY_BENCH_RAW: &'static str = "Find many and empty cursor (raw BSON)";
-const FIND_MANY_BENCH_SERDE: &'static str = "Find many and empty cursor (serde structs)";
-const GRIDFS_DOWNLOAD_BENCH: &'static str = "GridFS download";
-const LDJSON_MULTI_EXPORT_BENCH: &'static str = "LDJSON multi-file export";
-const GRIDFS_MULTI_DOWNLOAD_BENCH: &'static str = "GridFS multi-file download";
-const SMALL_DOC_INSERT_ONE_BENCH: &'static str = "Small doc insertOne";
-const LARGE_DOC_INSERT_ONE_BENCH: &'static str = "Large doc insertOne";
-const SMALL_DOC_BULK_INSERT_BENCH: &'static str = "Small doc bulk insert";
-const LARGE_DOC_BULK_INSERT_BENCH: &'static str = "Large doc bulk insert";
-const GRIDFS_UPLOAD_BENCH: &'static str = "GridFS upload";
-const LDJSON_MULTI_IMPORT_BENCH: &'static str = "LDJSON multi-file import";
-const GRIDFS_MULTI_UPLOAD_BENCH: &'static str = "GridFS multi-file upload";
+const FLAT_BSON_ENCODING: &str = "Flat BSON Encoding";
+const FLAT_BSON_DECODING: &str = "Flat BSON Decoding";
+const DEEP_BSON_ENCODING: &str = "Deep BSON Encoding";
+const DEEP_BSON_DECODING: &str = "Deep BSON Decoding";
+const FULL_BSON_ENCODING: &str = "Full BSON Encoding";
+const FULL_BSON_DECODING: &str = "Full BSON Decoding";
+const RUN_COMMAND_BENCH: &str = "Run Command";
+const RUN_COMMAND_COLD_START_BENCH: &str = "Run Command (cold start)";
+const FIND_ONE_BENCH: &str = "Find one";
+const FIND_MANY_BENCH: &str = "Find many and empty cursor";
+const FIND_MANY_BENCH_RAW: &str = "Find many and empty cursor (raw BSON)";
+const FIND_MANY_BENCH_SERDE: &str = "Find many and empty cursor (serde structs)";
+const GRIDFS_DOWNLOAD_BENCH: &str = "GridFS download";
+const LDJSON_MULTI_EXPORT_BENCH: &str = "LDJSON multi-file export";
+const GRIDFS_MULTI_DOWNLOAD_BENCH: &str = "GridFS multi-file download";
+const SMALL_DOC_INSERT_ONE_BENCH: &str = "Small doc insertOne";
+const LARGE_DOC_INSERT_ONE_BENCH: &str = "Large doc insertOne";
+const SMALL_DOC_INSERT_MANY_BENCH: &str = "Small doc insertMany";
+const LARGE_DOC_INSERT_MANY_BENCH: &str = "Large doc insertMany";
+const GRIDFS_UPLOAD_BENCH: &str = "GridFS upload";
+const LDJSON_MULTI_IMPORT_BENCH: &str = "LDJSON multi-file import";
+const GRIDFS_MULTI_UPLOAD_BENCH: &str = "GridFS multi-file upload";
+const SMALL_DOC_INSERT_BULK_WRITE_BENCH: &str = "Small doc insert-only bulkWrite";
+const LARGE_DOC_INSERT_BULK_WRITE_BENCH: &str = "Large doc insert-only bulkWrite";
+const MIXED_BULK_WRITE_BENCH: &str = "Mixed bulkWrite";
 
 #[derive(Copy, Clone, num_enum::TryFromPrimitive, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(u8)]
 enum BenchmarkId {
     RunCommand = 1,
-    FindOneById,
-    SmallDocInsertOne,
-    LargeDocInsertOne,
-    FindMany,
-    SmallDocBulkInsert,
-    LargeDocBulkInsert,
-    LdJsonMultiFileImport,
-    LdJsonMultiFileExport,
-    BsonFlatDocumentDecode,
-    BsonFlatDocumentEncode,
-    BsonDeepDocumentDecode,
-    BsonDeepDocumentEncode,
-    BsonFullDocumentDecode,
-    BsonFullDocumentEncode,
-    FindManyRawBson,
-    FindManySerde,
-    GridFsDownload,
-    GridFsUpload,
-    GridFsMultiDownload,
-    GridFsMultiUpload,
-    RunCommandColdStart,
+    FindOneById,             // 2
+    SmallDocInsertOne,       // 3
+    LargeDocInsertOne,       // 4
+    FindMany,                // 5
+    SmallDocInsertMany,      // 6
+    LargeDocInsertMany,      // 7
+    LdJsonMultiFileImport,   // 8
+    LdJsonMultiFileExport,   // 9
+    BsonFlatDocumentDecode,  // 10
+    BsonFlatDocumentEncode,  // 11
+    BsonDeepDocumentDecode,  // 12
+    BsonDeepDocumentEncode,  // 13
+    BsonFullDocumentDecode,  // 14
+    BsonFullDocumentEncode,  // 15
+    FindManyRawBson,         // 16
+    FindManySerde,           // 17
+    GridFsDownload,          // 18
+    GridFsUpload,            // 19
+    GridFsMultiDownload,     // 20
+    GridFsMultiUpload,       // 21
+    RunCommandColdStart,     // 22
+    SmallDocInsertBulkWrite, // 23
+    LargeDocInsertBulkWrite, // 24
+    MixedBulkWrite,          // 25
 }
 
 impl BenchmarkId {
@@ -113,8 +115,8 @@ impl BenchmarkId {
             BenchmarkId::SmallDocInsertOne => SMALL_DOC_INSERT_ONE_BENCH,
             BenchmarkId::LargeDocInsertOne => LARGE_DOC_INSERT_ONE_BENCH,
             BenchmarkId::FindMany => FIND_MANY_BENCH,
-            BenchmarkId::SmallDocBulkInsert => SMALL_DOC_BULK_INSERT_BENCH,
-            BenchmarkId::LargeDocBulkInsert => LARGE_DOC_BULK_INSERT_BENCH,
+            BenchmarkId::SmallDocInsertMany => SMALL_DOC_INSERT_MANY_BENCH,
+            BenchmarkId::LargeDocInsertMany => LARGE_DOC_INSERT_MANY_BENCH,
             BenchmarkId::LdJsonMultiFileImport => LDJSON_MULTI_IMPORT_BENCH,
             BenchmarkId::LdJsonMultiFileExport => LDJSON_MULTI_EXPORT_BENCH,
             BenchmarkId::BsonFlatDocumentDecode => FLAT_BSON_DECODING,
@@ -129,12 +131,15 @@ impl BenchmarkId {
             BenchmarkId::GridFsUpload => GRIDFS_UPLOAD_BENCH,
             BenchmarkId::GridFsMultiDownload => GRIDFS_MULTI_DOWNLOAD_BENCH,
             BenchmarkId::GridFsMultiUpload => GRIDFS_MULTI_UPLOAD_BENCH,
+            BenchmarkId::SmallDocInsertBulkWrite => SMALL_DOC_INSERT_BULK_WRITE_BENCH,
+            BenchmarkId::LargeDocInsertBulkWrite => LARGE_DOC_INSERT_BULK_WRITE_BENCH,
+            BenchmarkId::MixedBulkWrite => MIXED_BULK_WRITE_BENCH,
         }
     }
 }
 
 /// Benchmarks included in the "BSONBench" composite.
-const BSON_BENCHES: &[&'static str] = &[
+const BSON_BENCHES: &[&str] = &[
     FLAT_BSON_ENCODING,
     FLAT_BSON_DECODING,
     DEEP_BSON_ENCODING,
@@ -145,23 +150,26 @@ const BSON_BENCHES: &[&'static str] = &[
 
 /// Benchmarkes included in the "SingleBench" composite.
 /// This consists of all the single-doc benchmarks except Run Command.
-const SINGLE_BENCHES: &[&'static str] = &[
+const SINGLE_BENCHES: &[&str] = &[
     FIND_ONE_BENCH,
     SMALL_DOC_INSERT_ONE_BENCH,
     LARGE_DOC_INSERT_ONE_BENCH,
 ];
 
 /// Benchmarks included in the "MultiBench" composite.
-const MULTI_BENCHES: &[&'static str] = &[
+const MULTI_BENCHES: &[&str] = &[
     FIND_MANY_BENCH_RAW,
-    SMALL_DOC_BULK_INSERT_BENCH,
-    LARGE_DOC_BULK_INSERT_BENCH,
+    SMALL_DOC_INSERT_MANY_BENCH,
+    LARGE_DOC_INSERT_MANY_BENCH,
     GRIDFS_UPLOAD_BENCH,
     GRIDFS_DOWNLOAD_BENCH,
+    SMALL_DOC_INSERT_BULK_WRITE_BENCH,
+    LARGE_DOC_INSERT_BULK_WRITE_BENCH,
+    MIXED_BULK_WRITE_BENCH,
 ];
 
 /// Benchmarks included in the "ParallelBench" composite.
-const PARALLEL_BENCHES: &[&'static str] = &[
+const PARALLEL_BENCHES: &[&str] = &[
     LDJSON_MULTI_IMPORT_BENCH,
     LDJSON_MULTI_EXPORT_BENCH,
     GRIDFS_MULTI_UPLOAD_BENCH,
@@ -169,7 +177,7 @@ const PARALLEL_BENCHES: &[&'static str] = &[
 ];
 
 /// Benchmarks included in the "ReadBench" composite.
-const READ_BENCHES: &[&'static str] = &[
+const READ_BENCHES: &[&str] = &[
     FIND_ONE_BENCH,
     FIND_MANY_BENCH_RAW,
     GRIDFS_DOWNLOAD_BENCH,
@@ -178,17 +186,20 @@ const READ_BENCHES: &[&'static str] = &[
 ];
 
 /// Benchmarks included in the "WriteBench" composite.
-const WRITE_BENCHES: &[&'static str] = &[
+const WRITE_BENCHES: &[&str] = &[
     SMALL_DOC_INSERT_ONE_BENCH,
     LARGE_DOC_INSERT_ONE_BENCH,
-    SMALL_DOC_BULK_INSERT_BENCH,
-    LARGE_DOC_BULK_INSERT_BENCH,
+    SMALL_DOC_INSERT_MANY_BENCH,
+    LARGE_DOC_INSERT_MANY_BENCH,
     GRIDFS_UPLOAD_BENCH,
     LDJSON_MULTI_IMPORT_BENCH,
     GRIDFS_MULTI_UPLOAD_BENCH,
+    SMALL_DOC_INSERT_BULK_WRITE_BENCH,
+    LARGE_DOC_INSERT_BULK_WRITE_BENCH,
+    MIXED_BULK_WRITE_BENCH,
 ];
 
-const MAX_ID: u8 = BenchmarkId::RunCommandColdStart as u8;
+const MAX_ID: u8 = BenchmarkId::MixedBulkWrite as u8;
 
 async fn run_benchmarks(
     uri: &str,
@@ -236,9 +247,7 @@ async fn run_benchmarks(
             BenchmarkId::SmallDocInsertOne => {
                 let small_insert_one_options = bench::insert_one::Options {
                     num_iter: 10000,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("small_doc.json"),
+                    doc: get_small_doc().await,
                     uri: uri.to_string(),
                 };
                 let small_insert_one =
@@ -256,9 +265,7 @@ async fn run_benchmarks(
             BenchmarkId::LargeDocInsertOne => {
                 let large_insert_one_options = bench::insert_one::Options {
                     num_iter: 10,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("large_doc.json"),
+                    doc: get_large_doc().await,
                     uri: uri.to_string(),
                 };
                 let large_insert_one =
@@ -273,12 +280,10 @@ async fn run_benchmarks(
             }
 
             // Small doc bulk insert
-            BenchmarkId::SmallDocBulkInsert => {
+            BenchmarkId::SmallDocInsertMany => {
                 let small_insert_many_options = bench::insert_many::Options {
                     num_copies: 10000,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("small_doc.json"),
+                    doc: get_small_doc().await,
                     uri: uri.to_string(),
                 };
                 let small_insert_many =
@@ -286,19 +291,17 @@ async fn run_benchmarks(
 
                 comp_score += score_test(
                     small_insert_many,
-                    SMALL_DOC_BULK_INSERT_BENCH,
+                    SMALL_DOC_INSERT_MANY_BENCH,
                     2.75,
                     more_info,
                 );
             }
 
             // Large doc bulk insert
-            BenchmarkId::LargeDocBulkInsert => {
+            BenchmarkId::LargeDocInsertMany => {
                 let large_insert_many_options = bench::insert_many::Options {
                     num_copies: 10,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("large_doc.json"),
+                    doc: get_large_doc().await,
                     uri: uri.to_string(),
                 };
                 let large_insert_many =
@@ -306,7 +309,7 @@ async fn run_benchmarks(
 
                 comp_score += score_test(
                     large_insert_many,
-                    LARGE_DOC_BULK_INSERT_BENCH,
+                    LARGE_DOC_INSERT_MANY_BENCH,
                     27.31,
                     more_info,
                 );
@@ -363,7 +366,7 @@ async fn run_benchmarks(
             BenchmarkId::BsonFlatDocumentDecode => {
                 let bson_flat_decode_options = bench::bson_decode::Options {
                     num_iter: 10_000,
-                    path: DATA_PATH.join("extended_bson").join("flat_bson.json"),
+                    doc: get_flat_bson().await,
                 };
                 let bson_flat_decode =
                     bench::run_benchmark::<BsonDecodeBenchmark>(bson_flat_decode_options).await?;
@@ -375,7 +378,7 @@ async fn run_benchmarks(
             BenchmarkId::BsonFlatDocumentEncode => {
                 let bson_flat_encode_options = bench::bson_encode::Options {
                     num_iter: 10_000,
-                    path: DATA_PATH.join("extended_bson").join("flat_bson.json"),
+                    doc: get_flat_bson().await,
                 };
                 let bson_flat_encode =
                     bench::run_benchmark::<BsonEncodeBenchmark>(bson_flat_encode_options).await?;
@@ -387,7 +390,7 @@ async fn run_benchmarks(
             BenchmarkId::BsonDeepDocumentDecode => {
                 let bson_deep_decode_options = bench::bson_decode::Options {
                     num_iter: 10_000,
-                    path: DATA_PATH.join("extended_bson").join("deep_bson.json"),
+                    doc: get_deep_bson().await,
                 };
                 let bson_deep_decode =
                     bench::run_benchmark::<BsonDecodeBenchmark>(bson_deep_decode_options).await?;
@@ -399,7 +402,7 @@ async fn run_benchmarks(
             BenchmarkId::BsonDeepDocumentEncode => {
                 let bson_deep_encode_options = bench::bson_encode::Options {
                     num_iter: 10_000,
-                    path: DATA_PATH.join("extended_bson").join("deep_bson.json"),
+                    doc: get_deep_bson().await,
                 };
                 let bson_deep_encode =
                     bench::run_benchmark::<BsonEncodeBenchmark>(bson_deep_encode_options).await?;
@@ -411,7 +414,7 @@ async fn run_benchmarks(
             BenchmarkId::BsonFullDocumentDecode => {
                 let bson_full_decode_options = bench::bson_decode::Options {
                     num_iter: 10_000,
-                    path: DATA_PATH.join("extended_bson").join("full_bson.json"),
+                    doc: get_full_bson().await,
                 };
                 let bson_full_decode =
                     bench::run_benchmark::<BsonDecodeBenchmark>(bson_full_decode_options).await?;
@@ -423,7 +426,7 @@ async fn run_benchmarks(
             BenchmarkId::BsonFullDocumentEncode => {
                 let bson_full_encode_options = bench::bson_encode::Options {
                     num_iter: 10_000,
-                    path: DATA_PATH.join("extended_bson").join("full_bson.json"),
+                    doc: get_full_bson().await,
                 };
                 let bson_full_encode =
                     bench::run_benchmark::<BsonEncodeBenchmark>(bson_full_encode_options).await?;
@@ -435,9 +438,7 @@ async fn run_benchmarks(
             BenchmarkId::FindOneById => {
                 let find_one_options = bench::find_one::Options {
                     num_iter: 10000,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("tweet.json"),
+                    doc: get_tweet().await,
                     uri: uri.to_string(),
                 };
                 let find_one = bench::run_benchmark::<FindOneBenchmark>(find_one_options).await?;
@@ -455,9 +456,7 @@ async fn run_benchmarks(
                 };
                 let find_many_options = bench::find_many::Options {
                     num_iter: 10000,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("tweet.json"),
+                    doc: get_tweet().await,
                     uri: uri.to_string(),
                     mode,
                 };
@@ -522,6 +521,42 @@ async fn run_benchmarks(
 
                 comp_score += score_test(gridfs_multi_upload, id.name(), 262.144, more_info);
             }
+
+            // Small doc insert-only bulk write
+            BenchmarkId::SmallDocInsertBulkWrite => {
+                let bulk_write_options = bench::bulk_write::Options {
+                    uri: uri.to_string(),
+                    doc: get_small_doc().await,
+                    num_models: 10_000,
+                };
+                let small_doc_insert_bulk_write =
+                    bench::run_benchmark::<InsertBulkWriteBenchmark>(bulk_write_options).await?;
+                comp_score += score_test(small_doc_insert_bulk_write, id.name(), 2.75, more_info);
+            }
+
+            // Large doc insert-only bulk write
+            BenchmarkId::LargeDocInsertBulkWrite => {
+                let bulk_write_options = bench::bulk_write::Options {
+                    uri: uri.to_string(),
+                    doc: get_large_doc().await,
+                    num_models: 10,
+                };
+                let large_doc_insert_bulk_write =
+                    bench::run_benchmark::<InsertBulkWriteBenchmark>(bulk_write_options).await?;
+                comp_score += score_test(large_doc_insert_bulk_write, id.name(), 27.31, more_info);
+            }
+
+            // Mixed bulk write
+            BenchmarkId::MixedBulkWrite => {
+                let bulk_write_options = bench::bulk_write::Options {
+                    uri: uri.to_string(),
+                    doc: get_small_doc().await,
+                    num_models: 30_000,
+                };
+                let mixed_bulk_write =
+                    bench::run_benchmark::<MixedBulkWriteBenchmark>(bulk_write_options).await?;
+                comp_score += score_test(mixed_bulk_write, id.name(), 5.5, more_info);
+            }
         }
     }
 
@@ -531,7 +566,7 @@ async fn run_benchmarks(
 fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
     let mut ids: HashSet<BenchmarkId> = match matches.value_of("ids") {
         Some("all") => (1..=MAX_ID)
-            .map(|id| BenchmarkId::try_from(id as u8).unwrap())
+            .map(|id| BenchmarkId::try_from(id).unwrap())
             .collect(),
         Some(id_list) => id_list
             .split(',')
@@ -554,10 +589,13 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
     }
     if matches.is_present("multi") {
         ids.insert(BenchmarkId::FindManyRawBson);
-        ids.insert(BenchmarkId::SmallDocBulkInsert);
-        ids.insert(BenchmarkId::LargeDocBulkInsert);
+        ids.insert(BenchmarkId::SmallDocInsertMany);
+        ids.insert(BenchmarkId::LargeDocInsertMany);
         ids.insert(BenchmarkId::GridFsDownload);
         ids.insert(BenchmarkId::GridFsUpload);
+        ids.insert(BenchmarkId::SmallDocInsertBulkWrite);
+        ids.insert(BenchmarkId::LargeDocInsertBulkWrite);
+        ids.insert(BenchmarkId::MixedBulkWrite);
     }
     if matches.is_present("parallel") {
         ids.insert(BenchmarkId::LdJsonMultiFileImport);
@@ -583,13 +621,16 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         ids.insert(BenchmarkId::FindMany);
         ids.insert(BenchmarkId::FindManyRawBson);
         ids.insert(BenchmarkId::FindManySerde);
-        ids.insert(BenchmarkId::SmallDocBulkInsert);
-        ids.insert(BenchmarkId::LargeDocBulkInsert);
+        ids.insert(BenchmarkId::SmallDocInsertMany);
+        ids.insert(BenchmarkId::LargeDocInsertMany);
         ids.insert(BenchmarkId::LdJsonMultiFileImport);
         ids.insert(BenchmarkId::LdJsonMultiFileExport);
         ids.insert(BenchmarkId::GridFsDownload);
         ids.insert(BenchmarkId::GridFsUpload);
         ids.insert(BenchmarkId::GridFsMultiDownload);
+        ids.insert(BenchmarkId::SmallDocInsertBulkWrite);
+        ids.insert(BenchmarkId::LargeDocInsertBulkWrite);
+        ids.insert(BenchmarkId::MixedBulkWrite);
         // TODO RUST-2010 Re-enable this benchmark
         //ids.insert(BenchmarkId::GridFsMultiUpload);
     }
@@ -597,7 +638,7 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
     // if none were enabled, that means no arguments were provided and all should be enabled.
     if ids.is_empty() {
         ids = (1..=MAX_ID)
-            .map(|id| BenchmarkId::try_from(id as u8).unwrap())
+            .map(|id| BenchmarkId::try_from(id).unwrap())
             // TODO RUST-2010 Re-enable this benchmark
             .filter(|id| *id != BenchmarkId::GridFsMultiUpload)
             .collect()

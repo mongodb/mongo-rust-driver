@@ -1,37 +1,18 @@
-use std::{
-    env,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
-use bson::{doc, oid::ObjectId, Document};
 use futures_util::TryStreamExt;
 
 use crate::{
+    bson::{doc, oid::ObjectId, Document},
     search_index::SearchIndexType,
-    test::{log_uncaptured, spec::unified_runner::run_unified_tests},
     Client,
     Collection,
     SearchIndexModel,
 };
 
-#[tokio::test]
-async fn run() {
-    if env::var("INDEX_MANAGEMENT_TEST_UNIFIED").is_err() {
-        log_uncaptured(
-            "Skipping index management unified tests: INDEX_MANAGEMENT_TEST_UNIFIED not set",
-        );
-        return;
-    }
-    run_unified_tests(&["index-management"]).await;
-}
-
 /// Search Index Case 1: Driver can successfully create and list search indexes
 #[tokio::test]
 async fn search_index_create_list() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
     let start = Instant::now();
     let deadline = start + Duration::from_secs(60 * 5);
 
@@ -74,10 +55,6 @@ async fn search_index_create_list() {
 /// Search Index Case 2: Driver can successfully create multiple indexes in batch
 #[tokio::test]
 async fn search_index_create_multiple() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
     let start = Instant::now();
     let deadline = start + Duration::from_secs(60 * 5);
 
@@ -138,10 +115,6 @@ async fn search_index_create_multiple() {
 /// Search Index Case 3: Driver can successfully drop search indexes
 #[tokio::test]
 async fn search_index_drop() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
     let start = Instant::now();
     let deadline = start + Duration::from_secs(60 * 5);
 
@@ -192,10 +165,6 @@ async fn search_index_drop() {
 /// Search Index Case 4: Driver can update a search index
 #[tokio::test]
 async fn search_index_update() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
     let start = Instant::now();
     let deadline = start + Duration::from_secs(60 * 5);
 
@@ -262,10 +231,6 @@ async fn search_index_update() {
 /// Search Index Case 5: dropSearchIndex suppresses namespace not found errors
 #[tokio::test]
 async fn search_index_drop_not_found() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
     let client = Client::for_test().await;
     let coll_name = ObjectId::new().to_hex();
     let coll0 = client
@@ -292,10 +257,6 @@ async fn wait_for_index(coll: &Collection<Document>, name: &str) -> Document {
 // SearchIndex Case 7: Driver can successfully handle search index types when creating indexes
 #[tokio::test]
 async fn search_index_create_with_type() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
     let client = Client::for_test().await;
     let coll_name = ObjectId::new().to_hex();
     let db = client.database("search_index_test");
@@ -354,10 +315,6 @@ async fn search_index_create_with_type() {
 // SearchIndex Case 8: Driver requires explicit type to create a vector search index
 #[tokio::test]
 async fn search_index_requires_explicit_vector() {
-    if env::var("INDEX_MANAGEMENT_TEST_PROSE").is_err() {
-        log_uncaptured("Skipping index management prose test: INDEX_MANAGEMENT_TEST_PROSE not set");
-        return;
-    }
     let client = Client::for_test().await;
     let coll_name = ObjectId::new().to_hex();
     let db = client.database("search_index_test");

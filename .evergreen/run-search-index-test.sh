@@ -6,13 +6,12 @@ set -o pipefail
 source ./.evergreen/env.sh
 source .evergreen/cargo-test.sh
 
-set -o xtrace
+CARGO_OPTIONS+=("--ignore-default-filter")
 
-unset INDEX_MANAGEMENT_TEST_UNIFIED
-export INDEX_MANAGEMENT_TEST_PROSE=1
+set -o xtrace
 
 set +o errexit
 
-cargo_test test::spec::index_management
+cargo_test test::index_management::search_index
 
 exit ${CARGO_RESULT}

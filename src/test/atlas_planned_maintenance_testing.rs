@@ -2,6 +2,7 @@
 // DRIVER_REPOSITORY and DRIVER_REVISION fields for the Rust axis in drivers-atlas-testing's
 // evergreen config file can be updated to test against your branch.
 
+#[path = "atlas_planned_maintenance_testing/json_models.rs"]
 mod json_models;
 
 use std::{
@@ -28,28 +29,8 @@ use json_models::{Events, Results};
 
 use super::spec::unified_runner::EntityMap;
 
-#[test]
-#[ignore]
-fn get_exe_name() {
-    let mut file = File::create("exe_name.txt").expect("Failed to create file");
-    let exe_name = env::current_exe()
-        .expect("Failed to determine name of test executable")
-        .into_os_string()
-        .into_string()
-        .expect("Failed to convert OS string to string");
-    write!(&mut file, "{}", exe_name).expect("Failed to write executable name to file");
-}
-
 #[tokio::test]
 async fn workload_executor() {
-    if env::var("ATLAS_PLANNED_MAINTENANCE_TESTING").is_err() {
-        // This test should only be run from the workload-executor script.
-        log_uncaptured(
-            "Skipping workload_executor due to being run outside of planned maintenance testing",
-        );
-        return;
-    }
-
     let connection_string =
         env::var("WORKLOAD_EXECUTOR_CONNECTION_STRING").expect("No connection string specified");
 
@@ -94,7 +75,7 @@ async fn execute_workload(test_runner: &mut TestRunner, workload: Value) -> Vec<
 fn write_json(entities: &mut EntityMap, mut errors: Vec<Bson>) {
     log_uncaptured("Writing planned maintenance test results to files");
 
-    let mut events = Events::new_empty();
+    let mut events = Events::default();
     if let Some(Entity::Bson(Bson::Array(mut operation_errors))) = entities.remove("errors") {
         errors.append(&mut operation_errors);
     }

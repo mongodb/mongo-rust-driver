@@ -8,7 +8,7 @@ use crate::{
     error::{CommandError, Error, ErrorKind},
     event::{cmap::CmapEvent, sdam::SdamEvent},
     hello::LEGACY_HELLO_COMMAND_NAME,
-    options::{AuthMechanism, ClientOptions, Credential, ServerAddress},
+    options::{AuthMechanism, Credential, ServerAddress},
     runtime,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{
@@ -564,11 +564,8 @@ async fn saslprep() {
 
 #[tokio::test]
 #[function_name::named]
-async fn x509_auth() {
-    let username = match std::env::var("MONGO_X509_USER") {
-        Ok(user) => user,
-        Err(_) => return,
-    };
+async fn x509_auth_skip_ci() {
+    let username = std::env::var("MONGO_X509_USER").expect("MONGO_X509_USER");
 
     let client = Client::for_test().await;
     let drop_user_result = client
@@ -608,49 +605,6 @@ async fn x509_auth() {
         .find_one(doc! {})
         .await
         .unwrap();
-}
-
-#[tokio::test]
-async fn plain_auth() {
-    if std::env::var("MONGO_PLAIN_AUTH_TEST").is_err() {
-        log_uncaptured("skipping plain_auth due to environment variable MONGO_PLAIN_AUTH_TEST");
-        return;
-    }
-
-    let options = ClientOptions::builder()
-        .hosts(vec![ServerAddress::Tcp {
-            host: "ldaptest.10gen.cc".into(),
-            port: None,
-        }])
-        .credential(
-            Credential::builder()
-                .mechanism(AuthMechanism::Plain)
-                .username("drivers-team".to_string())
-                .password("mongor0x$xgen".to_string())
-                .build(),
-        )
-        .build();
-
-    let client = Client::with_options(options).unwrap();
-    let coll = client.database("ldap").collection("test");
-
-    let doc = coll.find_one(doc! {}).await.unwrap().unwrap();
-
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct TestDocument {
-        ldap: bool,
-        authenticated: String,
-    }
-
-    let doc: TestDocument = bson::from_document(doc).unwrap();
-
-    assert_eq!(
-        doc,
-        TestDocument {
-            ldap: true,
-            authenticated: "yeah".into()
-        }
-    );
 }
 
 /// Test verifies that retrying a commitTransaction operation after a checkOut
@@ -931,7 +885,7 @@ async fn warm_connection_pool() {
     client.list_database_names().await.unwrap();
 }
 
-async fn get_end_session_event_count<'a>(event_stream: &mut EventStream<'a, Event>) -> usize {
+async fn get_end_session_event_count(event_stream: &mut EventStream<'_, Event>) -> usize {
     // Use collect_successful_command_execution to assert that the call to endSessions succeeded.
     event_stream
         .collect_successful_command_execution(Duration::from_millis(500), "endSessions")

@@ -121,8 +121,7 @@ impl<'a> Action for InsertMany<'a> {
                 Ok(result) => {
                     let current_batch_size = result.inserted_ids.len();
 
-                    let cumulative_result =
-                        cumulative_result.get_or_insert_with(InsertManyResult::new);
+                    let cumulative_result = cumulative_result.get_or_insert_with(Default::default);
                     for (index, id) in result.inserted_ids {
                         cumulative_result
                             .inserted_ids
@@ -184,7 +183,7 @@ impl<'a> Action for InsertMany<'a> {
                 ErrorKind::InsertMany(failure),
                 Some(error_labels),
             )),
-            None => Ok(cumulative_result.unwrap_or_else(InsertManyResult::new)),
+            None => Ok(cumulative_result.unwrap_or_default()),
         }
     }
 }

@@ -2,10 +2,11 @@
 #![allow(clippy::cast_possible_wrap)]
 
 #[cfg(feature = "dns-resolver")]
-mod atlas_connectivity;
-mod atlas_planned_maintenance_testing;
-#[cfg(feature = "aws-auth")]
-mod auth_aws;
+#[path = "test/atlas_connectivity.rs"]
+mod atlas_connectivity_skip_ci; // requires Atlas URI environment variables set
+#[path = "test/atlas_planned_maintenance_testing.rs"]
+mod atlas_planned_maintenance_testing_skip_ci; // run from the drivers-atlas-testing project
+mod auth;
 mod bulk_write;
 mod change_stream;
 mod client;
@@ -17,17 +18,21 @@ mod coll;
 ))]
 mod compression;
 #[cfg(feature = "in-use-encryption")]
-pub(crate) mod csfle;
+#[path = "test/csfle.rs"]
+pub(crate) mod csfle_skip_local; // see modules for requirements
 mod cursor;
 mod db;
 mod documentation_examples;
-mod happy_eyeballs;
+#[path = "test/happy_eyeballs.rs"]
+mod happy_eyeballs_skip_ci; // requires happy eyeballs server
 mod index_management;
 mod lambda_examples;
 pub(crate) mod spec;
 mod timeseries;
 pub(crate) mod util;
 
+#[cfg(feature = "in-use-encryption")]
+pub(crate) use self::csfle_skip_local as csfle;
 pub(crate) use self::{
     spec::{run_spec_test, RunOn, Serverless, Topology},
     util::{

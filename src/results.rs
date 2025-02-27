@@ -19,7 +19,7 @@ pub use bulk_write::*;
 
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
 /// operation.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct InsertOneResult {
@@ -37,7 +37,7 @@ impl InsertOneResult {
 
 /// The result of a [`Collection::insert_many`](../struct.Collection.html#method.insert_many)
 /// operation.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct InsertManyResult {
@@ -45,18 +45,10 @@ pub struct InsertManyResult {
     pub inserted_ids: HashMap<usize, Bson>,
 }
 
-impl InsertManyResult {
-    pub(crate) fn new() -> Self {
-        InsertManyResult {
-            inserted_ids: HashMap::new(),
-        }
-    }
-}
-
 /// The result of a [`Collection::update_one`](../struct.Collection.html#method.update_one) or
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
 #[skip_serializing_none]
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct UpdateResult {
@@ -74,7 +66,7 @@ pub struct UpdateResult {
 
 /// The result of a [`Collection::delete_one`](../struct.Collection.html#method.delete_one) or
 /// [`Collection::delete_many`](../struct.Collection.html#method.delete_many) operation.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct DeleteResult {
@@ -85,7 +77,7 @@ pub struct DeleteResult {
 
 /// Information about the index created as a result of a
 /// [`Collection::create_index`](../struct.Collection.html#method.create_index).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 #[non_exhaustive]
 pub struct CreateIndexResult {
     /// The name of the index created in the `createIndex` command.
@@ -94,7 +86,7 @@ pub struct CreateIndexResult {
 
 /// Information about the indexes created as a result of a
 /// [`Collection::create_indexes`](../struct.Collection.html#method.create_indexes).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 #[non_exhaustive]
 pub struct CreateIndexesResult {
     /// The list containing the names of all indexes created in the `createIndexes` command.
@@ -120,7 +112,7 @@ pub(crate) struct GetMoreResult {
 
 /// Describes the type of data store returned when executing
 /// [`Database::list_collections`](../struct.Database.html#method.list_collections).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum CollectionType {
@@ -128,6 +120,7 @@ pub enum CollectionType {
     View,
 
     /// Indicates that the data store is a collection.
+    #[default]
     Collection,
 
     /// Indicates that the data store is a timeseries.
@@ -140,7 +133,7 @@ pub enum CollectionType {
 ///
 /// See the MongoDB [manual](https://www.mongodb.com/docs/manual/reference/command/listCollections/#listCollections.cursor)
 /// for more information.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CollectionSpecificationInfo {
@@ -155,7 +148,7 @@ pub struct CollectionSpecificationInfo {
 
 /// Information about a collection as reported by
 /// [`Database::list_collections`](../struct.Database.html#method.list_collections).
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CollectionSpecification {
@@ -179,7 +172,7 @@ pub struct CollectionSpecification {
 
 /// A struct modeling the information about an individual database returned from
 /// [`Client::list_databases`](../struct.Client.html#method.list_databases).
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct DatabaseSpecification {

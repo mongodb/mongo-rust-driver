@@ -1,4 +1,4 @@
-use crate::test::spec::unified_runner::run_unified_tests;
+use crate::test::{spec::unified_runner::run_unified_tests, SERVERLESS};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
@@ -41,7 +41,7 @@ async fn run_unified() {
         "Database-level aggregate with $merge omits read preference for pre-5.0 server",
     ];
     // TODO: remove this manual skip when this test is fixed to skip on serverless
-    if std::env::var("SERVERLESS").is_ok() {
+    if *SERVERLESS {
         skipped_tests.push("inserting _id with type null via clientBulkWrite");
     }
 

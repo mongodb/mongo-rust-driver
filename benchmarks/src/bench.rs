@@ -1,5 +1,6 @@
 pub mod bson_decode;
 pub mod bson_encode;
+pub mod bulk_write;
 pub mod find_many;
 pub mod find_one;
 pub mod gridfs_download;
@@ -59,17 +60,20 @@ pub static TARGET_ITERATION_COUNT: Lazy<usize> = Lazy::new(|| {
 
 #[async_trait::async_trait]
 pub trait Benchmark: Sized {
+    /// The options used to construct the benchmark.
     type Options;
+    /// The state needed to perform the benchmark task.
+    type TaskState: Default;
 
     /// execute once before benchmarking
     async fn setup(options: Self::Options) -> Result<Self>;
 
     /// execute at the beginning of every iteration
-    async fn before_task(&mut self) -> Result<()> {
-        Ok(())
+    async fn before_task(&self) -> Result<Self::TaskState> {
+        Ok(Default::default())
     }
 
-    async fn do_task(&self) -> Result<()>;
+    async fn do_task(&self, state: Self::TaskState) -> Result<()>;
 
     /// execute at the end of every iteration
     async fn after_task(&self) -> Result<()> {
@@ -108,7 +112,7 @@ fn finished(duration: Duration, iter: usize) -> bool {
 pub async fn run_benchmark<B: Benchmark + Send + Sync>(
     options: B::Options,
 ) -> Result<Vec<Duration>> {
-    let mut test = B::setup(options).await?;
+    let test = B::setup(options).await?;
 
     let mut test_durations = Vec::new();
 
@@ -127,9 +131,9 @@ pub async fn run_benchmark<B: Benchmark + Send + Sync>(
     while !finished(benchmark_timer.elapsed(), iter) {
         progress_bar.inc(1);
 
-        test.before_task().await?;
+        let state = test.before_task().await?;
         let timer = Instant::now();
-        test.do_task().await?;
+        test.do_task(state).await?;
         test_durations.push(timer.elapsed());
         test.after_task().await?;
 
@@ -152,13 +156,13 @@ pub async fn drop_database(uri: &str, database: &str) -> Result<()> {
         .run_command(doc! { "hello": true })
         .await?;
 
-    client.database(&database).drop().await?;
+    client.database(database).drop().await?;
 
     // in sharded clusters, take additional steps to ensure database is dropped completely.
     // see: https://www.mongodb.com/docs/manual/reference/method/db.dropDatabase/#replica-set-and-sharded-clusters
     let is_sharded = hello.get_str("msg").ok() == Some("isdbgrid");
     if is_sharded {
-        client.database(&database).drop().await?;
+        client.database(database).drop().await?;
         for host in options.hosts {
             client
                 .database("admin")

@@ -91,10 +91,10 @@ buildvariants:
       - name: .replicaset !.4.0 !.4.2 !.4.4 !.5.0
       - name: .sharded !.4.0 !.4.2 !.4.4 !.5.0
 
-  - name: macos-11.00
-    display_name: "MacOS 11.00"
+  - name: macos-14.00
+    display_name: "MacOS 14.00"
     run_on:
-      - macos-1100
+      - macos-14
     expansions:
       AUTH: auth
       SSL: ssl
@@ -142,7 +142,7 @@ buildvariants:
     display_name: "OpenSSL (MacOS)"
     patchable: false
     run_on:
-      - macos-1100
+      - macos-14
     expansions:
       OPENSSL: true
       AUTH: auth
@@ -260,17 +260,6 @@ buildvariants:
     tasks:
       - name: test-x509-auth
 
-  - name: plain-auth
-    display_name: "Plain Authentication"
-    patchable: false
-    run_on:
-      - rhel87-small
-    expansions:
-      AUTH: auth
-      SSL: ssl
-    tasks:
-      - test-plain-auth
-
   - name: serverless
     display_name: "Serverless"
     run_on:
@@ -300,7 +289,7 @@ buildvariants:
     display_name: "OIDC Macos"
     patchable: true
     run_on:
-      - macos-1100
+      - macos-14
     expansions:
       AUTH: auth
       SSL: ssl
@@ -383,7 +372,7 @@ buildvariants:
   - name: happy-eyeballs-macos
     display_name: "Happy Eyeballs (MacOS)"
     run_on:
-      - macos-1100
+      - macos-14
     tasks:
       - happy-eyeballs-task-group
 
@@ -972,14 +961,6 @@ tasks:
           TOPOLOGY: server
       - func: "run x509 tests"
 
-  - name: test-plain-auth
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          MONGODB_VERSION: rapid
-          TOPOLOGY: server
-      - func: "run plain tests"
-
   - name: test-serverless
     commands:
       - func: "run serverless tests"
@@ -1417,17 +1398,6 @@ functions:
 
           .evergreen/run-x509-tests.sh
 
-  "run plain tests":
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${PREPARE_SHELL}
-
-          .evergreen/run-plain-tests.sh
-
   "prepare resources":
     - command: subprocess.exec
       params:
@@ -1529,6 +1499,7 @@ functions:
         args:
           - .evergreen/run-tests.sh
         include_expansions_in_env:
+          - DRIVERS_TOOLS
           - PROJECT_DIRECTORY
           - OPENSSL
           - SINGLE_MONGOS_LB_URI
@@ -1693,7 +1664,7 @@ functions:
 
           echo "Building test ... begin"
           . ${PROJECT_DIRECTORY}/.evergreen/env.sh
-          cargo test get_exe_name --features in-use-encryption,gcp-kms -- --ignored
+          cargo test get_exe_name --features in-use-encryption,gcp-kms
           cp $(cat exe_name.txt) test-contents/test-exe
           echo "Building test ... end"
 
@@ -1707,25 +1678,21 @@ functions:
           echo "Untarring test contents ... end"
 
   "run gcp kms test":
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${PREPARE_SHELL}
-
-          set +o xtrace
-          export GCPKMS_GCLOUD=${GCPKMS_GCLOUD}
-          export GCPKMS_PROJECT=${GCPKMS_PROJECT}
-          export GCPKMS_ZONE=${GCPKMS_ZONE}
-          export GCPKMS_INSTANCENAME=${GCPKMS_INSTANCENAME}
-          set -o xtrace
-
-          export GCPKMS_CMD="ON_DEMAND_GCP_CREDS_SHOULD_SUCCEED=1 \
-            RUST_BACKTRACE=1 LD_LIBRARY_PATH=./test-contents/lib \
-            ./test-contents/test-exe on_demand_gcp_credentials --nocapture"
-          $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/run-command.sh
+        working_dir: ${DRIVERS_TOOLS}
+        binary: bash
+        include_expansions_in_env:
+          - GCPKMS_GCLOUD
+          - GCPKMS_PROJECT
+          - GCPKMS_ZONE
+          - GCPKMS_INSTANCENAME
+          - DRIVERS_TOOLS
+        env:
+          GCPKMS_CMD: "RUST_BACKTRACE=1 LD_LIBRARY_PATH=./test-contents/lib ./test-contents/test-exe on_demand_gcp::success -- --no-capture"
+        args:
+          - .evergreen/csfle/gcpkms/run-command.sh
 
   "assume ec2 role":
     - command: ec2.assume_role
@@ -1962,7 +1929,7 @@ functions:
     - command: expansions.update
       params:
         file: src/static-test-tarball-expansion.yml
-  
+
   "run oidc k8s test":
   - command: subprocess.exec
     params:

@@ -5,9 +5,24 @@ mod matchable;
 #[cfg(feature = "tracing-unstable")]
 mod trace;
 
-pub(crate) use self::{
-    event::{Event, EventClient},
-    matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
+use std::{env, fmt::Debug, fs::File, future::IntoFuture, io::Write, time::Duration};
+
+use futures::FutureExt;
+use semver::{Version, VersionReq};
+use serde::{de::DeserializeOwned, Serialize};
+
+#[cfg(feature = "in-use-encryption")]
+use crate::client::EncryptedClientBuilder;
+use crate::{
+    bson::{doc, Bson, Document},
+    client::options::ServerAddress,
+    error::Result,
+    hello::{hello_command, HelloCommandResponse},
+    options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
+    test::{get_client_options, Topology},
+    BoxFuture,
+    Client,
+    Collection,
 };
 
 #[cfg(feature = "tracing-unstable")]
@@ -17,28 +32,9 @@ pub(crate) use self::trace::{
     TracingEventValue,
     TracingHandler,
 };
-
-#[cfg(feature = "in-use-encryption")]
-use crate::client::EncryptedClientBuilder;
-use crate::{
-    bson::{doc, Bson},
-    client::options::ServerAddress,
-    hello::{hello_command, HelloCommandResponse},
-    BoxFuture,
-};
-use bson::Document;
-use futures::FutureExt;
-use semver::{Version, VersionReq};
-use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Debug, future::IntoFuture, time::Duration};
-
-use super::get_client_options;
-use crate::{
-    error::Result,
-    options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
-    test::Topology,
-    Client,
-    Collection,
+pub(crate) use self::{
+    event::{Event, EventClient},
+    matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
 };
 
 #[derive(Clone, Debug)]
@@ -407,6 +403,17 @@ pub(crate) fn get_default_name(description: &str) -> String {
     // database names must have fewer than 38 characters
     db_name.truncate(37);
     db_name
+}
+
+#[test]
+fn get_exe_name_skip_ci() {
+    let mut file = File::create("exe_name.txt").expect("Failed to create file");
+    let exe_name = env::current_exe()
+        .expect("Failed to determine name of test executable")
+        .into_os_string()
+        .into_string()
+        .expect("Failed to convert OS string to string");
+    write!(file, "{}", exe_name).expect("Failed to write executable name to file");
 }
 
 /// Log a message on stderr that won't be captured by `cargo test`.  Panics if the write fails.

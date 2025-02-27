@@ -131,6 +131,7 @@ struct ClientInner {
     session_pool: ServerSessionPool,
     shutdown: Shutdown,
     dropped: AtomicBool,
+    end_sessions_token: std::sync::Mutex<AsyncDropToken>,
     #[cfg(feature = "in-use-encryption")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
     #[cfg(test)]
@@ -159,6 +160,18 @@ impl Client {
     pub fn with_options(options: ClientOptions) -> Result<Self> {
         options.validate()?;
 
+        // Spawn a cleanup task, similar to register_async_drop
+        let (cleanup_tx, cleanup_rx) = tokio::sync::oneshot::channel::<BoxFuture<'static, ()>>();
+        crate::runtime::spawn(async move {
+            // If the cleanup channel is closed, that task was dropped.
+            if let Ok(cleanup) = cleanup_rx.await {
+                cleanup.await;
+            }
+        });
+        let end_sessions_token = std::sync::Mutex::new(AsyncDropToken {
+            tx: Some(cleanup_tx),
+        });
+
         let inner = TrackingArc::new(ClientInner {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
@@ -168,6 +181,7 @@ impl Client {
                 executed: AtomicBool::new(false),
             },
             dropped: AtomicBool::new(false),
+            end_sessions_token,
             #[cfg(feature = "in-use-encryption")]
             csfle: Default::default(),
             #[cfg(test)]
@@ -247,7 +261,7 @@ impl Client {
             .read()
             .await
             .as_ref()
-            .map_or(false, |cs| cs.exec().mongocryptd_spawned())
+            .is_some_and(|cs| cs.exec().mongocryptd_spawned())
     }
 
     #[cfg(all(test, feature = "in-use-encryption"))]
@@ -257,7 +271,7 @@ impl Client {
             .read()
             .await
             .as_ref()
-            .map_or(false, |cs| cs.exec().has_mongocryptd_client())
+            .is_some_and(|cs| cs.exec().has_mongocryptd_client())
     }
 
     fn test_command_event_channel(&self) -> Option<&options::TestEventSender> {
@@ -682,9 +696,13 @@ impl Drop for Client {
             // this cycle.
             self.inner.dropped.store(true, Ordering::SeqCst);
             let client = self.clone();
-            crate::runtime::spawn(async move {
-                client.end_all_sessions().await;
-            });
+            self.inner
+                .end_sessions_token
+                .lock()
+                .unwrap()
+                .spawn(async move {
+                    client.end_all_sessions().await;
+                });
         }
     }
 }

@@ -965,7 +965,12 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
             }
         }
     }
-    if credential.source.as_ref().is_some_and(|s| s != "$external") {
+
+    if credential
+        .source
+        .as_ref()
+        .is_some_and(|source| source != "$external")
+    {
         return Err(Error::invalid_argument(format!(
             "source must be $external for {} authentication, found: {:?}",
             MONGODB_OIDC_STR, credential.source
