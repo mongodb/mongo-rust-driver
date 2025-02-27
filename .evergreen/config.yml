@@ -645,6 +645,7 @@ task_groups:
             ${PREPARE_SHELL}
             ${DRIVERS_TOOLS}/.evergreen/auth_oidc/setup.sh
     teardown_task:
+      - func: "upload test results"
       - command: subprocess.exec
         params:
           binary: bash
