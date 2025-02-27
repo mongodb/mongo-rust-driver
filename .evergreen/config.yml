@@ -1194,7 +1194,7 @@ tasks:
           - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/gcp/run-driver-test.sh
         env:
           GCPOIDC_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
-          GCPOIDC_TEST_CMD: "ls -la && PROJECT_DIRECTORY='.' OIDC_ENV=gcp OIDC=oidc TEST_FILE=./${STATIC_TEST_BINARY} ./.evergreen/run-mongodb-oidc-test.sh"
+          GCPOIDC_TEST_CMD: "source ./secrets-export.sh && RUST_BACKTRACE=1 ./${STATIC_TEST_BINARY} test::spec::oidc_skip_ci::gcp -- --no-capture"
 
   - name: "oidc-auth-test-k8s-latest"
     commands:
