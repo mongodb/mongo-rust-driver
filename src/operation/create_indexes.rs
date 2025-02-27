@@ -48,7 +48,7 @@ impl OperationWithDefaults for CreateIndexes {
             && self
                 .options
                 .as_ref()
-                .map_or(false, |options| options.commit_quorum.is_some())
+                .is_some_and(|options| options.commit_quorum.is_some())
         {
             return Err(ErrorKind::InvalidArgument {
                 message: "Specifying a commit quorum to create_index(es) is not supported on \
