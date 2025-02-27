@@ -965,6 +965,7 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
             }
         }
     }
+
     if credential
         .source
         .as_ref()
