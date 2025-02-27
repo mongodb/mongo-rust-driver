@@ -1,64 +1,47 @@
-macro_rules! get_env_or_skip {
-    ( $env_var: literal ) => {
-        match std::env::var($env_var) {
-            Ok(val) => val,
-            Err(_) => {
-                crate::test::log_uncaptured(&format!("Skipping test, {} not set", $env_var));
-                return Ok(());
-            }
-        }
-    };
+use std::path::PathBuf;
+
+use once_cell::sync::Lazy;
+use tokio::sync::OnceCell;
+
+static MONGODB_URI: Lazy<String> = Lazy::new(|| get_env_var("MONGODB_URI"));
+static MONGODB_URI_SINGLE: Lazy<String> = Lazy::new(|| get_env_var("MONGODB_URI_SINGLE"));
+#[cfg(target_os = "linux")]
+static MONGODB_URI_MULTI: Lazy<String> = Lazy::new(|| get_env_var("MONGODB_URI_MULTI"));
+static OIDC_DOMAIN: Lazy<String> = Lazy::new(|| get_env_var("OIDC_DOMAIN"));
+static OIDC_TOKEN_DIR: Lazy<PathBuf> = Lazy::new(|| {
+    std::env::var("OIDC_TOKEN_DIR")
+        .unwrap_or_else(|_| "/tmp/tokens".to_string())
+        .into()
+});
+#[cfg(target_os = "linux")]
+static OIDC_TOKEN_FILE: Lazy<String> = Lazy::new(|| get_env_var("OIDC_TOKEN_FILE"));
+static TEST_USER_1_USERNAME: Lazy<String> = Lazy::new(|| format!("test_user1@{}", *OIDC_DOMAIN));
+#[cfg(target_os = "linux")]
+static TEST_USER_2_USERNAME: Lazy<String> = Lazy::new(|| format!("test_user2@{}", *OIDC_DOMAIN));
+
+async fn get_access_token_test_user(once_cell: &'static OnceCell<String>, user_n: u8) -> String {
+    once_cell
+        .get_or_init(|| async {
+            let mut path = OIDC_TOKEN_DIR.clone();
+            let user = format!("test_user{}", user_n);
+            path.push(user);
+            tokio::fs::read_to_string(path).await.unwrap()
+        })
+        .await
+        .to_string()
+}
+async fn get_access_token_test_user_1() -> String {
+    static ACCESS_TOKEN_TEST_USER_1: OnceCell<String> = OnceCell::const_new();
+    get_access_token_test_user(&ACCESS_TOKEN_TEST_USER_1, 1).await
+}
+#[cfg(target_os = "linux")]
+async fn get_access_token_test_user_2() -> String {
+    static ACCESS_TOKEN_TEST_USER_2: OnceCell<String> = OnceCell::const_new();
+    get_access_token_test_user(&ACCESS_TOKEN_TEST_USER_2, 2).await
 }
 
-macro_rules! mongodb_uri_admin {
-    () => {
-        get_env_or_skip!("MONGODB_URI")
-    };
-}
-
-macro_rules! mongodb_uri_single {
-    () => {
-        get_env_or_skip!("MONGODB_URI_SINGLE")
-    };
-}
-
-macro_rules! mongodb_uri_multi {
-    () => {
-        get_env_or_skip!("MONGODB_URI_MULTI")
-    };
-}
-
-macro_rules! token_dir {
-    ( $user_name: literal ) => {
-        // this cannot use get_env_or_skip because it is used in the callback
-        format!(
-            "{}/{}",
-            std::env::var("OIDC_TOKEN_DIR").unwrap_or_else(|_| "/tmp/tokens".to_string()),
-            $user_name
-        )
-    };
-}
-
-macro_rules! no_user_token_file {
-    () => {
-        // this cannot use get_env_or_skip because it is used in the callback
-        std::env::var("OIDC_TOKEN_FILE").unwrap()
-    };
-}
-
-macro_rules! explicit_user {
-    ( $user_name: literal ) => {
-        format!("{}@{}", $user_name, get_env_or_skip!("OIDC_DOMAIN"),)
-    };
-}
-
-macro_rules! admin_client {
-    () => {{
-        let opts = crate::client::options::ClientOptions::parse(mongodb_uri_admin!())
-            .await
-            .unwrap();
-        crate::Client::with_options(opts).unwrap()
-    }};
+fn get_env_var(var: &str) -> String {
+    std::env::var(var).expect(var)
 }
 
 mod basic {
@@ -76,15 +59,29 @@ mod basic {
     };
     use tokio::sync::Mutex;
 
+    use super::{
+        get_access_token_test_user_1,
+        MONGODB_URI,
+        MONGODB_URI_SINGLE,
+        TEST_USER_1_USERNAME,
+    };
+
+    #[cfg(target_os = "linux")]
+    use super::{
+        get_access_token_test_user_2,
+        MONGODB_URI_MULTI,
+        OIDC_TOKEN_FILE,
+        TEST_USER_2_USERNAME,
+    };
+
     // Machine Callback tests
     #[tokio::test]
     async fn machine_1_1_callback_is_called() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential.as_mut().unwrap().source = None;
         // test the new public API here.
         opts.credential.as_mut().unwrap().oidc_callback =
@@ -93,7 +90,7 @@ mod basic {
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse::builder()
-                        .access_token(tokio::fs::read_to_string(token_dir!("test_user1")).await?)
+                        .access_token(get_access_token_test_user_1().await)
                         .build())
                 }
                 .boxed()
@@ -112,12 +109,11 @@ mod basic {
     #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
     async fn machine_1_2_callback_is_called_only_once_for_multiple_connections(
     ) -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::machine(move |_| {
@@ -125,7 +121,7 @@ mod basic {
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -158,12 +154,11 @@ mod basic {
 
     #[tokio::test]
     async fn machine_2_1_valid_callback_inputs() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::machine(move |c| {
@@ -174,7 +169,7 @@ mod basic {
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -197,12 +192,11 @@ mod basic {
 
     #[tokio::test]
     async fn machine_2_3_oidc_callback_return_missing_data() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::machine(move |_| {
@@ -237,13 +231,12 @@ mod basic {
 
     #[tokio::test]
     async fn machine_2_4_invalid_client_configuration_with_callback() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         use crate::client::auth::oidc::{ENVIRONMENT_PROP_STR, TOKEN_RESOURCE_PROP_STR};
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::machine(move |_| {
@@ -251,7 +244,7 @@ mod basic {
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -281,12 +274,11 @@ mod basic {
     #[tokio::test]
     async fn machine_3_1_failure_with_cached_tokens_fetch_a_new_token_and_retry_auth(
     ) -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::machine(move |_| {
@@ -294,7 +286,7 @@ mod basic {
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -323,12 +315,11 @@ mod basic {
     #[tokio::test]
     async fn machine_3_2_auth_failures_without_cached_tokens_returns_an_error() -> anyhow::Result<()>
     {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::machine(move |_| {
@@ -363,8 +354,7 @@ mod basic {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn machine_4_reauthentication() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
-        let admin_client = admin_client!();
+        let admin_client = Client::with_uri_str(&*MONGODB_URI).await?;
 
         // Now set a failpoint for find with 391 error code
         let fail_point =
@@ -375,7 +365,7 @@ mod basic {
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::machine(move |_| {
@@ -383,7 +373,7 @@ mod basic {
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -406,12 +396,11 @@ mod basic {
     // Human Callback tests
     #[tokio::test]
     async fn human_1_1_single_principal_implicit_username() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |_| {
@@ -419,7 +408,7 @@ mod basic {
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -438,21 +427,20 @@ mod basic {
 
     #[tokio::test]
     async fn human_1_2_single_principal_explicit_username() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
-            .username(explicit_user!("test_user1"))
+            .username(TEST_USER_1_USERNAME.clone())
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |_| {
                 let call_count = cb_call_count.clone();
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -473,21 +461,20 @@ mod basic {
 
     #[tokio::test]
     async fn human_1_3_multiple_principal_user_1() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_multi!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
-            .username(explicit_user!("test_user1"))
+            .username(TEST_USER_1_USERNAME.clone())
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |_| {
                 let call_count = cb_call_count.clone();
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -507,22 +494,22 @@ mod basic {
     }
 
     #[tokio::test]
+    #[cfg(target_os = "linux")] // MONGODB_URI_MULTI is only set when running on linux
     async fn human_1_4_multiple_principal_user_2() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_multi!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_MULTI).await?;
         opts.credential = Credential::builder()
-            .username(explicit_user!("test_user2"))
+            .username(TEST_USER_2_USERNAME.clone())
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |_| {
                 let call_count = cb_call_count.clone();
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user2")).await?,
+                        access_token: get_access_token_test_user_2().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -542,13 +529,13 @@ mod basic {
     }
 
     #[tokio::test]
+    #[cfg(target_os = "linux")] // MONGODB_URI_MULTI is only set when running on linux
     async fn human_1_5_multiple_principal_no_user() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_multi!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_MULTI).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |_| {
@@ -556,7 +543,7 @@ mod basic {
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(no_user_token_file!()).await?,
+                        access_token: tokio::fs::read_to_string(&*OIDC_TOKEN_FILE).await?,
                         expires: None,
                         refresh_token: None,
                     })
@@ -583,7 +570,6 @@ mod basic {
 
     #[tokio::test]
     async fn human_1_6_allowed_hosts_blocked() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         use crate::client::auth::oidc::ALLOWED_HOSTS_PROP_STR;
         {
             // we need to assert the callback count
@@ -591,7 +577,7 @@ mod basic {
             let cb_call_count = call_count.clone();
 
             // Use empty list for ALLOWED_HOSTS
-            let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+            let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
             opts.credential = Credential::builder()
                 .mechanism(AuthMechanism::MongoDbOidc)
                 .mechanism_properties(bson::doc! {
@@ -602,8 +588,7 @@ mod basic {
                     async move {
                         *call_count.lock().await += 1;
                         Ok(oidc::IdpServerResponse {
-                            access_token: tokio::fs::read_to_string(token_dir!("test_user1"))
-                                .await?,
+                            access_token: get_access_token_test_user_1().await,
                             expires: None,
                             refresh_token: None,
                         })
@@ -633,7 +618,7 @@ mod basic {
             let call_count = Arc::new(Mutex::new(0));
             let cb_call_count = call_count.clone();
 
-            let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+            let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
             opts.credential = Credential::builder()
                 .mechanism(AuthMechanism::MongoDbOidc)
                 .mechanism_properties(bson::doc! {
@@ -644,8 +629,7 @@ mod basic {
                     async move {
                         *call_count.lock().await += 1;
                         Ok(oidc::IdpServerResponse {
-                            access_token: tokio::fs::read_to_string(token_dir!("test_user1"))
-                                .await?,
+                            access_token: get_access_token_test_user_1().await,
                             expires: None,
                             refresh_token: None,
                         })
@@ -675,12 +659,11 @@ mod basic {
 
     #[tokio::test]
     async fn human_2_1_valid_callback_inputs() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |c| {
@@ -692,7 +675,7 @@ mod basic {
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -713,12 +696,11 @@ mod basic {
 
     #[tokio::test]
     async fn human_2_2_callback_returns_missing_data() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |_| {
@@ -754,15 +736,14 @@ mod basic {
     #[tokio::test(flavor = "multi_thread")]
     async fn human_3_1_uses_speculative_authentication_if_there_is_a_cached_token(
     ) -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // get an admin_client for setting failpoints
-        let admin_client = admin_client!();
+        let admin_client = Client::with_uri_str(&*MONGODB_URI).await?;
 
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |_| {
@@ -786,9 +767,7 @@ mod basic {
             .as_mut()
             .unwrap()
             .oidc_callback
-            .set_access_token(Some(
-                tokio::fs::read_to_string(token_dir!("test_user1")).await?,
-            ))
+            .set_access_token(Some(get_access_token_test_user_1().await))
             .await;
 
         let client = Client::with_options(opts)?;
@@ -817,9 +796,8 @@ mod basic {
     #[tokio::test(flavor = "multi_thread")]
     async fn human_3_2_does_not_use_speculative_authentication_if_there_is_no_cached_token(
     ) -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // get an admin_client for setting failpoints
-        let admin_client = admin_client!();
+        let admin_client = Client::with_uri_str(&*MONGODB_URI).await?;
 
         // Now set a failpoint for find
         let fail_point =
@@ -829,7 +807,7 @@ mod basic {
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |_| {
@@ -837,7 +815,7 @@ mod basic {
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -866,19 +844,18 @@ mod basic {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn human_4_1_succeeds() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         use crate::{
             event::command::CommandEvent,
             test::{util::event_buffer::EventBuffer, Event},
         };
 
-        let admin_client = admin_client!();
+        let admin_client = Client::with_uri_str(&*MONGODB_URI).await?;
 
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |_| {
@@ -886,7 +863,7 @@ mod basic {
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -960,14 +937,13 @@ mod basic {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn human_4_2_succeeds_no_refresh() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
-        let admin_client = admin_client!();
+        let admin_client = Client::with_uri_str(&*MONGODB_URI).await?;
 
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |_| {
@@ -975,7 +951,7 @@ mod basic {
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -1009,14 +985,13 @@ mod basic {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn human_4_3_succeeds_after_refresh_fails() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
-        let admin_client = admin_client!();
+        let admin_client = Client::with_uri_str(&*MONGODB_URI).await?;
 
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |_| {
@@ -1024,7 +999,7 @@ mod basic {
                 async move {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: Some("fake refresh token".to_string()),
                     })
@@ -1060,14 +1035,13 @@ mod basic {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn human_4_4_fails() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
-        let admin_client = admin_client!();
+        let admin_client = Client::with_uri_str(&*MONGODB_URI).await?;
 
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |_| {
@@ -1077,8 +1051,7 @@ mod basic {
                     *cc += 1;
                     if *cc == 1 {
                         Ok(oidc::IdpServerResponse {
-                            access_token: tokio::fs::read_to_string(token_dir!("test_user1"))
-                                .await?,
+                            access_token: get_access_token_test_user_1().await,
                             expires: None,
                             refresh_token: Some("fake refresh token".to_string()),
                         })
@@ -1128,12 +1101,11 @@ mod basic {
     // This is not in the spec, but the spec has no test that actually tests refresh flow
     #[tokio::test]
     async fn human_4_5_refresh_token_flow() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential = Credential::builder()
             .mechanism(AuthMechanism::MongoDbOidc)
             .oidc_callback(oidc::Callback::human(move |c| {
@@ -1144,7 +1116,7 @@ mod basic {
                     *call_count.lock().await += 1;
                     Ok(oidc::IdpServerResponse {
                         // since this test will use the cached token, this callback shouldn't matter
-                        access_token: tokio::fs::read_to_string(token_dir!("test_user1")).await?,
+                        access_token: get_access_token_test_user_1().await,
                         expires: None,
                         refresh_token: None,
                     })
@@ -1182,11 +1154,11 @@ mod azure {
     use crate::client::{options::ClientOptions, Client};
     use bson::{doc, Document};
 
+    use super::MONGODB_URI_SINGLE;
+
     #[tokio::test]
     async fn machine_5_1_azure_with_no_username() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
-
-        let opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         let client = Client::with_options(opts)?;
         client
             .database("test")
@@ -1198,9 +1170,7 @@ mod azure {
 
     #[tokio::test]
     async fn machine_5_2_azure_with_bad_username() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
-
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential.as_mut().unwrap().username = Some("bad".to_string());
         let client = Client::with_options(opts)?;
         let res = client
@@ -1218,10 +1188,9 @@ mod azure {
 
     #[tokio::test]
     async fn machine_5_3_token_resource_must_be_set_for_azure() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         use crate::client::auth::oidc::{AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR};
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential.as_mut().unwrap().mechanism_properties = Some(doc! {
             ENVIRONMENT_PROP_STR: AZURE_ENVIRONMENT_VALUE_STR,
         });
@@ -1245,11 +1214,11 @@ mod gcp {
     use crate::client::{options::ClientOptions, Client};
     use bson::{doc, Document};
 
+    use super::MONGODB_URI_SINGLE;
+
     #[tokio::test]
     async fn machine_5_4_gcp_with_no_username() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
-
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential.as_mut().unwrap().source = None;
         let client = Client::with_options(opts)?;
         client
@@ -1262,10 +1231,9 @@ mod gcp {
 
     #[tokio::test]
     async fn machine_5_5_token_resource_must_be_set_for_gcp() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
         use crate::client::auth::oidc::{ENVIRONMENT_PROP_STR, GCP_ENVIRONMENT_VALUE_STR};
 
-        let mut opts = ClientOptions::parse(mongodb_uri_single!()).await?;
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential.as_mut().unwrap().source = None;
         opts.credential.as_mut().unwrap().mechanism_properties = Some(doc! {
             ENVIRONMENT_PROP_STR: GCP_ENVIRONMENT_VALUE_STR,
@@ -1292,12 +1260,12 @@ mod k8s {
         Client,
     };
 
+    use super::MONGODB_URI_SINGLE;
+
     // There's no spec test for K8s, so we run this simple sanity check.
     #[tokio::test]
     async fn successfully_authenticates() -> anyhow::Result<()> {
-        get_env_or_skip!("OIDC");
-
-        let client = Client::with_uri_str(mongodb_uri_single!()).await?;
+        let client = Client::with_uri_str(&*MONGODB_URI_SINGLE).await?;
         client
             .database("test")
             .collection::<Document>("test")
