@@ -47,8 +47,12 @@ fn get_env_var(var: &str) -> String {
 mod basic {
     use crate::{
         client::auth::{oidc, AuthMechanism, Credential},
+        event::command::CommandEvent,
         options::ClientOptions,
-        test::util::fail_point::{FailPoint, FailPointMode},
+        test::util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
         Client,
     };
     use bson::{doc, Document};
@@ -390,6 +394,77 @@ mod basic {
             .find_one(doc! {})
             .await?;
         assert_eq!(2, *(*call_count).lock().await);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn machine_4_4_speculative_auth_ignored_on_reauth() -> anyhow::Result<()> {
+        let call_count = Arc::new(Mutex::new(0));
+        let cb_call_count = call_count.clone();
+
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
+        let credential = Credential::builder()
+            .mechanism(AuthMechanism::MongoDbOidc)
+            .oidc_callback(oidc::Callback::machine(move |_| {
+                let call_count = cb_call_count.clone();
+                async move {
+                    *call_count.lock().await += 1;
+                    Ok(oidc::IdpServerResponse {
+                        access_token: get_access_token_test_user_1().await,
+                        expires: None,
+                        refresh_token: None,
+                    })
+                }
+                .boxed()
+            }))
+            .build();
+        credential
+            .oidc_callback
+            .set_access_token(Some(get_access_token_test_user_1().await))
+            .await;
+        opts.credential = Some(credential);
+        let buffer: EventBuffer<CommandEvent> = EventBuffer::new();
+        opts.command_event_handler = Some(buffer.handler());
+        let client = Client::with_options(opts)?;
+
+        client
+            .database("db")
+            .collection("coll")
+            .insert_one(doc! { "x": 1 })
+            .await?;
+
+        assert_eq!(*call_count.lock().await, 0);
+        let sasl_start_events = buffer.filter_map(|event| match event {
+            CommandEvent::Started(command_started_event)
+                if command_started_event.command_name == "saslStart" =>
+            {
+                Some(event.clone())
+            }
+            _ => None,
+        });
+        assert!(sasl_start_events.is_empty());
+
+        let fail_point =
+            FailPoint::fail_command(&["insert"], FailPointMode::Times(1)).error_code(391);
+        let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+        client
+            .database("db")
+            .collection("coll")
+            .insert_one(doc! { "y": 2 })
+            .await?;
+
+        assert_eq!(*call_count.lock().await, 1);
+        let sasl_start_events = buffer.filter_map(|event| match event {
+            CommandEvent::Started(command_started_event)
+                if command_started_event.command_name == "saslStart" =>
+            {
+                Some(event.clone())
+            }
+            _ => None,
+        });
+        assert!(!sasl_start_events.is_empty());
+
         Ok(())
     }
 
