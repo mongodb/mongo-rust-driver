@@ -5,6 +5,7 @@ use tokio::sync::OnceCell;
 
 static MONGODB_URI: Lazy<String> = Lazy::new(|| get_env_var("MONGODB_URI"));
 static MONGODB_URI_SINGLE: Lazy<String> = Lazy::new(|| get_env_var("MONGODB_URI_SINGLE"));
+#[cfg(target_os = "linux")]
 static MONGODB_URI_MULTI: Lazy<String> = Lazy::new(|| get_env_var("MONGODB_URI_MULTI"));
 static OIDC_DOMAIN: Lazy<String> = Lazy::new(|| get_env_var("OIDC_DOMAIN"));
 static OIDC_TOKEN_DIR: Lazy<PathBuf> = Lazy::new(|| {
@@ -12,9 +13,11 @@ static OIDC_TOKEN_DIR: Lazy<PathBuf> = Lazy::new(|| {
         .unwrap_or_else(|_| "/tmp/tokens".to_string())
         .into()
 });
+#[cfg(target_os = "linux")]
 static OIDC_TOKEN_FILE: Lazy<String> = Lazy::new(|| get_env_var("OIDC_TOKEN_FILE"));
 static TEST_USER_1_USERNAME: Lazy<String> = Lazy::new(|| format!("test_user1@{}", *OIDC_DOMAIN));
-static TEST_USER_2_USERNAME: Lazy<String> = Lazy::new(|| format!("test_user2@{}", *OIDC_DOMAIN,));
+#[cfg(target_os = "linux")]
+static TEST_USER_2_USERNAME: Lazy<String> = Lazy::new(|| format!("test_user2@{}", *OIDC_DOMAIN));
 
 async fn get_access_token_test_user(once_cell: &'static OnceCell<String>, user_n: u8) -> String {
     once_cell
@@ -31,6 +34,7 @@ async fn get_access_token_test_user_1() -> String {
     static ACCESS_TOKEN_TEST_USER_1: OnceCell<String> = OnceCell::const_new();
     get_access_token_test_user(&ACCESS_TOKEN_TEST_USER_1, 1).await
 }
+#[cfg(target_os = "linux")]
 async fn get_access_token_test_user_2() -> String {
     static ACCESS_TOKEN_TEST_USER_2: OnceCell<String> = OnceCell::const_new();
     get_access_token_test_user(&ACCESS_TOKEN_TEST_USER_2, 2).await
@@ -57,12 +61,16 @@ mod basic {
 
     use super::{
         get_access_token_test_user_1,
-        get_access_token_test_user_2,
         MONGODB_URI,
-        MONGODB_URI_MULTI,
         MONGODB_URI_SINGLE,
-        OIDC_TOKEN_FILE,
         TEST_USER_1_USERNAME,
+    };
+
+    #[cfg(target_os = "linux")]
+    use super::{
+        get_access_token_test_user_2,
+        MONGODB_URI_MULTI,
+        OIDC_TOKEN_FILE,
         TEST_USER_2_USERNAME,
     };
 
@@ -486,6 +494,7 @@ mod basic {
     }
 
     #[tokio::test]
+    #[cfg(target_os = "linux")] // MONGODB_URI_MULTI is only set when running on linux
     async fn human_1_4_multiple_principal_user_2() -> anyhow::Result<()> {
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
@@ -520,6 +529,7 @@ mod basic {
     }
 
     #[tokio::test]
+    #[cfg(target_os = "linux")] // MONGODB_URI_MULTI is only set when running on linux
     async fn human_1_5_multiple_principal_no_user() -> anyhow::Result<()> {
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
