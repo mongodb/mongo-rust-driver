@@ -1178,7 +1178,7 @@ tasks:
           - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/azure/run-driver-test.sh
         env:
           AZUREOIDC_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
-          AZUREOIDC_TEST_CMD: "ls -laR data && PROJECT_DIRECTORY='.' OIDC_ENV=azure OIDC=oidc TEST_FILE=./${STATIC_TEST_BINARY} ./.evergreen/run-mongodb-oidc-test.sh"
+          AZUREOIDC_TEST_CMD: "source ./env.sh && RUST_BACKTRACE=1 ./${STATIC_TEST_BINARY} test::spec::oidc_skip_ci::azure -- --no-capture"
 
   - name: "oidc-auth-test-gcp-latest"
     commands:
