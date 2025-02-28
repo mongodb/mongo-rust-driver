@@ -393,7 +393,7 @@ mod basic {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn machine_4_4_speculative_auth_ignored_on_reauth() -> anyhow::Result<()> {
         let call_count = Arc::new(Mutex::new(0));
         let cb_call_count = call_count.clone();
@@ -434,7 +434,7 @@ mod basic {
 
         let fail_point =
             FailPoint::fail_command(&["insert"], FailPointMode::Times(1)).error_code(391);
-        let _guard = client.enable_fail_point(fail_point).await.unwrap();
+        let _guard = client.enable_fail_point(fail_point).await?;
 
         client
             .database("test")
