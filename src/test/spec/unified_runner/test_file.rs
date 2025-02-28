@@ -18,6 +18,7 @@ use crate::{
     error::{BulkWriteError, Error, ErrorKind},
     gridfs::options::GridFsBucketOptions,
     options::{
+        AuthMechanism,
         ClientOptions,
         CollectionOptions,
         DatabaseOptions,
@@ -85,6 +86,7 @@ pub(crate) struct RunOnRequirement {
     serverless: Option<Serverless>,
     auth: Option<bool>,
     csfle: Option<bool>,
+    auth_mechanism: Option<AuthMechanism>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
@@ -147,6 +149,17 @@ impl RunOnRequirement {
         }
         if self.csfle == Some(true) && !cfg!(feature = "in-use-encryption") {
             return Err("requires csfle but in-use-encryption feature not enabled".to_string());
+        }
+        if let Some(ref auth_mechanism) = self.auth_mechanism {
+            let actual_mechanism = client
+                .options()
+                .credential
+                .as_ref()
+                .and_then(|c| c.mechanism.as_ref());
+            if !actual_mechanism.is_some_and(|actual_mechanism| actual_mechanism == auth_mechanism)
+            {
+                return Err("requires OIDC".to_string());
+            }
         }
         Ok(())
     }

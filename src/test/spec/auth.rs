@@ -5,7 +5,7 @@ use serde::Deserialize;
 use crate::{
     bson::Document,
     options::{AuthMechanism, ClientOptions, Credential},
-    test::run_spec_test,
+    test::{run_spec_test, spec::unified_runner::run_unified_tests},
 };
 
 #[derive(Debug, Deserialize)]
@@ -110,4 +110,7 @@ async fn run_legacy() {
     run_spec_test(&["auth", "legacy"], run_auth_test).await;
 }
 
-// TODO RUST-1665: run unified tests
+#[tokio::test]
+async fn run_unified() {
+    run_unified_tests(&["auth", "unified"]).await;
+}
