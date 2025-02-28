@@ -423,8 +423,8 @@ mod basic {
         let event_buffer = &client.events;
 
         client
-            .database("db")
-            .collection("coll")
+            .database("test")
+            .collection("test")
             .insert_one(doc! { "x": 1 })
             .await?;
 
@@ -437,8 +437,8 @@ mod basic {
         let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
         client
-            .database("db")
-            .collection("coll")
+            .database("test")
+            .collection("test")
             .insert_one(doc! { "y": 2 })
             .await?;
 
