@@ -630,7 +630,7 @@ async fn retry_commit_txn_check_out() {
         );
         return;
     }
-    if !streaming_monitor_protocol_supported().await {
+    if streaming_monitor_protocol_supported().await {
         log_uncaptured("skipping retry_commit_txn_check_out due to streaming protocol support");
         return;
     }
