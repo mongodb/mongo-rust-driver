@@ -12,18 +12,27 @@ use crate::{
     runtime,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{
+        auth_enabled,
         get_client_options,
         log_uncaptured,
+        topology_is_replica_set,
+        topology_is_sharded,
+        topology_is_standalone,
+        transactions_supported,
         util::{
             event_buffer::{EventBuffer, EventStream},
             fail_point::{FailPoint, FailPointMode},
-            TestClient,
         },
         Event,
         SERVER_API,
     },
     Client,
     ServerType,
+};
+
+use super::{
+    fail_command_appname_initial_handshake_supported,
+    streaming_monitor_protocol_supported,
 };
 
 #[derive(Debug, Deserialize)]
@@ -42,13 +51,13 @@ struct DriverMetadata {
 
 #[tokio::test]
 async fn metadata_sent_in_handshake() {
-    let client = Client::for_test().await;
-
     // skip on other topologies due to different currentOp behavior
-    if !client.is_standalone() || !client.is_replica_set() {
+    if !(topology_is_standalone().await || topology_is_replica_set().await) {
         log_uncaptured("skipping metadata_sent_in_handshake due to unsupported topology");
         return;
     }
+
+    let client = Client::for_test().await;
 
     let result = client
         .database("admin")
@@ -240,11 +249,12 @@ async fn list_database_names() {
 #[tokio::test]
 #[function_name::named]
 async fn list_authorized_databases() {
-    let client = Client::for_test().await;
-    if client.server_version_lt(4, 0) || !client.auth_enabled() {
+    if !auth_enabled().await {
         log_uncaptured("skipping list_authorized_databases due to test configuration");
         return;
     }
+
+    let client = Client::for_test().await;
 
     let dbs = &[
         format!("{}1", function_name!()),
@@ -410,12 +420,7 @@ async fn auth_test_uri(
 ///
 /// If only one mechanism is supplied, this will also test that using the other SCRAM mechanism will
 /// fail.
-async fn scram_test(
-    client: &TestClient,
-    username: &str,
-    password: &str,
-    mechanisms: &[AuthMechanism],
-) {
+async fn scram_test(username: &str, password: &str, mechanisms: &[AuthMechanism]) {
     for mechanism in mechanisms {
         auth_test_uri(username, password, Some(mechanism.clone()), true).await;
         auth_test_uri(username, password, None, true).await;
@@ -424,7 +429,7 @@ async fn scram_test(
     }
 
     // If only one scram mechanism is specified, verify the other doesn't work.
-    if mechanisms.len() == 1 && client.server_version_gte(4, 0) {
+    if mechanisms.len() == 1 {
         let other = match mechanisms[0] {
             AuthMechanism::ScramSha1 => AuthMechanism::ScramSha256,
             _ => AuthMechanism::ScramSha1,
@@ -436,11 +441,12 @@ async fn scram_test(
 
 #[tokio::test]
 async fn scram_sha1() {
-    let client = Client::for_test().await;
-    if !client.auth_enabled() {
+    if !auth_enabled().await {
         log_uncaptured("skipping scram_sha1 due to missing authentication");
         return;
     }
+
+    let client = Client::for_test().await;
 
     client
         .create_user(
@@ -452,16 +458,17 @@ async fn scram_sha1() {
         )
         .await
         .unwrap();
-    scram_test(&client, "sha1", "sha1", &[AuthMechanism::ScramSha1]).await;
+    scram_test("sha1", "sha1", &[AuthMechanism::ScramSha1]).await;
 }
 
 #[tokio::test]
 async fn scram_sha256() {
-    let client = Client::for_test().await;
-    if client.server_version_lt(4, 0) || !client.auth_enabled() {
+    if !auth_enabled().await {
         log_uncaptured("skipping scram_sha256 due to test configuration");
         return;
     }
+
+    let client = Client::for_test().await;
     client
         .create_user(
             "sha256",
@@ -472,16 +479,17 @@ async fn scram_sha256() {
         )
         .await
         .unwrap();
-    scram_test(&client, "sha256", "sha256", &[AuthMechanism::ScramSha256]).await;
+    scram_test("sha256", "sha256", &[AuthMechanism::ScramSha256]).await;
 }
 
 #[tokio::test]
 async fn scram_both() {
-    let client = Client::for_test().await;
-    if client.server_version_lt(4, 0) || !client.auth_enabled() {
+    if !auth_enabled().await {
         log_uncaptured("skipping scram_both due to test configuration");
         return;
     }
+
+    let client = Client::for_test().await;
     client
         .create_user(
             "both",
@@ -493,7 +501,6 @@ async fn scram_both() {
         .await
         .unwrap();
     scram_test(
-        &client,
         "both",
         "both",
         &[AuthMechanism::ScramSha1, AuthMechanism::ScramSha256],
@@ -503,8 +510,7 @@ async fn scram_both() {
 
 #[tokio::test]
 async fn scram_missing_user_uri() {
-    let client = Client::for_test().await;
-    if !client.auth_enabled() {
+    if !auth_enabled().await {
         log_uncaptured("skipping scram_missing_user_uri due to missing authentication");
         return;
     }
@@ -513,8 +519,7 @@ async fn scram_missing_user_uri() {
 
 #[tokio::test]
 async fn scram_missing_user_options() {
-    let client = Client::for_test().await;
-    if !client.auth_enabled() {
+    if !auth_enabled().await {
         log_uncaptured("skipping scram_missing_user_options due to missing authentication");
         return;
     }
@@ -523,12 +528,12 @@ async fn scram_missing_user_options() {
 
 #[tokio::test]
 async fn saslprep() {
-    let client = Client::for_test().await;
-
-    if client.server_version_lt(4, 0) || !client.auth_enabled() {
+    if !auth_enabled().await {
         log_uncaptured("skipping saslprep due to test configuration");
         return;
     }
+
+    let client = Client::for_test().await;
 
     client
         .create_user(
@@ -611,28 +616,26 @@ async fn x509_auth_skip_ci() {
 /// failure works.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_commit_txn_check_out() {
-    let setup_client = Client::for_test().await;
-    if !setup_client.is_replica_set() {
+    if !topology_is_replica_set().await {
         log_uncaptured("skipping retry_commit_txn_check_out due to non-replicaset topology");
         return;
     }
-
-    if !setup_client.supports_transactions() {
+    if !transactions_supported().await {
         log_uncaptured("skipping retry_commit_txn_check_out due to lack of transaction support");
         return;
     }
-
-    if !setup_client.supports_fail_command_appname_initial_handshake() {
+    if !fail_command_appname_initial_handshake_supported().await {
         log_uncaptured(
             "skipping retry_commit_txn_check_out due to insufficient failCommand support",
         );
         return;
     }
-
-    if setup_client.supports_streaming_monitoring_protocol() {
+    if !streaming_monitor_protocol_supported().await {
         log_uncaptured("skipping retry_commit_txn_check_out due to streaming protocol support");
         return;
     }
+
+    let setup_client = Client::for_test().await;
 
     // ensure namespace exists
     setup_client
@@ -747,11 +750,12 @@ async fn manual_shutdown_with_nothing() {
 /// Verifies that `Client::shutdown` succeeds when resources have been dropped.
 #[tokio::test]
 async fn manual_shutdown_with_resources() {
-    let client = Client::for_test().monitor_events().await;
-    if !client.supports_transactions() {
+    if !transactions_supported().await {
         log_uncaptured("Skipping manual_shutdown_with_resources: no transaction support");
         return;
     }
+
+    let client = Client::for_test().monitor_events().await;
     let db = client.database("shutdown_test");
     db.drop().await.unwrap();
     let coll = db.collection::<Document>("test");
@@ -780,7 +784,7 @@ async fn manual_shutdown_with_resources() {
         }
         let _stream = bucket.open_upload_stream("test").await.unwrap();
     }
-    let is_sharded = client.is_sharded();
+    let is_sharded = topology_is_sharded().await;
     let events = client.events.clone();
     client.into_client().shutdown().await;
     if !is_sharded {
@@ -805,11 +809,12 @@ async fn manual_shutdown_immediate_with_nothing() {
 /// Verifies that `Client::shutdown_immediate` succeeds without waiting for resources.
 #[tokio::test]
 async fn manual_shutdown_immediate_with_resources() {
-    let client = Client::for_test().monitor_events().await;
-    if !client.supports_transactions() {
+    if !transactions_supported().await {
         log_uncaptured("Skipping manual_shutdown_immediate_with_resources: no transaction support");
         return;
     }
+
+    let client = Client::for_test().monitor_events().await;
     let db = client.database("shutdown_test");
     db.drop().await.unwrap();
     let coll = db.collection::<Document>("test");

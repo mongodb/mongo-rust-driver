@@ -13,15 +13,19 @@ use crate::{
     bson::{doc, Document},
     error::{ErrorKind, Result},
     event::command::{CommandEvent, CommandStartedEvent},
-    test::{get_client_options, spec::unified_runner::run_unified_tests},
+    test::{
+        get_client_options,
+        server_version_gte,
+        spec::unified_runner::run_unified_tests,
+        topology_is_sharded,
+    },
     Client,
 };
 
 #[tokio::test(flavor = "multi_thread")]
 async fn run_unified() {
     let mut skipped_files = vec![];
-    let client = Client::for_test().await;
-    if client.is_sharded() && client.server_version_gte(7, 0) {
+    if topology_is_sharded().await && server_version_gte(7, 0).await {
         // TODO RUST-1666: unskip this file
         skipped_files.push("snapshot-sessions.json");
     }

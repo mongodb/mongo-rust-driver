@@ -25,9 +25,12 @@ use crate::{
     },
     selection_criteria::TagSet,
     test::{
+        fail_command_appname_initial_handshake_supported,
         get_client_options,
         log_uncaptured,
         run_spec_test,
+        topology_is_load_balanced,
+        topology_is_replica_set,
         util::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
@@ -627,6 +630,11 @@ async fn topology_closed_event_last() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn heartbeat_events() {
+    if topology_is_load_balanced().await {
+        log_uncaptured("skipping heartbeat_events tests due to load-balanced topology");
+        return;
+    }
+
     let mut options = get_client_options().await.clone();
     options.hosts.drain(1..);
     options.heartbeat_freq = Some(Duration::from_millis(50));
@@ -640,11 +648,6 @@ async fn heartbeat_events() {
         .await;
 
     let mut subscriber = client.events.stream_all();
-
-    if client.is_load_balanced() {
-        log_uncaptured("skipping heartbeat_events tests due to load-balanced topology");
-        return;
-    }
 
     subscriber
         .next_match(Duration::from_millis(500), |event| {
@@ -660,7 +663,7 @@ async fn heartbeat_events() {
         .await
         .expect("should see server heartbeat succeeded event");
 
-    if !client.supports_fail_command_appname_initial_handshake() {
+    if !fail_command_appname_initial_handshake_supported().await {
         return;
     }
 
@@ -687,11 +690,12 @@ async fn heartbeat_events() {
 #[tokio::test]
 #[function_name::named]
 async fn direct_connection() {
-    let test_client = Client::for_test().await;
-    if !test_client.is_replica_set() {
+    if !topology_is_replica_set().await {
         log_uncaptured("Skipping direct_connection test due to non-replica set topology");
         return;
     }
+
+    let test_client = Client::for_test().await;
 
     let criteria = SelectionCriteria::ReadPreference(ReadPreference::Secondary {
         options: Default::default(),

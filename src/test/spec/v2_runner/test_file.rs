@@ -2,18 +2,19 @@ use std::collections::HashMap;
 
 use bson::{doc, from_document, Bson};
 use futures::TryStreamExt;
-use semver::VersionReq;
 use serde::{Deserialize, Deserializer};
 
 use crate::{
     bson::Document,
     options::{ReadPreference, SelectionCriteria, SessionOptions},
     test::{
+        get_topology,
         log_uncaptured,
+        server_version_matches,
         spec::merge_uri_options,
         util::{fail_point::FailPoint, is_expected_type},
         Serverless,
-        TestClient,
+        Topology,
         DEFAULT_URI,
     },
     Client,
@@ -45,38 +46,34 @@ pub(crate) struct TestFile {
 pub(crate) struct RunOn {
     pub(crate) min_server_version: Option<String>,
     pub(crate) max_server_version: Option<String>,
-    pub(crate) topology: Option<Vec<String>>,
+    pub(crate) topology: Option<Vec<Topology>>,
     pub(crate) serverless: Option<Serverless>,
 }
 
 impl RunOn {
-    pub(crate) fn can_run_on(&self, client: &TestClient) -> bool {
+    pub(crate) async fn can_run_on(&self) -> bool {
         if let Some(ref min_version) = self.min_server_version {
-            let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
-            if !req.matches(&client.server_version) {
+            if !server_version_matches(&format!(">= {min_version}")).await {
                 log_uncaptured(format!(
-                    "runOn mismatch: required server version >= {}, got {}",
-                    min_version, client.server_version
+                    "runOn mismatch: required server version >= {min_version}",
                 ));
                 return false;
             }
         }
         if let Some(ref max_version) = self.max_server_version {
-            let req = VersionReq::parse(&format!("<= {}", &max_version)).unwrap();
-            if !req.matches(&client.server_version) {
+            if !server_version_matches(&format!("<= {max_version}")).await {
                 log_uncaptured(format!(
-                    "runOn mismatch: required server version <= {}, got {}",
-                    max_version, client.server_version
+                    "runOn mismatch: required server version <= {max_version}",
                 ));
                 return false;
             }
         }
         if let Some(ref topology) = self.topology {
-            if !topology.contains(&client.topology_string()) {
+            let actual_topology = get_topology().await;
+            if !topology.contains(actual_topology) {
                 log_uncaptured(format!(
                     "runOn mismatch: required topology in {:?}, got {:?}",
-                    topology,
-                    client.topology_string()
+                    topology, actual_topology
                 ));
                 return false;
             }

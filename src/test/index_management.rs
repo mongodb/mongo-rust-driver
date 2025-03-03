@@ -7,19 +7,26 @@ use crate::{
     bson::doc,
     error::ErrorKind,
     options::{CommitQuorum, IndexOptions},
-    test::{log_uncaptured, spec::unified_runner::run_unified_tests},
+    test::{
+        log_uncaptured,
+        server_version_lt,
+        spec::unified_runner::run_unified_tests,
+        topology_is_load_balanced,
+        topology_is_sharded,
+        topology_is_standalone,
+    },
     Client,
     IndexModel,
 };
 
 #[tokio::test]
 async fn run_unified() {
-    let client = Client::for_test().await;
-
     let mut skipped_files = Vec::new();
     let mut skipped_tests = Vec::new();
     // TODO DRIVERS-2794: unskip these tests
-    if client.server_version_lt(7, 2) && (client.is_sharded() || client.is_load_balanced()) {
+    if server_version_lt(7, 2).await
+        && (topology_is_sharded().await || topology_is_load_balanced().await)
+    {
         skipped_files.push("listSearchIndexes.json");
         skipped_tests.push("listSearchIndexes ignores read and write concern");
     }
@@ -329,11 +336,12 @@ async fn index_management_executes_commands() {
 #[tokio::test]
 #[function_name::named]
 async fn commit_quorum_error() {
-    let client = Client::for_test().await;
-    if client.is_standalone() {
+    if topology_is_standalone().await {
         log_uncaptured("skipping commit_quorum_error due to standalone topology");
         return;
     }
+
+    let client = Client::for_test().await;
 
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
@@ -345,7 +353,7 @@ async fn commit_quorum_error() {
         .commit_quorum(CommitQuorum::Majority)
         .await;
 
-    if client.server_version_lt(4, 4) {
+    if server_version_lt(4, 4).await {
         let err = result.unwrap_err();
         assert!(matches!(*err.kind, ErrorKind::InvalidArgument { .. }));
     } else {

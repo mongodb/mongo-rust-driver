@@ -33,7 +33,7 @@ use crate::{
     Namespace,
 };
 
-use super::{log_uncaptured, EventClient};
+use super::{log_uncaptured, server_version_lt, topology_is_standalone, EventClient};
 
 type Result<T> = anyhow::Result<T>;
 pub(crate) type KmsInfo = (KmsProvider, Document, Option<TlsOptions>);
@@ -300,12 +300,11 @@ macro_rules! failure {
 use failure;
 
 async fn fle2v2_ok(name: &str) -> bool {
-    let setup_client = Client::for_test().await;
-    if setup_client.server_version_lt(7, 0) {
+    if server_version_lt(7, 0).await {
         log_uncaptured(format!("Skipping {}: not supported on server < 7.0", name));
         return false;
     }
-    if setup_client.is_standalone() {
+    if topology_is_standalone().await {
         log_uncaptured(format!("Skipping {}: not supported on standalone", name));
         return false;
     }

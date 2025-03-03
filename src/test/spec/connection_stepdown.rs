@@ -7,7 +7,14 @@ use crate::{
     error::{CommandError, ErrorKind},
     options::{Acknowledgment, WriteConcern},
     selection_criteria::SelectionCriteria,
-    test::{get_client_options, log_uncaptured, EventClient},
+    test::{
+        get_client_options,
+        log_uncaptured,
+        server_version_eq,
+        server_version_lt,
+        topology_is_replica_set,
+        EventClient,
+    },
     Collection,
     Database,
 };
@@ -16,6 +23,14 @@ async fn run_test<F: Future>(
     name: &str,
     test: impl Fn(EventClient, Database, Collection<Document>) -> F,
 ) {
+    if !topology_is_replica_set().await {
+        log_uncaptured(format!(
+            "skipping test {:?} due to not running on a replica set",
+            name
+        ));
+        return;
+    }
+
     let mut options = get_client_options().await.clone();
     options.retry_writes = Some(false);
     let client = crate::Client::for_test()
@@ -23,14 +38,6 @@ async fn run_test<F: Future>(
         .use_single_mongos()
         .monitor_events()
         .await;
-
-    if !client.is_replica_set() {
-        log_uncaptured(format!(
-            "skipping test {:?} due to not running on a replica set",
-            name
-        ));
-        return;
-    }
 
     let name = format!("step-down-{}", name);
 
@@ -53,7 +60,7 @@ async fn run_test<F: Future>(
 async fn get_more() {
     async fn get_more_test(client: EventClient, _db: Database, coll: Collection<Document>) {
         // This test requires server version 4.2 or higher.
-        if client.server_version_lt(4, 2) {
+        if server_version_lt(4, 2).await {
             log_uncaptured("skipping get_more due to server version < 4.2");
             return;
         }
@@ -106,7 +113,7 @@ async fn notwritableprimary_keep_pool() {
         coll: Collection<Document>,
     ) {
         // This test requires server version 4.2 or higher.
-        if client.server_version_lt(4, 2) {
+        if server_version_lt(4, 2).await {
             log_uncaptured("skipping notwritableprimary_keep_pool due to server version < 4.2");
             return;
         }
@@ -156,7 +163,7 @@ async fn notwritableprimary_reset_pool() {
         coll: Collection<Document>,
     ) {
         // This test must only run on 4.0 servers.
-        if !client.server_version_eq(4, 0) {
+        if !server_version_eq(4, 0).await {
             log_uncaptured(
                 "skipping notwritableprimary_reset_pool due to unsupported server version",
             );
@@ -207,11 +214,6 @@ async fn shutdown_in_progress() {
         _db: Database,
         coll: Collection<Document>,
     ) {
-        if client.server_version_lt(4, 0) {
-            log_uncaptured("skipping shutdown_in_progress due to server version < 4.0");
-            return;
-        }
-
         client
             .database("admin")
             .run_command(doc! {
@@ -252,11 +254,6 @@ async fn interrupted_at_shutdown() {
         _db: Database,
         coll: Collection<Document>,
     ) {
-        if client.server_version_lt(4, 0) {
-            log_uncaptured("skipping interrupted_at_shutdown due to server version < 4.2");
-            return;
-        }
-
         client
             .database("admin")
             .run_command(doc! {

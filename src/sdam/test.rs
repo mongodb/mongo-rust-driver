@@ -4,7 +4,6 @@ use std::{
 };
 
 use bson::doc;
-use semver::VersionReq;
 
 use crate::{
     client::options::{ClientOptions, ServerAddress},
@@ -14,8 +13,12 @@ use crate::{
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     sdam::{ServerDescription, Topology},
     test::{
+        fail_command_appname_initial_handshake_supported,
         get_client_options,
         log_uncaptured,
+        server_version_matches,
+        topology_is_load_balanced,
+        topology_is_replica_set,
         util::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
@@ -27,25 +30,25 @@ use crate::{
 
 #[tokio::test(flavor = "multi_thread")]
 async fn min_heartbeat_frequency() {
-    let mut setup_client_options = get_client_options().await.clone();
-    if setup_client_options.load_balanced.unwrap_or(false) {
+    if topology_is_load_balanced().await {
         log_uncaptured("skipping min_heartbeat_frequency test due to load-balanced topology");
         return;
     }
-    setup_client_options.hosts.drain(1..);
-    setup_client_options.direct_connection = Some(true);
-
-    let setup_client = Client::for_test()
-        .options(setup_client_options.clone())
-        .await;
-
-    if !setup_client.supports_fail_command_appname_initial_handshake() {
+    if !fail_command_appname_initial_handshake_supported().await {
         log_uncaptured(
             "skipping min_heartbeat_frequency test due to server not supporting failcommand \
              appname",
         );
         return;
     }
+
+    let mut setup_client_options = get_client_options().await.clone();
+    setup_client_options.hosts.drain(1..);
+    setup_client_options.direct_connection = Some(true);
+
+    let setup_client = Client::for_test()
+        .options(setup_client_options.clone())
+        .await;
 
     let _guard = setup_client
         .enable_fail_point(
@@ -86,6 +89,13 @@ async fn min_heartbeat_frequency() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sdam_pool_management() {
+    if !server_version_matches(">= 4.2.9").await {
+        log_uncaptured(
+            "skipping sdam_pool_management test due to server not supporting appName failCommand",
+        );
+        return;
+    }
+
     let mut options = get_client_options().await.clone();
     if options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping sdam_pool_management test due to load-balanced topology");
@@ -104,16 +114,6 @@ async fn sdam_pool_management() {
         .await;
 
     let mut subscriber = client.events.stream_all();
-
-    if !VersionReq::parse(">= 4.2.9")
-        .unwrap()
-        .matches(&client.server_version)
-    {
-        log_uncaptured(
-            "skipping sdam_pool_management test due to server not supporting appName failCommand",
-        );
-        return;
-    }
 
     subscriber
         .next_match(Duration::from_millis(500), |event| {
@@ -160,6 +160,11 @@ async fn sdam_pool_management() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn hello_ok_true() {
+    if !server_version_matches(">= 4.4.5").await {
+        log_uncaptured("skipping hello_ok_true test due to server not supporting hello");
+        return;
+    }
+
     let mut setup_client_options = get_client_options().await.clone();
     setup_client_options.hosts.drain(1..);
 
@@ -170,17 +175,6 @@ async fn hello_ok_true() {
 
     if setup_client_options.load_balanced == Some(true) {
         log_uncaptured("skipping hello_ok_true test due to load balanced topology");
-        return;
-    }
-
-    let setup_client = Client::for_test()
-        .options(setup_client_options.clone())
-        .await;
-    if !VersionReq::parse(">= 4.4.5")
-        .unwrap()
-        .matches(&setup_client.server_version)
-    {
-        log_uncaptured("skipping hello_ok_true test due to server not supporting hello");
         return;
     }
 
@@ -226,8 +220,7 @@ async fn hello_ok_true() {
 
 #[tokio::test]
 async fn repl_set_name_mismatch() -> crate::error::Result<()> {
-    let client = Client::for_test().await;
-    if !client.is_replica_set() {
+    if !topology_is_replica_set().await {
         log_uncaptured("skipping repl_set_name_mismatch due to non-replica set topology");
         return Ok(());
     }

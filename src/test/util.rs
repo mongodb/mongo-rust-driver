@@ -8,18 +8,16 @@ mod trace;
 use std::{env, fmt::Debug, fs::File, future::IntoFuture, io::Write, time::Duration};
 
 use futures::FutureExt;
-use semver::{Version, VersionReq};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "in-use-encryption")]
 use crate::client::EncryptedClientBuilder;
 use crate::{
     bson::{doc, Bson, Document},
-    client::options::ServerAddress,
     error::Result,
     hello::{hello_command, HelloCommandResponse},
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
-    test::{get_client_options, Topology},
+    test::{get_client_options, server_version_gte, topology_is_sharded},
     BoxFuture,
     Client,
     Collection,
@@ -40,9 +38,6 @@ pub(crate) use self::{
 #[derive(Clone, Debug)]
 pub(crate) struct TestClient {
     client: Client,
-    pub(crate) server_info: HelloCommandResponse,
-    pub(crate) server_version: Version,
-    pub(crate) server_parameters: Document,
 }
 
 impl std::ops::Deref for TestClient {
@@ -124,14 +119,8 @@ impl IntoFuture for TestClientBuilder {
                 options.test_options_mut().min_heartbeat_freq = Some(freq);
             }
 
-            if self.use_single_mongos {
-                let tmp = TestClient::from_client(
-                    Client::with_options(get_client_options().await.clone()).unwrap(),
-                )
-                .await;
-                if tmp.is_sharded() {
-                    options.hosts = options.hosts.iter().take(1).cloned().collect();
-                }
+            if self.use_single_mongos && topology_is_sharded().await {
+                options.hosts = options.hosts.iter().take(1).cloned().collect();
             }
 
             #[cfg(feature = "in-use-encryption")]
@@ -145,50 +134,13 @@ impl IntoFuture for TestClientBuilder {
             #[cfg(not(feature = "in-use-encryption"))]
             let client = Client::with_options(options).unwrap();
 
-            TestClient::from_client(client).await
+            TestClient { client }
         }
         .boxed()
     }
 }
 
 impl TestClient {
-    async fn from_client(client: Client) -> Self {
-        let hello = hello_command(
-            client.options().server_api.as_ref(),
-            client.options().load_balanced,
-            None,
-            None,
-        );
-        let server_info_doc = client
-            .database("admin")
-            .run_command(hello.body.try_into().unwrap())
-            .await
-            .unwrap();
-        let server_info = bson::from_document(server_info_doc).unwrap();
-
-        let build_info = client
-            .database("test")
-            .run_command(doc! { "buildInfo": 1 })
-            .await
-            .unwrap();
-        let mut server_version = Version::parse(build_info.get_str("version").unwrap()).unwrap();
-        // Clear prerelease tag to allow version comparisons.
-        server_version.pre = semver::Prerelease::EMPTY;
-
-        let server_parameters = client
-            .database("admin")
-            .run_command(doc! { "getParameter": "*" })
-            .await
-            .unwrap_or_default();
-
-        Self {
-            client,
-            server_info,
-            server_version,
-            server_parameters,
-        }
-    }
-
     pub(crate) async fn create_user(
         &self,
         user: &str,
@@ -203,7 +155,7 @@ impl TestClient {
             cmd.insert("pwd", pwd);
         }
 
-        if self.server_version_gte(4, 0) && !mechanisms.is_empty() {
+        if server_version_gte(4, 0).await && !mechanisms.is_empty() {
             let ms: bson::Array = mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();
             cmd.insert("mechanisms", ms);
         }
@@ -266,135 +218,28 @@ impl TestClient {
         self.get_coll(db_name, coll_name)
     }
 
-    pub(crate) fn supports_fail_command(&self) -> bool {
-        let version = if self.is_sharded() {
-            ">= 4.1.5"
-        } else {
-            ">= 4.0"
-        };
-        self.server_version_matches(version)
-    }
-
-    pub(crate) fn server_version_matches(&self, req: &str) -> bool {
-        VersionReq::parse(req)
-            .unwrap()
-            .matches(&self.server_version)
-    }
-
-    pub(crate) fn supports_block_connection(&self) -> bool {
-        self.server_version_matches(">= 4.2.9")
-    }
-
-    /// Whether the deployment supports failing the initial handshake
-    /// only when it uses a specified appName.
-    ///
-    /// See SERVER-49336 for more info.
-    pub(crate) fn supports_fail_command_appname_initial_handshake(&self) -> bool {
-        let requirements = [
-            VersionReq::parse(">= 4.2.15, < 4.3.0").unwrap(),
-            VersionReq::parse(">= 4.4.7, < 4.5.0").unwrap(),
-            VersionReq::parse(">= 4.9.0").unwrap(),
-        ];
-        requirements
-            .iter()
-            .any(|req| req.matches(&self.server_version))
-    }
-
-    pub(crate) fn supports_transactions(&self) -> bool {
-        self.is_replica_set() && self.server_version_gte(4, 0)
-            || self.is_sharded() && self.server_version_gte(4, 2)
-    }
-
-    pub(crate) fn supports_streaming_monitoring_protocol(&self) -> bool {
-        self.server_info.topology_version.is_some()
-    }
-
-    pub(crate) fn auth_enabled(&self) -> bool {
-        self.client.options().credential.is_some()
-    }
-
-    pub(crate) fn is_standalone(&self) -> bool {
-        self.topology() == Topology::Single
-    }
-
-    pub(crate) fn is_replica_set(&self) -> bool {
-        self.topology() == Topology::ReplicaSet
-    }
-
-    pub(crate) fn is_sharded(&self) -> bool {
-        self.topology() == Topology::Sharded
-    }
-
-    pub(crate) fn is_load_balanced(&self) -> bool {
-        self.topology() == Topology::LoadBalanced
-    }
-
-    pub(crate) fn server_version_eq(&self, major: u64, minor: u64) -> bool {
-        self.server_version.major == major && self.server_version.minor == minor
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn server_version_gt(&self, major: u64, minor: u64) -> bool {
-        self.server_version.major > major
-            || (self.server_version.major == major && self.server_version.minor > minor)
-    }
-
-    pub(crate) fn server_version_gte(&self, major: u64, minor: u64) -> bool {
-        self.server_version.major > major
-            || (self.server_version.major == major && self.server_version.minor >= minor)
-    }
-
-    pub(crate) fn server_version_lt(&self, major: u64, minor: u64) -> bool {
-        self.server_version.major < major
-            || (self.server_version.major == major && self.server_version.minor < minor)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn server_version_lte(&self, major: u64, minor: u64) -> bool {
-        self.server_version.major < major
-            || (self.server_version.major == major && self.server_version.minor <= minor)
-    }
-
     pub(crate) async fn drop_collection(&self, db_name: &str, coll_name: &str) {
         let coll = self.get_coll(db_name, coll_name);
         coll.drop().await.unwrap();
     }
 
-    /// Returns the `Topology' that can be determined without a server query, i.e. all except
-    /// `Toplogy::ShardedReplicaSet`.
-    pub(crate) fn topology(&self) -> Topology {
-        if self.client.options().load_balanced.unwrap_or(false) {
-            return Topology::LoadBalanced;
-        }
-        if self.server_info.msg.as_deref() == Some("isdbgrid") {
-            return Topology::Sharded;
-        }
-        if self.server_info.set_name.is_some() {
-            return Topology::ReplicaSet;
-        }
-        Topology::Single
-    }
-
-    pub(crate) fn topology_string(&self) -> String {
-        match self.topology() {
-            Topology::LoadBalanced => "load-balanced",
-            Topology::Sharded => "sharded",
-            Topology::ReplicaSet => "replicaset",
-            Topology::Single => "single",
-        }
-        .to_string()
-    }
-
-    pub(crate) fn primary(&self) -> Option<ServerAddress> {
-        self.server_info
-            .primary
-            .as_ref()
-            .map(|s| ServerAddress::parse(s).unwrap())
-    }
-
     #[allow(dead_code)]
     pub(crate) fn into_client(self) -> Client {
         self.client
+    }
+
+    pub(crate) async fn hello(&self) -> Result<HelloCommandResponse> {
+        let hello = hello_command(
+            self.options().server_api.as_ref(),
+            self.options().load_balanced,
+            None,
+            None,
+        );
+        let hello_response_doc = self
+            .database("admin")
+            .run_command(hello.body.try_into()?)
+            .await?;
+        Ok(bson::from_document(hello_response_doc)?)
     }
 }
 

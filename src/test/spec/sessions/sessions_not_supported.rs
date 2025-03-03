@@ -6,17 +6,14 @@ use crate::{
     error::ErrorKind,
     event::command::CommandEvent,
     runtime::process::Process,
-    test::{log_uncaptured, util::Event, EventClient},
+    test::{log_uncaptured, server_version_lt, util::Event, EventClient},
     Client,
 };
 
 async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
-    let util_client = Client::for_test().await;
-    // TODO RUST-1447: unskip on 8.1+
-    if util_client.server_version_lt(4, 2) || util_client.server_version_gte(8, 1) {
+    if server_version_lt(4, 2).await {
         log_uncaptured(format!(
-            "Skipping {name}: cannot spawn mongocryptd due to server version < 4.2 or server \
-             version >= 8.1"
+            "Skipping {name}: cannot spawn mongocryptd due to server version < 4.2"
         ));
         return None;
     }
@@ -29,7 +26,8 @@ async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
         .await
         .unwrap();
     let client = Client::for_test().options(options).monitor_events().await;
-    assert!(client.server_info.logical_session_timeout_minutes.is_none());
+    let hello_response = client.hello().await.unwrap();
+    assert!(hello_response.logical_session_timeout_minutes.is_none());
 
     Some((client, process))
 }

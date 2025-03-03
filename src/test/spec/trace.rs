@@ -24,6 +24,7 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
+        topology_is_standalone,
         DEFAULT_GLOBAL_TRACING_HANDLER,
         SERVER_API,
     },
@@ -154,12 +155,9 @@ async fn command_logging_truncation_explicit_limit() {
 /// Prose test 3: mid-codepoint truncation
 #[tokio::test]
 async fn command_logging_truncation_mid_codepoint() {
-    let mut client_opts = get_client_options().await.clone();
-    client_opts.tracing_max_document_length_bytes = Some(215);
-    let client = Client::for_test().options(client_opts).await;
     // On non-standalone topologies the command includes a clusterTime and so gets truncated
     // differently.
-    if !client.is_standalone() {
+    if !topology_is_standalone().await {
         log_uncaptured("Skipping test due to incompatible topology type");
         return;
     }
@@ -168,6 +166,10 @@ async fn command_logging_truncation_mid_codepoint() {
         log_uncaptured("Skipping test due to server API version being specified");
         return;
     }
+
+    let mut client_opts = get_client_options().await.clone();
+    client_opts.tracing_max_document_length_bytes = Some(215);
+    let client = Client::for_test().options(client_opts).await;
 
     let coll = client.init_db_and_coll("tracing_test", "truncation").await;
 
