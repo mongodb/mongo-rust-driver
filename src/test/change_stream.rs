@@ -1,6 +1,5 @@
 use bson::{doc, Bson, Document};
 use futures_util::{StreamExt, TryStreamExt};
-use semver::VersionReq;
 
 use crate::{
     change_stream::{
@@ -17,7 +16,18 @@ use crate::{
     Collection,
 };
 
-use super::{get_client_options, log_uncaptured, EventClient};
+use super::{
+    fail_command_supported,
+    get_client_options,
+    log_uncaptured,
+    server_version_gte,
+    server_version_lt,
+    server_version_matches,
+    topology_is_replica_set,
+    topology_is_sharded,
+    transactions_supported,
+    EventClient,
+};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -31,19 +41,18 @@ async fn init_stream(
         ChangeStream<ChangeStreamEvent<Document>>,
     )>,
 > {
-    let init_client = Client::for_test().await;
-    if !init_client.is_replica_set() && !init_client.is_sharded() {
+    if !(topology_is_replica_set().await || topology_is_sharded().await) {
         log_uncaptured("skipping change stream test on unsupported topology");
         return Ok(None);
     }
-    if !init_client.supports_fail_command() {
+    if !fail_command_supported().await {
         log_uncaptured("skipping change stream test on version without fail commands");
         return Ok(None);
     }
 
     let mut options = get_client_options().await.clone();
     // Direct connection is needed for reliable behavior with fail points.
-    if direct_connection && init_client.is_sharded() {
+    if direct_connection && topology_is_sharded().await {
         options.direct_connection = Some(true);
         options.hosts.drain(1..);
     }
@@ -282,21 +291,16 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
 /// stream.
 #[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_start_at_operation_time() -> Result<()> {
+    if !server_version_matches(">=4.0, <4.0.7").await {
+        log_uncaptured("skipping change stream test due to server version");
+        return Ok(());
+    }
+
     let (client, coll, mut stream) =
         match init_stream("resume_start_at_operation_time", true).await? {
             Some(t) => t,
             None => return Ok(()),
         };
-    if !VersionReq::parse(">=4.0, <4.0.7")
-        .unwrap()
-        .matches(&client.server_version)
-    {
-        log_uncaptured(format!(
-            "skipping change stream test due to server version {:?}",
-            client.server_version
-        ));
-        return Ok(());
-    }
 
     let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(43);
     let _guard = client.enable_fail_point(fail_point).await?;
@@ -330,20 +334,15 @@ async fn resume_start_at_operation_time() -> Result<()> {
 /// the postBatchResumeToken from the current command response
 #[tokio::test]
 async fn batch_end_resume_token() -> Result<()> {
+    if !server_version_matches(">=4.0.7").await {
+        log_uncaptured("skipping change stream test due to server version");
+        return Ok(());
+    }
+
     let (client, _, mut stream) = match init_stream("batch_end_resume_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
     };
-    if !VersionReq::parse(">=4.0.7")
-        .unwrap()
-        .matches(&client.server_version)
-    {
-        log_uncaptured(format!(
-            "skipping change stream test due to server version {:?}",
-            client.server_version
-        ));
-        return Ok(());
-    }
 
     assert_eq!(stream.next_if_any().await?, None);
     let token = stream.resume_token().unwrap().parsed()?;
@@ -361,21 +360,15 @@ async fn batch_end_resume_token() -> Result<()> {
 /// Prose test 12: Running against a server <4.0.7, end of batch resume token must follow the spec
 #[tokio::test]
 async fn batch_end_resume_token_legacy() -> Result<()> {
-    let (client, coll, mut stream) =
-        match init_stream("batch_end_resume_token_legacy", false).await? {
-            Some(t) => t,
-            None => return Ok(()),
-        };
-    if !VersionReq::parse("<4.0.7")
-        .unwrap()
-        .matches(&client.server_version)
-    {
-        log_uncaptured(format!(
-            "skipping change stream test due to server version {:?}",
-            client.server_version
-        ));
+    if !server_version_matches("<4.0.7").await {
+        log_uncaptured("skipping change stream test due to server version");
         return Ok(());
     }
+
+    let (_, coll, mut stream) = match init_stream("batch_end_resume_token_legacy", false).await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
 
     // Case: empty batch, `resume_after` not specified
     assert_eq!(stream.next_if_any().await?, None);
@@ -433,24 +426,19 @@ async fn batch_mid_resume_token() -> Result<()> {
 /// spec.
 #[tokio::test]
 async fn aggregate_batch() -> Result<()> {
-    let (client, coll, mut stream) = match init_stream("aggregate_batch", false).await? {
-        Some(t) => t,
-        None => return Ok(()),
-    };
-    if client.is_sharded() {
+    if topology_is_sharded().await {
         log_uncaptured("skipping change stream test on unsupported topology");
         return Ok(());
     }
-    if !VersionReq::parse(">=4.2")
-        .unwrap()
-        .matches(&client.server_version)
-    {
-        log_uncaptured(format!(
-            "skipping change stream test on unsupported version {:?}",
-            client.server_version
-        ));
+    if server_version_lt(4, 2).await {
+        log_uncaptured("skipping change stream test on unsupported version > 4.2");
         return Ok(());
     }
+
+    let (_, coll, mut stream) = match init_stream("aggregate_batch", false).await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
 
     // Synthesize a resume token for the new stream to start at.
     coll.insert_one(doc! {}).await?;
@@ -478,20 +466,15 @@ async fn aggregate_batch() -> Result<()> {
 /// Prose test 17: Resuming a change stream with no results uses `startAfter`.
 #[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_uses_start_after() -> Result<()> {
+    if !server_version_matches(">=4.1.1").await {
+        log_uncaptured("skipping change stream test on unsupported version");
+        return Ok(());
+    }
+
     let (client, coll, mut stream) = match init_stream("resume_uses_start_after", true).await? {
         Some(t) => t,
         None => return Ok(()),
     };
-    if !VersionReq::parse(">=4.1.1")
-        .unwrap()
-        .matches(&client.server_version)
-    {
-        log_uncaptured(format!(
-            "skipping change stream test on unsupported version {:?}",
-            client.server_version
-        ));
-        return Ok(());
-    }
 
     coll.insert_one(doc! {}).await?;
     stream.next().await.transpose()?;
@@ -529,20 +512,15 @@ async fn resume_uses_start_after() -> Result<()> {
 /// Prose test 18: Resuming a change stream after results uses `resumeAfter`.
 #[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_uses_resume_after() -> Result<()> {
+    if !server_version_matches(">=4.1.1").await {
+        log_uncaptured("skipping change stream test on unsupported version");
+        return Ok(());
+    }
+
     let (client, coll, mut stream) = match init_stream("resume_uses_resume_after", true).await? {
         Some(t) => t,
         None => return Ok(()),
     };
-    if !VersionReq::parse(">=4.1.1")
-        .unwrap()
-        .matches(&client.server_version)
-    {
-        log_uncaptured(format!(
-            "skipping change stream test on unsupported version {:?}",
-            client.server_version
-        ));
-        return Ok(());
-    }
 
     coll.insert_one(doc! {}).await?;
     stream.next().await.transpose()?;
@@ -583,17 +561,12 @@ async fn resume_uses_resume_after() -> Result<()> {
 
 #[tokio::test]
 async fn create_coll_pre_post() -> Result<()> {
-    let client = Client::for_test().await;
-    if !VersionReq::parse(">=6.0")
-        .unwrap()
-        .matches(&client.server_version)
-    {
-        log_uncaptured(format!(
-            "skipping change stream test on unsupported version {:?}",
-            client.server_version
-        ));
+    if server_version_lt(6, 0).await {
+        log_uncaptured("skipping change stream test on unsupported version");
         return Ok(());
     }
+
+    let client = Client::for_test().await;
 
     let db = client.database("create_coll_pre_post");
     db.collection::<Document>("test").drop().await?;
@@ -607,20 +580,16 @@ async fn create_coll_pre_post() -> Result<()> {
 // Prose test 19: large event splitting
 #[tokio::test]
 async fn split_large_event() -> Result<()> {
-    let client = Client::for_test().await;
-    if !(client.server_version_matches(">= 6.0.9, < 6.1")
-        || client.server_version_matches(">= 7.0"))
-    {
-        log_uncaptured(format!(
-            "skipping change stream test on unsupported version {:?}",
-            client.server_version
-        ));
-        return Ok(());
-    }
-    if !client.is_replica_set() && !client.is_sharded() {
+    if !topology_is_replica_set().await && !topology_is_sharded().await {
         log_uncaptured("skipping change stream test on unsupported topology");
         return Ok(());
     }
+    if !(server_version_matches(">= 6.0.9, < 6.1").await || server_version_gte(7, 0).await) {
+        log_uncaptured("skipping change stream test on unsupported version");
+        return Ok(());
+    }
+
+    let client = Client::for_test().await;
 
     let db = client.database("change_stream_tests");
     db.collection::<Document>("split_large_event")
@@ -662,31 +631,28 @@ async fn split_large_event() -> Result<()> {
 /// Test that transaction fields are parsed correctly
 #[tokio::test]
 async fn transaction_fields() -> Result<()> {
-    let (client, coll, mut stream) =
-        match init_stream("chang_stream_transaction_fields", true).await? {
-            Some(t) => t,
-            None => return Ok(()),
-        };
-    if client.is_sharded() {
+    if topology_is_sharded().await {
         log_uncaptured("skipping change stream test transaction_fields on unsupported topology");
         return Ok(());
     }
-    if !VersionReq::parse(">=5.0")
-        .unwrap()
-        .matches(&client.server_version)
-    {
-        log_uncaptured(format!(
-            "skipping change stream test transaction_fields on unsupported version {:?}",
-            client.server_version
-        ));
+    if server_version_lt(5, 0).await {
+        log_uncaptured(
+            "skipping change stream test transaction_fields on unsupported server version",
+        );
         return Ok(());
     }
-    if !client.supports_transactions() {
+    if !transactions_supported().await {
         log_uncaptured(
             "skipping change stream transaction_fields test due to lack of transaction support",
         );
         return Ok(());
     }
+
+    let (client, coll, mut stream) =
+        match init_stream("chang_stream_transaction_fields", true).await? {
+            Some(t) => t,
+            None => return Ok(()),
+        };
 
     let mut session = client.start_session().await.unwrap();
     let session_id = session.id().get("id").cloned();

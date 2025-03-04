@@ -7,7 +7,15 @@ use crate::{
     results::UpdateResult,
     test::{
         get_client_options,
+        get_max_bson_object_size,
+        get_max_message_size_bytes,
+        get_max_write_batch_size,
         log_uncaptured,
+        server_version_gte,
+        server_version_lt,
+        topology_is_load_balanced,
+        topology_is_sharded,
+        topology_is_standalone,
         util::fail_point::{FailPoint, FailPointMode},
     },
     Client,
@@ -40,14 +48,14 @@ impl PartialBulkWriteResult {
 // CRUD prose test 3
 #[tokio::test]
 async fn max_write_batch_size_batching() {
-    let client = Client::for_test().monitor_events().await;
-
-    if client.server_version_lt(8, 0) {
+    if server_version_lt(8, 0).await {
         log_uncaptured("skipping max_write_batch_size_batching: bulkWrite requires 8.0+");
         return;
     }
 
-    let max_write_batch_size = client.server_info.max_write_batch_size.unwrap() as usize;
+    let client = Client::for_test().monitor_events().await;
+
+    let max_write_batch_size = get_max_write_batch_size().await;
 
     let model = InsertOneModel::builder()
         .namespace(Namespace::new("db", "coll"))
@@ -79,15 +87,15 @@ async fn max_write_batch_size_batching() {
 // CRUD prose test 4
 #[tokio::test]
 async fn max_message_size_bytes_batching() {
-    let client = Client::for_test().monitor_events().await;
-
-    if client.server_version_lt(8, 0) {
+    if server_version_lt(8, 0).await {
         log_uncaptured("skipping max_message_size_bytes_batching: bulkWrite requires 8.0+");
         return;
     }
 
-    let max_bson_object_size = client.server_info.max_bson_object_size as usize;
-    let max_message_size_bytes = client.server_info.max_message_size_bytes as usize;
+    let client = Client::for_test().monitor_events().await;
+
+    let max_bson_object_size = get_max_bson_object_size().await;
+    let max_message_size_bytes = get_max_message_size_bytes().await;
 
     let document = doc! { "a": "b".repeat(max_bson_object_size - 500) };
     let model = InsertOneModel::builder()
@@ -121,19 +129,19 @@ async fn max_message_size_bytes_batching() {
 // CRUD prose test 5
 #[tokio::test(flavor = "multi_thread")]
 async fn write_concern_error_batches() {
-    let mut options = get_client_options().await.clone();
-    options.retry_writes = Some(false);
-    if Client::for_test().await.is_sharded() {
-        options.hosts.drain(1..);
-    }
-    let client = Client::for_test().options(options).monitor_events().await;
-
-    if client.server_version_lt(8, 0) {
+    if server_version_lt(8, 0).await {
         log_uncaptured("skipping write_concern_error_batches: bulkWrite requires 8.0+");
         return;
     }
 
-    let max_write_batch_size = client.server_info.max_write_batch_size.unwrap() as usize;
+    let mut options = get_client_options().await.clone();
+    options.retry_writes = Some(false);
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
+    let client = Client::for_test().options(options).monitor_events().await;
+
+    let max_write_batch_size = get_max_write_batch_size().await;
 
     let fail_point = FailPoint::fail_command(&["bulkWrite"], FailPointMode::Times(2))
         .write_concern_error(doc! { "code": 91, "errmsg": "Replication is being shut down" });
@@ -167,19 +175,19 @@ async fn write_concern_error_batches() {
 // CRUD prose test 6
 #[tokio::test]
 async fn write_error_batches() {
-    let mut client = Client::for_test().monitor_events().await;
-
-    if client.server_version_lt(8, 0) {
+    if server_version_lt(8, 0).await {
         log_uncaptured("skipping write_error_batches: bulkWrite requires 8.0+");
         return;
     }
     // TODO RUST-2131
-    if client.is_load_balanced() {
+    if topology_is_load_balanced().await {
         log_uncaptured("skipping write_error_batches: load-balanced topology");
         return;
     }
 
-    let max_write_batch_size = client.server_info.max_write_batch_size.unwrap() as usize;
+    let mut client = Client::for_test().monitor_events().await;
+
+    let max_write_batch_size = get_max_write_batch_size().await;
 
     let document = doc! { "_id": 1 };
     let collection = client.database("db").collection("coll");
@@ -229,19 +237,19 @@ async fn write_error_batches() {
 // CRUD prose test 7
 #[tokio::test]
 async fn successful_cursor_iteration() {
-    let client = Client::for_test().monitor_events().await;
-
-    if client.server_version_lt(8, 0) {
+    if server_version_lt(8, 0).await {
         log_uncaptured("skipping successful_cursor_iteration: bulkWrite requires 8.0+");
         return;
     }
     // TODO RUST-2131
-    if client.is_load_balanced() {
+    if topology_is_load_balanced().await {
         log_uncaptured("skipping successful_cursor_iteration: load-balanced topology");
         return;
     }
 
-    let max_bson_object_size = client.server_info.max_bson_object_size as usize;
+    let client = Client::for_test().monitor_events().await;
+
+    let max_bson_object_size = get_max_bson_object_size().await;
 
     let collection = client.database("db").collection::<Document>("coll");
     collection.drop().await.unwrap();
@@ -272,9 +280,7 @@ async fn successful_cursor_iteration() {
 // CRUD prose test 8
 #[tokio::test]
 async fn cursor_iteration_in_a_transaction() {
-    let client = Client::for_test().monitor_events().await;
-
-    if client.server_version_lt(8, 0) || client.is_standalone() {
+    if server_version_lt(8, 0).await || topology_is_standalone().await {
         log_uncaptured(
             "skipping cursor_iteration_in_a_transaction: bulkWrite requires 8.0+, transactions \
              require a non-standalone topology",
@@ -282,12 +288,14 @@ async fn cursor_iteration_in_a_transaction() {
         return;
     }
     // TODO RUST-2131
-    if client.is_load_balanced() {
+    if topology_is_load_balanced().await {
         log_uncaptured("skipping cursor_iteration_in_a_transaction: load-balanced topology");
         return;
     }
 
-    let max_bson_object_size = client.server_info.max_bson_object_size as usize;
+    let client = Client::for_test().monitor_events().await;
+
+    let max_bson_object_size = get_max_bson_object_size().await;
 
     let collection = client.database("db").collection::<Document>("coll");
     collection.drop().await.unwrap();
@@ -326,23 +334,23 @@ async fn cursor_iteration_in_a_transaction() {
 // CRUD prose test 9
 #[tokio::test(flavor = "multi_thread")]
 async fn failed_cursor_iteration() {
-    let mut options = get_client_options().await.clone();
-    if Client::for_test().await.is_sharded() {
-        options.hosts.drain(1..);
-    }
-    let client = Client::for_test().options(options).monitor_events().await;
-
-    if client.server_version_lt(8, 0) {
+    if server_version_lt(8, 0).await {
         log_uncaptured("skipping failed_cursor_iteration: bulkWrite requires 8.0+");
         return;
     }
     // TODO RUST-2131
-    if client.is_load_balanced() {
+    if topology_is_load_balanced().await {
         log_uncaptured("skipping failed_cursor_iteration: load-balanced topology");
         return;
     }
 
-    let max_bson_object_size = client.server_info.max_bson_object_size as usize;
+    let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
+    let client = Client::for_test().options(options).monitor_events().await;
+
+    let max_bson_object_size = get_max_bson_object_size().await;
 
     let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(8);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
@@ -401,16 +409,17 @@ async fn failed_cursor_iteration() {
 // CRUD prose test 11
 #[tokio::test]
 async fn namespace_batch_splitting() {
-    let first_namespace = Namespace::new("db", "coll");
-
-    let mut client = Client::for_test().monitor_events().await;
-    if client.server_version_lt(8, 0) {
+    if server_version_lt(8, 0).await {
         log_uncaptured("skipping namespace_batch_splitting: bulkWrite requires 8.0+");
         return;
     }
 
-    let max_message_size_bytes = client.server_info.max_message_size_bytes as usize;
-    let max_bson_object_size = client.server_info.max_bson_object_size as usize;
+    let first_namespace = Namespace::new("db", "coll");
+
+    let mut client = Client::for_test().monitor_events().await;
+
+    let max_message_size_bytes = get_max_message_size_bytes().await;
+    let max_bson_object_size = get_max_bson_object_size().await;
 
     let ops_bytes = max_message_size_bytes - 1122;
     let num_models = ops_bytes / max_bson_object_size;
@@ -511,13 +520,13 @@ async fn namespace_batch_splitting() {
 // CRUD prose test 12
 #[tokio::test]
 async fn too_large_client_error() {
-    let client = Client::for_test().monitor_events().await;
-    let max_message_size_bytes = client.server_info.max_message_size_bytes as usize;
-
-    if client.server_version_lt(8, 0) {
+    if server_version_lt(8, 0).await {
         log_uncaptured("skipping too_large_client_error: bulkWrite requires 8.0+");
         return;
     }
+
+    let client = Client::for_test().monitor_events().await;
+    let max_message_size_bytes = get_max_message_size_bytes().await;
 
     // Case 1: document too large
     let model = InsertOneModel::builder()
@@ -576,12 +585,12 @@ async fn encryption_error() {
 
 #[tokio::test]
 async fn unsupported_server_client_error() {
-    let client = Client::for_test().await;
-
-    if client.server_version_gte(8, 0) {
+    if server_version_gte(8, 0).await {
+        log_uncaptured("skipping unsupported_server_client_error: bulk write supported");
         return;
     }
 
+    let client = Client::for_test().await;
     let error = client
         .bulk_write(vec![InsertOneModel::builder()
             .namespace(Namespace::new("db", "coll"))

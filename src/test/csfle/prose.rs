@@ -44,6 +44,8 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
+        server_version_lt,
+        topology_is_standalone,
         util::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
@@ -845,15 +847,16 @@ mod explicit_encryption {
     }
 
     async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData>> {
-        let key_vault_client = Client::for_test().await;
-        if key_vault_client.server_version_lt(6, 0) {
+        if server_version_lt(6, 0).await {
             log_uncaptured("skipping explicit encryption test: server below 6.0");
             return Ok(None);
         }
-        if key_vault_client.is_standalone() {
+        if topology_is_standalone().await {
             log_uncaptured("skipping explicit encryption test: cannot run on standalone");
             return Ok(None);
         }
+
+        let key_vault_client = Client::for_test().await;
 
         let encrypted_fields = load_testdata("data/encryptedFields.json")?;
         let key1_document = load_testdata("data/keys/key1-document.json")?;
@@ -1269,11 +1272,12 @@ mod decryption_events {
 
     impl DecryptionEventsTestdata {
         async fn setup() -> Result<Option<Self>> {
-            let setup_client = Client::for_test().await;
-            if !setup_client.is_standalone() {
+            if !topology_is_standalone().await {
                 log_uncaptured("skipping decryption events test: requires standalone topology");
                 return Ok(None);
             }
+
+            let setup_client = Client::for_test().await;
             let db = setup_client.database("db");
             db.collection::<Document>("decryption_events")
                 .drop()
@@ -1529,21 +1533,13 @@ mod auto_encryption_keys {
     use super::*;
 
     async fn auto_encryption_keys(master_key: impl Into<MasterKey>) -> Result<()> {
-        let master_key = master_key.into();
-
         if !fle2v2_ok("auto_encryption_keys").await {
             return Ok(());
         }
 
+        let master_key = master_key.into();
+
         let client = Client::for_test().await;
-        if client.server_version_lt(6, 0) {
-            log_uncaptured("Skipping auto_encryption_key test: server < 6.0");
-            return Ok(());
-        }
-        if client.is_standalone() {
-            log_uncaptured("Skipping auto_encryption_key test: standalone server");
-            return Ok(());
-        }
         let db = client.database("test_auto_encryption_keys");
         db.drop().await?;
         let ce = ClientEncryption::new(
@@ -1920,8 +1916,7 @@ mod range_explicit_encryption {
 
     #[tokio::test]
     async fn range_explicit_encryption() -> Result<()> {
-        let client = Client::for_test().await;
-        if client.server_version_lt(8, 0) || client.is_standalone() {
+        if server_version_lt(8, 0).await || topology_is_standalone().await {
             log_uncaptured("Skipping range_explicit_encryption due to unsupported topology");
             return Ok(());
         }
@@ -2052,16 +2047,11 @@ async fn range_explicit_encryption_defaults() -> Result<()> {
 // FLE 2.0 Documentation Example
 #[tokio::test]
 async fn fle2_example() -> Result<()> {
-    // FLE 2 is not supported on Standalone topology.
+    if !fle2v2_ok("fle2_example").await {
+        return Ok(());
+    }
+
     let test_client = Client::for_test().await;
-    if test_client.server_version_lt(7, 0) {
-        log_uncaptured("skipping fle2 example: server below 7.0");
-        return Ok(());
-    }
-    if test_client.is_standalone() {
-        log_uncaptured("skipping fle2 example: cannot run on standalone");
-        return Ok(());
-    }
 
     // Drop data from prior test runs.
     test_client

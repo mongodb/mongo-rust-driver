@@ -15,11 +15,13 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
+        server_version_lte,
         spec::unified_runner::{
             entity::EventList,
             matcher::events_match,
             test_file::{ExpectedEventType, TestFile},
         },
+        topology_is_sharded,
         update_options_for_testing,
         util::fail_point::FailPointGuard,
         TestClient,
@@ -121,7 +123,7 @@ impl TestRunner {
             let mut can_run_on = false;
             let mut run_on_errors = vec![];
             for requirement in requirements {
-                match requirement.can_run_on(&self.internal_client).await {
+                match requirement.can_run_on().await {
                     Ok(()) => can_run_on = true,
                     Err(e) => run_on_errors.push(e),
                 }
@@ -184,7 +186,7 @@ impl TestRunner {
                 let mut can_run_on = false;
                 let mut run_on_errors = vec![];
                 for requirement in requirements {
-                    match requirement.can_run_on(&self.internal_client).await {
+                    match requirement.can_run_on().await {
                         Ok(()) => can_run_on = true,
                         Err(e) => run_on_errors.push(e),
                     }
@@ -230,8 +232,8 @@ impl TestRunner {
             // test runners MUST execute a non-transactional distinct command on
             // each mongos server before running any test that might execute distinct within a
             // transaction.
-            if self.internal_client.is_sharded()
-                && self.internal_client.server_version_lte(4, 2)
+            if topology_is_sharded().await
+                && server_version_lte(4, 2).await
                 && test_case.operations.iter().any(|op| op.name == "distinct")
             {
                 self.internal_client.disable_command_events(true);
@@ -499,7 +501,7 @@ impl TestRunner {
 
                     options.server_api = server_api;
 
-                    if client.use_multiple_mongoses() && Client::for_test().await.is_sharded() {
+                    if client.use_multiple_mongoses() && topology_is_sharded().await {
                         assert!(
                             options.hosts.len() > 1,
                             "[{}]: Test requires multiple mongos hosts",

@@ -15,7 +15,9 @@ use crate::{
     selection_criteria::SelectionCriteria,
     test::{
         get_client_options,
+        get_primary,
         log_uncaptured,
+        topology_is_standalone,
         util::event_buffer::EventBuffer,
         Event,
         EventClient,
@@ -195,13 +197,13 @@ macro_rules! for_each_op {
 /// This test also satisifies the `endSession` testing requirement of prose test 5.
 #[tokio::test]
 async fn pool_is_lifo() {
+    if topology_is_standalone().await {
+        return;
+    }
+
     let client = Client::for_test().await;
     // Wait for the implicit sessions created in TestClient::new to be returned to the pool.
     tokio::time::sleep(Duration::from_millis(500)).await;
-
-    if client.is_standalone() {
-        return;
-    }
 
     let a = client.start_session().await.unwrap();
     let b = client.start_session().await.unwrap();
@@ -228,8 +230,7 @@ async fn pool_is_lifo() {
 #[tokio::test]
 #[function_name::named]
 async fn cluster_time_in_commands() {
-    let test_client = Client::for_test().await;
-    if test_client.is_standalone() {
+    if topology_is_standalone().await {
         log_uncaptured("skipping cluster_time_in_commands test due to standalone topology");
         return;
     }
@@ -303,7 +304,7 @@ async fn cluster_time_in_commands() {
 
         // Since we need to run an insert below, ensure the single host is a primary
         // if we're connected to a replica set.
-        if let Some(primary) = test_client.primary() {
+        if let Some(primary) = get_primary().await {
             options.hosts = vec![primary];
         } else {
             options.hosts.drain(1..);
@@ -374,8 +375,7 @@ async fn cluster_time_in_commands() {
 #[tokio::test]
 #[function_name::named]
 async fn session_usage() {
-    let client = Client::for_test().await;
-    if client.is_standalone() {
+    if topology_is_standalone().await {
         return;
     }
 
@@ -401,10 +401,11 @@ async fn session_usage() {
 #[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_immediate_exhaust() {
-    let client = Client::for_test().monitor_events().await;
-    if client.is_standalone() {
+    if topology_is_standalone().await {
         return;
     }
+
+    let client = Client::for_test().monitor_events().await;
 
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
@@ -441,11 +442,11 @@ async fn implicit_session_returned_after_immediate_exhaust() {
 #[tokio::test]
 #[function_name::named]
 async fn implicit_session_returned_after_exhaust_by_get_more() {
-    let client = Client::for_test().monitor_events().await;
-    if client.is_standalone() {
+    if topology_is_standalone().await {
         return;
     }
 
+    let client = Client::for_test().monitor_events().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
@@ -491,13 +492,14 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
 #[tokio::test]
 #[function_name::named]
 async fn find_and_getmore_share_session() {
-    let client = Client::for_test().monitor_events().await;
-    if client.is_standalone() {
+    if topology_is_standalone().await {
         log_uncaptured(
             "skipping find_and_getmore_share_session due to unsupported topology: Standalone",
         );
         return;
     }
+
+    let client = Client::for_test().monitor_events().await;
 
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())

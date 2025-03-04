@@ -9,8 +9,10 @@ use crate::{
     options::{FindOneOptions, GridFsBucketOptions, GridFsUploadOptions},
     runtime,
     test::{
+        fail_command_supported,
         get_client_options,
         spec::unified_runner::run_unified_tests,
+        topology_is_sharded,
         util::fail_point::{FailPoint, FailPointMode},
     },
     Client,
@@ -191,14 +193,11 @@ async fn upload_stream_multiple_buffers() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn upload_stream_errors() {
-    let client = Client::for_test().await;
-    let client = if client.is_sharded() {
-        let mut options = get_client_options().await.clone();
+    let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
         options.hosts.drain(1..);
-        Client::for_test().options(options).await
-    } else {
-        client
-    };
+    }
+    let client = Client::for_test().options(options).await;
 
     let bucket = client.database("upload_stream_errors").gridfs_bucket(None);
     bucket.drop().await.unwrap();
@@ -219,7 +218,7 @@ async fn upload_stream_errors() {
     upload_stream.abort().await.unwrap();
     assert_closed(&bucket, upload_stream).await;
 
-    if !client.supports_fail_command() {
+    if !fail_command_supported().await {
         return;
     }
 

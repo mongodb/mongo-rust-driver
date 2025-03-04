@@ -2,7 +2,6 @@ use std::{fmt::Debug, time::Duration};
 
 use futures::stream::{StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
-use semver::VersionReq;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -31,7 +30,17 @@ use crate::{
         WriteConcern,
     },
     results::DeleteResult,
-    test::{get_client_options, log_uncaptured, EventClient},
+    test::{
+        get_client_options,
+        get_max_bson_object_size,
+        get_max_message_size_bytes,
+        log_uncaptured,
+        server_version_eq,
+        server_version_lt,
+        topology_is_replica_set,
+        topology_is_standalone,
+        EventClient,
+    },
     Client,
     Collection,
     Cursor,
@@ -42,14 +51,15 @@ use crate::{
 #[tokio::test]
 #[function_name::named]
 async fn insert_err_details() {
+    if server_version_lt(4, 0).await || !topology_is_replica_set().await {
+        log_uncaptured("skipping insert_err_details due to test configuration");
+        return;
+    }
+
     let client = Client::for_test().await;
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
-    if client.server_version_lt(4, 0) || !client.is_replica_set() {
-        log_uncaptured("skipping insert_err_details due to test configuration");
-        return;
-    }
     client
         .database("admin")
         .run_command(doc! {
@@ -525,11 +535,12 @@ async fn find_allow_disk_use_not_specified() {
 
 #[function_name::named]
 async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>) {
-    let event_client = Client::for_test().monitor_events().await;
-    if event_client.server_version_lt(4, 3) {
+    if server_version_lt(4, 3).await {
         log_uncaptured("skipping allow_disk_use_test due to server version < 4.3");
         return;
     }
+
+    let event_client = Client::for_test().monitor_events().await;
     let coll = event_client
         .database(function_name!())
         .collection::<Document>(function_name!());
@@ -595,13 +606,12 @@ async fn delete_hint_not_specified() {
 }
 
 async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>, name: &str) {
-    let client = Client::for_test().monitor_events().await;
-
-    let req = VersionReq::parse(">= 4.2").unwrap();
-    if options.is_some() && !req.matches(&client.server_version) {
+    if options.is_some() && server_version_lt(4, 2).await {
         log_uncaptured("skipping find_one_and_delete_hint_test due to test configuration");
         return;
     }
+
+    let client = Client::for_test().monitor_events().await;
 
     let coll = client.database(name).collection(name);
     let _: Result<Option<Document>> = coll
@@ -658,12 +668,10 @@ async fn find_one_and_delete_hint_server_version() {
         .hint(Hint::Name(String::new()))
         .await;
 
-    let req1 = VersionReq::parse("< 4.2").unwrap();
-    let req2 = VersionReq::parse("4.2.*").unwrap();
-    if req1.matches(&client.server_version) {
+    if server_version_lt(4, 2).await {
         let error = res.expect_err("find one and delete should fail");
         assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
-    } else if req2.matches(&client.server_version) {
+    } else if server_version_eq(4, 2).await {
         let error = res.expect_err("find one and delete should fail");
         assert!(matches!(*error.kind, ErrorKind::Command { .. }));
     } else {
@@ -674,12 +682,12 @@ async fn find_one_and_delete_hint_server_version() {
 #[tokio::test]
 #[function_name::named]
 async fn no_read_preference_to_standalone() {
-    let client = Client::for_test().monitor_events().await;
-
-    if !client.is_standalone() {
+    if !topology_is_standalone().await {
         log_uncaptured("skipping no_read_preference_to_standalone due to test topology");
         return;
     }
+
+    let client = Client::for_test().monitor_events().await;
 
     client
         .database(function_name!())
@@ -925,7 +933,7 @@ async fn assert_options_inherited(client: &EventClient, command_name: &str) {
     assert!(event.command.contains_key("readConcern"));
     assert_eq!(
         event.command.contains_key("$readPreference"),
-        !client.is_standalone()
+        !topology_is_standalone().await
     );
 }
 
@@ -982,7 +990,7 @@ async fn cursor_batch_size() {
     assert_eq!(docs.len(), 10);
 
     // test session cursors
-    if client.is_standalone() {
+    if topology_is_standalone().await {
         log_uncaptured("skipping cursor_batch_size due to standalone topology");
         return;
     }
@@ -1235,8 +1243,8 @@ async fn insert_many_document_sequences() {
 
     let mut event_stream = client.events.stream();
 
-    let max_object_size = client.server_info.max_bson_object_size;
-    let max_message_size = client.server_info.max_message_size_bytes;
+    let max_object_size = get_max_bson_object_size().await;
+    let max_message_size = get_max_message_size_bytes().await;
 
     let collection = client
         .database("insert_many_document_sequences")
@@ -1246,8 +1254,8 @@ async fn insert_many_document_sequences() {
     // A payload with > max_bson_object_size bytes but < max_message_size bytes should require only
     // one round trip
     let docs = vec![
-        rawdoc! { "s": "a".repeat((max_object_size / 2) as usize) },
-        rawdoc! { "s": "b".repeat((max_object_size / 2) as usize) },
+        rawdoc! { "s": "a".repeat(max_object_size / 2) },
+        rawdoc! { "s": "b".repeat(max_object_size / 2) },
     ];
     collection.insert_many(docs).await.unwrap();
 
@@ -1264,8 +1272,8 @@ async fn insert_many_document_sequences() {
     while size <= max_message_size {
         // Leave some room for key/metadata bytes in document
         let string_length = max_object_size - 500;
-        let doc = rawdoc! { "s": "a".repeat(string_length as usize) };
-        size += doc.as_bytes().len() as i32;
+        let doc = rawdoc! { "s": "a".repeat(string_length) };
+        size += doc.as_bytes().len();
         docs.push(doc);
     }
     let total_docs = docs.len();

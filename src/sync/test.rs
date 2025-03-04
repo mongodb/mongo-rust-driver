@@ -20,6 +20,7 @@ use crate::{
         WriteConcern,
     },
     sync::{Client, ClientSession, Collection},
+    test::transactions_supported,
     Client as AsyncClient,
 };
 
@@ -233,10 +234,7 @@ fn typed_collection() {
 #[test]
 #[function_name::named]
 fn transactions() {
-    let should_skip = crate::sync::TOKIO_RUNTIME.block_on(async {
-        let test_client = AsyncClient::for_test().await;
-        !test_client.supports_transactions()
-    });
+    let should_skip = crate::sync::TOKIO_RUNTIME.block_on(async { transactions_supported().await });
     if should_skip {
         return;
     }

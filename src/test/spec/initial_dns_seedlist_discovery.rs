@@ -7,7 +7,14 @@ use crate::{
     client::Client,
     options::{ClientOptions, ResolverConfig, ServerAddress},
     srv::{DomainMismatch, LookupHosts},
-    test::{get_client_options, log_uncaptured, run_spec_test},
+    test::{
+        get_client_options,
+        log_uncaptured,
+        run_spec_test,
+        topology_is_load_balanced,
+        topology_is_replica_set,
+        topology_is_sharded,
+    },
 };
 
 #[derive(Debug, Deserialize)]
@@ -188,15 +195,15 @@ async fn run_test(mut test_file: TestFile) {
 
 #[tokio::test]
 async fn replica_set() {
-    let client = Client::for_test().await;
-    let skip =
-        if client.is_replica_set() && client.options().repl_set_name.as_deref() != Some("repl0") {
-            Some("repl_set_name != repl0")
-        } else if !client.is_replica_set() {
-            Some("not a replica set")
-        } else {
-            None
-        };
+    let skip = if topology_is_replica_set().await
+        && get_client_options().await.repl_set_name.as_deref() != Some("repl0")
+    {
+        Some("repl_set_name != repl0")
+    } else if !topology_is_replica_set().await {
+        Some("not a replica set")
+    } else {
+        None
+    };
     if let Some(skip) = skip {
         log_uncaptured(format!(
             "skipping initial_dns_seedlist_discovery::replica_set due to unmet topology \
@@ -211,8 +218,7 @@ async fn replica_set() {
 
 #[tokio::test]
 async fn load_balanced() {
-    let client = Client::for_test().await;
-    if !client.is_load_balanced() {
+    if !topology_is_load_balanced().await {
         log_uncaptured(
             "skipping initial_dns_seedlist_discovery::load_balanced due to unmet topology \
              requirement (not a load balanced cluster)",
@@ -228,8 +234,7 @@ async fn load_balanced() {
 
 #[tokio::test]
 async fn sharded() {
-    let client = Client::for_test().await;
-    if !client.is_sharded() {
+    if !topology_is_sharded().await {
         log_uncaptured(
             "skipping initial_dns_seedlist_discovery::sharded due to unmet topology requirement \
              (not a sharded cluster)",

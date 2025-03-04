@@ -7,7 +7,6 @@ pub(crate) mod test_file;
 use std::{future::IntoFuture, sync::Arc, time::Duration};
 
 use futures::{future::BoxFuture, FutureExt};
-use semver::VersionReq;
 
 use crate::{
     bson::{doc, from_bson},
@@ -20,7 +19,10 @@ use crate::{
         file_level_log,
         get_client_options,
         log_uncaptured,
+        server_version_gte,
+        server_version_lte,
         spec::deserialize_spec_tests,
+        topology_is_sharded,
         util::{
             fail_point::{FailPoint, FailPointGuard},
             get_default_name,
@@ -106,13 +108,17 @@ impl FileContext {
         }
     }
 
-    fn check_topology(&self, test_file: &TestFile) -> bool {
+    async fn check_topology(&self, test_file: &TestFile) -> bool {
         if let Some(requirements) = &test_file.run_on {
-            return requirements
-                .iter()
-                .any(|run_on| run_on.can_run_on(&self.internal_client));
+            for requirement in requirements {
+                if requirement.can_run_on().await {
+                    return true;
+                }
+            }
+            false
+        } else {
+            true
         }
-        true
     }
 }
 
@@ -153,10 +159,9 @@ impl TestContext {
         if let Some(enc_fields) = &test_file.encrypted_fields {
             options.encrypted_fields = Some(enc_fields.clone());
         }
-        let req = VersionReq::parse(">=4.7").unwrap();
         if !(db_name.as_str() == "admin"
-            && internal_client.is_sharded()
-            && req.matches(&internal_client.server_version))
+            && topology_is_sharded().await
+            && server_version_gte(4, 7).await)
         {
             coll.drop().with_options(options).await.unwrap();
         }
@@ -219,8 +224,8 @@ impl TestContext {
         let client = builder.monitor_events().await;
 
         // TODO RUST-900: Remove this extraneous call.
-        if internal_client.is_sharded()
-            && internal_client.server_version_lte(4, 2)
+        if topology_is_sharded().await
+            && server_version_lte(4, 2).await
             && test.operations.iter().any(|op| op.name == "distinct")
         {
             for server_address in internal_client.options().hosts.clone() {
@@ -479,7 +484,7 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
 
     file_level_log(format!("Running tests from {}", path.display(),));
 
-    if !file_ctx.check_topology(&test_file) {
+    if !file_ctx.check_topology(&test_file).await {
         log_uncaptured("Client topology not compatible with test");
         return;
     }

@@ -447,6 +447,19 @@ async fn cmap_spec_tests() {
             return;
         }
 
+        if let Some(ref run_on) = test_file.run_on {
+            let mut can_run_on = false;
+            for requirement in run_on {
+                if requirement.can_run_on().await {
+                    can_run_on = true;
+                }
+            }
+            if !can_run_on {
+                log_uncaptured("skipping due to runOn requirements");
+                return;
+            }
+        }
+
         let mut options = get_client_options().await.clone();
         if options.load_balanced.unwrap_or(false) {
             log_uncaptured(format!(
@@ -458,13 +471,6 @@ async fn cmap_spec_tests() {
         options.hosts.drain(1..);
         options.direct_connection = Some(true);
         let client = crate::Client::for_test().options(options).await;
-        if let Some(ref run_on) = test_file.run_on {
-            let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
-            if !can_run_on {
-                log_uncaptured("skipping due to runOn requirements");
-                return;
-            }
-        }
 
         let _guard = if let Some(fail_point) = test_file.fail_point.take() {
             Some(client.enable_fail_point(fail_point).await.unwrap())

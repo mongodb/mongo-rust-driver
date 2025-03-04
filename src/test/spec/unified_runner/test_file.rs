@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::HashMap, fmt::Write, sync::Arc, time::Durati
 use percent_encoding::NON_ALPHANUMERIC;
 use pretty_assertions::assert_eq;
 use regex::Regex;
-use semver::{Version, VersionReq};
+use semver::Version;
 use serde::{Deserialize, Deserializer};
 use tokio::sync::oneshot;
 
@@ -28,7 +28,15 @@ use crate::{
         WriteConcern,
     },
     serde_util,
-    test::{Event, Serverless, TestClient, DEFAULT_URI},
+    test::{
+        auth_enabled,
+        get_server_parameters,
+        get_topology,
+        server_version_matches,
+        Event,
+        Serverless,
+        DEFAULT_URI,
+    },
 };
 
 #[derive(Debug, Deserialize)]
@@ -91,38 +99,31 @@ pub(crate) enum Topology {
 }
 
 impl RunOnRequirement {
-    pub(crate) async fn can_run_on(&self, client: &TestClient) -> Result<(), String> {
+    pub(crate) async fn can_run_on(&self) -> Result<(), String> {
         if let Some(ref min_version) = self.min_server_version {
-            let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
-            if !req.matches(&client.server_version) {
-                return Err(format!(
-                    "min server version {:?}, actual {:?}",
-                    min_version, client.server_version
-                ));
+            if !server_version_matches(&format!(">= {min_version}")).await {
+                return Err(format!("does not match min server version: {min_version}"));
             }
         }
         if let Some(ref max_version) = self.max_server_version {
-            let req = VersionReq::parse(&format!("<= {}", &max_version)).unwrap();
-            if !req.matches(&client.server_version) {
-                return Err(format!(
-                    "max server version {:?}, actual {:?}",
-                    max_version, client.server_version
-                ));
+            if !server_version_matches(&format!("<= {max_version}")).await {
+                return Err(format!("does not match max server version: {max_version}"));
             }
         }
         if let Some(ref topologies) = self.topologies {
-            let client_topology = client.topology();
-            if !topologies.contains(&client_topology) {
+            let client_topology = get_topology().await;
+            if !topologies.contains(client_topology) {
                 return Err(format!(
                     "allowed topologies {:?}, actual: {:?}",
                     topologies, client_topology
                 ));
             }
         }
-        if let Some(ref actual_server_parameters) = self.server_parameters {
+        if let Some(ref required_server_parameters) = self.server_parameters {
+            let actual_server_parameters = get_server_parameters().await;
             if results_match(
-                Some(&Bson::Document(client.server_parameters.clone())),
-                &Bson::Document(actual_server_parameters.clone()),
+                Some(&Bson::Document(actual_server_parameters.clone())),
+                &Bson::Document(required_server_parameters.clone()),
                 false,
                 None,
             )
@@ -130,7 +131,7 @@ impl RunOnRequirement {
             {
                 return Err(format!(
                     "required server parameters {:?}, actual {:?}",
-                    actual_server_parameters, client.server_parameters
+                    required_server_parameters, actual_server_parameters
                 ));
             }
         }
@@ -140,7 +141,7 @@ impl RunOnRequirement {
             }
         }
         if let Some(ref auth) = self.auth {
-            if *auth != client.auth_enabled() {
+            if *auth != auth_enabled().await {
                 return Err("requires auth".to_string());
             }
         }

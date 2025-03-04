@@ -1,20 +1,20 @@
 use crate::{
     bson::{doc, Document},
     error::{ErrorKind, WriteFailure},
-    test::log_uncaptured,
+    test::{log_uncaptured, server_version_lt},
     Client,
     Collection,
 };
 
 #[tokio::test]
 async fn details() {
-    let client = Client::for_test().monitor_events().await;
-
-    if client.server_version_lt(5, 0) {
+    if server_version_lt(5, 0).await {
         // SERVER-58399
         log_uncaptured("skipping write_error_details test due to server version");
         return;
     }
+
+    let client = Client::for_test().monitor_events().await;
 
     let db = client.database("write_error_details");
     db.drop().await.unwrap();

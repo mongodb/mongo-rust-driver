@@ -7,9 +7,12 @@ use crate::{
     hello::LEGACY_HELLO_COMMAND_NAME,
     runtime,
     test::{
+        block_connection_supported,
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
+        streaming_monitor_protocol_supported,
+        topology_is_load_balanced,
         util::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
@@ -45,8 +48,7 @@ async fn run_unified() {
 /// Streaming protocol prose test 1 from SDAM spec tests.
 #[tokio::test(flavor = "multi_thread")]
 async fn streaming_min_heartbeat_frequency() {
-    let test_client = Client::for_test().await;
-    if test_client.is_load_balanced() {
+    if topology_is_load_balanced().await {
         log_uncaptured("skipping streaming_min_heartbeat_frequency due to load balanced topology");
         return;
     }
@@ -96,8 +98,7 @@ async fn streaming_min_heartbeat_frequency() {
 /// Variant of the previous prose test that checks for a non-minHeartbeatFrequencyMS value.
 #[tokio::test(flavor = "multi_thread")]
 async fn heartbeat_frequency_is_respected() {
-    let test_client = Client::for_test().await;
-    if test_client.is_load_balanced() {
+    if topology_is_load_balanced().await {
         log_uncaptured("skipping streaming_min_heartbeat_frequency due to load balanced topology");
         return;
     }
@@ -147,20 +148,17 @@ async fn heartbeat_frequency_is_respected() {
 /// RTT prose test 1 from SDAM spec tests.
 #[tokio::test(flavor = "multi_thread")]
 async fn rtt_is_updated() {
-    let test_client = Client::for_test().await;
-    if !test_client.supports_streaming_monitoring_protocol() {
+    if !streaming_monitor_protocol_supported().await {
         log_uncaptured(
             "skipping rtt_is_updated due to not supporting streaming monitoring protocol",
         );
         return;
     }
-
-    if test_client.is_load_balanced() {
+    if topology_is_load_balanced().await {
         log_uncaptured("skipping rtt_is_updated due to load balanced topology");
         return;
     }
-
-    if test_client.supports_block_connection() {
+    if !block_connection_supported().await {
         log_uncaptured("skipping rtt_is_updated due to not supporting block_connection");
         return;
     }

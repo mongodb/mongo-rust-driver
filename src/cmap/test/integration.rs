@@ -17,8 +17,11 @@ use crate::{
     sdam::TopologyUpdater,
     selection_criteria::ReadPreference,
     test::{
+        block_connection_supported,
+        fail_command_supported,
         get_client_options,
         log_uncaptured,
+        topology_is_load_balanced,
         util::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
@@ -26,7 +29,6 @@ use crate::{
     },
     Client,
 };
-use semver::VersionReq;
 use std::time::Duration;
 
 #[derive(Debug, Deserialize)]
@@ -84,6 +86,13 @@ async fn acquire_connection_and_send_command() {
 
 #[tokio::test]
 async fn concurrent_connections() {
+    if !block_connection_supported().await {
+        log_uncaptured(
+            "skipping concurrent_connections test due to server not supporting block connection",
+        );
+        return;
+    }
+
     let mut options = get_client_options().await.clone();
     if options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping concurrent_connections test due to load-balanced topology");
@@ -93,14 +102,6 @@ async fn concurrent_connections() {
     options.hosts.drain(1..);
 
     let client = Client::for_test().options(options).await;
-    let version = VersionReq::parse(">= 4.2.9").unwrap();
-    // blockConnection failpoint option only supported in 4.2.9+.
-    if !version.matches(&client.server_version) {
-        log_uncaptured(
-            "skipping concurrent_connections test due to server not supporting failpoint option",
-        );
-        return;
-    }
 
     // stall creating connections for a while
     let failpoint = doc! {
@@ -169,26 +170,27 @@ async fn concurrent_connections() {
 #[function_name::named]
 
 async fn connection_error_during_establishment() {
-    let mut client_options = get_client_options().await.clone();
-    if client_options.load_balanced.unwrap_or(false) {
+    if topology_is_load_balanced().await {
         log_uncaptured(
             "skipping connection_error_during_establishment test due to load-balanced topology",
         );
         return;
     }
-    client_options.heartbeat_freq = Duration::from_secs(300).into(); // high so that monitors dont trip failpoint
-    client_options.hosts.drain(1..);
-    client_options.direct_connection = Some(true);
-    client_options.repl_set_name = None;
-
-    let client = Client::for_test().options(client_options.clone()).await;
-    if !client.supports_fail_command() {
+    if !fail_command_supported().await {
         log_uncaptured(format!(
             "skipping {} due to failCommand not being supported",
             function_name!()
         ));
         return;
     }
+
+    let mut client_options = get_client_options().await.clone();
+    client_options.heartbeat_freq = Duration::from_secs(300).into(); // high so that monitors dont trip failpoint
+    client_options.hosts.drain(1..);
+    client_options.direct_connection = Some(true);
+    client_options.repl_set_name = None;
+
+    let client = Client::for_test().options(client_options.clone()).await;
 
     let fail_point = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
@@ -230,6 +232,14 @@ async fn connection_error_during_establishment() {
 #[function_name::named]
 
 async fn connection_error_during_operation() {
+    if !fail_command_supported().await {
+        log_uncaptured(format!(
+            "skipping {} due to failCommand not being supported",
+            function_name!()
+        ));
+        return;
+    }
+
     let mut options = get_client_options().await.clone();
     let buffer = EventBuffer::<CmapEvent>::new();
     options.cmap_event_handler = Some(buffer.handler());
@@ -237,13 +247,6 @@ async fn connection_error_during_operation() {
     options.max_pool_size = Some(1);
 
     let client = Client::for_test().options(options).await;
-    if !client.supports_fail_command() {
-        log_uncaptured(format!(
-            "skipping {} due to failCommand not being supported",
-            function_name!()
-        ));
-        return;
-    }
 
     let fail_point =
         FailPoint::fail_command(&["ping"], FailPointMode::Times(10)).close_connection(true);

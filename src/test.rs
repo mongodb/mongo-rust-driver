@@ -55,16 +55,19 @@ use tokio::sync::OnceCell;
 #[cfg(feature = "tracing-unstable")]
 use self::util::TracingHandler;
 use crate::{
+    bson::{doc, Document},
     client::{
         auth::Credential,
         options::{ServerApi, ServerApiVersion},
     },
-    options::ClientOptions,
+    hello::HelloCommandResponse,
+    options::{ClientOptions, ServerAddress},
+    Client,
 };
 use std::{fs::read_to_string, str::FromStr};
 
-static CLIENT_OPTIONS: OnceCell<ClientOptions> = OnceCell::const_new();
 pub(crate) async fn get_client_options() -> &'static ClientOptions {
+    static CLIENT_OPTIONS: OnceCell<ClientOptions> = OnceCell::const_new();
     CLIENT_OPTIONS
         .get_or_init(|| async {
             let mut options = ClientOptions::parse(&*DEFAULT_URI).await.unwrap();
@@ -72,6 +75,168 @@ pub(crate) async fn get_client_options() -> &'static ClientOptions {
             options
         })
         .await
+}
+pub(crate) async fn auth_enabled() -> bool {
+    get_client_options().await.credential.is_some()
+}
+
+async fn get_server_version() -> &'static semver::Version {
+    static SERVER_VERSION: OnceCell<semver::Version> = OnceCell::const_new();
+    SERVER_VERSION
+        .get_or_init(|| async {
+            let client = Client::for_test().await;
+            let build_info = client
+                .database("test")
+                .run_command(doc! { "buildInfo": 1 })
+                .await
+                .unwrap();
+            let mut server_version =
+                semver::Version::parse(build_info.get_str("version").unwrap()).unwrap();
+            // ignore whether the version is a prerelease
+            server_version.pre = semver::Prerelease::EMPTY;
+            server_version
+        })
+        .await
+}
+// Utility functions to check server version requirements. All but server_version_matches ignore
+// the server's patch version; specify a requirement string to server_version_matches for a
+// patch-sensitive comparison.
+pub(crate) async fn server_version_eq(major: u64, minor: u64) -> bool {
+    let version = get_server_version().await;
+    version.major == major && version.minor == minor
+}
+pub(crate) async fn server_version_gt(major: u64, minor: u64) -> bool {
+    let version = get_server_version().await;
+    version.major > major || version.major == major && version.minor > minor
+}
+pub(crate) async fn server_version_gte(major: u64, minor: u64) -> bool {
+    let version = get_server_version().await;
+    version.major > major || version.major == major && version.minor >= minor
+}
+pub(crate) async fn server_version_lt(major: u64, minor: u64) -> bool {
+    let version = get_server_version().await;
+    version.major < major || version.major == major && version.minor < minor
+}
+pub(crate) async fn server_version_lte(major: u64, minor: u64) -> bool {
+    let version = get_server_version().await;
+    version.major < major || version.major == major && version.minor <= minor
+}
+pub(crate) async fn server_version_matches(requirement: &str) -> bool {
+    let requirement = semver::VersionReq::parse(requirement).unwrap();
+    requirement.matches(get_server_version().await)
+}
+
+pub(crate) async fn get_server_parameters() -> &'static Document {
+    static SERVER_PARAMETERS: OnceCell<Document> = OnceCell::const_new();
+    SERVER_PARAMETERS
+        .get_or_init(|| async {
+            let client = Client::for_test().await;
+            client
+                .database("admin")
+                .run_command(doc! { "getParameter": "*" })
+                .await
+                .unwrap()
+        })
+        .await
+}
+
+async fn get_hello_response() -> &'static HelloCommandResponse {
+    static HELLO_COMMAND_RESPONSE: OnceCell<HelloCommandResponse> = OnceCell::const_new();
+    HELLO_COMMAND_RESPONSE
+        .get_or_init(|| async {
+            let client = Client::for_test().await;
+            client.hello().await.unwrap()
+        })
+        .await
+}
+pub(crate) async fn get_primary() -> Option<ServerAddress> {
+    get_hello_response()
+        .await
+        .primary
+        .as_ref()
+        .map(|s| ServerAddress::parse(s).unwrap())
+}
+pub(crate) async fn get_max_write_batch_size() -> usize {
+    get_hello_response()
+        .await
+        .max_write_batch_size
+        .unwrap()
+        .try_into()
+        .unwrap()
+}
+pub(crate) async fn get_max_bson_object_size() -> usize {
+    get_hello_response()
+        .await
+        .max_bson_object_size
+        .try_into()
+        .unwrap()
+}
+pub(crate) async fn get_max_message_size_bytes() -> usize {
+    get_hello_response()
+        .await
+        .max_message_size_bytes
+        .try_into()
+        .unwrap()
+}
+
+async fn get_topology() -> &'static Topology {
+    static TOPOLOGY: OnceCell<Topology> = OnceCell::const_new();
+    TOPOLOGY
+        .get_or_init(|| async {
+            let client_options = get_client_options().await;
+            if client_options.load_balanced == Some(true) {
+                return Topology::LoadBalanced;
+            }
+
+            let hello_response = get_hello_response().await;
+            if hello_response.msg.as_deref() == Some("isdbgrid") {
+                return Topology::Sharded;
+            }
+            if hello_response.set_name.is_some() {
+                return Topology::ReplicaSet;
+            }
+
+            Topology::Single
+        })
+        .await
+}
+pub(crate) async fn topology_is_standalone() -> bool {
+    get_topology().await == &Topology::Single
+}
+pub(crate) async fn topology_is_replica_set() -> bool {
+    get_topology().await == &Topology::ReplicaSet
+}
+pub(crate) async fn topology_is_sharded() -> bool {
+    get_topology().await == &Topology::Sharded
+}
+pub(crate) async fn topology_is_load_balanced() -> bool {
+    get_topology().await == &Topology::LoadBalanced
+}
+
+pub(crate) async fn transactions_supported() -> bool {
+    topology_is_replica_set().await || topology_is_sharded().await && server_version_gte(4, 2).await
+}
+pub(crate) async fn block_connection_supported() -> bool {
+    server_version_matches(">=4.2.9").await
+}
+pub(crate) async fn fail_command_supported() -> bool {
+    if topology_is_sharded().await {
+        server_version_matches(">=4.1.5").await
+    } else {
+        true
+    }
+}
+pub(crate) async fn fail_command_appname_initial_handshake_supported() -> bool {
+    let requirements = [">= 4.2.15, < 4.3.0", ">= 4.4.7, < 4.5.0", ">= 4.9.0"];
+    for requirement in requirements {
+        if server_version_matches(requirement).await {
+            return true;
+        }
+    }
+    false
+}
+pub(crate) async fn streaming_monitor_protocol_supported() -> bool {
+    get_hello_response().await.topology_version.is_some()
 }
 
 pub(crate) static DEFAULT_URI: Lazy<String> = Lazy::new(get_default_uri);

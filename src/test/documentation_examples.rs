@@ -2,13 +2,21 @@ mod aggregation_data;
 
 use bson::Document;
 use futures::TryStreamExt;
-use semver::Version;
 
 use crate::{
     bson::{doc, Bson},
     error::Result,
     options::{ClientOptions, ServerApi, ServerApiVersion},
-    test::{log_uncaptured, DEFAULT_URI},
+    test::{
+        log_uncaptured,
+        server_version_lt,
+        server_version_matches,
+        topology_is_load_balanced,
+        topology_is_replica_set,
+        topology_is_sharded,
+        transactions_supported,
+        DEFAULT_URI,
+    },
     Client,
     Collection,
 };
@@ -1237,22 +1245,23 @@ type GenericResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[allow(unused_variables)]
 async fn stable_api_examples() -> GenericResult<()> {
-    let setup_client = Client::for_test().await;
-    if setup_client.server_version_lt(4, 9) {
+    if server_version_lt(4, 9).await {
         log_uncaptured("skipping stable API examples due to unsupported server version");
         return Ok(());
     }
-    if setup_client.is_sharded() && setup_client.server_version <= Version::new(5, 0, 2) {
+    if topology_is_sharded().await && server_version_matches("<=5.0.2").await {
         // See SERVER-58794.
         log_uncaptured(
             "skipping stable API examples due to unsupported server version on sharded topology",
         );
         return Ok(());
     }
-    if setup_client.is_load_balanced() {
+    if topology_is_load_balanced().await {
         log_uncaptured("skipping stable API examples due to load-balanced topology");
         return Ok(());
     }
+
+    let setup_client = Client::for_test().await;
 
     let uri = DEFAULT_URI.clone();
     // Start Versioned API Example 1
@@ -1596,11 +1605,12 @@ async fn change_streams_examples() -> Result<()> {
     use crate::{options::FullDocumentType, runtime};
     use std::time::Duration;
 
-    let client = Client::for_test().await;
-    if !client.is_replica_set() && !client.is_sharded() {
+    if !topology_is_replica_set().await && !topology_is_sharded().await {
         log_uncaptured("skipping change_streams_examples due to unsupported topology");
         return Ok(());
     }
+
+    let client = Client::for_test().await;
     let db = client.database("change_streams_examples");
     db.drop().await?;
     let inventory = db.collection::<Document>("inventory");
@@ -1666,9 +1676,7 @@ async fn change_streams_examples() -> Result<()> {
 async fn convenient_transaction_examples() -> Result<()> {
     use crate::ClientSession;
     use futures::FutureExt;
-
-    let setup_client = Client::for_test().await;
-    if !setup_client.supports_transactions() {
+    if !transactions_supported().await {
         log_uncaptured(
             "skipping convenient transaction API examples due to no transaction support",
         );

@@ -4,7 +4,7 @@ use crate::{
     bson::{doc, Bson, Document},
     error::ErrorKind,
     options::{Acknowledgment, ReadConcern, WriteConcern},
-    test::EventClient,
+    test::{server_version_lt, transactions_supported, EventClient},
     Client,
     Collection,
 };
@@ -131,17 +131,18 @@ async fn unacknowledged_write_concern_rejected() {
 #[tokio::test]
 #[function_name::named]
 async fn snapshot_read_concern() {
-    let client = Client::for_test().monitor_events().await;
     // snapshot read concern was introduced in 4.0
-    if client.server_version_lt(4, 0) {
+    if server_version_lt(4, 0).await {
         return;
     }
+
+    let client = Client::for_test().monitor_events().await;
 
     let coll = client
         .database(function_name!())
         .collection::<Document>(function_name!());
 
-    if client.supports_transactions() {
+    if transactions_supported().await {
         let mut session = client.start_session().await.unwrap();
         session
             .start_transaction()
@@ -153,7 +154,7 @@ async fn snapshot_read_concern() {
         assert_event_contains_read_concern(&client).await;
     }
 
-    if client.server_version_lt(4, 9) {
+    if server_version_lt(4, 9).await {
         let error = coll
             .find_one(doc! {})
             .read_concern(ReadConcern::snapshot())

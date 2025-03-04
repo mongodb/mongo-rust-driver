@@ -10,9 +10,13 @@ use crate::{
     },
     runtime::{self, AsyncJoinHandle},
     test::{
+        block_connection_supported,
+        fail_command_supported,
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
+        topology_is_load_balanced,
+        topology_is_sharded,
         util::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
@@ -31,16 +35,17 @@ async fn run_unified() {
 /// pool before the second attempt.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_releases_connection() {
+    if !fail_command_supported().await {
+        log_uncaptured("skipping retry_releases_connection due to failCommand not being supported");
+        return;
+    }
+
     let mut client_options = get_client_options().await.clone();
     client_options.hosts.drain(1..);
     client_options.retry_reads = Some(true);
     client_options.max_pool_size = Some(1);
 
     let client = Client::for_test().options(client_options).await;
-    if !client.supports_fail_command() {
-        log_uncaptured("skipping retry_releases_connection due to failCommand not being supported");
-        return;
-    }
 
     let collection = client
         .database("retry_releases_connection")
@@ -65,6 +70,17 @@ async fn retry_releases_connection() {
 /// Prose test from retryable reads spec verifying that PoolClearedErrors are retried.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_read_pool_cleared() {
+    if !block_connection_supported().await {
+        log_uncaptured(
+            "skipping retry_read_pool_cleared due to blockConnection not being supported",
+        );
+        return;
+    }
+    if topology_is_load_balanced().await {
+        log_uncaptured("skipping retry_read_pool_cleared due to load-balanced topology");
+        return;
+    }
+
     let buffer = EventBuffer::new();
 
     let mut client_options = get_client_options().await.clone();
@@ -78,16 +94,6 @@ async fn retry_read_pool_cleared() {
     }
 
     let client = Client::for_test().options(client_options.clone()).await;
-    if !client.supports_block_connection() {
-        log_uncaptured(
-            "skipping retry_read_pool_cleared due to blockConnection not being supported",
-        );
-        return;
-    }
-    if client.is_load_balanced() {
-        log_uncaptured("skipping retry_read_pool_cleared due to load-balanced topology");
-        return;
-    }
 
     let collection = client
         .database("retry_read_pool_cleared")
@@ -153,8 +159,12 @@ async fn retry_read_pool_cleared() {
 // Retryable Reads Are Retried on a Different mongos if One is Available
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_read_different_mongos() {
+    if !fail_command_supported().await {
+        log_uncaptured("skipping retry_read_different_mongos: requires failCommand");
+        return;
+    }
     let mut client_options = get_client_options().await.clone();
-    if client_options.repl_set_name.is_some() || client_options.hosts.len() < 2 {
+    if !(topology_is_sharded().await && client_options.hosts.len() >= 2) {
         log_uncaptured(
             "skipping retry_read_different_mongos: requires sharded cluster with at least two \
              hosts",
@@ -170,10 +180,6 @@ async fn retry_read_different_mongos() {
         opts.hosts.remove(ix);
         opts.direct_connection = Some(true);
         let client = Client::for_test().options(opts).await;
-        if !client.supports_fail_command() {
-            log_uncaptured("skipping retry_read_different_mongos: requires failCommand");
-            return;
-        }
 
         let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
             .error_code(6)
@@ -212,12 +218,11 @@ async fn retry_read_different_mongos() {
 // Retryable Reads Are Retried on the Same mongos if No Others are Available
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_read_same_mongos() {
-    let init_client = Client::for_test().await;
-    if !init_client.supports_fail_command() {
+    if !fail_command_supported().await {
         log_uncaptured("skipping retry_read_same_mongos: requires failCommand");
         return;
     }
-    if !init_client.is_sharded() {
+    if !topology_is_sharded().await {
         log_uncaptured("skipping retry_read_same_mongos: requires sharded cluster");
         return;
     }
