@@ -489,8 +489,8 @@ async fn cluster_time_sent_in_commands() {
 
     let client = Client::for_test().monitor_events().await;
     let coll = client
-        .database("causal_consistency_12")
-        .collection::<Document>("causal_consistency_12");
+        .create_fresh_collection("causal_consistency_12", "causal_consistency_12", None)
+        .await;
 
     coll.find_one(doc! {}).await.unwrap();
 
