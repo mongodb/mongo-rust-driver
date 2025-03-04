@@ -335,3 +335,27 @@ async fn removed_server_monitor_stops() -> crate::error::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn ipv6_invalid_me() {
+    let addr = ServerAddress::Tcp {
+        host: "::1".to_string(),
+        port: Some(8191),
+    };
+    let desc = ServerDescription {
+        address: addr.clone(),
+        server_type: super::ServerType::RsSecondary,
+        last_update_time: None,
+        average_round_trip_time: None,
+        reply: Ok(Some(crate::hello::HelloReply {
+            server_address: addr.clone(),
+            command_response: crate::hello::HelloCommandResponse {
+                me: Some("[::1]:8191".to_string()),
+                ..Default::default()
+            },
+            raw_command_response: bson::RawDocumentBuf::new(),
+            cluster_time: None,
+        })),
+    };
+    assert!(!desc.invalid_me().unwrap());
+}
