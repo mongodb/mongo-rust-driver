@@ -10,7 +10,8 @@ mod handshake;
 #[cfg(feature = "dns-resolver")]
 mod initial_dns_seedlist_discovery;
 mod load_balancers;
-mod oidc;
+#[path = "spec/oidc.rs"]
+mod oidc_skip_ci;
 mod read_write_concern;
 mod retryable_reads;
 mod retryable_writes;

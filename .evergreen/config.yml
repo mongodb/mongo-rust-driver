@@ -286,7 +286,7 @@ buildvariants:
       - test-k8s-oidc-task-group
 
   - name: oidc-macos
-    display_name: "OIDC Macos"
+    display_name: "OIDC MacOS"
     patchable: true
     run_on:
       - macos-14
@@ -645,6 +645,7 @@ task_groups:
             ${PREPARE_SHELL}
             ${DRIVERS_TOOLS}/.evergreen/auth_oidc/setup.sh
     teardown_task:
+      - func: "upload test results"
       - command: subprocess.exec
         params:
           binary: bash
@@ -1177,7 +1178,7 @@ tasks:
           - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/azure/run-driver-test.sh
         env:
           AZUREOIDC_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
-          AZUREOIDC_TEST_CMD: "ls -laR data && PROJECT_DIRECTORY='.' OIDC_ENV=azure OIDC=oidc TEST_FILE=./${STATIC_TEST_BINARY} ./.evergreen/run-mongodb-oidc-test.sh"
+          AZUREOIDC_TEST_CMD: "source ./env.sh && RUST_BACKTRACE=1 ./${STATIC_TEST_BINARY} test::spec::oidc_skip_ci::azure -- --no-capture"
 
   - name: "oidc-auth-test-gcp-latest"
     commands:
@@ -1193,7 +1194,7 @@ tasks:
           - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/gcp/run-driver-test.sh
         env:
           GCPOIDC_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
-          GCPOIDC_TEST_CMD: "ls -la && PROJECT_DIRECTORY='.' OIDC_ENV=gcp OIDC=oidc TEST_FILE=./${STATIC_TEST_BINARY} ./.evergreen/run-mongodb-oidc-test.sh"
+          GCPOIDC_TEST_CMD: "source ./secrets-export.sh && RUST_BACKTRACE=1 ./${STATIC_TEST_BINARY} test::spec::oidc_skip_ci::gcp -- --no-capture"
 
   - name: "oidc-auth-test-k8s-latest"
     commands:
@@ -1700,16 +1701,16 @@ functions:
         role_arn: ${aws_test_secrets_role}
 
   "run oidc auth test with test credentials":
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
         working_dir: src
-        shell: bash
-        include_expansions_in_env: ["DRIVERS_TOOLS", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"]
-        script: |
-          ${PREPARE_SHELL}
-          export OIDC="oidc"
-          .evergreen/run-mongodb-oidc-test.sh
+        binary: bash
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+        args:
+          - .evergreen/run-mongodb-oidc-test.sh
 
   "start happy eyeballs server":
     - command: subprocess.exec
@@ -1953,7 +1954,7 @@ functions:
         - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/run-driver-test.sh
       env:
         K8S_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
-        K8S_TEST_CMD: "ls -la && PROJECT_DIRECTORY='.' OIDC_ENV=k8s OIDC=oidc TEST_FILE=./${STATIC_TEST_BINARY} ./.evergreen/run-mongodb-oidc-test.sh"
+        K8S_TEST_CMD: "RUST_BACKTRACE=1 ./${STATIC_TEST_BINARY} test::spec::oidc_skip_ci::k8s -- --no-capture"
       include_expansions_in_env:
         - AWS_ACCESS_KEY_ID
         - AWS_SECRET_ACCESS_KEY
