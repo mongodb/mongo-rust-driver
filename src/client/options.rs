@@ -10,7 +10,7 @@ use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter, Write},
     hash::{Hash, Hasher},
-    net::Ipv6Addr,
+    net::{Ipv4Addr, Ipv6Addr},
     path::PathBuf,
     str::FromStr,
     sync::Arc,
@@ -272,6 +272,14 @@ impl ServerAddress {
             .into());
         }
 
+        let normalized_hostname = if let Ok(v4) = hostname.parse::<Ipv4Addr>() {
+            v4.to_string()
+        } else if let Ok(v6) = hostname.parse::<Ipv6Addr>() {
+            v6.to_string()
+        } else {
+            hostname.to_lowercase()
+        };
+
         let port = if let Some(port) = port {
             match u16::from_str(port) {
                 Ok(0) | Err(_) => {
@@ -291,7 +299,7 @@ impl ServerAddress {
         };
 
         Ok(Self::Tcp {
-            host: hostname.to_lowercase(),
+            host: normalized_hostname,
             port,
         })
     }
