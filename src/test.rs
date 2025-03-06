@@ -80,11 +80,17 @@ pub(crate) async fn auth_enabled() -> bool {
     get_client_options().await.credential.is_some()
 }
 
-async fn get_server_version() -> &'static semver::Version {
-    static SERVER_VERSION: OnceCell<semver::Version> = OnceCell::const_new();
-    SERVER_VERSION
+struct TestClientMetadata {
+    server_version: semver::Version,
+    hello_response: HelloCommandResponse,
+    server_parameters: Document,
+}
+async fn get_test_client_metadata() -> &'static TestClientMetadata {
+    static TEST_CLIENT_METADATA: OnceCell<TestClientMetadata> = OnceCell::const_new();
+    TEST_CLIENT_METADATA
         .get_or_init(|| async {
             let client = Client::for_test().await;
+
             let build_info = client
                 .database("test")
                 .run_command(doc! { "buildInfo": 1 })
@@ -94,86 +100,86 @@ async fn get_server_version() -> &'static semver::Version {
                 semver::Version::parse(build_info.get_str("version").unwrap()).unwrap();
             // ignore whether the version is a prerelease
             server_version.pre = semver::Prerelease::EMPTY;
-            server_version
+
+            let hello_response = client.hello().await.unwrap();
+
+            let server_parameters = client
+                .database("admin")
+                .run_command(doc! { "getParameter": "*" })
+                .await
+                .unwrap();
+
+            TestClientMetadata {
+                server_version,
+                hello_response,
+                server_parameters,
+            }
         })
         .await
 }
+
 // Utility functions to check server version requirements. All but server_version_matches ignore
 // the server's patch version; specify a requirement string to server_version_matches for a
 // patch-sensitive comparison.
 pub(crate) async fn server_version_eq(major: u64, minor: u64) -> bool {
-    let version = get_server_version().await;
-    version.major == major && version.minor == minor
+    let server_version = &get_test_client_metadata().await.server_version;
+    server_version.major == major && server_version.minor == minor
 }
 pub(crate) async fn server_version_gt(major: u64, minor: u64) -> bool {
-    let version = get_server_version().await;
-    version.major > major || version.major == major && version.minor > minor
+    let server_version = &get_test_client_metadata().await.server_version;
+    server_version.major > major || server_version.major == major && server_version.minor > minor
 }
 pub(crate) async fn server_version_gte(major: u64, minor: u64) -> bool {
-    let version = get_server_version().await;
-    version.major > major || version.major == major && version.minor >= minor
+    let server_version = &get_test_client_metadata().await.server_version;
+    server_version.major > major || server_version.major == major && server_version.minor >= minor
 }
 pub(crate) async fn server_version_lt(major: u64, minor: u64) -> bool {
-    let version = get_server_version().await;
-    version.major < major || version.major == major && version.minor < minor
+    let server_version = &get_test_client_metadata().await.server_version;
+    server_version.major < major || server_version.major == major && server_version.minor < minor
 }
 pub(crate) async fn server_version_lte(major: u64, minor: u64) -> bool {
-    let version = get_server_version().await;
-    version.major < major || version.major == major && version.minor <= minor
+    let server_version = &get_test_client_metadata().await.server_version;
+    server_version.major < major || server_version.major == major && server_version.minor <= minor
 }
 pub(crate) async fn server_version_matches(requirement: &str) -> bool {
     let requirement = semver::VersionReq::parse(requirement).unwrap();
-    requirement.matches(get_server_version().await)
+    let server_version = &get_test_client_metadata().await.server_version;
+    requirement.matches(server_version)
 }
 
 pub(crate) async fn get_server_parameters() -> &'static Document {
-    static SERVER_PARAMETERS: OnceCell<Document> = OnceCell::const_new();
-    SERVER_PARAMETERS
-        .get_or_init(|| async {
-            let client = Client::for_test().await;
-            client
-                .database("admin")
-                .run_command(doc! { "getParameter": "*" })
-                .await
-                .unwrap()
-        })
-        .await
+    &get_test_client_metadata().await.server_parameters
 }
 
-async fn get_hello_response() -> &'static HelloCommandResponse {
-    static HELLO_COMMAND_RESPONSE: OnceCell<HelloCommandResponse> = OnceCell::const_new();
-    HELLO_COMMAND_RESPONSE
-        .get_or_init(|| async {
-            let client = Client::for_test().await;
-            client.hello().await.unwrap()
-        })
-        .await
-}
 pub(crate) async fn get_primary() -> Option<ServerAddress> {
-    get_hello_response()
+    get_test_client_metadata()
         .await
+        .hello_response
         .primary
         .as_ref()
         .map(|s| ServerAddress::parse(s).unwrap())
 }
 pub(crate) async fn get_max_write_batch_size() -> usize {
-    get_hello_response()
+    get_test_client_metadata()
         .await
+        .hello_response
         .max_write_batch_size
         .unwrap()
         .try_into()
         .unwrap()
 }
 pub(crate) async fn get_max_bson_object_size() -> usize {
-    get_hello_response()
+    get_test_client_metadata()
         .await
+        .hello_response
         .max_bson_object_size
         .try_into()
         .unwrap()
 }
 pub(crate) async fn get_max_message_size_bytes() -> usize {
-    get_hello_response()
+    get_test_client_metadata()
         .await
+        .hello_response
         .max_message_size_bytes
         .try_into()
         .unwrap()
@@ -188,7 +194,7 @@ async fn get_topology() -> &'static Topology {
                 return Topology::LoadBalanced;
             }
 
-            let hello_response = get_hello_response().await;
+            let hello_response = &get_test_client_metadata().await.hello_response;
             if hello_response.msg.as_deref() == Some("isdbgrid") {
                 return Topology::Sharded;
             }
@@ -236,7 +242,11 @@ pub(crate) async fn fail_command_appname_initial_handshake_supported() -> bool {
     false
 }
 pub(crate) async fn streaming_monitor_protocol_supported() -> bool {
-    get_hello_response().await.topology_version.is_some()
+    get_test_client_metadata()
+        .await
+        .hello_response
+        .topology_version
+        .is_some()
 }
 
 pub(crate) static DEFAULT_URI: Lazy<String> = Lazy::new(get_default_uri);
