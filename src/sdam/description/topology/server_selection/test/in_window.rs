@@ -2,7 +2,6 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use approx::abs_diff_eq;
 use bson::{doc, Document};
-use semver::VersionReq;
 use serde::Deserialize;
 
 use crate::{
@@ -14,9 +13,12 @@ use crate::{
     sdam::{description::topology::server_selection, Server},
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{
+        auth_enabled,
+        block_connection_supported,
         get_client_options,
         log_uncaptured,
         run_spec_test,
+        topology_is_sharded,
         util::fail_point::{FailPoint, FailPointMode},
         Event,
         EventClient,
@@ -112,40 +114,30 @@ async fn select_in_window() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn load_balancing_test() {
-    let mut setup_client_options = get_client_options().await.clone();
-
-    if setup_client_options.load_balanced.unwrap_or(false) {
-        log_uncaptured("skipping load_balancing_test test due to load-balanced topology");
+    if !topology_is_sharded().await {
+        log_uncaptured("skipping load_balancing_test test due to topology not being sharded");
         return;
     }
-
-    if setup_client_options.credential.is_some() {
+    if get_client_options().await.hosts.len() != 2 {
+        log_uncaptured("skipping load_balancing_test test due to topology not having 2 mongoses");
+        return;
+    }
+    if auth_enabled().await {
         log_uncaptured("skipping load_balancing_test test due to auth being enabled");
         return;
     }
-
-    setup_client_options.hosts.drain(1..);
-    setup_client_options.direct_connection = Some(true);
-    let setup_client = Client::for_test().options(setup_client_options).await;
-
-    let version = VersionReq::parse(">= 4.2.9").unwrap();
-    // blockConnection failpoint option only supported in 4.2.9+.
-    if !version.matches(&setup_client.server_version) {
+    if !block_connection_supported().await {
         log_uncaptured(
             "skipping load_balancing_test test due to server not supporting blockConnection option",
         );
         return;
     }
 
-    if !setup_client.is_sharded() {
-        log_uncaptured("skipping load_balancing_test test due to topology not being sharded");
-        return;
-    }
+    let mut setup_client_options = get_client_options().await.clone();
 
-    if get_client_options().await.hosts.len() != 2 {
-        log_uncaptured("skipping load_balancing_test test due to topology not having 2 mongoses");
-        return;
-    }
+    setup_client_options.hosts.drain(1..);
+    setup_client_options.direct_connection = Some(true);
+    let setup_client = Client::for_test().options(setup_client_options).await;
 
     // clear the collection so subsequent test runs don't increase linearly in time
     setup_client

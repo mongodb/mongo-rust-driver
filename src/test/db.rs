@@ -16,12 +16,11 @@ use crate::{
         ValidationLevel,
     },
     results::{CollectionSpecification, CollectionType},
+    test::{log_uncaptured, server_version_lt},
     Client,
     Cursor,
     Database,
 };
-
-use super::log_uncaptured;
 
 async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionSpecification> {
     let mut colls: Vec<CollectionSpecification> = db
@@ -221,12 +220,6 @@ async fn collection_management() {
 #[tokio::test]
 async fn db_aggregate() {
     let client = Client::for_test().await;
-
-    if client.server_version_lt(4, 0) {
-        log_uncaptured("skipping db_aggregate due to server version < 4.0");
-        return;
-    }
-
     let db = client.database("admin");
 
     let pipeline = vec![
@@ -263,12 +256,6 @@ async fn db_aggregate() {
 #[tokio::test]
 async fn db_aggregate_disk_use() {
     let client = Client::for_test().await;
-
-    if client.server_version_lt(4, 0) {
-        log_uncaptured("skipping db_aggregate_disk_use due to server version < 4.0");
-        return;
-    }
-
     let db = client.database("admin");
 
     let pipeline = vec![
@@ -352,12 +339,12 @@ fn deserialize_clustered_index_option_from_bool() {
 
 #[tokio::test]
 async fn clustered_index_list_collections() {
-    let client = Client::for_test().await;
-    let database = client.database("db");
-
-    if client.server_version_lt(5, 3) {
+    if server_version_lt(5, 3).await {
         return;
     }
+
+    let client = Client::for_test().await;
+    let database = client.database("db");
 
     database
         .create_collection("clustered_index_collection")
@@ -381,6 +368,13 @@ async fn clustered_index_list_collections() {
 
 #[tokio::test]
 async fn aggregate_with_generics() {
+    if server_version_lt(5, 1).await {
+        log_uncaptured(
+            "skipping aggregate_with_generics: $documents agg stage only available on 5.1+",
+        );
+        return;
+    }
+
     #[derive(Deserialize)]
     struct A {
         str: String,
@@ -388,13 +382,6 @@ async fn aggregate_with_generics() {
 
     let client = Client::for_test().await;
     let database = client.database("aggregate_with_generics");
-
-    if client.server_version_lt(5, 1) {
-        log_uncaptured(
-            "skipping aggregate_with_generics: $documents agg stage only available on 5.1+",
-        );
-        return;
-    }
 
     // The cursor returned will contain these documents
     let pipeline = vec![doc! { "$documents": [ { "str": "hi" } ] }];

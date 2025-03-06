@@ -1,7 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
 use bson::Bson;
-use semver::VersionReq;
 use tokio::sync::Mutex;
 
 use crate::{
@@ -11,12 +10,19 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
-    runtime,
-    runtime::{spawn, AcknowledgedMessage, AsyncJoinHandle},
+    runtime::{self, spawn, AcknowledgedMessage, AsyncJoinHandle},
     test::{
+        block_connection_supported,
+        fail_command_supported,
         get_client_options,
         log_uncaptured,
+        server_version_gt,
+        server_version_lt,
         spec::unified_runner::run_unified_tests,
+        topology_is_load_balanced,
+        topology_is_replica_set,
+        topology_is_sharded,
+        topology_is_standalone,
         util::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
@@ -38,14 +44,12 @@ async fn run_unified() {
 #[tokio::test]
 #[function_name::named]
 async fn mmapv1_error_raised() {
-    let client = Client::for_test().await;
-
-    let req = semver::VersionReq::parse("<=4.0").unwrap();
-    if !req.matches(&client.server_version) || !client.is_replica_set() {
+    if server_version_gt(4, 0).await || !topology_is_replica_set().await {
         log_uncaptured("skipping mmapv1_error_raised due to test topology");
         return;
     }
 
+    let client = Client::for_test().await;
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
     let server_status = client
@@ -88,24 +92,17 @@ async fn label_not_added_second_read_error() {
 
 #[function_name::named]
 async fn label_not_added(retry_reads: bool) {
+    if !fail_command_supported().await {
+        log_uncaptured("skipping label_not_added due to fail command unsupported");
+        return;
+    }
+
     let mut options = get_client_options().await.clone();
     options.retry_reads = Some(retry_reads);
     let client = Client::for_test()
         .options(options)
         .use_single_mongos()
         .await;
-
-    // Configuring a failpoint is only supported on 4.0+ replica sets and 4.1.5+ sharded clusters.
-    let req = VersionReq::parse(">=4.0").unwrap();
-    let sharded_req = VersionReq::parse(">=4.1.5").unwrap();
-    if client.is_sharded() && !sharded_req.matches(&client.server_version)
-        || !req.matches(&client.server_version)
-    {
-        log_uncaptured(
-            "skipping label_not_added due to unsupported replica set or sharded cluster version",
-        );
-        return;
-    }
 
     let coll = client
         .init_db_and_coll(&format!("{}{}", function_name!(), retry_reads), "coll")
@@ -133,6 +130,21 @@ async fn label_not_added(retry_reads: bool) {
 /// Prose test from retryable writes spec verifying that PoolClearedErrors are retried.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_pool_cleared() {
+    if topology_is_standalone().await {
+        log_uncaptured("skipping retry_write_pool_cleared due standalone topology");
+        return;
+    }
+    if topology_is_load_balanced().await {
+        log_uncaptured("skipping retry_write_pool_cleared due to load-balanced topology");
+        return;
+    }
+    if !block_connection_supported().await {
+        log_uncaptured(
+            "skipping retry_write_pool_cleared due to blockConnection not being supported",
+        );
+        return;
+    }
+
     let buffer = EventBuffer::new();
 
     let mut client_options = get_client_options().await.clone();
@@ -146,22 +158,6 @@ async fn retry_write_pool_cleared() {
     }
 
     let client = Client::for_test().options(client_options.clone()).await;
-    if !client.supports_block_connection() {
-        log_uncaptured(
-            "skipping retry_write_pool_cleared due to blockConnection not being supported",
-        );
-        return;
-    }
-
-    if client.is_standalone() {
-        log_uncaptured("skipping retry_write_pool_cleared due standalone topology");
-        return;
-    }
-
-    if client.is_load_balanced() {
-        log_uncaptured("skipping retry_write_pool_cleared due to load-balanced topology");
-        return;
-    }
 
     let collection = client
         .database("retry_write_pool_cleared")
@@ -228,6 +224,11 @@ async fn retry_write_pool_cleared() {
 /// encountering a WriteConcernError with a RetryableWriteError label.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_retryable_write_error() {
+    if !topology_is_replica_set().await || server_version_lt(6, 0).await {
+        log_uncaptured("skipping retry_write_retryable_write_error: invalid topology");
+        return;
+    }
+
     let mut client_options = get_client_options().await.clone();
     client_options.retry_writes = Some(true);
     let (event_tx, event_rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
@@ -281,11 +282,6 @@ async fn retry_write_retryable_write_error() {
     let client = Client::for_test().options(client_options).await;
     *listener_client.lock().await = Some(client.clone());
 
-    if !client.is_replica_set() || client.server_version_lt(6, 0) {
-        log_uncaptured("skipping retry_write_retryable_write_error: invalid topology");
-        return;
-    }
-
     let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
         .write_concern_error(doc! {
             "code": 91,
@@ -307,8 +303,12 @@ async fn retry_write_retryable_write_error() {
 // Test that in a sharded cluster writes are retried on a different mongos if one available
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_different_mongos() {
+    if !fail_command_supported().await {
+        log_uncaptured("skipping retry_write_different_mongos: requires failCommand");
+        return;
+    }
     let mut client_options = get_client_options().await.clone();
-    if client_options.repl_set_name.is_some() || client_options.hosts.len() < 2 {
+    if !(topology_is_sharded().await && client_options.hosts.len() >= 2) {
         log_uncaptured(
             "skipping retry_write_different_mongos: requires sharded cluster with at least two \
              hosts",
@@ -324,10 +324,6 @@ async fn retry_write_different_mongos() {
         opts.hosts.remove(ix);
         opts.direct_connection = Some(true);
         let client = Client::for_test().options(opts).await;
-        if !client.supports_fail_command() {
-            log_uncaptured("skipping retry_write_different_mongos: requires failCommand");
-            return;
-        }
 
         let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
             .error_code(6)
@@ -367,12 +363,11 @@ async fn retry_write_different_mongos() {
 // Retryable Reads Are Retried on the Same mongos if No Others are Available
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_same_mongos() {
-    let init_client = Client::for_test().await;
-    if !init_client.supports_fail_command() {
+    if !fail_command_supported().await {
         log_uncaptured("skipping retry_write_same_mongos: requires failCommand");
         return;
     }
-    if !init_client.is_sharded() {
+    if !topology_is_sharded().await {
         log_uncaptured("skipping retry_write_same_mongos: requires sharded cluster");
         return;
     }

@@ -1,17 +1,22 @@
 use bson::doc;
 use futures::TryStreamExt;
 
-use crate::{db::options::TimeseriesOptions, test::log_uncaptured, Client};
+use crate::{
+    db::options::TimeseriesOptions,
+    test::{log_uncaptured, server_version_lt},
+    Client,
+};
 
 type Result<T> = anyhow::Result<T>;
 
 #[tokio::test]
 async fn list_collections_timeseries() -> Result<()> {
-    let client = Client::for_test().await;
-    if client.server_version_lt(5, 0) {
+    if server_version_lt(5, 0).await {
         log_uncaptured("Skipping list_collections_timeseries: timeseries require server >= 5.0");
         return Ok(());
     }
+
+    let client = Client::for_test().await;
     let db = client.database("list_collections_timeseries");
     db.drop().await?;
     db.create_collection("test")

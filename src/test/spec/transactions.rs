@@ -9,7 +9,10 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
+        server_version_lt,
         spec::unified_runner::run_unified_tests,
+        topology_is_sharded,
+        transactions_supported,
         util::fail_point::{FailPoint, FailPointMode},
     },
     Client,
@@ -36,6 +39,11 @@ async fn run_unified_convenient_api() {
 #[tokio::test(flavor = "multi_thread")]
 #[function_name::named]
 async fn deserialize_recovery_token() {
+    if !topology_is_sharded().await || server_version_lt(4, 2).await {
+        log_uncaptured("skipping deserialize_recovery_token due to test topology");
+        return;
+    }
+
     #[derive(Debug, Serialize)]
     struct A {
         num: i32,
@@ -47,10 +55,6 @@ async fn deserialize_recovery_token() {
     }
 
     let client = Client::for_test().await;
-    if !client.is_sharded() || client.server_version_lt(4, 2) {
-        log_uncaptured("skipping deserialize_recovery_token due to test topology");
-        return;
-    }
 
     let mut session = client.start_session().await.unwrap();
 
@@ -86,11 +90,12 @@ async fn deserialize_recovery_token() {
 
 #[tokio::test]
 async fn convenient_api_custom_error() {
-    let client = Client::for_test().monitor_events().await;
-    if !client.supports_transactions() {
+    if !transactions_supported().await {
         log_uncaptured("Skipping convenient_api_custom_error: no transaction support.");
         return;
     }
+
+    let client = Client::for_test().monitor_events().await;
     let mut session = client.start_session().await.unwrap();
     let coll = client
         .database("test_convenient")
@@ -118,11 +123,12 @@ async fn convenient_api_custom_error() {
 
 #[tokio::test]
 async fn convenient_api_returned_value() {
-    let client = Client::for_test().monitor_events().await;
-    if !client.supports_transactions() {
+    if !transactions_supported().await {
         log_uncaptured("Skipping convenient_api_returned_value: no transaction support.");
         return;
     }
+
+    let client = Client::for_test().monitor_events().await;
     let mut session = client.start_session().await.unwrap();
     let coll = client
         .database("test_convenient")
@@ -145,11 +151,12 @@ async fn convenient_api_returned_value() {
 
 #[tokio::test]
 async fn convenient_api_retry_timeout_callback() {
-    let client = Client::for_test().monitor_events().await;
-    if !client.supports_transactions() {
+    if !transactions_supported().await {
         log_uncaptured("Skipping convenient_api_retry_timeout_callback: no transaction support.");
         return;
     }
+
+    let client = Client::for_test().monitor_events().await;
     let mut session = client.start_session().await.unwrap();
     session.convenient_transaction_timeout = Some(Duration::ZERO);
     let coll = client
@@ -176,19 +183,20 @@ async fn convenient_api_retry_timeout_callback() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn convenient_api_retry_timeout_commit_unknown() {
-    let mut options = get_client_options().await.clone();
-    if Client::for_test().await.is_sharded() {
-        options.direct_connection = Some(true);
-        options.hosts.drain(1..);
-    }
-
-    let client = Client::for_test().options(options).monitor_events().await;
-    if !client.supports_transactions() {
+    if !transactions_supported().await {
         log_uncaptured(
             "Skipping convenient_api_retry_timeout_commit_unknown: no transaction support.",
         );
         return;
     }
+
+    let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        options.direct_connection = Some(true);
+        options.hosts.drain(1..);
+    }
+
+    let client = Client::for_test().options(options).monitor_events().await;
     let mut session = client.start_session().await.unwrap();
     session.convenient_transaction_timeout = Some(Duration::ZERO);
     let coll = client
@@ -217,19 +225,20 @@ async fn convenient_api_retry_timeout_commit_unknown() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn convenient_api_retry_timeout_commit_transient() {
-    let mut options = get_client_options().await.clone();
-    if Client::for_test().await.is_sharded() {
-        options.direct_connection = Some(true);
-        options.hosts.drain(1..);
-    }
-
-    let client = Client::for_test().options(options).monitor_events().await;
-    if !client.supports_transactions() {
+    if !transactions_supported().await {
         log_uncaptured(
             "Skipping convenient_api_retry_timeout_commit_transient: no transaction support.",
         );
         return;
     }
+
+    let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        options.direct_connection = Some(true);
+        options.hosts.drain(1..);
+    }
+
+    let client = Client::for_test().options(options).monitor_events().await;
     let mut session = client.start_session().await.unwrap();
     session.convenient_transaction_timeout = Some(Duration::ZERO);
     let coll = client
