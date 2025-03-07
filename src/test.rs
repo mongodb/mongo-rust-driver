@@ -89,7 +89,13 @@ async fn get_test_client_metadata() -> &'static TestClientMetadata {
     static TEST_CLIENT_METADATA: OnceCell<TestClientMetadata> = OnceCell::const_new();
     TEST_CLIENT_METADATA
         .get_or_init(|| async {
-            let client = Client::for_test().await;
+            let client = match std::env::var("MONGODB_URI_SINGLE") {
+                Ok(uri) => {
+                    let options = ClientOptions::parse(uri).await.unwrap();
+                    Client::for_test().options(options).await
+                }
+                Err(_) => Client::for_test().await,
+            };
 
             let build_info = client
                 .database("test")
