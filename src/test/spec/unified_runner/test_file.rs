@@ -31,6 +31,7 @@ use crate::{
     serde_util,
     test::{
         auth_enabled,
+        get_client_options,
         get_server_parameters,
         get_topology,
         server_version_matches,
@@ -151,14 +152,14 @@ impl RunOnRequirement {
             return Err("requires csfle but in-use-encryption feature not enabled".to_string());
         }
         if let Some(ref auth_mechanism) = self.auth_mechanism {
-            let actual_mechanism = client
-                .options()
+            let actual_mechanism = get_client_options()
+                .await
                 .credential
                 .as_ref()
                 .and_then(|c| c.mechanism.as_ref());
             if !actual_mechanism.is_some_and(|actual_mechanism| actual_mechanism == auth_mechanism)
             {
-                return Err("requires OIDC".to_string());
+                return Err(format!("requires {:?} auth mechanism", auth_mechanism));
             }
         }
         Ok(())
