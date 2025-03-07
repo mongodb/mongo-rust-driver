@@ -523,7 +523,7 @@ mod basic {
 
         assert_eq!(*call_count.lock().await, 1);
         let sasl_start_events = event_buffer.get_command_started_events(&["saslStart"]);
-        assert!(sasl_start_events.is_empty());
+        assert!(!sasl_start_events.is_empty());
 
         Ok(())
     }
