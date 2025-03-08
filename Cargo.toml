@@ -77,7 +77,7 @@ chrono = { version = "0.4.7", default-features = false, features = [
     "clock",
     "std",
 ] }
-derive_more = "0.99.17"
+derive_more = { version = "1.0", features = ["from", "display"] }
 derive-where = "1.2.7"
 flate2 = { version = "1.0", optional = true }
 futures-io = "0.3.21"
@@ -98,7 +98,10 @@ openssl = { version = "0.10.38", optional = true }
 openssl-probe = { version = "0.1.5", optional = true }
 pem = { version = "3.0.4", optional = true }
 percent-encoding = "2.0.0"
-pkcs8 = { version = "0.10.2", features = ["encryption", "pkcs5"], optional = true }
+pkcs8 = { version = "0.10.2", features = [
+    "encryption",
+    "pkcs5",
+], optional = true }
 rand = { version = "0.8.3", features = ["small_rng"] }
 rayon = { version = "1.5.3", optional = true }
 rustc_version_runtime = "0.3.0"
@@ -111,10 +114,10 @@ socket2 = "0.5.5"
 stringprep = "0.1.2"
 strsim = "0.11.1"
 take_mut = "0.2.2"
-thiserror = "1.0.24"
+thiserror = "2.0"
 tokio-openssl = { version = "0.6.3", optional = true }
 tracing = { version = "0.1.36", optional = true }
-typed-builder = "0.10.0"
+typed-builder = "0.20"
 webpki-roots = "0.25.2"
 zstd = { version = "0.11.2", optional = true }
 macro_magic = "0.5.1"
