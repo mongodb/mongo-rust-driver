@@ -82,7 +82,10 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
     let config_builder = ClientConfig::builder_with_provider(provider::default_provider().into())
         .with_safe_default_protocol_versions()
         .map_err(|e| ErrorKind::InvalidTlsConfig {
-            message: format!("built-in provider should support default protocol versions: {}", e)
+            message: format!(
+                "built-in provider should support default protocol versions: {}",
+                e
+            ),
         })?
         .with_root_certificates(store);
 
