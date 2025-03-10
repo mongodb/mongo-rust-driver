@@ -149,8 +149,7 @@ Commits to main are run automatically on [evergreen](https://evergreen.mongodb.c
 
 ## Minimum supported Rust version (MSRV) policy
 
-The MSRV for this crate is currently 1.71.1. This will rarely be increased, and if it ever is,
-it will only happen in a minor or major version release.
+The MSRV for this crate is currently 1.71.1. Increases to the MSRV will only happen in a minor or major version release, and will be to a Rust version at least six months old.
 
 ## License
 
