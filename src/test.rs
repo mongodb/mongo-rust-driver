@@ -89,6 +89,7 @@ async fn get_test_client_metadata() -> &'static TestClientMetadata {
     static TEST_CLIENT_METADATA: OnceCell<TestClientMetadata> = OnceCell::const_new();
     TEST_CLIENT_METADATA
         .get_or_init(|| async {
+            // Use the correct URI when running with OIDC authentication.
             let client = match std::env::var("MONGODB_URI_SINGLE") {
                 Ok(uri) => {
                     let options = ClientOptions::parse(uri).await.unwrap();
