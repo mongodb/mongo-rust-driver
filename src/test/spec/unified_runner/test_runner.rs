@@ -482,8 +482,6 @@ impl TestRunner {
                                 "Test requires URI for load balancer fronting single server",
                             )
                         }
-                    } else if let Some(oidc_uri) = &*OIDC_URI {
-                        oidc_uri
                     } else {
                         &DEFAULT_URI
                     };

@@ -102,9 +102,11 @@ async fn get_test_client_metadata() -> &'static TestClientMetadata {
                 std::env::var("OIDC_ADMIN_USER"),
                 std::env::var("OIDC_ADMIN_PWD"),
             ) {
-                let credential = client_options.credential.get_or_insert_default();
-                credential.username = Some(username);
-                credential.password = Some(password);
+                let credential = Credential::builder()
+                    .username(username)
+                    .password(password)
+                    .build();
+                client_options.credential = Some(credential);
             }
             let client = Client::for_test().options(client_options).await;
 
@@ -348,6 +350,9 @@ fn get_default_uri() -> String {
         if !uri.is_empty() {
             return uri;
         }
+    }
+    if let Some(uri) = &*OIDC_URI {
+        return uri.clone();
     }
     if let Ok(uri) = std::env::var("MONGODB_URI") {
         return uri;
