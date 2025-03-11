@@ -48,6 +48,7 @@ pub(crate) use self::{
     },
 };
 
+use futures::FutureExt;
 use home::home_dir;
 use once_cell::sync::Lazy;
 use tokio::sync::OnceCell;
@@ -61,7 +62,12 @@ use crate::{
         options::{ServerApi, ServerApiVersion},
     },
     hello::HelloCommandResponse,
-    options::{ClientOptions, ServerAddress},
+    options::{
+        oidc::{Callback, IdpServerResponse},
+        ClientOptions,
+        ServerAddress,
+    },
+    test::spec::oidc::get_access_token_test_user_1,
     Client,
 };
 use std::{fs::read_to_string, str::FromStr};
@@ -314,6 +320,25 @@ pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
                 .password(SERVERLESS_ATLAS_PASSWORD.clone())
                 .build(),
         );
+    }
+
+    if let Some(properties) = options
+        .credential
+        .as_mut()
+        .and_then(|credential| credential.mechanism_properties.as_mut())
+    {
+        if properties == &doc! { "$$placeholder": 1 } {
+            *properties = doc! { "ENVIRONMENT": "test" };
+            options.credential.get_or_insert_default().oidc_callback =
+                Callback::machine(move |_| {
+                    async move {
+                        Ok(IdpServerResponse::builder()
+                            .access_token(get_access_token_test_user_1().await)
+                            .build())
+                    }
+                    .boxed()
+                });
+        }
     }
 }
 

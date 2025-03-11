@@ -11,7 +11,7 @@ mod handshake;
 mod initial_dns_seedlist_discovery;
 mod load_balancers;
 #[path = "spec/oidc.rs"]
-mod oidc_skip_ci;
+pub(crate) mod oidc_skip_ci;
 mod read_write_concern;
 mod retryable_reads;
 mod retryable_writes;
@@ -37,6 +37,7 @@ use std::{
 use serde::{de::DeserializeOwned, Deserialize};
 
 pub(crate) use self::{
+    oidc_skip_ci as oidc,
     unified_runner::{merge_uri_options, ExpectedEventType, Topology},
     v2_runner::{operation::Operation, test_file::RunOn},
 };

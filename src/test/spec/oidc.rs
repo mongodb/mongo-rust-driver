@@ -30,7 +30,7 @@ async fn get_access_token_test_user(once_cell: &'static OnceCell<String>, user_n
         .await
         .to_string()
 }
-async fn get_access_token_test_user_1() -> String {
+pub(crate) async fn get_access_token_test_user_1() -> String {
     static ACCESS_TOKEN_TEST_USER_1: OnceCell<String> = OnceCell::const_new();
     get_access_token_test_user(&ACCESS_TOKEN_TEST_USER_1, 1).await
 }

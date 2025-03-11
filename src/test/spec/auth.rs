@@ -8,8 +8,6 @@ use crate::{
     test::{run_spec_test, spec::unified_runner::run_unified_tests},
 };
 
-use super::unified_runner::TestFileEntity;
-
 #[derive(Debug, Deserialize)]
 struct TestFile {
     pub tests: Vec<TestCase>,
@@ -114,25 +112,5 @@ async fn run_legacy() {
 
 #[tokio::test]
 async fn run_unified() {
-    run_unified_tests(&["auth", "unified"])
-        .transform_files(|test_file| {
-            if let Some(ref mut create_entities) = test_file.create_entities {
-                for ref mut entity in create_entities {
-                    if let TestFileEntity::Client(ref mut client) = entity {
-                        if let Some(ref mut uri_options) = client.uri_options {
-                            if uri_options
-                                .get_document("authMechanismProperties")
-                                .is_ok_and(|doc| doc == &doc! { "$$placeholder": 1 })
-                            {
-                                uri_options.insert(
-                                    "authMechanismProperties",
-                                    doc! { "ENVIRONMENT": "test" },
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        })
-        .await;
+    run_unified_tests(&["auth", "unified"]).await;
 }
