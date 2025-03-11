@@ -1151,10 +1151,47 @@ mod basic {
 }
 
 mod azure {
-    use crate::client::{options::ClientOptions, Client};
-    use bson::{doc, Document};
+    use crate::{
+        bson::{doc, Document},
+        client::{
+            auth::oidc::{
+                AZURE_ENVIRONMENT_VALUE_STR,
+                ENVIRONMENT_PROP_STR,
+                TOKEN_RESOURCE_PROP_STR,
+            },
+            options::ClientOptions,
+            Client,
+        },
+        test::spec::unified_runner::{run_unified_tests, TestFileEntity},
+    };
 
-    use super::MONGODB_URI_SINGLE;
+    use super::{get_env_var, MONGODB_URI_SINGLE};
+
+    #[tokio::test]
+    async fn unified() {
+        run_unified_tests(&["auth", "unified"])
+            .transform_files(|test_file| {
+                if let Some(create_entities) = test_file.create_entities.as_mut() {
+                    for entity in create_entities {
+                        if let TestFileEntity::Client(client_entity) = entity {
+                            if client_entity.uri_options.as_ref().and_then(|uri_options| {
+                                uri_options.get_document("authMechanismProperties").ok()
+                            }) == Some(&doc! { "$$placeholder": 1 })
+                            {
+                                let token_resource_property = doc! {
+                                    TOKEN_RESOURCE_PROP_STR: get_env_var("AZUREOIDC_RESOURCE"),
+                                };
+                                client_entity
+                                    .uri_options
+                                    .get_or_insert_default()
+                                    .insert("authMechanismProperties", token_resource_property);
+                            }
+                        }
+                    }
+                }
+            })
+            .await;
+    }
 
     #[tokio::test]
     async fn machine_5_1_azure_with_no_username() -> anyhow::Result<()> {
@@ -1188,8 +1225,6 @@ mod azure {
 
     #[tokio::test]
     async fn machine_5_3_token_resource_must_be_set_for_azure() -> anyhow::Result<()> {
-        use crate::client::auth::oidc::{AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR};
-
         let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential.as_mut().unwrap().mechanism_properties = Some(doc! {
             ENVIRONMENT_PROP_STR: AZURE_ENVIRONMENT_VALUE_STR,
