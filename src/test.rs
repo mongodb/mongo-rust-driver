@@ -95,14 +95,18 @@ async fn get_test_client_metadata() -> &'static TestClientMetadata {
     static TEST_CLIENT_METADATA: OnceCell<TestClientMetadata> = OnceCell::const_new();
     TEST_CLIENT_METADATA
         .get_or_init(|| async {
-            // Use the correct URI when running with OIDC authentication.
-            let client = match std::env::var("MONGODB_URI_SINGLE") {
-                Ok(uri) => {
-                    let options = ClientOptions::parse(uri).await.unwrap();
-                    Client::for_test().options(options).await
-                }
-                Err(_) => Client::for_test().await,
-            };
+            let mut client_options = get_client_options().await.clone();
+            // OIDC admin credentials are required when running in an OIDC environment to call
+            // getParameter.
+            if let (Ok(username), Ok(password)) = (
+                std::env::var("OIDC_ADMIN_USER"),
+                std::env::var("OIDC_ADMIN_PWD"),
+            ) {
+                let credential = client_options.credential.get_or_insert_default();
+                credential.username = Some(username);
+                credential.password = Some(password);
+            }
+            let client = Client::for_test().options(client_options).await;
 
             let build_info = client
                 .database("test")
