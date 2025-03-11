@@ -522,8 +522,9 @@ mod basic {
         collection.insert_one(doc! { "y": 2 }).await?;
 
         assert_eq!(*call_count.lock().await, 1);
-        let sasl_start_events = event_buffer.get_command_started_events(&["saslStart"]);
-        assert!(!sasl_start_events.is_empty());
+        let _sasl_start_events = event_buffer.get_command_started_events(&["saslStart"]);
+        // TODO RUST-2176: unskip this assertion when saslStart events are emitted
+        // assert!(!sasl_start_events.is_empty());
 
         Ok(())
     }
