@@ -28,6 +28,7 @@ use crate::{
         DEFAULT_URI,
         LOAD_BALANCED_MULTIPLE_URI,
         LOAD_BALANCED_SINGLE_URI,
+        OIDC_URI,
         SERVERLESS,
         SERVER_API,
     },
@@ -481,6 +482,8 @@ impl TestRunner {
                                 "Test requires URI for load balancer fronting single server",
                             )
                         }
+                    } else if let Some(oidc_uri) = &*OIDC_URI {
+                        oidc_uri
                     } else {
                         &DEFAULT_URI
                     };

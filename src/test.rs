@@ -282,6 +282,8 @@ pub(crate) static LOAD_BALANCED_SINGLE_URI: Lazy<Option<String>> =
     Lazy::new(|| std::env::var("SINGLE_MONGOS_LB_URI").ok());
 pub(crate) static LOAD_BALANCED_MULTIPLE_URI: Lazy<Option<String>> =
     Lazy::new(|| std::env::var("MULTI_MONGOS_LB_URI").ok());
+pub(crate) static OIDC_URI: Lazy<Option<String>> =
+    Lazy::new(|| std::env::var("MONGODB_URI_SINGLE").ok());
 pub(crate) static SERVERLESS_ATLAS_USER: Lazy<Option<String>> =
     Lazy::new(|| std::env::var("SERVERLESS_ATLAS_USER").ok());
 pub(crate) static SERVERLESS_ATLAS_PASSWORD: Lazy<Option<String>> =
@@ -326,22 +328,17 @@ pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
         );
     }
 
-    if let Some(properties) = options
-        .credential
-        .as_mut()
-        .and_then(|credential| credential.mechanism_properties.as_mut())
-    {
-        if properties == &doc! { "$$placeholder": 1 } {
-            *properties = doc! { "ENVIRONMENT": "test" };
-            options.credential.get_or_insert_default().oidc_callback =
-                Callback::machine(move |_| {
-                    async move {
-                        Ok(IdpServerResponse::builder()
-                            .access_token(get_access_token_test_user_1().await)
-                            .build())
-                    }
-                    .boxed()
-                });
+    if let Some(ref mut credential) = options.credential {
+        if credential.mechanism_properties == Some(doc! { "$$placeholder": 1 }) {
+            credential.mechanism_properties = None;
+            credential.oidc_callback = Callback::machine(move |_| {
+                async move {
+                    Ok(IdpServerResponse::builder()
+                        .access_token(get_access_token_test_user_1().await)
+                        .build())
+                }
+                .boxed()
+            });
         }
     }
 }
