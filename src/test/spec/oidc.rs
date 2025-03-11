@@ -410,11 +410,9 @@ mod basic {
                     } else {
                         "bad token".to_string()
                     };
-                    Ok(oidc::IdpServerResponse {
-                        access_token,
-                        expires: None,
-                        refresh_token: None,
-                    })
+                    Ok(oidc::IdpServerResponse::builder()
+                        .access_token(access_token)
+                        .build())
                 }
                 .boxed()
             }))
@@ -453,11 +451,9 @@ mod basic {
                     } else {
                         "bad token".to_string()
                     };
-                    Ok(oidc::IdpServerResponse {
-                        access_token,
-                        expires: None,
-                        refresh_token: None,
-                    })
+                    Ok(oidc::IdpServerResponse::builder()
+                        .access_token(access_token)
+                        .build())
                 }
                 .boxed()
             }))
@@ -491,11 +487,9 @@ mod basic {
                 let call_count = cb_call_count.clone();
                 async move {
                     *call_count.lock().await += 1;
-                    Ok(oidc::IdpServerResponse {
-                        access_token: get_access_token_test_user_1().await,
-                        expires: None,
-                        refresh_token: None,
-                    })
+                    Ok(oidc::IdpServerResponse::builder()
+                        .access_token(get_access_token_test_user_1().await)
+                        .build())
                 }
                 .boxed()
             }))
