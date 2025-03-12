@@ -28,7 +28,6 @@ use crate::{
         DEFAULT_URI,
         LOAD_BALANCED_MULTIPLE_URI,
         LOAD_BALANCED_SINGLE_URI,
-        OIDC_URI,
         SERVERLESS,
         SERVER_API,
     },

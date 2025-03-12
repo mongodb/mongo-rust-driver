@@ -64,6 +64,7 @@ use crate::{
     hello::HelloCommandResponse,
     options::{
         oidc::{Callback, IdpServerResponse},
+        AuthMechanism,
         ClientOptions,
         ServerAddress,
     },
@@ -331,16 +332,22 @@ pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
     }
 
     if let Some(ref mut credential) = options.credential {
-        if credential.mechanism_properties == Some(doc! { "$$placeholder": 1 }) {
-            credential.mechanism_properties = None;
-            credential.oidc_callback = Callback::machine(move |_| {
-                async move {
-                    Ok(IdpServerResponse::builder()
-                        .access_token(get_access_token_test_user_1().await)
-                        .build())
-                }
-                .boxed()
-            });
+        if credential.mechanism == Some(AuthMechanism::MongoDbOidc) {
+            if credential
+                .mechanism_properties
+                .as_ref()
+                .map(|properties| properties.get("ENVIRONMENT").is_none())
+                .unwrap_or(true)
+            {
+                credential.oidc_callback = Callback::machine(move |_| {
+                    async move {
+                        Ok(IdpServerResponse::builder()
+                            .access_token(get_access_token_test_user_1().await)
+                            .build())
+                    }
+                    .boxed()
+                });
+            }
         }
     }
 }
