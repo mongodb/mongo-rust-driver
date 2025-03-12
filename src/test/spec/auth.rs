@@ -109,8 +109,3 @@ async fn run_auth_test(test_file: TestFile) {
 async fn run_legacy() {
     run_spec_test(&["auth", "legacy"], run_auth_test).await;
 }
-
-#[tokio::test]
-async fn run_unified() {
-    run_unified_tests(&["auth", "unified"]).await;
-}

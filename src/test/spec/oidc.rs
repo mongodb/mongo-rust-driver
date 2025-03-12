@@ -52,7 +52,7 @@ fn remove_mechanism_properties_placeholder(test_file: &mut TestFile) {
             if let TestFileEntity::Client(ref mut client) = entity {
                 if let Some(ref mut uri_options) = client.uri_options {
                     if let Ok(mechanism_properties) =
-                        uri_options.get_document_mut("mechanismProperties")
+                        uri_options.get_document_mut("authMechanismProperties")
                     {
                         mechanism_properties.remove("$$placeholder");
                     }
