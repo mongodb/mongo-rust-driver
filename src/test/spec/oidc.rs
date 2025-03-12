@@ -106,7 +106,7 @@ mod basic {
         TEST_USER_2_USERNAME,
     };
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn run_unified() {
         run_unified_tests(&["auth", "unified"])
             .transform_files(remove_mechanism_properties_placeholder)
