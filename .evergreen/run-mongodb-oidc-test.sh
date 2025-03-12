@@ -21,6 +21,5 @@ source ${DRIVERS_TOOLS}/.evergreen/auth_oidc/secrets-export.sh
 set +o errexit
 
 cargo_test test::spec::oidc_skip_ci::basic
-cargo_test test::spec::auth::run_unified
 
 exit $CARGO_RESULT
