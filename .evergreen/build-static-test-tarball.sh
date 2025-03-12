@@ -9,7 +9,7 @@ export RUSTFLAGS="-C target-feature=+crt-static"
 cargo test ${BUILD_FEATURES} --target x86_64-unknown-linux-gnu get_exe_name
 TEST_BINARY=$(cat exe_name.txt)
 TEST_TARBALL="/tmp/mongo-rust-driver.tar.gz"
-tar czvf ${TEST_TARBALL} ${TEST_BINARY} ./.evergreen
+tar czvf ${TEST_TARBALL} ${TEST_BINARY} ./.evergreen ${TEST_FILES}
 
 cat <<EOT > static-test-tarball-expansion.yml
 STATIC_TEST_BINARY: ${TEST_BINARY}
