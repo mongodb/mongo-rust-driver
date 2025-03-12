@@ -97,8 +97,8 @@ async fn get_test_client_metadata() -> &'static TestClientMetadata {
     TEST_CLIENT_METADATA
         .get_or_init(|| async {
             let mut client_options = get_client_options().await.clone();
-            // OIDC admin credentials are required when running in an OIDC environment to call
-            // getParameter.
+            // OIDC admin credentials are required to call getParameter when running with OIDC
+            // authentication.
             if let (Ok(username), Ok(password)) = (
                 std::env::var("OIDC_ADMIN_USER"),
                 std::env::var("OIDC_ADMIN_PWD"),
