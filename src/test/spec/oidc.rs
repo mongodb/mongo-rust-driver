@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use once_cell::sync::Lazy;
 use tokio::sync::OnceCell;
 
-use super::unified_runner::{TestFile, TestFileEntity};
+use crate::{
+    bson::Bson,
+    test::spec::unified_runner::{TestFile, TestFileEntity},
+};
 
 static MONGODB_URI: Lazy<String> = Lazy::new(|| get_env_var("MONGODB_URI"));
 static MONGODB_URI_SINGLE: Lazy<String> = Lazy::new(|| get_env_var("MONGODB_URI_SINGLE"));
@@ -51,10 +54,17 @@ fn remove_mechanism_properties_placeholder(test_file: &mut TestFile) {
         for ref mut entity in create_entities {
             if let TestFileEntity::Client(ref mut client) = entity {
                 if let Some(ref mut uri_options) = client.uri_options {
-                    if let Ok(mechanism_properties) =
-                        uri_options.get_document_mut("authMechanismProperties")
+                    if let Some(mut mechanism_properties) = uri_options
+                        .remove("authMechanismProperties")
+                        .and_then(|bson| match bson {
+                            Bson::Document(document) => Some(document),
+                            _ => None,
+                        })
                     {
                         mechanism_properties.remove("$$placeholder");
+                        if !mechanism_properties.is_empty() {
+                            uri_options.insert("authMechanismProperties", mechanism_properties);
+                        }
                     }
                 }
             }

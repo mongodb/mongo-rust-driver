@@ -5,7 +5,7 @@ use serde::Deserialize;
 use crate::{
     bson::{doc, Document},
     options::{AuthMechanism, ClientOptions, Credential},
-    test::{run_spec_test, spec::unified_runner::run_unified_tests},
+    test::run_spec_test,
 };
 
 #[derive(Debug, Deserialize)]
