@@ -1307,23 +1307,15 @@ mod gcp {
 }
 
 mod k8s {
-    use crate::{
-        bson::{doc, Document},
-        Client,
-    };
+    use crate::test::spec::unified_runner::run_unified_tests;
 
-    use super::MONGODB_URI_SINGLE;
+    use super::remove_mechanism_properties_placeholder;
 
-    // There's no spec test for K8s, so we run this simple sanity check.
-    #[tokio::test]
-    async fn successfully_authenticates() -> anyhow::Result<()> {
-        let client = Client::with_uri_str(&*MONGODB_URI_SINGLE).await?;
-        client
-            .database("test")
-            .collection::<Document>("test")
-            .find_one(doc! {})
-            .await?;
-
-        Ok(())
+    #[tokio::test(flavor = "multi_thread")]
+    async fn unified() {
+        run_unified_tests(&["test_files"])
+            .transform_files(remove_mechanism_properties_placeholder)
+            .use_exact_path()
+            .await;
     }
 }

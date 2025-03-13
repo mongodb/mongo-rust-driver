@@ -1200,6 +1200,8 @@ tasks:
   - name: "oidc-auth-test-k8s-latest"
     commands:
     - func: "build static test tarball"
+      vars:
+        TEST_FILES: "${PROJECT_DIRECTORY}/src/test/spec/json/auth/unified"
     - command: ec2.assume_role
       params:
           role_arn: ${aws_test_secrets_role}
