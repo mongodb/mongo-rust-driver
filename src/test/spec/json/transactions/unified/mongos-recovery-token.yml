@@ -150,6 +150,7 @@ tests:
                   # flight heartbeat refreshes the first mongoes' SDAM state in between
                   # the initial commitTransaction and the retry attempt.
                   heartbeatFrequencyMS: 30000
+                  appName: &appName transactionsClient
                 observeEvents:
                   - commandStartedEvent
             - database:
@@ -195,6 +196,7 @@ tests:
                 - isMaster
                 - hello
               closeConnection: true
+              appName: *appName
       # The first commitTransaction sees a retryable connection error due to
       # the fail point and also fails on the server. The retry attempt on a
       # new mongos will wait for the transaction to timeout and will fail

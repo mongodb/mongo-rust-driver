@@ -606,7 +606,7 @@ tests:
                 findAndModify: *collection_name
                 query: { _id: 0 }
                 update: { x: 1 }
-                new: false
+                new: { $$unsetOrMatches: false }
                 <<: *transactionCommandArgs
               commandName: findAndModify
               databaseName: *database_name
@@ -642,7 +642,7 @@ tests:
                 findAndModify: *collection_name
                 query: { _id: 0 }
                 update: { $inc: { x: 1 } }
-                new: false
+                new: { $$unsetOrMatches: false }
                 <<: *transactionCommandArgs
               commandName: findAndModify
               databaseName: *database_name
