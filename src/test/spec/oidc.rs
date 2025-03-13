@@ -1263,10 +1263,21 @@ mod azure {
 }
 
 mod gcp {
-    use crate::client::{options::ClientOptions, Client};
-    use bson::{doc, Document};
+    use crate::{
+        bson::{doc, Document},
+        client::{options::ClientOptions, Client},
+        test::spec::unified_runner::run_unified_tests,
+    };
 
-    use super::MONGODB_URI_SINGLE;
+    use super::{remove_mechanism_properties_placeholder, MONGODB_URI_SINGLE};
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn unified() {
+        run_unified_tests(&["test_files"])
+            .transform_files(remove_mechanism_properties_placeholder)
+            .use_exact_path()
+            .await;
+    }
 
     #[tokio::test]
     async fn machine_5_4_gcp_with_no_username() -> anyhow::Result<()> {

@@ -1186,6 +1186,7 @@ tasks:
     - func: "build static test tarball"
       vars:
         BUILD_FEATURES: "--features gcp-oidc"
+        TEST_FILES: "${PROJECT_DIRECTORY}/src/test/spec/json/auth/unified"
     - command: subprocess.exec
       type: test
       params:
