@@ -422,6 +422,7 @@ fn selection_criteria_tracing_representation() {
         "ReadPreference { Mode: PrimaryPreferred, Max Staleness: 200ms }"
     );
 
+    #[allow(deprecated)]
     let opts_with_hedge = Some(
         ReadPreferenceOptions::builder()
             .hedge(HedgedReadOptions::builder().enabled(true).build())

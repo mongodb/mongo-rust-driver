@@ -639,8 +639,10 @@ fn deserialize_selection_criteria() {
                 options: Some(options),
             } => {
                 assert_eq!(options.max_staleness, Some(Duration::from_secs(100)));
+                #[allow(deprecated)]
+                let hedge = options.hedge;
                 assert_eq!(
-                    options.hedge,
+                    hedge,
                     Some(HedgedReadOptions::builder().enabled(true).build())
                 );
             }
