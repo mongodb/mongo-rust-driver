@@ -140,6 +140,7 @@ impl std::fmt::Display for ReadPreference {
             if let Some(ref max_staleness) = options.max_staleness {
                 write!(f, ", Max Staleness: {:?}", max_staleness)?;
             }
+            #[allow(deprecated)]
             if let Some(ref hedge) = options.hedge {
                 write!(f, ", Hedge: {}", hedge.enabled)?;
             }
@@ -215,6 +216,7 @@ impl Serialize for ReadPreference {
 }
 
 /// Specifies read preference options for non-primary read preferences.
+#[allow(deprecated)]
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
@@ -241,15 +243,21 @@ pub struct ReadPreferenceOptions {
 
     /// Specifies hedging behavior for reads. These options only apply to sharded clusters on
     /// servers that are at least version 4.4. Note that hedged reads are automatically enabled for
-    /// read preference mode "nearest".
+    /// read preference mode "nearest" on server versions less than 8.0.
     ///
     /// See the [MongoDB docs](https://www.mongodb.com/docs/manual/core/read-preference-hedge-option/) for more details.
+    #[deprecated(
+        note = "hedged reads are deprecated as of MongoDB 8.0 and will be removed in a future \
+                server version"
+    )]
     pub hedge: Option<HedgedReadOptions>,
 }
 
 impl ReadPreferenceOptions {
     pub(crate) fn is_default(&self) -> bool {
-        self.hedge.is_none()
+        #[allow(deprecated)]
+        let hedge = self.hedge.is_some();
+        !hedge
             && self.max_staleness.is_none()
             && self
                 .tag_sets
@@ -354,6 +362,7 @@ mod test {
 
     #[test]
     fn hedged_read_included_in_document() {
+        #[allow(deprecated)]
         let options = Some(
             ReadPreferenceOptions::builder()
                 .hedge(HedgedReadOptions { enabled: true })
