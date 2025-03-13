@@ -11,7 +11,7 @@ mod handshake;
 mod initial_dns_seedlist_discovery;
 mod load_balancers;
 #[path = "spec/oidc.rs"]
-mod oidc_skip_ci;
+pub(crate) mod oidc_skip_ci;
 mod read_write_concern;
 mod retryable_reads;
 mod retryable_writes;
@@ -37,6 +37,7 @@ use std::{
 use serde::{de::DeserializeOwned, Deserialize};
 
 pub(crate) use self::{
+    oidc_skip_ci as oidc,
     unified_runner::{merge_uri_options, ExpectedEventType, Topology},
     v2_runner::{operation::Operation, test_file::RunOn},
 };
@@ -44,18 +45,31 @@ use crate::{bson::Bson, test::SERVERLESS};
 
 use super::log_uncaptured;
 
+pub(crate) fn deserialize_spec_tests_from_exact_path<T: DeserializeOwned>(
+    path: &[&str],
+    skipped_files: Option<&[&str]>,
+) -> Vec<(T, PathBuf)> {
+    deserialize_spec_tests_common(path.iter().collect(), skipped_files)
+}
+
 pub(crate) fn deserialize_spec_tests<T: DeserializeOwned>(
     spec: &[&str],
     skipped_files: Option<&[&str]>,
 ) -> Vec<(T, PathBuf)> {
-    let dir_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src", "test", "spec", "json"]
+    let mut path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src", "test", "spec", "json"]
         .iter()
-        .chain(spec.iter())
         .collect();
+    path.extend(spec);
+    deserialize_spec_tests_common(path, skipped_files)
+}
 
+fn deserialize_spec_tests_common<T: DeserializeOwned>(
+    path: PathBuf,
+    skipped_files: Option<&[&str]>,
+) -> Vec<(T, PathBuf)> {
     let mut tests = vec![];
-    for entry in read_dir(&dir_path)
-        .unwrap_or_else(|e| panic!("Failed to read directory at {:?}: {}", &dir_path, e))
+    for entry in
+        read_dir(&path).unwrap_or_else(|e| panic!("Failed to read directory at {:?}: {}", &path, e))
     {
         let path = entry.unwrap().path();
         let Some(filename) = path

@@ -10,7 +10,11 @@ use std::future::IntoFuture;
 use futures::future::{BoxFuture, FutureExt};
 use serde::Deserialize;
 
-use crate::test::{file_level_log, log_uncaptured, spec::deserialize_spec_tests};
+use crate::test::{
+    file_level_log,
+    log_uncaptured,
+    spec::{deserialize_spec_tests, deserialize_spec_tests_from_exact_path},
+};
 
 pub(crate) use self::{
     entity::{ClientEntity, Entity, SessionEntity, TestCursor},
@@ -35,6 +39,7 @@ pub(crate) fn run_unified_tests(spec: &'static [&'static str]) -> RunUnifiedTest
         skipped_files: None,
         skipped_tests: None,
         file_transformation: None,
+        use_exact_path: false,
     }
 }
 
@@ -44,6 +49,7 @@ pub(crate) struct RunUnifiedTestsAction {
     skipped_files: Option<Vec<&'static str>>,
     skipped_tests: Option<Vec<&'static str>>,
     file_transformation: Option<FileTransformation>,
+    use_exact_path: bool,
 }
 
 impl RunUnifiedTestsAction {
@@ -74,6 +80,16 @@ impl RunUnifiedTestsAction {
             ..self
         }
     }
+
+    /// Use the exact path provided to run_unified_tests when deserializing the spec tests. This is
+    /// useful when running the tests in an environment in which the test files have been uploaded
+    /// separately and are not being read from the driver directory.
+    pub(crate) fn use_exact_path(self) -> Self {
+        Self {
+            use_exact_path: true,
+            ..self
+        }
+    }
 }
 
 impl IntoFuture for RunUnifiedTestsAction {
@@ -82,9 +98,15 @@ impl IntoFuture for RunUnifiedTestsAction {
 
     fn into_future(self) -> Self::IntoFuture {
         async move {
-            for (mut test_file, path) in
+            let files = if self.use_exact_path {
+                deserialize_spec_tests_from_exact_path::<TestFile>(
+                    self.spec,
+                    self.skipped_files.as_deref(),
+                )
+            } else {
                 deserialize_spec_tests::<TestFile>(self.spec, self.skipped_files.as_deref())
-            {
+            };
+            for (mut test_file, path) in files {
                 if let Some(ref file_transformation) = self.file_transformation {
                     file_transformation(&mut test_file);
                 }

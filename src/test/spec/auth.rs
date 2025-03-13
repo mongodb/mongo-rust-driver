@@ -109,5 +109,3 @@ async fn run_auth_test(test_file: TestFile) {
 async fn run_legacy() {
     run_spec_test(&["auth", "legacy"], run_auth_test).await;
 }
-
-// TODO RUST-1665: run unified tests

@@ -48,6 +48,7 @@ pub(crate) use self::{
     },
 };
 
+use futures::FutureExt;
 use home::home_dir;
 use once_cell::sync::Lazy;
 use tokio::sync::OnceCell;
@@ -61,7 +62,13 @@ use crate::{
         options::{ServerApi, ServerApiVersion},
     },
     hello::HelloCommandResponse,
-    options::{ClientOptions, ServerAddress},
+    options::{
+        oidc::{Callback, IdpServerResponse},
+        AuthMechanism,
+        ClientOptions,
+        ServerAddress,
+    },
+    test::spec::oidc::get_access_token_test_user_1,
     Client,
 };
 use std::{fs::read_to_string, str::FromStr};
@@ -89,7 +96,20 @@ async fn get_test_client_metadata() -> &'static TestClientMetadata {
     static TEST_CLIENT_METADATA: OnceCell<TestClientMetadata> = OnceCell::const_new();
     TEST_CLIENT_METADATA
         .get_or_init(|| async {
-            let client = Client::for_test().await;
+            let mut client_options = get_client_options().await.clone();
+            // OIDC admin credentials are required to call getParameter when running with OIDC
+            // authentication.
+            if let (Ok(username), Ok(password)) = (
+                std::env::var("OIDC_ADMIN_USER"),
+                std::env::var("OIDC_ADMIN_PWD"),
+            ) {
+                let credential = Credential::builder()
+                    .username(username)
+                    .password(password)
+                    .build();
+                client_options.credential = Some(credential);
+            }
+            let client = Client::for_test().options(client_options).await;
 
             let build_info = client
                 .database("test")
@@ -265,6 +285,8 @@ pub(crate) static LOAD_BALANCED_SINGLE_URI: Lazy<Option<String>> =
     Lazy::new(|| std::env::var("SINGLE_MONGOS_LB_URI").ok());
 pub(crate) static LOAD_BALANCED_MULTIPLE_URI: Lazy<Option<String>> =
     Lazy::new(|| std::env::var("MULTI_MONGOS_LB_URI").ok());
+pub(crate) static OIDC_URI: Lazy<Option<String>> =
+    Lazy::new(|| std::env::var("MONGODB_URI_SINGLE").ok());
 pub(crate) static SERVERLESS_ATLAS_USER: Lazy<Option<String>> =
     Lazy::new(|| std::env::var("SERVERLESS_ATLAS_USER").ok());
 pub(crate) static SERVERLESS_ATLAS_PASSWORD: Lazy<Option<String>> =
@@ -308,6 +330,25 @@ pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
                 .build(),
         );
     }
+
+    if let Some(ref mut credential) = options.credential {
+        if credential.mechanism == Some(AuthMechanism::MongoDbOidc)
+            && credential
+                .mechanism_properties
+                .as_ref()
+                .map(|properties| properties.get("ENVIRONMENT").is_none())
+                .unwrap_or(true)
+        {
+            credential.oidc_callback = Callback::machine(move |_| {
+                async move {
+                    Ok(IdpServerResponse::builder()
+                        .access_token(get_access_token_test_user_1().await)
+                        .build())
+                }
+                .boxed()
+            });
+        }
+    }
 }
 
 fn get_default_uri() -> String {
@@ -315,6 +356,9 @@ fn get_default_uri() -> String {
         if !uri.is_empty() {
             return uri;
         }
+    }
+    if let Some(uri) = &*OIDC_URI {
+        return uri.clone();
     }
     if let Ok(uri) = std::env::var("MONGODB_URI") {
         return uri;

@@ -90,6 +90,7 @@ pub enum AuthMechanism {
     MongoDbAws,
 
     /// MONGODB-OIDC authenticates using [OpenID Connect](https://openid.net/developers/specs/) access tokens.
+    #[serde(alias = "MONGODB-OIDC")]
     MongoDbOidc,
 }
 

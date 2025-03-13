@@ -3,6 +3,11 @@ use std::path::PathBuf;
 use once_cell::sync::Lazy;
 use tokio::sync::OnceCell;
 
+use crate::{
+    bson::Bson,
+    test::spec::unified_runner::{TestFile, TestFileEntity},
+};
+
 static MONGODB_URI: Lazy<String> = Lazy::new(|| get_env_var("MONGODB_URI"));
 static MONGODB_URI_SINGLE: Lazy<String> = Lazy::new(|| get_env_var("MONGODB_URI_SINGLE"));
 #[cfg(target_os = "linux")]
@@ -30,7 +35,7 @@ async fn get_access_token_test_user(once_cell: &'static OnceCell<String>, user_n
         .await
         .to_string()
 }
-async fn get_access_token_test_user_1() -> String {
+pub(crate) async fn get_access_token_test_user_1() -> String {
     static ACCESS_TOKEN_TEST_USER_1: OnceCell<String> = OnceCell::const_new();
     get_access_token_test_user(&ACCESS_TOKEN_TEST_USER_1, 1).await
 }
@@ -44,11 +49,37 @@ fn get_env_var(var: &str) -> String {
     std::env::var(var).expect(var)
 }
 
+fn remove_mechanism_properties_placeholder(test_file: &mut TestFile) {
+    if let Some(ref mut create_entities) = test_file.create_entities {
+        for ref mut entity in create_entities {
+            if let TestFileEntity::Client(ref mut client) = entity {
+                if let Some(ref mut uri_options) = client.uri_options {
+                    if let Some(mut mechanism_properties) = uri_options
+                        .remove("authMechanismProperties")
+                        .and_then(|bson| match bson {
+                            Bson::Document(document) => Some(document),
+                            _ => None,
+                        })
+                    {
+                        mechanism_properties.remove("$$placeholder");
+                        if !mechanism_properties.is_empty() {
+                            uri_options.insert("authMechanismProperties", mechanism_properties);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 mod basic {
     use crate::{
         client::auth::{oidc, AuthMechanism, Credential},
         options::ClientOptions,
-        test::util::fail_point::{FailPoint, FailPointMode},
+        test::{
+            spec::unified_runner::run_unified_tests,
+            util::fail_point::{FailPoint, FailPointMode},
+        },
         Client,
     };
     use bson::{doc, Document};
@@ -61,6 +92,7 @@ mod basic {
 
     use super::{
         get_access_token_test_user_1,
+        remove_mechanism_properties_placeholder,
         MONGODB_URI,
         MONGODB_URI_SINGLE,
         TEST_USER_1_USERNAME,
@@ -73,6 +105,13 @@ mod basic {
         OIDC_TOKEN_FILE,
         TEST_USER_2_USERNAME,
     };
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn run_unified() {
+        run_unified_tests(&["auth", "unified"])
+            .transform_files(remove_mechanism_properties_placeholder)
+            .await;
+    }
 
     // Machine Callback tests
     #[tokio::test]
@@ -1281,10 +1320,25 @@ mod basic {
 }
 
 mod azure {
-    use crate::client::{options::ClientOptions, Client};
-    use bson::{doc, Document};
+    use crate::{
+        bson::{doc, Document},
+        client::{
+            auth::oidc::{AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR},
+            options::ClientOptions,
+            Client,
+        },
+        test::spec::unified_runner::run_unified_tests,
+    };
 
-    use super::MONGODB_URI_SINGLE;
+    use super::{remove_mechanism_properties_placeholder, MONGODB_URI_SINGLE};
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn run_unified() {
+        run_unified_tests(&["test_files"])
+            .transform_files(remove_mechanism_properties_placeholder)
+            .use_exact_path()
+            .await;
+    }
 
     #[tokio::test]
     async fn machine_5_1_azure_with_no_username() -> anyhow::Result<()> {
@@ -1318,8 +1372,6 @@ mod azure {
 
     #[tokio::test]
     async fn machine_5_3_token_resource_must_be_set_for_azure() -> anyhow::Result<()> {
-        use crate::client::auth::oidc::{AZURE_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR};
-
         let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
         opts.credential.as_mut().unwrap().mechanism_properties = Some(doc! {
             ENVIRONMENT_PROP_STR: AZURE_ENVIRONMENT_VALUE_STR,
@@ -1341,10 +1393,21 @@ mod azure {
 }
 
 mod gcp {
-    use crate::client::{options::ClientOptions, Client};
-    use bson::{doc, Document};
+    use crate::{
+        bson::{doc, Document},
+        client::{options::ClientOptions, Client},
+        test::spec::unified_runner::run_unified_tests,
+    };
 
-    use super::MONGODB_URI_SINGLE;
+    use super::{remove_mechanism_properties_placeholder, MONGODB_URI_SINGLE};
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn run_unified() {
+        run_unified_tests(&["test_files"])
+            .transform_files(remove_mechanism_properties_placeholder)
+            .use_exact_path()
+            .await;
+    }
 
     #[tokio::test]
     async fn machine_5_4_gcp_with_no_username() -> anyhow::Result<()> {
@@ -1385,23 +1448,15 @@ mod gcp {
 }
 
 mod k8s {
-    use crate::{
-        bson::{doc, Document},
-        Client,
-    };
+    use crate::test::spec::unified_runner::run_unified_tests;
 
-    use super::MONGODB_URI_SINGLE;
+    use super::remove_mechanism_properties_placeholder;
 
-    // There's no spec test for K8s, so we run this simple sanity check.
-    #[tokio::test]
-    async fn successfully_authenticates() -> anyhow::Result<()> {
-        let client = Client::with_uri_str(&*MONGODB_URI_SINGLE).await?;
-        client
-            .database("test")
-            .collection::<Document>("test")
-            .find_one(doc! {})
-            .await?;
-
-        Ok(())
+    #[tokio::test(flavor = "multi_thread")]
+    async fn run_unified() {
+        run_unified_tests(&["test_files"])
+            .transform_files(remove_mechanism_properties_placeholder)
+            .use_exact_path()
+            .await;
     }
 }

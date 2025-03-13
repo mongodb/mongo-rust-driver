@@ -1169,6 +1169,7 @@ tasks:
     - func: "build static test tarball"
       vars:
         BUILD_FEATURES: "--features azure-oidc"
+        TEST_FILES: "${PROJECT_DIRECTORY}/src/test/spec/json/auth/unified"
     - command: subprocess.exec
       type: test
       params:
@@ -1185,6 +1186,7 @@ tasks:
     - func: "build static test tarball"
       vars:
         BUILD_FEATURES: "--features gcp-oidc"
+        TEST_FILES: "${PROJECT_DIRECTORY}/src/test/spec/json/auth/unified"
     - command: subprocess.exec
       type: test
       params:
@@ -1199,6 +1201,8 @@ tasks:
   - name: "oidc-auth-test-k8s-latest"
     commands:
     - func: "build static test tarball"
+      vars:
+        TEST_FILES: "${PROJECT_DIRECTORY}/src/test/spec/json/auth/unified"
     - command: ec2.assume_role
       params:
           role_arn: ${aws_test_secrets_role}
@@ -1927,6 +1931,7 @@ functions:
         include_expansions_in_env:
           - PROJECT_DIRECTORY
           - BUILD_FEATURES
+          - TEST_FILES
     - command: expansions.update
       params:
         file: src/static-test-tarball-expansion.yml
