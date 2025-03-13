@@ -1203,7 +1203,7 @@ mod azure {
     use super::{remove_mechanism_properties_placeholder, MONGODB_URI_SINGLE};
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn unified() {
+    async fn run_unified() {
         run_unified_tests(&["test_files"])
             .transform_files(remove_mechanism_properties_placeholder)
             .use_exact_path()
@@ -1272,7 +1272,7 @@ mod gcp {
     use super::{remove_mechanism_properties_placeholder, MONGODB_URI_SINGLE};
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn unified() {
+    async fn run_unified() {
         run_unified_tests(&["test_files"])
             .transform_files(remove_mechanism_properties_placeholder)
             .use_exact_path()
@@ -1323,7 +1323,7 @@ mod k8s {
     use super::remove_mechanism_properties_placeholder;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn unified() {
+    async fn run_unified() {
         run_unified_tests(&["test_files"])
             .transform_files(remove_mechanism_properties_placeholder)
             .use_exact_path()

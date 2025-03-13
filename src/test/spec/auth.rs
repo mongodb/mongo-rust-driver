@@ -3,7 +3,7 @@ use std::str::FromStr;
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Document},
+    bson::Document,
     options::{AuthMechanism, ClientOptions, Credential},
     test::run_spec_test,
 };
