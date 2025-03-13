@@ -1202,10 +1202,11 @@ mod azure {
 
     use super::{remove_mechanism_properties_placeholder, MONGODB_URI_SINGLE};
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn unified() {
-        run_unified_tests(&["auth", "unified"])
+        run_unified_tests(&["test_files"])
             .transform_files(remove_mechanism_properties_placeholder)
+            .use_exact_path()
             .await;
     }
 

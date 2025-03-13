@@ -45,18 +45,31 @@ use crate::{bson::Bson, test::SERVERLESS};
 
 use super::log_uncaptured;
 
+pub(crate) fn deserialize_spec_tests_from_exact_path<T: DeserializeOwned>(
+    path: &[&str],
+    skipped_files: Option<&[&str]>,
+) -> Vec<(T, PathBuf)> {
+    deserialize_spec_tests_common(path.iter().collect(), skipped_files)
+}
+
 pub(crate) fn deserialize_spec_tests<T: DeserializeOwned>(
     spec: &[&str],
     skipped_files: Option<&[&str]>,
 ) -> Vec<(T, PathBuf)> {
-    let dir_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src", "test", "spec", "json"]
+    let mut path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src", "test", "spec", "json"]
         .iter()
-        .chain(spec.iter())
         .collect();
+    path.extend(spec);
+    deserialize_spec_tests_common(path, skipped_files)
+}
 
+fn deserialize_spec_tests_common<T: DeserializeOwned>(
+    path: PathBuf,
+    skipped_files: Option<&[&str]>,
+) -> Vec<(T, PathBuf)> {
     let mut tests = vec![];
-    for entry in read_dir(&dir_path)
-        .unwrap_or_else(|e| panic!("Failed to read directory at {:?}: {}", &dir_path, e))
+    for entry in
+        read_dir(&path).unwrap_or_else(|e| panic!("Failed to read directory at {:?}: {}", &path, e))
     {
         let path = entry.unwrap().path();
         let Some(filename) = path

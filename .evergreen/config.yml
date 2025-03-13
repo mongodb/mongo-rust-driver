@@ -1928,6 +1928,7 @@ functions:
         include_expansions_in_env:
           - PROJECT_DIRECTORY
           - BUILD_FEATURES
+          - TEST_FILES
     - command: expansions.update
       params:
         file: src/static-test-tarball-expansion.yml
