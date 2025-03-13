@@ -332,22 +332,21 @@ pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
     }
 
     if let Some(ref mut credential) = options.credential {
-        if credential.mechanism == Some(AuthMechanism::MongoDbOidc) {
-            if credential
+        if credential.mechanism == Some(AuthMechanism::MongoDbOidc)
+            && credential
                 .mechanism_properties
                 .as_ref()
                 .map(|properties| properties.get("ENVIRONMENT").is_none())
                 .unwrap_or(true)
-            {
-                credential.oidc_callback = Callback::machine(move |_| {
-                    async move {
-                        Ok(IdpServerResponse::builder()
-                            .access_token(get_access_token_test_user_1().await)
-                            .build())
-                    }
-                    .boxed()
-                });
-            }
+        {
+            credential.oidc_callback = Callback::machine(move |_| {
+                async move {
+                    Ok(IdpServerResponse::builder()
+                        .access_token(get_access_token_test_user_1().await)
+                        .build())
+                }
+                .boxed()
+            });
         }
     }
 }
