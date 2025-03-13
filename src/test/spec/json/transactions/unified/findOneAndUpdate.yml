@@ -130,7 +130,7 @@ tests:
                 findAndModify: *collection_name
                 query: { _id: 3 }
                 update: { $inc: { x: 1 } }
-                new: false
+                new: { $$unsetOrMatches: false }
                 lsid: { $$sessionLsid: *session0 }
                 txnNumber: { $numberLong: '1' }
                 startTransaction: true
@@ -173,7 +173,7 @@ tests:
                 findAndModify: *collection_name
                 query: { _id: 3 }
                 update: { $inc: { x: 1 } }
-                new: false
+                new: { $$unsetOrMatches: false }
                 lsid: { $$sessionLsid: *session0 }
                 txnNumber: { $numberLong: '2' }
                 startTransaction: true
@@ -201,7 +201,7 @@ tests:
                 findAndModify: *collection_name
                 query: { _id: 3 }
                 update: { $inc: { x: 1 } }
-                new: false
+                new: { $$unsetOrMatches: false }
                 lsid: { $$sessionLsid: *session0 }
                 txnNumber: { $numberLong: '3' }
                 startTransaction: true
@@ -277,7 +277,7 @@ tests:
                 findAndModify: *collection_name
                 query: { _id: 3 }
                 update: { $inc: { x: 1 } }
-                new: false
+                new: { $$unsetOrMatches: false }
                 lsid: { $$sessionLsid: *session0 }
                 txnNumber: { $numberLong: '1' }
                 startTransaction: true

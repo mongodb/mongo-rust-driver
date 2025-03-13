@@ -527,6 +527,7 @@ tests:
                   # flight heartbeat refreshes the first mongoes' SDAM state in between
                   # the insert connection error and the single commit attempt.
                   heartbeatFrequencyMS: 30000
+                  appName: &appName transactionsClient
                 observeEvents:
                   - commandStartedEvent
             - database:
@@ -572,6 +573,7 @@ tests:
                 - isMaster
                 - hello
               closeConnection: true
+              appName: *appName
       -
         object: *collection1
         name: insertOne
