@@ -19,8 +19,10 @@ use crate::{
     },
     test::{
         get_client_options,
+        log_uncaptured,
         server_version_gte,
         spec::unified_runner::run_unified_tests,
+        topology_is_load_balanced,
         topology_is_sharded,
         Event,
     },
@@ -206,6 +208,9 @@ async fn implicit_session_after_connection() {
 // Sessions prose test 20
 #[tokio::test]
 async fn no_cluster_time_in_sdam() {
+    if topology_is_load_balanced().await {
+        log_uncaptured("Skipping no_cluster_time_in_sdam: load-balanced topology");
+    }
     let mut options = get_client_options().await.clone();
     options.direct_connection = Some(true);
     options.hosts.drain(1..);
