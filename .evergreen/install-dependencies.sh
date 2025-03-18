@@ -21,6 +21,15 @@ for arg; do
   if [ $arg == "rust" ]; then
     curl https://sh.rustup.rs -sSf | sh -s -- -y --no-modify-path $DEFAULT_HOST_OPTIONS
 
+    # Cygwin has a bug with reporting symlink paths that breaks rustup; see 
+    # https://github.com/rust-lang/rustup/issues/4239.  This works around it by replacing the
+    # symlinks with copies.
+    if [ "Windows_NT" == "$OS" ]; then
+      pushd ${CARGO_HOME}/bin
+      python3 ../../.evergreen/unsymlink.py
+      popd
+    fi
+
     # This file is not created by default on Windows
     echo 'export PATH="$PATH:${CARGO_HOME}/bin"' >>${CARGO_HOME}/env
     echo "export CARGO_NET_GIT_FETCH_WITH_CLI=true" >>${CARGO_HOME}/env
