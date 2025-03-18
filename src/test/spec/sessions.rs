@@ -210,6 +210,7 @@ async fn implicit_session_after_connection() {
 async fn no_cluster_time_in_sdam() {
     if topology_is_load_balanced().await {
         log_uncaptured("Skipping no_cluster_time_in_sdam: load-balanced topology");
+        return;
     }
     let mut options = get_client_options().await.clone();
     options.direct_connection = Some(true);
