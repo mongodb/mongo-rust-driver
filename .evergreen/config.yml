@@ -260,16 +260,16 @@ buildvariants:
     tasks:
       - name: test-x509-auth
 
-  - name: serverless
-    display_name: "Serverless"
-    run_on:
-      - rhel80-small
-    expansions:
-      LIBMONGOCRYPT_OS: rhel-80-64-bit
-      AUTH: auth
-      SSL: ssl
-    tasks:
-      - serverless-task-group
+  # - name: serverless
+  #   display_name: "Serverless"
+  #   run_on:
+  #     - rhel80-small
+  #   expansions:
+  #     LIBMONGOCRYPT_OS: rhel-80-64-bit
+  #     AUTH: auth
+  #     SSL: ssl
+  #   tasks:
+  #     - serverless-task-group
 
   - name: oidc-linux
     display_name: "OIDC Linux"
