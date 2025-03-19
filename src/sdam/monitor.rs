@@ -275,7 +275,11 @@ impl Monitor {
         let start = Instant::now();
         let result = tokio::select! {
             result = execute_hello => match result {
-                Ok(reply) => HelloResult::Ok(reply),
+                Ok(mut reply) => {
+                    // Do not propagate server reported cluster time for monitoring hello responses.
+                    reply.cluster_time = None;
+                    HelloResult::Ok(reply)
+                },
                 Err(e) => HelloResult::Err(e)
             },
             r = self.request_receiver.wait_for_cancellation() => {
