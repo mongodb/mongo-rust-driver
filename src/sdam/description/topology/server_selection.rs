@@ -124,7 +124,12 @@ impl TopologyDescription {
             SelectionCriteria::Predicate(ref filter) => self
                 .servers
                 .values()
-                .filter(|s| s.server_type.is_data_bearing() && filter(&ServerInfo::new_borrowed(s)))
+                .filter(|s| {
+                    // If we're direct-connected or connected to a standalone, ignore whether the
+                    // single server in the topology is data-bearing.
+                    (self.topology_type == TopologyType::Single || s.server_type.is_data_bearing())
+                        && filter(&ServerInfo::new_borrowed(s))
+                })
                 .collect(),
         };
 
