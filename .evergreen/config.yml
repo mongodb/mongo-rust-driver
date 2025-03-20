@@ -376,6 +376,26 @@ buildvariants:
     tasks:
       - happy-eyeballs-task-group
 
+  #- name: graviton-legacy
+  #  display_name: "Graviton (legacy versions)"
+  #  run_on:
+  #    - amazon2-arm64-latest-large-m8g
+  #  tasks:
+  #    - name: .6.0
+  #    - name: .5.0
+  #    - name: .4.4
+  #    - name: .4.4
+  #    - name: .4.2
+
+  - name: graviton
+    display_name: "Graviton"
+    run_on:
+      - amazon2023-arm64-latest-large-m8g
+    tasks:
+      - name: .latest
+      #- name: .8.0
+      #- name: .7.0
+
 ###############
 # Task Groups #
 ###############
