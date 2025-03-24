@@ -34,7 +34,7 @@ pub(crate) fn get_int(val: &Bson) -> Option<i64> {
     }
 }
 
-/// Coerce numeric types into an `i64` if it would be lossless to do so. If this Bson is not numeric
+/// Coerce numeric types into an `f64` if it would be lossless to do so. If this Bson is not numeric
 /// or the conversion would be lossy (e.g. 1.5 -> 1), this returns `None`.
 #[cfg(test)]
 #[allow(clippy::cast_possible_truncation)]

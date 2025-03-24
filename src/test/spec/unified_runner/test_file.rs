@@ -275,7 +275,7 @@ pub(crate) fn merge_uri_options(
     };
 
     if let Some(existing_options) = existing_options {
-        for option in existing_options.split(",") {
+        for option in existing_options.split("&") {
             let (key, value) = option.split_once("=").unwrap();
             // prefer the option specified by the test
             if !uri_options.contains_key(key) {
