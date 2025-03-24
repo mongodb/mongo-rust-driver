@@ -137,7 +137,7 @@ impl<'de> Deserialize<'de> for ClientOptions {
             .map(bson::from_bson)
             .transpose()
             .map_err(D::Error::custom)?;
-        let uri = merge_uri_options(&*DEFAULT_URI, Some(&uri_options), true);
+        let uri = merge_uri_options(&DEFAULT_URI, Some(&uri_options), true);
         Ok(Self {
             uri,
             #[cfg(feature = "in-use-encryption")]
