@@ -1,6 +1,5 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use percent_encoding::NON_ALPHANUMERIC;
 use pretty_assertions::assert_eq;
 use regex::Regex;
 use semver::Version;
@@ -264,9 +263,8 @@ pub(crate) fn merge_uri_options(
         given_uri.to_string()
     };
 
-    let mut uri_options = match uri_options {
-        Some(uri_options) => uri_options.clone(),
-        None => return uri,
+    let Some(mut uri_options) = uri_options.cloned() else {
+        return uri;
     };
 
     let (mut uri, existing_options) = match uri.split_once("?") {
@@ -299,9 +297,7 @@ pub(crate) fn merge_uri_options(
 
         let value = value.to_string();
         let value = value.trim_start_matches('\"').trim_end_matches('\"');
-        let value =
-            percent_encoding::percent_encode(value.as_bytes(), NON_ALPHANUMERIC).to_string();
-        uri.push_str(&value);
+        uri.push_str(value);
     }
 
     uri
