@@ -54,6 +54,6 @@ tests:
               databaseName: *database0Name
           - commandStartedEvent:
               command:
-                getMore: { $$type: long }
+                getMore: { $$type: [ int, long ] }
                 collection: *collection0Name
               commandName: getMore

@@ -1,6 +1,6 @@
-description: matches-lte-operator
+description: operator-lte
 
-# Note: $$lte is not technically in the 1.8 schema but was introduced at the same time.
+# Note: $$lte was introduced alongside schema changes for CSOT
 schemaVersion: "1.9"
 
 createEntities:

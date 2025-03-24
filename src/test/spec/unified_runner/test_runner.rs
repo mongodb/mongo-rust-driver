@@ -509,6 +509,11 @@ impl TestRunner {
                         );
                     }
 
+                    if options.direct_connection == Some(true) {
+                        options.hosts.drain(1..);
+                        options.repl_set_name = None;
+                    }
+
                     // In order to speed up the tests where a failpoint is used, the test runner
                     // MAY specified a reduced value for `heartbeatFrequencyMS` and
                     // `minHeartbeatFrequencyMS`. Test runners MUST NOT do so
