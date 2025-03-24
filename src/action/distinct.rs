@@ -3,7 +3,7 @@ use std::time::Duration;
 use bson::{Bson, Document};
 
 use crate::{
-    coll::options::DistinctOptions,
+    coll::options::{DistinctOptions, Hint},
     collation::Collation,
     error::Result,
     operation::Distinct as Op,
