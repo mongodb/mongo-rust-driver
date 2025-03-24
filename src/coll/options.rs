@@ -764,6 +764,10 @@ pub struct DistinctOptions {
     ///
     /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
+
+    /// A document or string that specifies the index to use to support the query predicate.
+    /// Available on server versions 7.1+.
+    pub hint: Option<Hint>,
 }
 
 /// Specifies the options to a [`Collection::find`](../struct.Collection.html#method.find)
