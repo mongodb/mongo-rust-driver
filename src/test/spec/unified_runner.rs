@@ -134,6 +134,8 @@ async fn valid_pass() {
         // TODO: unskip this file when the convenient transactions API tests are converted to the
         // unified format
         "poc-transactions-convenient-api.json",
+        // TODO RUST-2077: unskip this file
+        "poc-queryable-encryption.json",
     ];
     // These tests need the in-use-encryption feature flag to be deserialized and run.
     if cfg!(not(feature = "in-use-encryption")) {

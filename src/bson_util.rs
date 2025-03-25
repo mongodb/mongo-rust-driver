@@ -34,6 +34,19 @@ pub(crate) fn get_int(val: &Bson) -> Option<i64> {
     }
 }
 
+/// Coerce numeric types into an `f64` if it would be lossless to do so. If this Bson is not numeric
+/// or the conversion would be lossy (e.g. 1.5 -> 1), this returns `None`.
+#[cfg(test)]
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) fn get_double(val: &Bson) -> Option<f64> {
+    match *val {
+        Bson::Int32(i) => Some(f64::from(i)),
+        Bson::Int64(i) if i == i as f64 as i64 => Some(i as f64),
+        Bson::Double(f) => Some(f),
+        _ => None,
+    }
+}
+
 /// Coerce numeric types into an `i64` if it would be lossless to do so. If this Bson is not numeric
 /// or the conversion would be lossy (e.g. 1.5 -> 1), this returns `None`.
 pub(crate) fn get_int_raw(val: RawBsonRef<'_>) -> Option<i64> {

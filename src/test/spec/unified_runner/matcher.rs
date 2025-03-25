@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use crate::{
     bson::{doc, spec::ElementType, Bson, Document},
-    bson_util::get_int,
+    bson_util::{get_double, get_int},
     event::{
         cmap::CmapEvent,
         command::CommandEvent,
@@ -574,6 +574,21 @@ fn special_operator_matches(
             results_match_inner(Some(&doc), value, false, false, entities)
         }
         "$$matchAsRoot" => results_match_inner(actual, value, false, true, entities),
+        "$$lte" => {
+            let Some(expected) = get_double(value) else {
+                return Err(format!("expected number for comparison, got {}", value));
+            };
+            let Some(actual) = actual.and_then(get_double) else {
+                return Err(format!("expected actual to be a number, got {:?}", actual));
+            };
+            if actual > expected {
+                return Err(format!(
+                    "expected actual to be <= {}, got {}",
+                    expected, actual
+                ));
+            }
+            Ok(())
+        }
         other => panic!("unknown special operator: {}", other),
     }
 }
@@ -593,6 +608,10 @@ fn type_matches(types: &Bson, actual: &Bson) -> Result<(), String> {
             }
         }
         Bson::String(str) => {
+            if str == "number" {
+                let number_types: Bson = vec!["int", "long", "double", "decimal"].into();
+                return type_matches(&number_types, actual);
+            }
             let expected = match str.as_ref() {
                 "double" => ElementType::Double,
                 "string" => ElementType::String,

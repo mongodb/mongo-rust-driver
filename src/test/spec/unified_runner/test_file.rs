@@ -1,6 +1,5 @@
-use std::{borrow::Cow, collections::HashMap, fmt::Write, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use percent_encoding::NON_ALPHANUMERIC;
 use pretty_assertions::assert_eq;
 use regex::Regex;
 use semver::Version;
@@ -240,7 +239,13 @@ pub(crate) fn merge_uri_options(
     uri_options: Option<&Document>,
     use_multiple_hosts: bool,
 ) -> String {
-    let given_uri = if !use_multiple_hosts && !given_uri.starts_with("mongodb+srv") {
+    let direct_connection = uri_options
+        .and_then(|options| options.get_bool("directConnection").ok())
+        .unwrap_or(false);
+
+    // TODO RUST-1308: use the ConnectionString type to remove hosts
+    let uri = if (!use_multiple_hosts || direct_connection) && !given_uri.starts_with("mongodb+srv")
+    {
         let hosts_regex = Regex::new(r"mongodb://([^/]*)").unwrap();
         let single_host = hosts_regex
             .captures(given_uri)
@@ -251,54 +256,49 @@ pub(crate) fn merge_uri_options(
             .split(',')
             .next()
             .expect("expected URI to contain at least one host, but it had none");
-        hosts_regex.replace(given_uri, format!("mongodb://{}", single_host))
+        hosts_regex
+            .replace(given_uri, format!("mongodb://{}", single_host))
+            .to_string()
     } else {
-        Cow::Borrowed(given_uri)
+        given_uri.to_string()
     };
 
-    let uri_options = match uri_options {
-        Some(opts) => opts,
-        None => return given_uri.to_string(),
+    let Some(mut uri_options) = uri_options.cloned() else {
+        return uri;
     };
 
-    let mut given_uri_parts = given_uri.split('?');
+    let (mut uri, existing_options) = match uri.split_once("?") {
+        Some((pre_options, options)) => (pre_options.to_string(), Some(options)),
+        None => (uri, None),
+    };
 
-    let mut uri = String::from(given_uri_parts.next().unwrap());
-    // A connection string has two slashes before the host list and one slash before the auth db
-    // name. If an auth db name is not provided the latter slash might not be present, so it needs
-    // to be added manually.
-    if uri.chars().filter(|c| *c == '/').count() < 3 {
-        uri.push('/');
-    }
-    uri.push('?');
-
-    if let Some(options) = given_uri_parts.next() {
-        let options = options.split('&');
-        for option in options {
-            let key = option.split('=').next().unwrap();
-            // The provided URI options should override any existing options in the connection
-            // string.
+    if let Some(existing_options) = existing_options {
+        for option in existing_options.split("&") {
+            let (key, value) = option.split_once("=").unwrap();
+            // prefer the option specified by the test
             if !uri_options.contains_key(key) {
-                uri.push_str(option);
-                uri.push('&');
+                uri_options.insert(key, value);
             }
         }
     }
 
-    for (key, value) in uri_options {
-        let value = value.to_string();
-        // to_string() wraps quotations around Bson strings
-        let value = value.trim_start_matches('\"').trim_end_matches('\"');
-        let _ = write!(
-            &mut uri,
-            "{}={}&",
-            &key,
-            percent_encoding::percent_encode(value.as_bytes(), NON_ALPHANUMERIC)
-        );
+    if direct_connection {
+        uri_options.remove("replicaSet");
     }
 
-    // remove the trailing '&' from the URI (or '?' if no options are present)
-    uri.pop();
+    let mut join = '?';
+    for (key, value) in uri_options {
+        uri.push(join);
+        if join == '?' {
+            join = '&';
+        }
+        uri.push_str(&key);
+        uri.push('=');
+
+        let value = value.to_string();
+        let value = value.trim_start_matches('\"').trim_end_matches('\"');
+        uri.push_str(value);
+    }
 
     uri
 }
