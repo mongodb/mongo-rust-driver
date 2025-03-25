@@ -1,4 +1,4 @@
-# This test is split out into a separate file to accomodate drivers that validate operation structure while decoding
+# This test is split out into a separate file to accommodate drivers that validate operation structure while decoding
 # from JSON/YML. Such drivers fail to decode any files containing invalid operations. Combining this test in a file
 # with other ignoreResultAndError valid-fail tests, which test failures that occur during test execution, would prevent
 # such drivers from decoding the file and running any of the tests.
