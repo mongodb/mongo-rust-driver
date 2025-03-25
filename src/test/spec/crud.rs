@@ -32,6 +32,8 @@ async fn run_unified() {
         // Unacknowledged write; see above.
         "Unacknowledged write using dollar-prefixed or dotted keys may be silently rejected on \
          pre-5.0 server",
+        "Requesting unacknowledged write with verboseResults is a client-side error",
+        "Requesting unacknowledged write with ordered is a client-side error",
         // TODO RUST-663: Unskip these tests.
         "Aggregate with $out includes read preference for 5.0+ server",
         "Aggregate with $out omits read preference for pre-5.0 server",

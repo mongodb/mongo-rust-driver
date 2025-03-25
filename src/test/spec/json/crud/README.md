@@ -370,54 +370,15 @@ Assert that a CommandStartedEvent was observed for the `killCursors` command.
 
 ### 10. `MongoClient.bulkWrite` returns error for unacknowledged too-large insert
 
-This test must only be run on 8.0+ servers. This test must be skipped on Atlas Serverless.
-
-Construct a `MongoClient` (referred to as `client`).
-
-Perform a `hello` command using `client` and record the following values from the response: `maxBsonObjectSize`.
-
-Then, construct the following document (referred to as `document`):
-
-```javascript
-{
-  "a": "b".repeat(maxBsonObjectSize)
-}
-```
+Removed.
 
 #### With insert
 
-Construct the following write model (referred to as `model`):
-
-```javascript
-InsertOne: {
-  "namespace": "db.coll",
-  "document": document
-}
-```
-
-Construct as list of write models (referred to as `models`) with the one `model`.
-
-Call `MongoClient.bulkWrite` with `models` and `BulkWriteOptions.writeConcern` set to an unacknowledged write concern.
-
-Expect a client-side error due the size.
+Removed.
 
 #### With replace
 
-Construct the following write model (referred to as `model`):
-
-```javascript
-ReplaceOne: {
-  "namespace": "db.coll",
-  "filter": {},
-  "replacement": document
-}
-```
-
-Construct as list of write models (referred to as `models`) with the one `model`.
-
-Call `MongoClient.bulkWrite` with `models` and `BulkWriteOptions.writeConcern` set to an unacknowledged write concern.
-
-Expect a client-side error due the size.
+Removed.
 
 ### 11. `MongoClient.bulkWrite` batch splits when the addition of a new namespace exceeds the maximum message size
 
@@ -437,7 +398,7 @@ CommandStartedEvents. Perform a `hello` command using `client` and record the fo
 
 Calculate the following values:
 
-```
+```javascript
 opsBytes = maxMessageSizeBytes - 1122
 numModels = opsBytes / maxBsonObjectSize
 remainderBytes = opsBytes % maxBsonObjectSize
@@ -493,7 +454,7 @@ Assert that the namespace contained in `event.command.nsInfo` is "db.coll".
 
 Construct the following namespace (referred to as `namespace`):
 
-```
+```javascript
 "db." + "c".repeat(200)
 ```
 
@@ -533,19 +494,19 @@ changed in the bulk write specification.
 
 The command document for the `bulkWrite` has the following structure and size:
 
-```javascript
+```typescript
 {
   "bulkWrite": 1,
   "errorsOnly": true,
   "ordered": true
 }
 
-Size: 43 bytes
+// Size: 43 bytes
 ```
 
 Each write model will create an `ops` document with the following structure and size:
 
-```javascript
+```typescript
 {
   "insert": <0 | 1>,
   "document": {
@@ -554,7 +515,7 @@ Each write model will create an `ops` document with the following structure and 
   }
 }
 
-Size: 57 bytes + <number of characters in string>
+// Size: 57 bytes + <number of characters in string>
 ```
 
 The `ops` document for both `newNamespaceModel` and `sameNamespaceModel` has a string with one character, so it is a
@@ -567,7 +528,7 @@ The models using the "db.coll" namespace will create one `nsInfo` document with 
   "ns": "db.coll"
 }
 
-Size: 21 bytes
+// Size: 21 bytes
 ```
 
 `newNamespaceModel` will create an `nsInfo` document with the following structure and size:
@@ -577,13 +538,13 @@ Size: 21 bytes
   "ns": "db.<c repeated 200 times>"
 }
 
-Size: 217 bytes
+// Size: 217 bytes
 ```
 
 We need to fill up the rest of the message with bytes such that another `ops` document will fit, but another `nsInfo`
 entry will not. The following calculations are used:
 
-```
+```python
 # 1000 is the OP_MSG overhead required in the spec
 maxBulkWriteBytes = maxMessageSizeBytes - 1000
 
@@ -628,7 +589,7 @@ Assert that `error` is a client error.
 
 Construct the following namespace (referred to as `namespace`):
 
-```
+```javascript
 "db." + "c".repeat(maxMessageSizeBytes)
 ```
 
@@ -693,3 +654,57 @@ maxTimeMS value of 2000ms for the `explain`.
 
 Obtain the command started event for the explain. Confirm that the top-level explain command should has a `maxTimeMS`
 value of `2000`.
+
+### 15. `MongoClient.bulkWrite` with unacknowledged write concern uses `w:0` for all batches
+
+This test must only be run on 8.0+ servers. This test must be skipped on Atlas Serverless.
+
+If testing with a sharded cluster, only connect to one mongos. This is intended to ensure the `countDocuments` operation
+uses the same connection as the `bulkWrite` to get the correct connection count. (See
+[DRIVERS-2921](https://jira.mongodb.org/browse/DRIVERS-2921)).
+
+Construct a `MongoClient` (referred to as `client`) with
+[command monitoring](../../command-logging-and-monitoring/command-logging-and-monitoring.md) enabled to observe
+CommandStartedEvents. Perform a `hello` command using `client` and record the `maxBsonObjectSize` and
+`maxMessageSizeBytes` values in the response.
+
+Construct a `MongoCollection` (referred to as `coll`) for the collection "db.coll". Drop `coll`.
+
+Use the `create` command to create "db.coll" to workaround [SERVER-95537](https://jira.mongodb.org/browse/SERVER-95537).
+
+Construct the following write model (referred to as `model`):
+
+```javascript
+InsertOne: {
+  "namespace": "db.coll",
+  "document": { "a": "b".repeat(maxBsonObjectSize - 500) }
+}
+```
+
+Construct a list of write models (referred to as `models`) with `model` repeated
+`maxMessageSizeBytes / maxBsonObjectSize + 1` times.
+
+Call `client.bulkWrite` with `models`. Pass `BulkWriteOptions` with `ordered` set to `false` and `writeConcern` set to
+an unacknowledged write concern. Assert no error occurred. Assert the result indicates the write was unacknowledged.
+
+Assert that two CommandStartedEvents (referred to as `firstEvent` and `secondEvent`) were observed for the `bulkWrite`
+command. Assert that the length of `firstEvent.command.ops` is `maxMessageSizeBytes / maxBsonObjectSize`. Assert that
+the length of `secondEvent.command.ops` is 1. If the driver exposes `operationId`s in its CommandStartedEvents, assert
+that `firstEvent.operationId` is equal to `secondEvent.operationId`. Assert both commands include
+`writeConcern: {w: 0}`.
+
+To force completion of the `w:0` writes, execute `coll.countDocuments` and expect the returned count is
+`maxMessageSizeBytes / maxBsonObjectSize + 1`. This is intended to avoid incomplete writes interfering with other tests
+that may use this collection.
+
+### 16. Generated document identifiers are the first field in their document
+
+Construct a `MongoClient` (referred to as `client`) with
+[command monitoring](../../command-logging-and-monitoring/command-logging-and-monitoring.md) enabled to observe
+CommandStartedEvents. For each of `insertOne`, client `bulkWrite`, and collection `bulkWrite`, do the following:
+
+- Execute the command with a document that does not contain an `_id` field.
+- If possible, capture the wire protocol message (referred to as `request`) of the command and assert that the first
+    field of `request.documents[0]` is `_id`.
+- Otherwise, capture the CommandStartedEvent (referred to as `event`) emitted by the command and assert that the first
+    field of `event.command.documents[0]` is `_id`.
