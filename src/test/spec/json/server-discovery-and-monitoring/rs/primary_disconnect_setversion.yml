@@ -16,7 +16,7 @@ phases: [
                 setVersion: 1,
                 electionId: {"$oid": "000000000000000000000001"},
                 minWireVersion: 0,
-                maxWireVersion: 6
+                maxWireVersion: 21
             }],
             ["b:27017", {
                 ok: 1,
@@ -27,7 +27,7 @@ phases: [
                 setVersion: 2,
                 electionId: {"$oid": "000000000000000000000001"},
                 minWireVersion: 0,
-                maxWireVersion: 6
+                maxWireVersion: 21
             }]
         ],
 
@@ -36,7 +36,8 @@ phases: [
                 "a:27017": {
                     type: "Unknown",
                     setName: ,
-                    electionId:
+                    electionId:,
+                    error: "primary marked stale due to discovery of newer primary"
                 },
                 "b:27017": {
                     type: "RSPrimary",
@@ -91,7 +92,7 @@ phases: [
                 setVersion: 1,
                 electionId: {"$oid": "000000000000000000000001"},
                 minWireVersion: 0,
-                maxWireVersion: 6
+                maxWireVersion: 21
             }]
         ],
         outcome: {
@@ -99,6 +100,7 @@ phases: [
                 "a:27017": {
                     type: "Unknown",
                     setName: ,
+                    error: "primary marked stale due to electionId/setVersion mismatch",
                     electionId:
                 },
                 "b:27017": {
@@ -127,7 +129,7 @@ phases: [
                 setVersion: 2,
                 electionId: {"$oid": "000000000000000000000002"},
                 minWireVersion: 0,
-                maxWireVersion: 6
+                maxWireVersion: 21
             }]
         ],
         outcome: {
@@ -163,7 +165,7 @@ phases: [
                 hosts: ["a:27017", "b:27017"],
                 setName: "rs",
                 minWireVersion: 0,
-                maxWireVersion: 6
+                maxWireVersion: 21
             }]
         ],
         outcome: {

@@ -15,7 +15,7 @@ phases: [
                     setName: "rs",
                     hosts: ["a:27017", "b:27017"],
                     minWireVersion: 0,
-                    maxWireVersion: 6
+                    maxWireVersion: 21
                 }]
         ],
 
@@ -52,7 +52,7 @@ phases: [
                     setName: "rs",
                     hosts: ["a:27017", "b:27017"],
                     minWireVersion: 0,
-                    maxWireVersion: 6
+                    maxWireVersion: 21
                 }]
         ],
 
@@ -63,7 +63,8 @@ phases: [
                 "a:27017": {
 
                     type: "Unknown",
-                    setName:
+                    setName:,
+                    error: "primary marked stale due to discovery of newer primary"
                 },
 
                 "b:27017": {
