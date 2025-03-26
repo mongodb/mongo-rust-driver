@@ -94,12 +94,6 @@ impl TestOperation for Delete {
 pub(super) struct Upload {
     source: Document,
     filename: String,
-    // content_type and disableMD5 are deprecated and no longer supported.
-    // Options included for deserialization.
-    #[serde(rename = "contentType")]
-    _content_type: Option<String>,
-    #[serde(rename = "disableMD5")]
-    _disable_md5: Option<bool>,
     #[serde(flatten)]
     options: GridFsUploadOptions,
 }
