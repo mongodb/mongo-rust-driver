@@ -4,7 +4,7 @@ use crate::{
     bson::{rawdoc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     operation::{CursorBody, OperationWithDefaults, Retryability, SERVER_4_4_0_WIRE_VERSION},
     options::{CursorType, FindOptions, SelectionCriteria},
     Namespace,
@@ -38,21 +38,23 @@ impl OperationWithDefaults for Find {
             Self::NAME: self.ns.coll.clone(),
         };
 
-        if let Some(ref options) = self.options {
+        if let Some(ref mut options) = self.options {
             // negative limits should be interpreted as request for single batch as per crud spec.
             if options.limit.map(|limit| limit < 0) == Some(true) {
                 body.append("singleBatch", true);
             }
 
-            if options
-                .batch_size
-                .map(|batch_size| batch_size > i32::MAX as u32)
-                == Some(true)
-            {
-                return Err(ErrorKind::InvalidArgument {
-                    message: "The batch size must fit into a signed 32-bit integer".to_string(),
+            if let Some(ref mut batch_size) = options.batch_size {
+                if i32::try_from(*batch_size).is_err() {
+                    return Err(Error::invalid_argument(
+                        "the batch size must fit into a signed 32-bit integer",
+                    ));
                 }
-                .into());
+                if let Some(limit) = options.limit.and_then(|limit| u32::try_from(limit).ok()) {
+                    if *batch_size == limit {
+                        *batch_size += 1;
+                    }
+                }
             }
 
             match options.cursor_type {
