@@ -653,9 +653,16 @@ impl TopologyDescription {
                             || (topology_max_set_version == server_set_version
                                 && *topology_max_election_id > server_election_id)
                         {
+                            // Stale primary.
                             self.servers.insert(
                                 server_description.address.clone(),
-                                ServerDescription::new(&server_description.address),
+                                ServerDescription::new_from_error(
+                                    server_description.address,
+                                    Error::invalid_response(
+                                        "primary marked stale due to electionId/setVersion \
+                                         mismatch",
+                                    ),
+                                ),
                             );
                             self.record_primary_state();
                             return Ok(());
@@ -688,7 +695,12 @@ impl TopologyDescription {
             }
 
             if let ServerType::RsPrimary = self.servers.get(&address).unwrap().server_type {
-                let description = ServerDescription::new(&address);
+                let description = ServerDescription::new_from_error(
+                    address.clone(),
+                    Error::invalid_response(
+                        "primary marked stale due to discovery of newer primary",
+                    ),
+                );
                 self.servers.insert(address, description);
             }
         }
