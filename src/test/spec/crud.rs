@@ -41,6 +41,8 @@ async fn run_unified() {
         "Aggregate with $merge omits read preference for pre-5.0 server",
         "Database-level aggregate with $out omits read preference for pre-5.0 server",
         "Database-level aggregate with $merge omits read preference for pre-5.0 server",
+        // TODO RUST-2071: unskip this test
+        "Find with batchSize equal to limit",
     ];
     // TODO: remove this manual skip when this test is fixed to skip on serverless
     if *SERVERLESS {
