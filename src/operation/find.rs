@@ -4,7 +4,7 @@ use crate::{
     bson::{rawdoc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
-    error::{Error, ErrorKind, Result},
+    error::{Error, Result},
     operation::{CursorBody, OperationWithDefaults, Retryability, SERVER_4_4_0_WIRE_VERSION},
     options::{CursorType, FindOptions, SelectionCriteria},
     Namespace,
