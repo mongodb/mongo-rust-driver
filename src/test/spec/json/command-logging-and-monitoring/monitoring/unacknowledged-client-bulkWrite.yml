@@ -50,23 +50,18 @@ tests:
                 namespace: *namespace
                 filter: { _id: 3 }
                 update: { $set: { x: 333 } }
+          ordered: false
         expectResult:
-          insertedCount:
-            $$unsetOrMatches: 0
-          upsertedCount:
-            $$unsetOrMatches: 0
-          matchedCount:
-            $$unsetOrMatches: 0
-          modifiedCount:
-            $$unsetOrMatches: 0
-          deletedCount:
-            $$unsetOrMatches: 0
-          insertResults:
-            $$unsetOrMatches: {}
-          updateResults:
-            $$unsetOrMatches: {}
-          deleteResults:
-            $$unsetOrMatches: {}
+          $$unsetOrMatches:
+            acknowledged: { $$unsetOrMatches: false }
+            insertedCount: { $$unsetOrMatches: 0 }
+            upsertedCount: { $$unsetOrMatches: 0 }
+            matchedCount: { $$unsetOrMatches: 0 }
+            modifiedCount: { $$unsetOrMatches: 0 }
+            deletedCount: { $$unsetOrMatches: 0 }
+            insertResults: { $$unsetOrMatches: {} }
+            updateResults: { $$unsetOrMatches: {} }
+            deleteResults: { $$unsetOrMatches: {} }
       # Force completion of the w:0 write by executing a find on the same connection
       - object: *collection
         name: find
@@ -89,7 +84,7 @@ tests:
               command:
                 bulkWrite: 1
                 errorsOnly: true
-                ordered: true
+                ordered: false
                 ops:
                   - insert: 0
                     document: { _id: 4, x: 44 }
