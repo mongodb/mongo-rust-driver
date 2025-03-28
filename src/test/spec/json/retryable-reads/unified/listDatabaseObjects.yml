@@ -1,6 +1,6 @@
 # listDatabaseObjects returns an array of MongoDatabase objects.
 # Not all drivers support this functionality. For more details, see:
-# https://github.com/mongodb/specifications/blob/v1/source/enumerate-databases.rst#enumerating-mongodatabase-objects
+# https://github.com/mongodb/specifications/blob/master/source/enumerate-databases.md#enumerating-mongodatabase-objects
 
 description: listDatabaseObjects
 
