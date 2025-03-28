@@ -141,7 +141,7 @@ tests:
         object: *bucket0
         arguments:
           id: { $oid: "000000000000000000000000" }
-        expectError: { isError: true } # FileNotFound
+        expectError: { isClientError: true } # FileNotFound
     outcome:
       - collectionName: *bucket0_files_collectionName
         databaseName: *database0Name
@@ -170,7 +170,7 @@ tests:
         object: *bucket0
         arguments:
           id: { $oid: "000000000000000000000004" }
-        expectError: { isError: true } # FileNotFound
+        expectError: { isClientError: true } # FileNotFound
     outcome:
       - collectionName: *bucket0_files_collectionName
         databaseName: *database0Name

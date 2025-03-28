@@ -133,7 +133,7 @@ tests:
         object: *bucket0
         arguments:
           filename: "xyz"
-        expectError: { isError: true } # FileNotFound
+        expectError: { isClientError: true } # FileNotFound
   - description: "downloadByName when revision does not exist"
     operations:
       - name: downloadByName
@@ -141,4 +141,4 @@ tests:
         arguments:
           filename: "abc"
           revision: 999
-        expectError: { isError: true } # RevisionNotFound
+        expectError: { isClientError: true } # RevisionNotFound
