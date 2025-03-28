@@ -84,7 +84,7 @@ impl<'a> Action for Rename<'a> {
     }
 }
 
-// Renames a file selected by name.  Construct with [`GridFsBucket::rename_by_name`].
+/// Renames a file selected by name.  Construct with [`GridFsBucket::rename_by_name`].
 #[must_use]
 pub struct RenameByName<'a> {
     bucket: &'a GridFsBucket,
