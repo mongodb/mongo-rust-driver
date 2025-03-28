@@ -83,6 +83,7 @@ async fn generated_id_first_field() {
 
     if server_version_lt(8, 0).await || *SERVERLESS {
         log_uncaptured("skipping bulk write test in generated_id_first_field");
+        return;
     }
 
     let insert_one_model = collection.insert_one_model(doc! { "y": 2 }).unwrap();
