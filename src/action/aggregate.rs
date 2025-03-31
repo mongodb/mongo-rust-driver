@@ -166,7 +166,7 @@ impl<'a, T> Aggregate<'a, ImplicitSession, T> {
     pub fn session(
         self,
         value: impl Into<&'a mut ClientSession>,
-    ) -> Aggregate<'a, ExplicitSession<'a>> {
+    ) -> Aggregate<'a, ExplicitSession<'a>, T> {
         Aggregate {
             target: self.target,
             pipeline: self.pipeline,
@@ -263,5 +263,22 @@ impl AggregateTargetRef<'_> {
             Self::Collection(cr) => cr.selection_criteria(),
             Self::Database(db) => db.selection_criteria(),
         }
+    }
+}
+
+#[test]
+fn aggregate_session_type() {
+    // Assert that this code compiles but do not actually run it.
+    #[allow(
+        unreachable_code,
+        unused_variables,
+        dead_code,
+        clippy::diverging_sub_expression
+    )]
+    fn compile_ok() {
+        let agg: Aggregate = todo!();
+        let typed: Aggregate<'_, _, ()> = agg.with_type::<()>();
+        let mut session: ClientSession = todo!();
+        let typed_session: Aggregate<'_, _, ()> = typed.session(&mut session);
     }
 }
