@@ -89,6 +89,28 @@ impl TestOperation for Delete {
         .boxed()
     }
 }
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct DeleteByName {
+    filename: String,
+}
+
+impl TestOperation for DeleteByName {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let bucket = test_runner.get_bucket(id).await;
+            bucket.delete_by_name(&self.filename).await?;
+            Ok(None)
+        }
+        .boxed()
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Upload {
@@ -120,6 +142,30 @@ impl TestOperation for Upload {
             };
 
             Ok(Some(Entity::Bson(id)))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct RenameByName {
+    filename: String,
+    new_filename: String,
+}
+
+impl TestOperation for RenameByName {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let bucket = test_runner.get_bucket(id).await;
+            bucket
+                .rename_by_name(&self.filename, &self.new_filename)
+                .await?;
+            Ok(None)
         }
         .boxed()
     }
