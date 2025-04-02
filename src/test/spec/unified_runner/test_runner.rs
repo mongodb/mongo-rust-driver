@@ -6,7 +6,10 @@ use tokio::sync::{mpsc, RwLock};
 
 use crate::{
     bson::{doc, Document},
-    client::options::ClientOptions,
+    client::{
+        csfle::options::{AutoEncryptionOptions, KmsProviders},
+        options::ClientOptions,
+    },
     concern::WriteConcern,
     gridfs::GridFsBucket,
     options::{CollectionOptions, ReadConcern, ReadPreference, SelectionCriteria},
@@ -508,15 +511,39 @@ impl TestRunner {
                         options.tracing_max_document_length_bytes = Some(10000);
                     }
 
-                    (
-                        id,
-                        Entity::Client(ClientEntity::new(
-                            options,
-                            observe_events,
-                            ignore_command_names,
-                            observe_sensitive_commands,
-                        )),
-                    )
+                    let entity = ClientEntity::new(
+                        options,
+                        observe_events,
+                        ignore_command_names,
+                        observe_sensitive_commands,
+                    );
+
+                    #[cfg(feature = "in-use-encryption")]
+                    if let Some(opts) = &client.auto_encryption_opts {
+                        let real_opts = AutoEncryptionOptions {
+                            key_vault_client: None,
+                            key_vault_namespace: opts.key_vault_namespace.clone(),
+                            kms_providers: KmsProviders::new(fill_kms_placeholders(
+                                opts.kms_providers.clone(),
+                            ))
+                            .unwrap(),
+                            schema_map: opts.schema_map.clone(),
+                            bypass_auto_encryption: opts.bypass_auto_encryption,
+                            extra_options: opts.extra_options.clone(),
+                            encrypted_fields_map: opts.encrypted_fields_map.clone(),
+                            bypass_query_analysis: opts.bypass_query_analysis,
+                            disable_crypt_shared: None,
+                            key_cache_expiration: opts.key_cache_expiration,
+                        };
+                        entity
+                            .client()
+                            .unwrap()
+                            .init_csfle(real_opts)
+                            .await
+                            .unwrap();
+                    }
+
+                    (id, Entity::Client(entity))
                 }
                 TestFileEntity::Database(database) => {
                     let id = database.id.clone();
