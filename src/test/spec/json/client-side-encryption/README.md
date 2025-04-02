@@ -3413,3 +3413,361 @@ Repeat this test with the `azure` and `gcp` masterKeys.
 2. Call `client_encryption.createDataKey()` with "aws" as the provider. Expect this to fail.
 
 Repeat this test with the `azure` and `gcp` masterKeys.
+
+### 25. Test $lookup
+
+All tests require libmongocrypt 1.13.0, server 7.0+, and must be skipped on standalone. Tests define more constraints.
+
+The syntax `<filename.json>` is used to refer to the content of the corresponding file in `../etc/data/lookup`.
+
+#### Setup
+
+Create an encrypted MongoClient named `encryptedClient` configured with:
+
+```python
+AutoEncryptionOpts(
+    keyVaultNamespace="db.keyvault",
+    kmsProviders={"local": { "key": "<base64 decoding of LOCAL_MASTERKEY>" }}
+)
+```
+
+Use `encryptedClient` to drop `db.keyvault`. Insert `<key-doc.json>` into `db.keyvault` with majority write concern.
+
+Use `encryptedClient` to drop and create the following collections:
+
+- `db.csfle` with options: `{ "validator": { "$jsonSchema": "<schema-csfle.json>"}}`.
+- `db.csfle2` with options: `{ "validator": { "$jsonSchema": "<schema-csfle2.json>"}}`.
+- `db.qe` with options: `{ "encryptedFields": "<schema-qe.json>"}`.
+- `db.qe2` with options: `{ "encryptedFields": "<schema-qe2.json>"}`.
+- `db.no_schema` with no options.
+- `db.no_schema2` with no options.
+
+Create an unencrypted MongoClient named `unencryptedClient`.
+
+Insert documents with `encryptedClient`:
+
+- `{"csfle": "csfle"}` into `db.csfle`
+    - Use `unencryptedClient` to retrieve it. Assert the `csfle` field is BSON binary.
+- `{"csfle2": "csfle2"}` into `db.csfle2`
+    - Use `unencryptedClient` to retrieve it. Assert the `csfle2` field is BSON binary.
+- `{"qe": "qe"}` into `db.qe`
+    - Use `unencryptedClient` to retrieve it. Assert the `qe` field is BSON binary.
+- `{"qe2": "qe2"}` into `db.qe2`
+    - Use `unencryptedClient` to retrieve it. Assert the `qe2` field is BSON binary.
+- `{"no_schema": "no_schema"}` into `db.no_schema`
+- `{"no_schema2": "no_schema2"}` into `db.no_schema2`
+
+#### Case 1: `db.csfle` joins `db.no_schema`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.csfle` with the following pipeline:
+
+```json
+[
+    {"$match" : {"csfle" : "csfle"}},
+    {
+        "$lookup" : {
+            "from" : "no_schema",
+            "as" : "matched",
+            "pipeline" : [ {"$match" : {"no_schema" : "no_schema"}}, {"$project" : {"_id" : 0}} ]
+        }
+    },
+    {"$project" : {"_id" : 0}}
+]
+```
+
+Expect one document to be returned matching: `{"csfle" : "csfle", "matched" : [ {"no_schema" : "no_schema"} ]}`.
+
+#### Case 2: `db.qe` joins `db.no_schema`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.qe` with the following pipeline:
+
+```json
+[
+    {"$match" : {"qe" : "qe"}},
+    {
+       "$lookup" : {
+          "from" : "no_schema",
+          "as" : "matched",
+          "pipeline" :
+             [ {"$match" : {"no_schema" : "no_schema"}}, {"$project" : {"_id" : 0, "__safeContent__" : 0}} ]
+       }
+    },
+    {"$project" : {"_id" : 0, "__safeContent__" : 0}}
+]
+```
+
+Expect one document to be returned matching: `{"qe" : "qe", "matched" : [ {"no_schema" : "no_schema"} ]}`.
+
+#### Case 3: `db.no_schema` joins `db.csfle`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.no_schema` with the following pipeline:
+
+```json
+[
+    {"$match" : {"no_schema" : "no_schema"}},
+    {
+        "$lookup" : {
+            "from" : "csfle",
+            "as" : "matched",
+            "pipeline" : [ {"$match" : {"csfle" : "csfle"}}, {"$project" : {"_id" : 0}} ]
+        }
+    },
+    {"$project" : {"_id" : 0}}
+]
+```
+
+Expect one document to be returned matching: `{"no_schema" : "no_schema", "matched" : [ {"csfle" : "csfle"} ]}`.
+
+#### Case 4: `db.no_schema` joins `db.qe`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.no_schema` with the following pipeline:
+
+```json
+[
+   {"$match" : {"no_schema" : "no_schema"}},
+   {
+      "$lookup" : {
+         "from" : "qe",
+         "as" : "matched",
+         "pipeline" : [ {"$match" : {"qe" : "qe"}}, {"$project" : {"_id" : 0, "__safeContent__" : 0}} ]
+      }
+   },
+   {"$project" : {"_id" : 0}}
+]
+```
+
+Expect one document to be returned matching: `{"no_schema" : "no_schema", "matched" : [ {"qe" : "qe"} ]}`.
+
+#### Case 5: `db.csfle` joins `db.csfle2`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.csfle` with the following pipeline:
+
+```json
+[
+   {"$match" : {"csfle" : "csfle"}},
+   {
+      "$lookup" : {
+         "from" : "csfle2",
+         "as" : "matched",
+         "pipeline" : [ {"$match" : {"csfle2" : "csfle2"}}, {"$project" : {"_id" : 0}} ]
+      }
+   },
+   {"$project" : {"_id" : 0}}
+]
+```
+
+Expect one document to be returned matching: `{"csfle" : "csfle", "matched" : [ {"csfle2" : "csfle2"} ]}`.
+
+#### Case 6: `db.qe` joins `db.qe2`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.qe` with the following pipeline:
+
+```json
+[
+   {"$match" : {"qe" : "qe"}},
+   {
+      "$lookup" : {
+         "from" : "qe2",
+         "as" : "matched",
+         "pipeline" : [ {"$match" : {"qe2" : "qe2"}}, {"$project" : {"_id" : 0, "__safeContent__" : 0}} ]
+      }
+   },
+   {"$project" : {"_id" : 0, "__safeContent__" : 0}}
+]
+```
+
+Expect one document to be returned matching: `{"qe" : "qe", "matched" : [ {"qe2" : "qe2"} ]}`.
+
+#### Case 7: `db.no_schema` joins `db.no_schema2`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.no_schema` with the following pipeline:
+
+```json
+[
+    {"$match" : {"no_schema" : "no_schema"}},
+    {
+        "$lookup" : {
+            "from" : "no_schema2",
+            "as" : "matched",
+            "pipeline" : [ {"$match" : {"no_schema2" : "no_schema2"}}, {"$project" : {"_id" : 0}} ]
+        }
+    },
+    {"$project" : {"_id" : 0}}
+]
+```
+
+Expect one document to be returned matching:
+`{"no_schema" : "no_schema", "matched" : [ {"no_schema2" : "no_schema2"} ]}`.
+
+#### Case 8: `db.csfle` joins `db.qe`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.csfle` with the following pipeline:
+
+```json
+[
+    {"$match" : {"csfle" : "qe"}},
+    {
+        "$lookup" : {
+            "from" : "qe",
+            "as" : "matched",
+            "pipeline" : [ {"$match" : {"qe" : "qe"}}, {"$project" : {"_id" : 0}} ]
+        }
+    },
+    {"$project" : {"_id" : 0}}
+]
+```
+
+Expect an exception to be thrown with a message containing the substring `not supported`.
+
+#### Case 9: test error with \<8.1
+
+This case requires mongocryptd/crypt_shared \<8.1.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.csfle` with the following pipeline:
+
+```json
+[
+    {"$match" : {"csfle" : "csfle"}},
+    {
+        "$lookup" : {
+            "from" : "no_schema",
+            "as" : "matched",
+            "pipeline" : [ {"$match" : {"no_schema" : "no_schema"}}, {"$project" : {"_id" : 0}} ]
+        }
+    },
+    {"$project" : {"_id" : 0}}
+]
+```
+
+Expect an exception to be thrown with a message containing the substring `Upgrade`.
+
+### 26. Custom AWS Credentials
+
+These tests require valid AWS credentials for the remote KMS provider via the secrets manager (FLE_AWS_KEY and
+FLE_AWS_SECRET). These tests MUST NOT run inside an AWS environment that has the same credentials set in order to
+properly ensure the tests would fail using on-demand credentials.
+
+#### Case 1: ClientEncryption with `credentialProviders` and incorrect `kmsProviders`
+
+Create a MongoClient named `setupClient`.
+
+Create a [ClientEncryption](../client-side-encryption.md#clientencryption) object with the following options:
+
+```typescript
+class ClientEncryptionOpts {
+  keyVaultClient: <setupClient>,
+  keyVaultNamespace: "keyvault.datakeys",
+  kmsProviders: { "aws": { "accessKeyId": <set from secrets manager>, "secretAccessKey": <set from secrets manager> } },
+  credentialProviders: { "aws": <default provider from AWS SDK> }
+}
+```
+
+Assert that an error is thrown.
+
+#### Case 2: ClientEncryption with `credentialProviders` works
+
+Create a MongoClient named `setupClient`.
+
+Create a [ClientEncryption](../client-side-encryption.md#clientencryption) object with the following options:
+
+```typescript
+class ClientEncryptionOpts {
+  keyVaultClient: <setupClient>,
+  keyVaultNamespace: "keyvault.datakeys",
+  kmsProviders: { "aws": {} },
+  credentialProviders: { "aws": <object/function that returns valid credentials from the secrets manager> }
+}
+```
+
+Use the client encryption to create a datakey using the "aws" KMS provider. This should successfully load and use the
+AWS credentials that were provided by the secrets manager for the remote provider. Assert the datakey was created and
+that the custom credential provider was called at least once.
+
+An example of this in Node.js:
+
+```typescript
+import { ClientEncryption, MongoClient } from 'mongodb';
+
+let calledCount = 0;
+const masterKey = {
+  region: '<aws region>',
+  key: '<key for arn>'
+};
+const keyVaultClient = new MongoClient(process.env.MONGODB_URI);
+const options = {
+  keyVaultNamespace: 'keyvault.datakeys',
+  kmsProviders: { aws: {} },
+  credentialProviders: {
+    aws: async () => {
+      calledCount++;
+      return {
+        accessKeyId: process.env.FLE_AWS_KEY,
+        secretAccessKey: process.env.FLE_AWS_SECRET
+      };
+    }
+  }
+};
+const clientEncryption = new ClientEncryption(keyVaultClient, options);
+const dk = await clientEncryption.createDataKey('aws', { masterKey });
+expect(dk).to.be.a(Binary);
+expect(calledCount).to.be.greaterThan(0);
+```
+
+#### Case 3: `AutoEncryptionOpts` with `credentialProviders` and incorrect `kmsProviders`
+
+Create a `MongoClient` object with the following options:
+
+```typescript
+class AutoEncryptionOpts {
+  autoEncryption: {
+    keyVaultNamespace: "keyvault.datakeys",
+    kmsProviders: { "aws": { "accessKeyId": <set from secrets manager>, "secretAccessKey": <set from secrets manager> } },
+    credentialProviders: { "aws": <default provider from AWS SDK> }
+  }
+}
+```
+
+Assert that an error is thrown.
