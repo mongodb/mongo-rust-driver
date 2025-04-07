@@ -39,9 +39,12 @@ where
         }
     }
 
-    /// Gets the number of documents.
+    /// Gets the number of documents. This method returns an accurate count.
     ///
-    /// Note that this method returns an accurate count.
+    /// Certain query operators cannot be used in the filter provided to this method, including
+    /// `$where` and `$near`. See the documentation for the `$match` aggregation pipeline stage for
+    /// full details on these restrictions:
+    /// https://www.mongodb.com/docs/manual/reference/operator/aggregation/match/#restrictions
     ///
     /// `await` will return d[`Result<u64>`].
     #[deeplink]
