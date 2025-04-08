@@ -189,7 +189,7 @@ impl Client {
         Ok(SessionCursor::new(self.clone(), details.output, pinned))
     }
 
-    fn is_load_balanced(&self) -> bool {
+    pub(crate) fn is_load_balanced(&self) -> bool {
         self.inner.options.load_balanced.unwrap_or(false)
     }
 
@@ -484,7 +484,7 @@ impl Client {
     }
 
     /// Executes an operation on a given connection, optionally using a provided session.
-    async fn execute_operation_on_connection<T: Operation>(
+    pub(crate) async fn execute_operation_on_connection<T: Operation>(
         &self,
         op: &mut T,
         connection: &mut PooledConnection,

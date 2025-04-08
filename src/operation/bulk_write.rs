@@ -12,7 +12,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{BulkWriteError, Error, ErrorKind, Result},
-    operation::OperationWithDefaults,
+    operation::{GetMore, OperationWithDefaults},
     options::{BulkWriteOptions, OperationType, WriteModel},
     results::{BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult},
     BoxFuture,
@@ -75,47 +75,92 @@ where
         error: &mut BulkWriteError,
     ) -> Result<()> {
         while let Some(response) = stream.try_next().await? {
-            let index = response.index + self.offset;
-            match response.result {
-                SingleOperationResult::Success {
-                    n,
-                    n_modified,
-                    upserted,
-                } => {
-                    let model = self.get_model(response.index)?;
-                    match model.operation_type() {
-                        OperationType::Insert => {
-                            let inserted_id = self.get_inserted_id(index)?;
-                            let insert_result = InsertOneResult { inserted_id };
-                            result.add_insert_result(index, insert_result);
-                        }
-                        OperationType::Update => {
-                            let modified_count =
-                                n_modified.ok_or_else(|| ErrorKind::InvalidResponse {
-                                    message: "nModified value not returned for update bulkWrite \
-                                              operation"
-                                        .into(),
-                                })?;
-                            let update_result = UpdateResult {
-                                matched_count: n,
-                                modified_count,
-                                upserted_id: upserted.map(|upserted| upserted.id),
-                            };
-                            result.add_update_result(index, update_result);
-                        }
-                        OperationType::Delete => {
-                            let delete_result = DeleteResult { deleted_count: n };
-                            result.add_delete_result(index, delete_result);
-                        }
+            self.handle_individual_response(response, result, error)?;
+        }
+        Ok(())
+    }
+
+    fn handle_individual_response(
+        &self,
+        response: SingleOperationResponse,
+        result: &mut impl BulkWriteResult,
+        error: &mut BulkWriteError,
+    ) -> Result<()> {
+        let index = response.index + self.offset;
+        match response.result {
+            SingleOperationResult::Success {
+                n,
+                n_modified,
+                upserted,
+            } => {
+                let model = self.get_model(response.index)?;
+                match model.operation_type() {
+                    OperationType::Insert => {
+                        let inserted_id = self.get_inserted_id(index)?;
+                        let insert_result = InsertOneResult { inserted_id };
+                        result.add_insert_result(index, insert_result);
+                    }
+                    OperationType::Update => {
+                        let modified_count =
+                            n_modified.ok_or_else(|| ErrorKind::InvalidResponse {
+                                message: "nModified value not returned for update bulkWrite \
+                                          operation"
+                                    .into(),
+                            })?;
+                        let update_result = UpdateResult {
+                            matched_count: n,
+                            modified_count,
+                            upserted_id: upserted.map(|upserted| upserted.id),
+                        };
+                        result.add_update_result(index, update_result);
+                    }
+                    OperationType::Delete => {
+                        let delete_result = DeleteResult { deleted_count: n };
+                        result.add_delete_result(index, delete_result);
                     }
                 }
-                SingleOperationResult::Error(write_error) => {
-                    error.write_errors.insert(index, write_error);
-                }
+            }
+            SingleOperationResult::Error(write_error) => {
+                error.write_errors.insert(index, write_error);
             }
         }
-
         Ok(())
+    }
+
+    async fn do_get_mores<'b>(
+        &self,
+        context: &mut ExecutionContext<'b>,
+        cursor_specification: CursorSpecification,
+        result: &mut impl BulkWriteResult,
+        error: &mut BulkWriteError,
+    ) -> Result<()> {
+        let mut responses = cursor_specification.initial_buffer;
+        let mut more_responses = cursor_specification.info.id != 0;
+        loop {
+            for response_document in &responses {
+                let response: SingleOperationResponse =
+                    bson::from_slice(response_document.as_bytes())?;
+                self.handle_individual_response(response, result, error)?;
+            }
+
+            if !more_responses {
+                return Ok(());
+            }
+
+            let mut get_more = GetMore::new(cursor_specification.info.clone(), None);
+            let get_more_response = self
+                .client
+                .execute_operation_on_connection(
+                    &mut get_more,
+                    context.connection,
+                    &mut context.session,
+                    None,
+                    Retryability::None,
+                )
+                .await?;
+            responses = get_more_response.batch;
+            more_responses = get_more_response.id != 0;
+        }
     }
 
     fn get_model(&self, index: usize) -> Result<&WriteModel> {
@@ -293,27 +338,28 @@ where
                 self.options.and_then(|options| options.comment.clone()),
             );
 
-            let pinned_connection = self.client.pin_connection_for_cursor(
-                &specification,
-                context.connection,
-                context.session.as_deref_mut(),
-            )?;
-            let iteration_result = match context.session {
-                Some(session) => {
-                    let mut session_cursor =
-                        SessionCursor::new(self.client.clone(), specification, pinned_connection);
-                    self.iterate_results_cursor(
-                        session_cursor.stream(session),
-                        &mut result,
-                        &mut error,
-                    )
+            let iteration_result = if self.client.is_load_balanced() {
+                // Using a cursor with a pinned connection is not feasible here; see RUST-2131 for
+                // more details.
+                self.do_get_mores(&mut context, specification, &mut result, &mut error)
                     .await
-                }
-                None => {
-                    let cursor =
-                        Cursor::new(self.client.clone(), specification, None, pinned_connection);
-                    self.iterate_results_cursor(cursor, &mut result, &mut error)
+            } else {
+                match context.session {
+                    Some(session) => {
+                        let mut session_cursor =
+                            SessionCursor::new(self.client.clone(), specification, None);
+                        self.iterate_results_cursor(
+                            session_cursor.stream(session),
+                            &mut result,
+                            &mut error,
+                        )
                         .await
+                    }
+                    None => {
+                        let cursor = Cursor::new(self.client.clone(), specification, None, None);
+                        self.iterate_results_cursor(cursor, &mut result, &mut error)
+                            .await
+                    }
                 }
             };
 
