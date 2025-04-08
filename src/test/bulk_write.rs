@@ -13,7 +13,6 @@ use crate::{
         log_uncaptured,
         server_version_gte,
         server_version_lt,
-        topology_is_load_balanced,
         topology_is_sharded,
         topology_is_standalone,
         util::fail_point::{FailPoint, FailPointMode},
@@ -179,11 +178,6 @@ async fn write_error_batches() {
         log_uncaptured("skipping write_error_batches: bulkWrite requires 8.0+");
         return;
     }
-    // TODO RUST-2131
-    if topology_is_load_balanced().await {
-        log_uncaptured("skipping write_error_batches: load-balanced topology");
-        return;
-    }
 
     let mut client = Client::for_test().monitor_events().await;
 
@@ -241,11 +235,6 @@ async fn successful_cursor_iteration() {
         log_uncaptured("skipping successful_cursor_iteration: bulkWrite requires 8.0+");
         return;
     }
-    // TODO RUST-2131
-    if topology_is_load_balanced().await {
-        log_uncaptured("skipping successful_cursor_iteration: load-balanced topology");
-        return;
-    }
 
     let client = Client::for_test().monitor_events().await;
 
@@ -285,11 +274,6 @@ async fn cursor_iteration_in_a_transaction() {
             "skipping cursor_iteration_in_a_transaction: bulkWrite requires 8.0+, transactions \
              require a non-standalone topology",
         );
-        return;
-    }
-    // TODO RUST-2131
-    if topology_is_load_balanced().await {
-        log_uncaptured("skipping cursor_iteration_in_a_transaction: load-balanced topology");
         return;
     }
 
@@ -336,11 +320,6 @@ async fn cursor_iteration_in_a_transaction() {
 async fn failed_cursor_iteration() {
     if server_version_lt(8, 0).await {
         log_uncaptured("skipping failed_cursor_iteration: bulkWrite requires 8.0+");
-        return;
-    }
-    // TODO RUST-2131
-    if topology_is_load_balanced().await {
-        log_uncaptured("skipping failed_cursor_iteration: load-balanced topology");
         return;
     }
 
