@@ -80,6 +80,46 @@ where
         Ok(())
     }
 
+    async fn do_get_mores(
+        &self,
+        context: &mut ExecutionContext<'_>,
+        cursor_specification: CursorSpecification,
+        result: &mut impl BulkWriteResult,
+        error: &mut BulkWriteError,
+    ) -> Result<()> {
+        let mut responses = cursor_specification.initial_buffer;
+        let mut more_responses = cursor_specification.info.id != 0;
+        loop {
+            for response_document in &responses {
+                let response: SingleOperationResponse =
+                    bson::from_slice(response_document.as_bytes())?;
+                self.handle_individual_response(response, result, error)?;
+            }
+
+            if !more_responses {
+                return Ok(());
+            }
+
+            let mut get_more = GetMore::new(cursor_specification.info.clone(), None);
+            let txn_number = context
+                .session
+                .as_mut()
+                .and_then(|s| s.get_txn_number_for_operation(get_more.retryability()));
+            let get_more_response = self
+                .client
+                .execute_operation_on_connection(
+                    &mut get_more,
+                    context.connection,
+                    &mut context.session,
+                    txn_number,
+                    Retryability::None,
+                )
+                .await?;
+            responses = get_more_response.batch;
+            more_responses = get_more_response.id != 0;
+        }
+    }
+
     fn handle_individual_response(
         &self,
         response: SingleOperationResponse,
@@ -125,42 +165,6 @@ where
             }
         }
         Ok(())
-    }
-
-    async fn do_get_mores<'b>(
-        &self,
-        context: &mut ExecutionContext<'b>,
-        cursor_specification: CursorSpecification,
-        result: &mut impl BulkWriteResult,
-        error: &mut BulkWriteError,
-    ) -> Result<()> {
-        let mut responses = cursor_specification.initial_buffer;
-        let mut more_responses = cursor_specification.info.id != 0;
-        loop {
-            for response_document in &responses {
-                let response: SingleOperationResponse =
-                    bson::from_slice(response_document.as_bytes())?;
-                self.handle_individual_response(response, result, error)?;
-            }
-
-            if !more_responses {
-                return Ok(());
-            }
-
-            let mut get_more = GetMore::new(cursor_specification.info.clone(), None);
-            let get_more_response = self
-                .client
-                .execute_operation_on_connection(
-                    &mut get_more,
-                    context.connection,
-                    &mut context.session,
-                    None,
-                    Retryability::None,
-                )
-                .await?;
-            responses = get_more_response.batch;
-            more_responses = get_more_response.id != 0;
-        }
     }
 
     fn get_model(&self, index: usize) -> Result<&WriteModel> {

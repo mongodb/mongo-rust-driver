@@ -16,6 +16,7 @@ use uuid::Uuid;
 use crate::{
     bson::{doc, spec::BinarySubtype, Binary, Bson, Document, Timestamp},
     cmap::conn::PinnedConnectionHandle,
+    operation::Retryability,
     options::{SessionOptions, TransactionOptions},
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
@@ -310,10 +311,20 @@ impl ClientSession {
         self.server_session.txn_number += 1;
     }
 
-    /// Increments the txn_number and returns the new value.
-    pub(crate) fn get_and_increment_txn_number(&mut self) -> i64 {
-        self.increment_txn_number();
-        self.server_session.txn_number
+    /// Gets the txn_number to use for an operation based on the current transaction status and the
+    /// operation's retryability.
+    pub(crate) fn get_txn_number_for_operation(
+        &mut self,
+        retryability: Retryability,
+    ) -> Option<i64> {
+        if self.transaction.state != TransactionState::None {
+            Some(self.txn_number())
+        } else if retryability == Retryability::Write {
+            self.increment_txn_number();
+            Some(self.txn_number())
+        } else {
+            None
+        }
     }
 
     /// Pin mongos to session.

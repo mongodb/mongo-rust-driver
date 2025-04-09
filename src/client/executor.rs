@@ -382,10 +382,14 @@ impl Client {
                 retry.first_error()?;
             }
 
-            let txn_number = retry
-                .as_ref()
-                .and_then(|r| r.prior_txn_number)
-                .or_else(|| get_txn_number(&mut session, retryability));
+            let txn_number =
+                if let Some(txn_number) = retry.as_ref().and_then(|r| r.prior_txn_number) {
+                    Some(txn_number)
+                } else {
+                    session
+                        .as_mut()
+                        .and_then(|s| s.get_txn_number_for_operation(retryability))
+                };
 
             let details = match self
                 .execute_operation_on_connection(
@@ -954,25 +958,6 @@ async fn get_connection<T: Operation>(
             session_handle.take_connection().await
         }
         (None, None) => pool.check_out().await,
-    }
-}
-
-fn get_txn_number(
-    session: &mut Option<&mut ClientSession>,
-    retryability: Retryability,
-) -> Option<i64> {
-    match session {
-        Some(ref mut session) => {
-            if session.transaction.state != TransactionState::None {
-                Some(session.txn_number())
-            } else {
-                match retryability {
-                    Retryability::Write => Some(session.get_and_increment_txn_number()),
-                    _ => None,
-                }
-            }
-        }
-        None => None,
     }
 }
 
