@@ -6,13 +6,13 @@ use futures_core::TryStream;
 use futures_util::{FutureExt, TryStreamExt};
 
 use crate::{
-    bson::{rawdoc, Bson, RawDocumentBuf},
+    bson::{doc, rawdoc, Bson, RawDocumentBuf},
     bson_util::{self, extend_raw_document_buf},
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{BulkWriteError, Error, ErrorKind, Result},
-    operation::{GetMore, OperationWithDefaults},
+    operation::{run_command::RunCommand, GetMore, OperationWithDefaults},
     options::{BulkWriteOptions, OperationType, WriteModel},
     results::{BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult},
     BoxFuture,
@@ -89,6 +89,7 @@ where
     ) -> Result<()> {
         let mut responses = cursor_specification.initial_buffer;
         let mut more_responses = cursor_specification.info.id != 0;
+        let mut namespace = cursor_specification.info.ns.clone();
         loop {
             for response_document in &responses {
                 let response: SingleOperationResponse =
@@ -105,7 +106,7 @@ where
                 .session
                 .as_mut()
                 .and_then(|s| s.get_txn_number_for_operation(get_more.retryability()));
-            let get_more_response = self
+            let get_more_result = self
                 .client
                 .execute_operation_on_connection(
                     &mut get_more,
@@ -114,9 +115,37 @@ where
                     txn_number,
                     Retryability::None,
                 )
-                .await?;
+                .await;
+
+            let get_more_response = match get_more_result {
+                Ok(response) => response,
+                Err(error) => {
+                    if !error.is_network_error() {
+                        let kill_cursors = doc! {
+                            "killCursors": &namespace.db,
+                            "cursors": [cursor_specification.info.id],
+                        };
+                        let mut run_command =
+                            RunCommand::new(namespace.db.clone(), kill_cursors, None, None)?;
+                        let result = self
+                            .client
+                            .execute_operation_on_connection(
+                                &mut run_command,
+                                context.connection,
+                                &mut context.session,
+                                txn_number,
+                                Retryability::None,
+                            )
+                            .await;
+                        debug_assert!(result.is_ok());
+                    }
+                    return Err(error);
+                }
+            };
+
             responses = get_more_response.batch;
             more_responses = get_more_response.id != 0;
+            namespace = get_more_response.ns;
         }
     }
 
