@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::{Bson, Document};
+use bson::{Bson, Document, RawDocumentBuf};
 
 use crate::{
     client::session::TransactionState,
@@ -39,6 +39,26 @@ impl Database {
     #[options_doc(run_command)]
     pub fn run_command(&self, command: Document) -> RunCommand {
         RunCommand {
+            db: self,
+            command,
+            options: None,
+            session: None,
+        }
+    }
+
+    /// Runs a database-level command.
+    ///
+    /// Note that no inspection is done on `doc`, so the command will not use the database's default
+    /// read concern or write concern. If specific read concern or write concern is desired, it must
+    /// be specified manually.
+    /// Please note that run_command doesn't validate WriteConcerns passed into the body of the
+    /// command document.
+    ///
+    /// `await` will return d[`Result<Document>`].
+    #[deeplink]
+    #[options_doc(run_command)]
+    pub fn raw_run_command(&self, command: RawDocumentBuf) -> RawRunCommand {
+        RawRunCommand {
             db: self,
             command,
             options: None,
@@ -140,6 +160,68 @@ impl<'a> Action for RunCommand<'a> {
         }
 
         let operation = run_command::RunCommand::new(
+            self.db.name().into(),
+            self.command,
+            selection_criteria,
+            None,
+        )?;
+        self.db
+            .client()
+            .execute_operation(operation, self.session)
+            .await
+    }
+}
+
+/// Run a database-level command.  Create with [`Database::raw_run_command`].
+#[must_use]
+pub struct RawRunCommand<'a> {
+    db: &'a Database,
+    command: RawDocumentBuf,
+    options: Option<RunCommandOptions>,
+    session: Option<&'a mut ClientSession>,
+}
+
+#[option_setters(crate::db::options::RunCommandOptions)]
+#[export_doc(run_raw_command)]
+impl<'a> RawRunCommand<'a> {
+    /// Run the command using the provided [`ClientSession`].
+    pub fn session(mut self, value: impl Into<&'a mut ClientSession>) -> Self {
+        self.session = Some(value.into());
+        self
+    }
+}
+
+#[action_impl]
+impl<'a> Action for RawRunCommand<'a> {
+    type Future = RunRawCommandFuture;
+
+    async fn execute(self) -> Result<Document> {
+        let mut selection_criteria = self.options.and_then(|o| o.selection_criteria);
+        if let Some(session) = &self.session {
+            match session.transaction.state {
+                TransactionState::Starting | TransactionState::InProgress => {
+                    if self.command.get("readConcern").is_ok() {
+                        return Err(ErrorKind::InvalidArgument {
+                            message: "Cannot set read concern after starting a transaction".into(),
+                        }
+                        .into());
+                    }
+                    selection_criteria = match selection_criteria {
+                        Some(selection_criteria) => Some(selection_criteria),
+                        None => {
+                            if let Some(ref options) = session.transaction.options {
+                                options.selection_criteria.clone()
+                            } else {
+                                None
+                            }
+                        }
+                    };
+                }
+                _ => {}
+            }
+        }
+
+        let operation = run_command::RunCommand::new_raw(
             self.db.name().into(),
             self.command,
             selection_criteria,
