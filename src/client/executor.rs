@@ -472,278 +472,271 @@ impl Client {
         txn_number: Option<i64>,
         retryability: Retryability,
     ) -> Result<T::O> {
-        Box::pin(async move {
-            let stream_description = connection.stream_description()?;
-            let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
-            let mut cmd = op.build(stream_description)?;
-            self.inner.topology.update_command_with_read_pref(
-                connection.address(),
-                &mut cmd,
-                op.selection_criteria(),
-            );
+        let stream_description = connection.stream_description()?;
+        let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
+        let mut cmd = op.build(stream_description)?;
+        self.inner.topology.update_command_with_read_pref(
+            connection.address(),
+            &mut cmd,
+            op.selection_criteria(),
+        );
 
-            match session {
-                Some(ref mut session) if op.supports_sessions() && op.is_acknowledged() => {
-                    cmd.set_session(session);
-                    if let Some(txn_number) = txn_number {
-                        cmd.set_txn_number(txn_number);
-                    }
-                    if session
-                        .options()
-                        .and_then(|opts| opts.snapshot)
-                        .unwrap_or(false)
+        match session {
+            Some(ref mut session) if op.supports_sessions() && op.is_acknowledged() => {
+                cmd.set_session(session);
+                if let Some(txn_number) = txn_number {
+                    cmd.set_txn_number(txn_number);
+                }
+                if session
+                    .options()
+                    .and_then(|opts| opts.snapshot)
+                    .unwrap_or(false)
+                {
+                    if connection
+                        .stream_description()?
+                        .max_wire_version
+                        .unwrap_or(0)
+                        < 13
                     {
-                        if connection
-                            .stream_description()?
-                            .max_wire_version
-                            .unwrap_or(0)
-                            < 13
-                        {
-                            let labels: Option<Vec<_>> = None;
-                            return Err(Error::new(
-                                ErrorKind::IncompatibleServer {
-                                    message: "Snapshot reads require MongoDB 5.0 or later".into(),
-                                },
-                                labels,
-                            ));
-                        }
-                        cmd.set_snapshot_read_concern(session);
+                        let labels: Option<Vec<_>> = None;
+                        return Err(Error::new(
+                            ErrorKind::IncompatibleServer {
+                                message: "Snapshot reads require MongoDB 5.0 or later".into(),
+                            },
+                            labels,
+                        ));
                     }
-                    // If this is a causally consistent session, set `readConcern.afterClusterTime`.
-                    // Causal consistency defaults to true, unless snapshot is true.
-                    else if session.causal_consistency()
-                        && matches!(
-                            session.transaction.state,
-                            TransactionState::None | TransactionState::Starting
-                        )
-                        && op.supports_read_concern(stream_description)
-                    {
-                        cmd.set_after_cluster_time(session);
-                    }
+                    cmd.set_snapshot_read_concern(session);
+                }
+                // If this is a causally consistent session, set `readConcern.afterClusterTime`.
+                // Causal consistency defaults to true, unless snapshot is true.
+                else if session.causal_consistency()
+                    && matches!(
+                        session.transaction.state,
+                        TransactionState::None | TransactionState::Starting
+                    )
+                    && op.supports_read_concern(stream_description)
+                {
+                    cmd.set_after_cluster_time(session);
+                }
 
-                    match session.transaction.state {
-                        TransactionState::Starting => {
-                            cmd.set_start_transaction();
-                            cmd.set_autocommit();
-                            if session.causal_consistency() {
-                                cmd.set_after_cluster_time(session);
-                            }
-
-                            if let Some(ref options) = session.transaction.options {
-                                if let Some(ref read_concern) = options.read_concern {
-                                    cmd.set_read_concern_level(read_concern.level.clone());
-                                }
-                            }
-                            if self.is_load_balanced() {
-                                session.pin_connection(connection.pin()?);
-                            } else if is_sharded {
-                                session.pin_mongos(connection.address().clone());
-                            }
-                            session.transaction.state = TransactionState::InProgress;
+                match session.transaction.state {
+                    TransactionState::Starting => {
+                        cmd.set_start_transaction();
+                        cmd.set_autocommit();
+                        if session.causal_consistency() {
+                            cmd.set_after_cluster_time(session);
                         }
-                        TransactionState::InProgress => cmd.set_autocommit(),
-                        TransactionState::Committed { .. } | TransactionState::Aborted => {
-                            cmd.set_autocommit();
 
-                            // Append the recovery token to the command if we are committing or
-                            // aborting on a sharded transaction.
-                            if is_sharded {
-                                if let Some(ref recovery_token) = session.transaction.recovery_token
-                                {
-                                    cmd.set_recovery_token(recovery_token);
-                                }
+                        if let Some(ref options) = session.transaction.options {
+                            if let Some(ref read_concern) = options.read_concern {
+                                cmd.set_read_concern_level(read_concern.level.clone());
                             }
                         }
-                        _ => {}
-                    }
-                    session.update_last_use();
-                }
-                Some(ref session) if !op.supports_sessions() && !session.is_implicit() => {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: format!("{} does not support sessions", cmd.name),
-                    }
-                    .into());
-                }
-                Some(ref session) if !op.is_acknowledged() && !session.is_implicit() => {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "Cannot use ClientSessions with unacknowledged write concern"
-                            .to_string(),
-                    }
-                    .into());
-                }
-                _ => {}
-            }
-
-            let session_cluster_time = session.as_ref().and_then(|session| session.cluster_time());
-            let client_cluster_time = self.inner.topology.cluster_time();
-            let max_cluster_time =
-                std::cmp::max(session_cluster_time, client_cluster_time.as_ref());
-            if let Some(cluster_time) = max_cluster_time {
-                cmd.set_cluster_time(cluster_time);
-            }
-
-            let connection_info = connection.info();
-            let service_id = connection.service_id();
-            let request_id = next_request_id();
-
-            if let Some(ref server_api) = self.inner.options.server_api {
-                cmd.set_server_api(server_api);
-            }
-
-            let should_redact = cmd.should_redact();
-
-            let cmd_name = cmd.name.clone();
-            let target_db = cmd.target_db.clone();
-
-            let mut message = Message::try_from(cmd)?;
-            message.request_id = Some(request_id);
-            #[cfg(feature = "in-use-encryption")]
-            {
-                let guard = self.inner.csfle.read().await;
-                if let Some(ref csfle) = *guard {
-                    if csfle.opts().bypass_auto_encryption != Some(true) {
-                        let encrypted_payload = self
-                            .auto_encrypt(csfle, &message.document_payload, &target_db)
-                            .await?;
-                        message.document_payload = encrypted_payload;
-                    }
-                }
-            }
-
-            self.emit_command_event(|| {
-                let command_body = if should_redact {
-                    Document::new()
-                } else {
-                    message.get_command_document()
-                };
-                CommandEvent::Started(CommandStartedEvent {
-                    command: command_body,
-                    db: target_db.clone(),
-                    command_name: cmd_name.clone(),
-                    request_id,
-                    connection: connection_info.clone(),
-                    service_id,
-                })
-            })
-            .await;
-
-            let start_time = Instant::now();
-            let command_result = match connection.send_message(message).await {
-                Ok(response) => {
-                    self.handle_response(op, session, is_sharded, response)
-                        .await
-                }
-                Err(err) => Err(err),
-            };
-
-            let duration = start_time.elapsed();
-
-            let result = match command_result {
-                Err(mut err) => {
-                    self.emit_command_event(|| {
-                        let mut err = err.clone();
-                        if should_redact {
-                            err.redact();
+                        if self.is_load_balanced() {
+                            session.pin_connection(connection.pin()?);
+                        } else if is_sharded {
+                            session.pin_mongos(connection.address().clone());
                         }
+                        session.transaction.state = TransactionState::InProgress;
+                    }
+                    TransactionState::InProgress => cmd.set_autocommit(),
+                    TransactionState::Committed { .. } | TransactionState::Aborted => {
+                        cmd.set_autocommit();
 
-                        CommandEvent::Failed(CommandFailedEvent {
-                            duration,
-                            command_name: cmd_name.clone(),
-                            failure: err,
-                            request_id,
-                            connection: connection_info.clone(),
-                            service_id,
-                        })
-                    })
-                    .await;
-
-                    if let Some(ref mut session) = session {
-                        if err.is_network_error() {
-                            session.mark_dirty();
+                        // Append the recovery token to the command if we are committing or
+                        // aborting on a sharded transaction.
+                        if is_sharded {
+                            if let Some(ref recovery_token) = session.transaction.recovery_token {
+                                cmd.set_recovery_token(recovery_token);
+                            }
                         }
                     }
-
-                    err.add_labels_and_update_pin(
-                        Some(connection.stream_description()?),
-                        session,
-                        Some(retryability),
-                    );
-
-                    op.handle_error(err)
+                    _ => {}
                 }
-                Ok(response) => {
-                    self.emit_command_event(|| {
-                        let reply = if should_redact {
-                            Document::new()
-                        } else {
-                            response
-                                .body()
-                                .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() })
-                        };
-
-                        CommandEvent::Succeeded(CommandSucceededEvent {
-                            duration,
-                            reply,
-                            command_name: cmd_name.clone(),
-                            request_id,
-                            connection: connection_info.clone(),
-                            service_id,
-                        })
-                    })
-                    .await;
-
-                    #[cfg(feature = "in-use-encryption")]
-                    let response = {
-                        let guard = self.inner.csfle.read().await;
-                        if let Some(ref csfle) = *guard {
-                            let new_body = self.auto_decrypt(csfle, response.raw_body()).await?;
-                            RawCommandResponse::new_raw(response.source, new_body)
-                        } else {
-                            response
-                        }
-                    };
-
-                    let context = ExecutionContext {
-                        connection,
-                        session: session.as_deref_mut(),
-                    };
-
-                    match op.handle_response(response, context).await {
-                        Ok(response) => Ok(response),
-                        Err(mut err) => {
-                            err.add_labels_and_update_pin(
-                                Some(connection.stream_description()?),
-                                session,
-                                Some(retryability),
-                            );
-                            Err(err)
-                        }
-                    }
+                session.update_last_use();
+            }
+            Some(ref session) if !op.supports_sessions() && !session.is_implicit() => {
+                return Err(ErrorKind::InvalidArgument {
+                    message: format!("{} does not support sessions", cmd.name),
                 }
-            };
+                .into());
+            }
+            Some(ref session) if !op.is_acknowledged() && !session.is_implicit() => {
+                return Err(ErrorKind::InvalidArgument {
+                    message: "Cannot use ClientSessions with unacknowledged write concern"
+                        .to_string(),
+                }
+                .into());
+            }
+            _ => {}
+        }
 
-            if result
-                .as_ref()
-                .err()
-                .is_some_and(|e| e.is_reauthentication_required())
-            {
-                // If the error is a reauthentication error, reauthenticate the connection
-                // and, if successful, retry the operation regardless of whether is is
-                // read/write retryable.
-                self.reauthenticate_connection(connection).await?;
-                self.execute_operation_on_connection(
-                    op,
-                    connection,
-                    session,
-                    txn_number,
-                    retryability,
-                )
-                .await
+        let session_cluster_time = session.as_ref().and_then(|session| session.cluster_time());
+        let client_cluster_time = self.inner.topology.cluster_time();
+        let max_cluster_time = std::cmp::max(session_cluster_time, client_cluster_time.as_ref());
+        if let Some(cluster_time) = max_cluster_time {
+            cmd.set_cluster_time(cluster_time);
+        }
+
+        let connection_info = connection.info();
+        let service_id = connection.service_id();
+        let request_id = next_request_id();
+
+        if let Some(ref server_api) = self.inner.options.server_api {
+            cmd.set_server_api(server_api);
+        }
+
+        let should_redact = cmd.should_redact();
+
+        let cmd_name = cmd.name.clone();
+        let target_db = cmd.target_db.clone();
+
+        let mut message = Message::try_from(cmd)?;
+        message.request_id = Some(request_id);
+        #[cfg(feature = "in-use-encryption")]
+        {
+            let guard = self.inner.csfle.read().await;
+            if let Some(ref csfle) = *guard {
+                if csfle.opts().bypass_auto_encryption != Some(true) {
+                    let encrypted_payload = self
+                        .auto_encrypt(csfle, &message.document_payload, &target_db)
+                        .await?;
+                    message.document_payload = encrypted_payload;
+                }
+            }
+        }
+
+        self.emit_command_event(|| {
+            let command_body = if should_redact {
+                Document::new()
             } else {
-                result
-            }
+                message.get_command_document()
+            };
+            CommandEvent::Started(CommandStartedEvent {
+                command: command_body,
+                db: target_db.clone(),
+                command_name: cmd_name.clone(),
+                request_id,
+                connection: connection_info.clone(),
+                service_id,
+            })
         })
-        .await
+        .await;
+
+        let start_time = Instant::now();
+        let command_result = match connection.send_message(message).await {
+            Ok(response) => {
+                self.handle_response(op, session, is_sharded, response)
+                    .await
+            }
+            Err(err) => Err(err),
+        };
+
+        let duration = start_time.elapsed();
+
+        let result = match command_result {
+            Err(mut err) => {
+                self.emit_command_event(|| {
+                    let mut err = err.clone();
+                    if should_redact {
+                        err.redact();
+                    }
+
+                    CommandEvent::Failed(CommandFailedEvent {
+                        duration,
+                        command_name: cmd_name.clone(),
+                        failure: err,
+                        request_id,
+                        connection: connection_info.clone(),
+                        service_id,
+                    })
+                })
+                .await;
+
+                if let Some(ref mut session) = session {
+                    if err.is_network_error() {
+                        session.mark_dirty();
+                    }
+                }
+
+                err.add_labels_and_update_pin(
+                    Some(connection.stream_description()?),
+                    session,
+                    Some(retryability),
+                );
+
+                op.handle_error(err)
+            }
+            Ok(response) => {
+                self.emit_command_event(|| {
+                    let reply = if should_redact {
+                        Document::new()
+                    } else {
+                        response
+                            .body()
+                            .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() })
+                    };
+
+                    CommandEvent::Succeeded(CommandSucceededEvent {
+                        duration,
+                        reply,
+                        command_name: cmd_name.clone(),
+                        request_id,
+                        connection: connection_info.clone(),
+                        service_id,
+                    })
+                })
+                .await;
+
+                #[cfg(feature = "in-use-encryption")]
+                let response = {
+                    let guard = self.inner.csfle.read().await;
+                    if let Some(ref csfle) = *guard {
+                        let new_body = self.auto_decrypt(csfle, response.raw_body()).await?;
+                        RawCommandResponse::new_raw(response.source, new_body)
+                    } else {
+                        response
+                    }
+                };
+
+                let context = ExecutionContext {
+                    connection,
+                    session: session.as_deref_mut(),
+                };
+
+                match op.handle_response(response, context).await {
+                    Ok(response) => Ok(response),
+                    Err(mut err) => {
+                        err.add_labels_and_update_pin(
+                            Some(connection.stream_description()?),
+                            session,
+                            Some(retryability),
+                        );
+                        Err(err)
+                    }
+                }
+            }
+        };
+
+        if result
+            .as_ref()
+            .err()
+            .is_some_and(|e| e.is_reauthentication_required())
+        {
+            // This retry is done outside of the normal retry loop because all operations,
+            // regardless of retryability, should be retried after reauthentication.
+            self.reauthenticate_connection_and_retry_operation(
+                op,
+                connection,
+                session,
+                txn_number,
+                retryability,
+            )
+            .await
+        } else {
+            result
+        }
     }
 
     #[cfg(feature = "in-use-encryption")]
@@ -774,7 +767,16 @@ impl Client {
         })
     }
 
-    async fn reauthenticate_connection(&self, connection: &mut PooledConnection) -> Result<()> {
+    // Reauthenticates a connection and retries the operation that received a reauthentication
+    // required error.
+    async fn reauthenticate_connection_and_retry_operation<T: Operation>(
+        &self,
+        op: &mut T,
+        connection: &mut PooledConnection,
+        session: &mut Option<&mut ClientSession>,
+        txn_number: Option<i64>,
+        retryability: Retryability,
+    ) -> Result<T::O> {
         let credential =
             self.inner
                 .options
@@ -795,6 +797,9 @@ impl Client {
                     .to_string(),
             })?
             .reauthenticate_stream(connection, credential, server_api)
+            .await?;
+
+        self.execute_operation_on_connection(op, connection, session, txn_number, retryability)
             .await
     }
 
