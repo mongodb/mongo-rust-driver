@@ -7,7 +7,7 @@ use crate::{
     cursor::CursorSpecification,
     error::Result,
     operation::{append_options, remove_empty_write_concern, Retryability},
-    options::{AggregateOptions, SelectionCriteria, WriteConcern},
+    options::{AggregateOptions, ReadPreference, SelectionCriteria, WriteConcern},
     Namespace,
 };
 
@@ -107,6 +107,14 @@ impl OperationWithDefaults for Aggregate {
             self.options.as_ref().and_then(|opts| opts.max_await_time),
             comment,
         ))
+    }
+
+    fn update_for_topology(&mut self, topology: &crate::sdam::TopologyDescription) {
+        match self.selection_criteria() {
+            None => return,
+            Some(SelectionCriteria::ReadPreference(ReadPreference::Primary)) => return,
+            _ => (),
+        }
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

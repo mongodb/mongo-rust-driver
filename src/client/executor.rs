@@ -309,6 +309,8 @@ impl Client {
         let mut retry: Option<ExecutionRetry> = None;
         let mut implicit_session: Option<ClientSession> = None;
         loop {
+            op.update_for_topology(&self.inner.topology.description());
+
             if retry.is_some() {
                 op.update_for_retry();
             }
