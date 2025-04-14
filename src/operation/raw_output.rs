@@ -68,6 +68,10 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.update_for_retry()
     }
 
+    fn update_for_topology(&mut self, topology: &crate::sdam::TopologyDescription) {
+        self.0.update_for_topology(topology)
+    }
+
     fn pinned_connection(&self) -> Option<&crate::cmap::conn::PinnedConnectionHandle> {
         self.0.pinned_connection()
     }

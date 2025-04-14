@@ -52,6 +52,7 @@ use crate::{
         WriteFailure,
     },
     options::WriteConcern,
+    sdam::TopologyDescription,
     selection_criteria::SelectionCriteria,
     BoxFuture,
     ClientSession,
@@ -148,6 +149,9 @@ pub(crate) trait Operation {
     /// Updates this operation as needed for a retry.
     fn update_for_retry(&mut self);
 
+    /// Updates this operation based on server topology.
+    fn update_for_topology(&mut self, _topology: &TopologyDescription);
+
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle>;
 
     fn name(&self) -> &str;
@@ -235,6 +239,9 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     /// Updates this operation as needed for a retry.
     fn update_for_retry(&mut self) {}
 
+    /// Updates this operation based on server topology.
+    fn update_for_topology(&mut self, _topology: &TopologyDescription) {}
+
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         None
     }
@@ -286,6 +293,9 @@ where
     }
     fn update_for_retry(&mut self) {
         self.update_for_retry()
+    }
+    fn update_for_topology(&mut self, topology: &TopologyDescription) {
+        self.update_for_topology(topology)
     }
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.pinned_connection()
