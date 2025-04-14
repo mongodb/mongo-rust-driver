@@ -109,7 +109,7 @@ impl OperationWithDefaults for Aggregate {
         ))
     }
 
-    fn update_for_topology(&mut self, topology: &crate::sdam::TopologyDescription) {
+    fn update_for_topology(&mut self, _topology: &crate::sdam::TopologyDescription) {
         match self.selection_criteria() {
             None => return,
             Some(SelectionCriteria::ReadPreference(ReadPreference::Primary)) => return,
