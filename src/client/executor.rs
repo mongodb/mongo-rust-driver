@@ -29,6 +29,7 @@ use crate::{
             wire::{next_request_id, Message},
             PinnedConnectionHandle,
         },
+        Command,
         ConnectionPool,
         RawCommandResponse,
         StreamDescription,
@@ -59,7 +60,7 @@ use crate::{
         Retryability,
     },
     options::{ChangeStreamOptions, SelectionCriteria},
-    sdam::{HandshakePhase, SelectedServer, ServerType, TopologyType, TransactionSupportStatus},
+    sdam::{HandshakePhase, ServerType, TopologyType, TransactionSupportStatus},
     selection_criteria::ReadPreference,
     tracking_arc::TrackingArc,
     ClusterTime,
@@ -309,7 +310,7 @@ impl Client {
         let mut retry: Option<ExecutionRetry> = None;
         let mut implicit_session: Option<ClientSession> = None;
         loop {
-            op.update_for_topology(&self.inner.topology.description());
+            //op.update_for_topology(&self.inner.topology.description());
 
             if retry.is_some() {
                 op.update_for_retry();
@@ -320,7 +321,7 @@ impl Client {
                 .and_then(|s| s.transaction.pinned_mongos())
                 .or_else(|| op.selection_criteria());
 
-            let server = match self
+            let (server, effective_criteria) = match self
                 .select_server(
                     selection_criteria,
                     op.name(),
@@ -328,7 +329,7 @@ impl Client {
                 )
                 .await
             {
-                Ok(server) => server,
+                Ok(out) => out,
                 Err(mut err) => {
                     retry.first_error()?;
 
@@ -394,13 +395,7 @@ impl Client {
                 };
 
             let details = match self
-                .execute_operation_on_connection(
-                    op,
-                    &mut conn,
-                    &mut session,
-                    txn_number,
-                    retryability,
-                )
+                .execute_command_on_connection(cmd, op, &mut conn, &mut session, retryability)
                 .await
             {
                 Ok(output) => ExecutionDetails {
@@ -866,7 +861,7 @@ impl Client {
             (matches!(topology_type, TopologyType::Single) && server_type.is_available())
                 || server_type.is_data_bearing()
         }));
-        let _: SelectedServer = self
+        let _ = self
             .select_server(Some(&criteria), operation_name, None)
             .await?;
         Ok(())

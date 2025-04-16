@@ -52,7 +52,6 @@ use crate::{
         WriteFailure,
     },
     options::WriteConcern,
-    sdam::TopologyDescription,
     selection_criteria::SelectionCriteria,
     BoxFuture,
     ClientSession,
@@ -77,6 +76,7 @@ pub(crate) use update::{Update, UpdateOrReplace};
 
 const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
 const SERVER_4_4_0_WIRE_VERSION: i32 = 9;
+const _SERVER_5_0_0_WIRE_VERSION: i32 = 13;
 const SERVER_8_0_0_WIRE_VERSION: i32 = 25;
 // The maximum number of bytes that may be included in a write payload when auto-encryption is
 // enabled.
@@ -148,9 +148,6 @@ pub(crate) trait Operation {
 
     /// Updates this operation as needed for a retry.
     fn update_for_retry(&mut self);
-
-    /// Updates this operation based on server topology.
-    fn update_for_topology(&mut self, _topology: &TopologyDescription);
 
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle>;
 
@@ -239,9 +236,6 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     /// Updates this operation as needed for a retry.
     fn update_for_retry(&mut self) {}
 
-    /// Updates this operation based on server topology.
-    fn update_for_topology(&mut self, _topology: &TopologyDescription) {}
-
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         None
     }
@@ -293,9 +287,6 @@ where
     }
     fn update_for_retry(&mut self) {
         self.update_for_retry()
-    }
-    fn update_for_topology(&mut self, topology: &TopologyDescription) {
-        self.update_for_topology(topology)
     }
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.pinned_connection()

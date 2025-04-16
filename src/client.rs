@@ -446,7 +446,7 @@ impl Client {
         &self,
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
-        let server = self
+        let (server, _) = self
             .select_server(criteria, "Test select server", None)
             .await?;
         Ok(server.address.clone())
@@ -460,7 +460,7 @@ impl Client {
         #[allow(unused_variables)] // we only use the operation_name for tracing.
         operation_name: &str,
         deprioritized: Option<&ServerAddress>,
-    ) -> Result<SelectedServer> {
+    ) -> Result<(SelectedServer, SelectionCriteria)> {
         let criteria =
             criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
 
@@ -488,9 +488,12 @@ impl Client {
         let mut watcher = self.inner.topology.watch();
         loop {
             let state = watcher.observe_latest();
-
+            for server in state.description.servers.values() {
+                eprintln!("at selection: {:?}", server.hello_response());
+            }
+            let effective_criteria = criteria; // TODO
             let result = server_selection::attempt_to_select_server(
-                criteria,
+                effective_criteria,
                 &state.description,
                 &state.servers(),
                 deprioritized,
@@ -507,7 +510,7 @@ impl Client {
                         #[cfg(feature = "tracing-unstable")]
                         event_emitter.emit_succeeded_event(&state.description, &server);
 
-                        return Ok(server);
+                        return Ok((server, effective_criteria.clone()));
                     } else {
                         #[cfg(feature = "tracing-unstable")]
                         if !emitted_waiting_message {

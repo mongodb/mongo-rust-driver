@@ -79,10 +79,6 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.update_for_retry()
     }
 
-    fn update_for_topology(&mut self, topology: &crate::sdam::TopologyDescription) {
-        self.run_command.update_for_topology(topology)
-    }
-
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.run_command.pinned_connection()
     }

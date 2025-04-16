@@ -229,6 +229,7 @@ impl Topology {
         self.watcher.peek_latest().servers()
     }
 
+    #[cfg(test)]
     pub(crate) fn description(&self) -> TopologyDescription {
         self.watcher.peek_latest().description.clone()
     }
