@@ -106,6 +106,21 @@ impl crate::sync::Database {
         self.async_database.run_command(command)
     }
 
+    /// Runs a database-level command.
+    ///
+    /// Note that no inspection is done on `doc`, so the command will not use the database's default
+    /// read concern or write concern. If specific read concern or write concern is desired, it must
+    /// be specified manually.
+    /// Please note that run_command doesn't validate WriteConcerns passed into the body of the
+    /// command document.
+    ///
+    /// [`run`](RunCommand::run) will return d[`Result<Document>`].
+    #[deeplink]
+    #[options_doc(run_command, sync)]
+    pub fn run_raw_command(&self, command: RawDocumentBuf) -> RunCommand {
+        self.async_database.run_raw_command(command)
+    }
+
     /// Runs a database-level command and returns a cursor to the response.
     ///
     /// [`run`](RunCursorCommand::run) will return d[`Result<crate::sync::Cursor<Document>>`] or a
@@ -114,6 +129,16 @@ impl crate::sync::Database {
     #[options_doc(run_cursor_command, sync)]
     pub fn run_cursor_command(&self, command: Document) -> RunCursorCommand {
         self.async_database.run_cursor_command(command)
+    }
+
+    /// Runs a database-level command and returns a cursor to the response.
+    ///
+    /// [`run`](RunCursorCommand::run) will return d[`Result<crate::sync::Cursor<Document>>`] or a
+    /// d[`Result<crate::sync::SessionCursor<Document>>`] if a [`ClientSession`] is provided.
+    #[deeplink]
+    #[options_doc(run_cursor_command, sync)]
+    pub fn run_raw_cursor_command(&self, command: RawDocumentBuf) -> RunCursorCommand {
+        self.async_database.run_raw_cursor_command(command)
     }
 }
 
