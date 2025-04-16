@@ -21,30 +21,16 @@ pub(crate) struct RunCommand<'conn> {
 impl<'conn> RunCommand<'conn> {
     pub(crate) fn new(
         db: String,
-        command: Document,
-        selection_criteria: Option<SelectionCriteria>,
-        pinned_connection: Option<&'conn PinnedConnectionHandle>,
-    ) -> Result<Self> {
-        Ok(Self {
-            db,
-            command: RawDocumentBuf::from_document(&command)?,
-            selection_criteria,
-            pinned_connection,
-        })
-    }
-
-    pub(crate) fn new_raw(
-        db: String,
         command: RawDocumentBuf,
         selection_criteria: Option<SelectionCriteria>,
         pinned_connection: Option<&'conn PinnedConnectionHandle>,
-    ) -> Result<Self> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             db,
             command,
             selection_criteria,
             pinned_connection,
-        })
+        }
     }
 
     fn command_name(&self) -> Option<&str> {
