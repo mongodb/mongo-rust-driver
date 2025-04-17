@@ -76,7 +76,6 @@ pub(crate) use update::{Update, UpdateOrReplace};
 
 const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
 const SERVER_4_4_0_WIRE_VERSION: i32 = 9;
-const _SERVER_5_0_0_WIRE_VERSION: i32 = 13;
 const SERVER_8_0_0_WIRE_VERSION: i32 = 25;
 // The maximum number of bytes that may be included in a write payload when auto-encryption is
 // enabled.
@@ -148,6 +147,9 @@ pub(crate) trait Operation {
 
     /// Updates this operation as needed for a retry.
     fn update_for_retry(&mut self);
+
+    /// Returns whether this is a $out or $merge aggregation operation.
+    fn is_out_or_merge(&self) -> bool;
 
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle>;
 
@@ -236,6 +238,11 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     /// Updates this operation as needed for a retry.
     fn update_for_retry(&mut self) {}
 
+    /// Returns whether this is a $out or $merge aggregation operation.
+    fn is_out_or_merge(&self) -> bool {
+        false
+    }
+
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         None
     }
@@ -287,6 +294,9 @@ where
     }
     fn update_for_retry(&mut self) {
         self.update_for_retry()
+    }
+    fn is_out_or_merge(&self) -> bool {
+        self.is_out_or_merge()
     }
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.pinned_connection()

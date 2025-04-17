@@ -326,6 +326,7 @@ impl Client {
                     selection_criteria,
                     op.name(),
                     retry.as_ref().map(|r| &r.first_server),
+                    op.is_out_or_merge(),
                 )
                 .await
             {
@@ -489,7 +490,7 @@ impl Client {
         connection: &mut PooledConnection,
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
-        _effective_critera: SelectionCriteria,
+        effective_criteria: SelectionCriteria,
     ) -> Result<Command> {
         let stream_description = connection.stream_description()?;
         let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
@@ -497,7 +498,7 @@ impl Client {
         self.inner.topology.update_command_with_read_pref(
             connection.address(),
             &mut cmd,
-            op.selection_criteria(),
+            Some(&effective_criteria),
         );
 
         match session {
@@ -854,7 +855,7 @@ impl Client {
                 || server_type.is_data_bearing()
         }));
         let _ = self
-            .select_server(Some(&criteria), operation_name, None)
+            .select_server(Some(&criteria), operation_name, None, false)
             .await?;
         Ok(())
     }
