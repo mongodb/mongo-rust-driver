@@ -79,8 +79,8 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.update_for_retry()
     }
 
-    fn is_out_or_merge(&self) -> bool {
-        self.run_command.is_out_or_merge()
+    fn override_criteria(&self) -> super::OverrideCriteriaFn {
+        self.run_command.override_criteria()
     }
 
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {

@@ -386,13 +386,6 @@ impl ServerDescription {
         Ok(me)
     }
 
-    pub(crate) fn hello_response(&self) -> Result<Option<&HelloCommandResponse>> {
-        self.reply
-            .as_ref()
-            .map_err(Clone::clone)
-            .map(|o| o.as_ref().map(|r| &r.command_response))
-    }
-
     pub(crate) fn last_write_date(&self) -> Result<Option<DateTime>> {
         match self.reply {
             Ok(None) => Ok(None),

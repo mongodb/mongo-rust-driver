@@ -35,6 +35,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
     event::command::CommandEvent,
     id_set::IdSet,
+    operation::OverrideCriteriaFn,
     options::{ClientOptions, DatabaseOptions, ReadPreference, SelectionCriteria, ServerAddress},
     sdam::{
         server_selection::{self, attempt_to_select_server},
@@ -447,7 +448,7 @@ impl Client {
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
         let (server, _) = self
-            .select_server(criteria, "Test select server", None, false)
+            .select_server(criteria, "Test select server", None, |_, _| None)
             .await?;
         Ok(server.address.clone())
     }
@@ -460,7 +461,7 @@ impl Client {
         #[allow(unused_variables)] // we only use the operation_name for tracing.
         operation_name: &str,
         deprioritized: Option<&ServerAddress>,
-        is_out_or_merge: bool,
+        override_criteria: OverrideCriteriaFn,
     ) -> Result<(SelectedServer, SelectionCriteria)> {
         let criteria =
             criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
@@ -489,15 +490,14 @@ impl Client {
         let mut watcher = self.inner.topology.watch();
         loop {
             let state = watcher.observe_latest();
-            let override_criteria;
-            let effective_criteria = if let Some(oc) =
-                Self::override_criteria(criteria, &state.description, is_out_or_merge)
-            {
-                override_criteria = oc;
-                &override_criteria
-            } else {
-                criteria
-            };
+            let override_slot;
+            let effective_criteria =
+                if let Some(oc) = override_criteria(criteria, &state.description) {
+                    override_slot = oc;
+                    &override_slot
+                } else {
+                    criteria
+                };
             let result = server_selection::attempt_to_select_server(
                 effective_criteria,
                 &state.description,
@@ -547,38 +547,6 @@ impl Client {
                 }
             }
         }
-    }
-
-    /// Check to see if selection criteria need to be overridden.  Currently only required for
-    /// aggregate operations with $merge/$out stages.
-    fn override_criteria(
-        criteria: &SelectionCriteria,
-        desc: &crate::sdam::TopologyDescription,
-        is_out_or_merge: bool,
-    ) -> Option<SelectionCriteria> {
-        if is_out_or_merge {
-            eprintln!("aggregate: checking override");
-        }
-        if !is_out_or_merge
-            || criteria == &SelectionCriteria::ReadPreference(ReadPreference::Primary)
-            || desc.topology_type() == crate::TopologyType::LoadBalanced
-        {
-            if is_out_or_merge {
-                eprintln!("aggregate: skipping override");
-            }
-            return None;
-        }
-        for server in desc.servers.values() {
-            let _ = dbg!(server.hello_response());
-            if let Ok(Some(v)) = server.max_wire_version() {
-                static SERVER_5_0_0_WIRE_VERSION: i32 = 13;
-                if v < SERVER_5_0_0_WIRE_VERSION {
-                    eprintln!("aggregate: overriding criteria");
-                    return Some(SelectionCriteria::ReadPreference(ReadPreference::Primary));
-                }
-            }
-        }
-        return None;
     }
 
     #[cfg(all(test, feature = "dns-resolver"))]
