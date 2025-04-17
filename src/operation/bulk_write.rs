@@ -127,7 +127,7 @@ where
                         };
                         let mut run_command =
                             RunCommand::new(namespace.db.clone(), kill_cursors, None, None)?;
-                        let result = self
+                        let _ = self
                             .client
                             .execute_operation_on_connection(
                                 &mut run_command,
@@ -137,7 +137,6 @@ where
                                 Retryability::None,
                             )
                             .await;
-                        debug_assert!(result.is_ok());
                     }
                     return Err(error);
                 }
