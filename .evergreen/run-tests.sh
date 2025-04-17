@@ -33,13 +33,10 @@ if [ "Windows_NT" == "$OS" ]; then
   export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
 fi
 
-CARGO_OPTIONS+=("--nocapture")
-export TEST_FILE=aggregate-write-readPreference.json
-cargo_test "test::spec::crud::run_unified"
-#cargo_test ""
+cargo_test ""
 
 # cargo-nextest doesn't support doc tests
-#RUST_BACKTRACE=1 cargo test --doc $(cargo_test_options)
-#((CARGO_RESULT = ${CARGO_RESULT} || $?))
+RUST_BACKTRACE=1 cargo test --doc $(cargo_test_options)
+((CARGO_RESULT = ${CARGO_RESULT} || $?))
 
 exit $CARGO_RESULT
