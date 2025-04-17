@@ -498,7 +498,7 @@ impl Client {
         self.inner.topology.update_command_with_read_pref(
             connection.address(),
             &mut cmd,
-            Some(&effective_criteria),
+            &effective_criteria,
         );
 
         match session {
