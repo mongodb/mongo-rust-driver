@@ -326,6 +326,7 @@ impl Client {
                     selection_criteria,
                     op.name(),
                     retry.as_ref().map(|r| &r.first_server),
+                    op.is_out_or_merge(),
                 )
                 .await
             {
@@ -862,7 +863,7 @@ impl Client {
                 || server_type.is_data_bearing()
         }));
         let _ = self
-            .select_server(Some(&criteria), operation_name, None)
+            .select_server(Some(&criteria), operation_name, None, false)
             .await?;
         Ok(())
     }

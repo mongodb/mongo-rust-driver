@@ -68,6 +68,10 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.update_for_retry()
     }
 
+    fn is_out_or_merge(&self) -> bool {
+        self.0.is_out_or_merge()
+    }
+
     fn pinned_connection(&self) -> Option<&crate::cmap::conn::PinnedConnectionHandle> {
         self.0.pinned_connection()
     }

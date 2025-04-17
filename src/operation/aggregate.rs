@@ -109,33 +109,6 @@ impl OperationWithDefaults for Aggregate {
         ))
     }
 
-    /*
-    fn update_for_topology(&mut self, topology: &crate::sdam::TopologyDescription) {
-        eprintln!("aggregate: update_for_topology");
-        if !self.is_out_or_merge()
-            || matches!(
-                self.selection_criteria(),
-                None | Some(SelectionCriteria::ReadPreference(ReadPreference::Primary))
-            )
-            || topology.topology_type() == TopologyType::LoadBalanced
-        {
-            eprintln!("aggregate: skipping topology update");
-            return;
-        }
-        for server in topology.servers.values() {
-            let _ = dbg!(server.hello_response());
-            if let Ok(Some(v)) = server.max_wire_version() {
-                if v < SERVER_5_0_0_WIRE_VERSION {
-                    eprintln!("aggregate: updating topology");
-                    self.options.get_or_insert_default().selection_criteria =
-                        Some(SelectionCriteria::ReadPreference(ReadPreference::Primary));
-                    break;
-                }
-            }
-        }
-    }
-    */
-
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         self.options
             .as_ref()
@@ -161,10 +134,7 @@ impl OperationWithDefaults for Aggregate {
             Retryability::Read
         }
     }
-}
 
-impl Aggregate {
-    /// Returns whether this is a $out or $merge aggregation operation.
     fn is_out_or_merge(&self) -> bool {
         self.pipeline
             .last()
