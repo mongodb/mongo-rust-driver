@@ -29,6 +29,7 @@ use crate::{
             wire::{next_request_id, Message},
             PinnedConnectionHandle,
         },
+        Command,
         ConnectionPool,
         RawCommandResponse,
     },
@@ -58,7 +59,7 @@ use crate::{
         Retryability,
     },
     options::{ChangeStreamOptions, SelectionCriteria},
-    sdam::{HandshakePhase, SelectedServer, ServerType, TopologyType, TransactionSupportStatus},
+    sdam::{HandshakePhase, ServerType, TopologyType, TransactionSupportStatus},
     selection_criteria::ReadPreference,
     tracking_arc::TrackingArc,
     ClusterTime,
@@ -309,6 +310,8 @@ impl Client {
         let mut retry: Option<ExecutionRetry> = None;
         let mut implicit_session: Option<ClientSession> = None;
         loop {
+            //op.update_for_topology(&self.inner.topology.description());
+
             if retry.is_some() {
                 op.update_for_retry();
             }
@@ -318,15 +321,16 @@ impl Client {
                 .and_then(|s| s.transaction.pinned_mongos())
                 .or_else(|| op.selection_criteria());
 
-            let server = match self
+            let (server, effective_criteria) = match self
                 .select_server(
                     selection_criteria,
                     op.name(),
                     retry.as_ref().map(|r| &r.first_server),
+                    op.override_criteria(),
                 )
                 .await
             {
-                Ok(server) => server,
+                Ok(out) => out,
                 Err(mut err) => {
                     retry.first_error()?;
 
@@ -387,14 +391,11 @@ impl Client {
                 .and_then(|r| r.prior_txn_number)
                 .or_else(|| get_txn_number(&mut session, retryability));
 
+            let cmd =
+                self.build_command(op, &mut conn, &mut session, txn_number, effective_criteria)?;
+
             let details = match self
-                .execute_operation_on_connection(
-                    op,
-                    &mut conn,
-                    &mut session,
-                    txn_number,
-                    retryability,
-                )
+                .execute_command_on_connection(cmd, op, &mut conn, &mut session, retryability)
                 .await
             {
                 Ok(output) => ExecutionDetails {
@@ -483,26 +484,21 @@ impl Client {
         }
     }
 
-    /// Executes an operation on a given connection, optionally using a provided session.
-    async fn execute_operation_on_connection<T: Operation>(
+    fn build_command<T: Operation>(
         &self,
         op: &mut T,
         connection: &mut PooledConnection,
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
-        retryability: Retryability,
-    ) -> Result<T::O> {
-        if let Some(wc) = op.write_concern() {
-            wc.validate()?;
-        }
-
+        effective_criteria: SelectionCriteria,
+    ) -> Result<Command> {
         let stream_description = connection.stream_description()?;
         let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
         let mut cmd = op.build(stream_description)?;
         self.inner.topology.update_command_with_read_pref(
             connection.address(),
             &mut cmd,
-            op.selection_criteria(),
+            &effective_criteria,
         );
 
         match session {
@@ -603,16 +599,30 @@ impl Client {
             cmd.set_cluster_time(cluster_time);
         }
 
-        let connection_info = connection.info();
-        let service_id = connection.service_id();
-        let request_id = next_request_id();
-
         if let Some(ref server_api) = self.inner.options.server_api {
             cmd.set_server_api(server_api);
         }
 
-        let should_redact = cmd.should_redact();
+        Ok(cmd)
+    }
 
+    /// Executes a command on a given connection, optionally using a provided session.
+    async fn execute_command_on_connection<T: Operation>(
+        &self,
+        cmd: Command,
+        op: &mut T,
+        connection: &mut PooledConnection,
+        session: &mut Option<&mut ClientSession>,
+        retryability: Retryability,
+    ) -> Result<T::O> {
+        if let Some(wc) = op.write_concern() {
+            wc.validate()?;
+        }
+
+        let connection_info = connection.info();
+        let service_id = connection.service_id();
+        let request_id = next_request_id();
+        let should_redact = cmd.should_redact();
         let cmd_name = cmd.name.clone();
         let target_db = cmd.target_db.clone();
 
@@ -651,78 +661,9 @@ impl Client {
         let start_time = Instant::now();
         let command_result = match connection.send_message(message).await {
             Ok(response) => {
-                async fn handle_response<T: Operation>(
-                    client: &Client,
-                    op: &T,
-                    session: &mut Option<&mut ClientSession>,
-                    is_sharded: bool,
-                    response: RawCommandResponse,
-                ) -> Result<RawCommandResponse> {
-                    let raw_doc = RawDocument::from_bytes(response.as_bytes())?;
-
-                    let ok = match raw_doc.get("ok")? {
-                        Some(b) => crate::bson_util::get_int_raw(b).ok_or_else(|| {
-                            ErrorKind::InvalidResponse {
-                                message: format!(
-                                    "expected ok value to be a number, instead got {:?}",
-                                    b
-                                ),
-                            }
-                        })?,
-                        None => {
-                            return Err(ErrorKind::InvalidResponse {
-                                message: "missing 'ok' value in response".to_string(),
-                            }
-                            .into())
-                        }
-                    };
-
-                    let cluster_time: Option<ClusterTime> = raw_doc
-                        .get("$clusterTime")?
-                        .and_then(RawBsonRef::as_document)
-                        .map(|d| bson::from_slice(d.as_bytes()))
-                        .transpose()?;
-
-                    let at_cluster_time = op.extract_at_cluster_time(raw_doc)?;
-
-                    client
-                        .update_cluster_time(cluster_time, at_cluster_time, session)
-                        .await;
-
-                    if let (Some(session), Some(ts)) = (
-                        session.as_mut(),
-                        raw_doc
-                            .get("operationTime")?
-                            .and_then(RawBsonRef::as_timestamp),
-                    ) {
-                        session.advance_operation_time(ts);
-                    }
-
-                    if ok == 1 {
-                        if let Some(ref mut session) = session {
-                            if is_sharded && session.in_transaction() {
-                                let recovery_token = raw_doc
-                                    .get("recoveryToken")?
-                                    .and_then(RawBsonRef::as_document)
-                                    .map(|d| bson::from_slice(d.as_bytes()))
-                                    .transpose()?;
-                                session.transaction.recovery_token = recovery_token;
-                            }
-                        }
-
-                        Ok(response)
-                    } else {
-                        Err(response
-                            .body::<CommandErrorBody>()
-                            .map(|error_response| error_response.into())
-                            .unwrap_or_else(|e| {
-                                Error::from(ErrorKind::InvalidResponse {
-                                    message: format!("error deserializing command error: {}", e),
-                                })
-                            }))
-                    }
-                }
-                handle_response(self, op, session, is_sharded, response).await
+                let is_sharded =
+                    connection.stream_description()?.initial_server_type == ServerType::Mongos;
+                Self::parse_response(self, op, session, is_sharded, response).await
             }
             Err(err) => Err(err),
         };
@@ -809,6 +750,75 @@ impl Client {
         }
     }
 
+    async fn parse_response<T: Operation>(
+        client: &Client,
+        op: &T,
+        session: &mut Option<&mut ClientSession>,
+        is_sharded: bool,
+        response: RawCommandResponse,
+    ) -> Result<RawCommandResponse> {
+        let raw_doc = RawDocument::from_bytes(response.as_bytes())?;
+
+        let ok = match raw_doc.get("ok")? {
+            Some(b) => {
+                crate::bson_util::get_int_raw(b).ok_or_else(|| ErrorKind::InvalidResponse {
+                    message: format!("expected ok value to be a number, instead got {:?}", b),
+                })?
+            }
+            None => {
+                return Err(ErrorKind::InvalidResponse {
+                    message: "missing 'ok' value in response".to_string(),
+                }
+                .into())
+            }
+        };
+
+        let cluster_time: Option<ClusterTime> = raw_doc
+            .get("$clusterTime")?
+            .and_then(RawBsonRef::as_document)
+            .map(|d| bson::from_slice(d.as_bytes()))
+            .transpose()?;
+
+        let at_cluster_time = op.extract_at_cluster_time(raw_doc)?;
+
+        client
+            .update_cluster_time(cluster_time, at_cluster_time, session)
+            .await;
+
+        if let (Some(session), Some(ts)) = (
+            session.as_mut(),
+            raw_doc
+                .get("operationTime")?
+                .and_then(RawBsonRef::as_timestamp),
+        ) {
+            session.advance_operation_time(ts);
+        }
+
+        if ok == 1 {
+            if let Some(ref mut session) = session {
+                if is_sharded && session.in_transaction() {
+                    let recovery_token = raw_doc
+                        .get("recoveryToken")?
+                        .and_then(RawBsonRef::as_document)
+                        .map(|d| bson::from_slice(d.as_bytes()))
+                        .transpose()?;
+                    session.transaction.recovery_token = recovery_token;
+                }
+            }
+
+            Ok(response)
+        } else {
+            Err(response
+                .body::<CommandErrorBody>()
+                .map(|error_response| error_response.into())
+                .unwrap_or_else(|e| {
+                    Error::from(ErrorKind::InvalidResponse {
+                        message: format!("error deserializing command error: {}", e),
+                    })
+                }))
+        }
+    }
+
     #[cfg(feature = "in-use-encryption")]
     fn auto_encrypt<'a>(
         &'a self,
@@ -844,8 +854,8 @@ impl Client {
             (matches!(topology_type, TopologyType::Single) && server_type.is_available())
                 || server_type.is_data_bearing()
         }));
-        let _: SelectedServer = self
-            .select_server(Some(&criteria), operation_name, None)
+        let _ = self
+            .select_server(Some(&criteria), operation_name, None, |_, _| None)
             .await?;
         Ok(())
     }

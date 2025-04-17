@@ -68,6 +68,10 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.update_for_retry()
     }
 
+    fn override_criteria(&self) -> super::OverrideCriteriaFn {
+        self.0.override_criteria()
+    }
+
     fn pinned_connection(&self) -> Option<&crate::cmap::conn::PinnedConnectionHandle> {
         self.0.pinned_connection()
     }

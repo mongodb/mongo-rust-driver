@@ -79,6 +79,10 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.update_for_retry()
     }
 
+    fn override_criteria(&self) -> super::OverrideCriteriaFn {
+        self.run_command.override_criteria()
+    }
+
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.run_command.pinned_connection()
     }
