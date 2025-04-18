@@ -514,7 +514,7 @@ async fn too_large_client_error() {
         .build();
 
     let error = client.bulk_write(vec![model]).await.unwrap_err();
-    assert!(!error.is_server_error());
+    assert!(error.is_invalid_argument());
 
     // Case 2: namespace too large
     let model = InsertOneModel::builder()
@@ -523,7 +523,7 @@ async fn too_large_client_error() {
         .build();
 
     let error = client.bulk_write(vec![model]).await.unwrap_err();
-    assert!(!error.is_server_error());
+    assert!(error.is_invalid_argument());
 }
 
 // CRUD prose test 13
