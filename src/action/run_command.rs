@@ -9,11 +9,19 @@ use crate::{
     error::{ErrorKind, Result},
     operation::{run_command, run_cursor_command},
     selection_criteria::SelectionCriteria,
-    ClientSession, Cursor, Database, SessionCursor,
+    ClientSession,
+    Cursor,
+    Database,
+    SessionCursor,
 };
 
 use super::{
-    action_impl, deeplink, export_doc, option_setters, options_doc, ExplicitSession,
+    action_impl,
+    deeplink,
+    export_doc,
+    option_setters,
+    options_doc,
+    ExplicitSession,
     ImplicitSession,
 };
 
