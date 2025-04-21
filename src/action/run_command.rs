@@ -9,19 +9,11 @@ use crate::{
     error::{ErrorKind, Result},
     operation::{run_command, run_cursor_command},
     selection_criteria::SelectionCriteria,
-    ClientSession,
-    Cursor,
-    Database,
-    SessionCursor,
+    ClientSession, Cursor, Database, SessionCursor,
 };
 
 use super::{
-    action_impl,
-    deeplink,
-    export_doc,
-    option_setters,
-    options_doc,
-    ExplicitSession,
+    action_impl, deeplink, export_doc, option_setters, options_doc, ExplicitSession,
     ImplicitSession,
 };
 
@@ -179,7 +171,7 @@ impl<'a> Action for RunCommand<'a> {
         if let Some(session) = &self.session {
             match session.transaction.state {
                 TransactionState::Starting | TransactionState::InProgress => {
-                    if command.get("readConcern").ok().is_some() {
+                    if command.get("readConcern").is_ok_and(|rc| rc.is_some()) {
                         return Err(ErrorKind::InvalidArgument {
                             message: "Cannot set read concern after starting a transaction".into(),
                         }
