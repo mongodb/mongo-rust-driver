@@ -6,7 +6,7 @@ use futures_core::TryStream;
 use futures_util::{FutureExt, TryStreamExt};
 
 use crate::{
-    bson::{doc, rawdoc, Bson, RawDocumentBuf},
+    bson::{rawdoc, Bson, RawDocumentBuf},
     bson_util::{self, extend_raw_document_buf},
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -121,12 +121,12 @@ where
                 Ok(response) => response,
                 Err(error) => {
                     if !error.is_network_error() {
-                        let kill_cursors = doc! {
-                            "killCursors": &namespace.db,
+                        let kill_cursors = rawdoc! {
+                            "killCursors": namespace.db.clone(),
                             "cursors": [cursor_specification.info.id],
                         };
                         let mut run_command =
-                            RunCommand::new(namespace.db.clone(), kill_cursors, None, None)?;
+                            RunCommand::new(namespace.db.clone(), kill_cursors, None, None);
                         let _ = self
                             .client
                             .execute_operation_on_connection(
