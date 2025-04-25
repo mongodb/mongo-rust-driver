@@ -51,7 +51,7 @@ impl Database {
     /// Note that no inspection is done on `doc`, so the command will not use the database's default
     /// read concern or write concern. If specific read concern or write concern is desired, it must
     /// be specified manually.
-    /// Please note that run_command doesn't validate WriteConcerns passed into the body of the
+    /// Please note that run_raw_command doesn't validate WriteConcerns passed into the body of the
     /// command document.
     ///
     /// `await` will return d[`Result<Document>`].
@@ -119,7 +119,7 @@ impl crate::sync::Database {
     /// Note that no inspection is done on `doc`, so the command will not use the database's default
     /// read concern or write concern. If specific read concern or write concern is desired, it must
     /// be specified manually.
-    /// Please note that run_command doesn't validate WriteConcerns passed into the body of the
+    /// Please note that run_raw_command doesn't validate WriteConcerns passed into the body of the
     /// command document.
     ///
     /// [`run`](RunCommand::run) will return d[`Result<Document>`].
