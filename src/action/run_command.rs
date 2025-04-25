@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::{Bson, Document};
+use bson::{Bson, Document, RawDocumentBuf};
 
 use crate::{
     client::session::TransactionState,
@@ -40,7 +40,27 @@ impl Database {
     pub fn run_command(&self, command: Document) -> RunCommand {
         RunCommand {
             db: self,
-            command,
+            command: RawDocumentBuf::from_document(&command),
+            options: None,
+            session: None,
+        }
+    }
+
+    /// Runs a database-level command.
+    ///
+    /// Note that no inspection is done on `doc`, so the command will not use the database's default
+    /// read concern or write concern. If specific read concern or write concern is desired, it must
+    /// be specified manually.
+    /// Please note that run_raw_command doesn't validate WriteConcerns passed into the body of the
+    /// command document.
+    ///
+    /// `await` will return d[`Result<Document>`].
+    #[deeplink]
+    #[options_doc(run_command)]
+    pub fn run_raw_command(&self, command: RawDocumentBuf) -> RunCommand {
+        RunCommand {
+            db: self,
+            command: Ok(command),
             options: None,
             session: None,
         }
@@ -55,7 +75,22 @@ impl Database {
     pub fn run_cursor_command(&self, command: Document) -> RunCursorCommand {
         RunCursorCommand {
             db: self,
-            command,
+            command: RawDocumentBuf::from_document(&command),
+            options: None,
+            session: ImplicitSession,
+        }
+    }
+
+    /// Runs a database-level command and returns a cursor to the response.
+    ///
+    /// `await` will return d[`Result<Cursor<Document>>`] or a
+    /// d[`Result<SessionCursor<Document>>`] if a [`ClientSession`] is provided.
+    #[deeplink]
+    #[options_doc(run_cursor_command)]
+    pub fn run_raw_cursor_command(&self, command: RawDocumentBuf) -> RunCursorCommand {
+        RunCursorCommand {
+            db: self,
+            command: Ok(command),
             options: None,
             session: ImplicitSession,
         }
@@ -79,6 +114,21 @@ impl crate::sync::Database {
         self.async_database.run_command(command)
     }
 
+    /// Runs a database-level command.
+    ///
+    /// Note that no inspection is done on `doc`, so the command will not use the database's default
+    /// read concern or write concern. If specific read concern or write concern is desired, it must
+    /// be specified manually.
+    /// Please note that run_raw_command doesn't validate WriteConcerns passed into the body of the
+    /// command document.
+    ///
+    /// [`run`](RunCommand::run) will return d[`Result<Document>`].
+    #[deeplink]
+    #[options_doc(run_command, sync)]
+    pub fn run_raw_command(&self, command: RawDocumentBuf) -> RunCommand {
+        self.async_database.run_raw_command(command)
+    }
+
     /// Runs a database-level command and returns a cursor to the response.
     ///
     /// [`run`](RunCursorCommand::run) will return d[`Result<crate::sync::Cursor<Document>>`] or a
@@ -88,13 +138,23 @@ impl crate::sync::Database {
     pub fn run_cursor_command(&self, command: Document) -> RunCursorCommand {
         self.async_database.run_cursor_command(command)
     }
+
+    /// Runs a database-level command and returns a cursor to the response.
+    ///
+    /// [`run`](RunCursorCommand::run) will return d[`Result<crate::sync::Cursor<Document>>`] or a
+    /// d[`Result<crate::sync::SessionCursor<Document>>`] if a [`ClientSession`] is provided.
+    #[deeplink]
+    #[options_doc(run_cursor_command, sync)]
+    pub fn run_raw_cursor_command(&self, command: RawDocumentBuf) -> RunCursorCommand {
+        self.async_database.run_raw_cursor_command(command)
+    }
 }
 
 /// Run a database-level command.  Create with [`Database::run_command`].
 #[must_use]
 pub struct RunCommand<'a> {
     db: &'a Database,
-    command: Document,
+    command: bson::raw::Result<RawDocumentBuf>,
     options: Option<RunCommandOptions>,
     session: Option<&'a mut ClientSession>,
 }
@@ -115,10 +175,11 @@ impl<'a> Action for RunCommand<'a> {
 
     async fn execute(self) -> Result<Document> {
         let mut selection_criteria = self.options.and_then(|o| o.selection_criteria);
+        let command = self.command?;
         if let Some(session) = &self.session {
             match session.transaction.state {
                 TransactionState::Starting | TransactionState::InProgress => {
-                    if self.command.contains_key("readConcern") {
+                    if command.get("readConcern").is_ok_and(|rc| rc.is_some()) {
                         return Err(ErrorKind::InvalidArgument {
                             message: "Cannot set read concern after starting a transaction".into(),
                         }
@@ -139,12 +200,8 @@ impl<'a> Action for RunCommand<'a> {
             }
         }
 
-        let operation = run_command::RunCommand::new(
-            self.db.name().into(),
-            self.command,
-            selection_criteria,
-            None,
-        )?;
+        let operation =
+            run_command::RunCommand::new(self.db.name().into(), command, selection_criteria, None);
         self.db
             .client()
             .execute_operation(operation, self.session)
@@ -157,7 +214,7 @@ impl<'a> Action for RunCommand<'a> {
 #[must_use]
 pub struct RunCursorCommand<'a, Session = ImplicitSession> {
     db: &'a Database,
-    command: Document,
+    command: bson::raw::Result<RawDocumentBuf>,
     options: Option<RunCursorCommandOptions>,
     session: Session,
 }
@@ -192,10 +249,10 @@ impl<'a> Action for RunCursorCommand<'a, ImplicitSession> {
             .and_then(|options| options.selection_criteria.clone());
         let rcc = run_command::RunCommand::new(
             self.db.name().to_string(),
-            self.command,
+            self.command?,
             selection_criteria,
             None,
-        )?;
+        );
         let rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
         let client = self.db.client();
         client.execute_cursor_operation(rc_command).await
@@ -218,10 +275,10 @@ impl<'a> Action for RunCursorCommand<'a, ExplicitSession<'a>> {
             .and_then(|options| options.selection_criteria.clone());
         let rcc = run_command::RunCommand::new(
             self.db.name().to_string(),
-            self.command,
+            self.command?,
             selection_criteria,
             None,
-        )?;
+        );
         let rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
         let client = self.db.client();
         client

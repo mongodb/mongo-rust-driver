@@ -1,6 +1,7 @@
 use std::cmp::Ord;
 
-use futures::stream::TryStreamExt;
+use bson::RawDocumentBuf;
+use futures::{stream::TryStreamExt, StreamExt};
 use serde::Deserialize;
 
 use crate::{
@@ -412,4 +413,56 @@ async fn aggregate_with_generics() {
         .session(&mut session)
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn test_run_command() {
+    let client = Client::for_test().await;
+    let database = client.database("db");
+
+    // Test run_command
+    {
+        let got = database.run_command(doc! {"ping": 1}).await.unwrap();
+        assert_eq!(crate::bson_util::get_int(got.get("ok").unwrap()), Some(1));
+    }
+
+    // Test run_raw_command
+    {
+        let mut cmd = RawDocumentBuf::new();
+        cmd.append("ping", 1);
+        let got = database.run_raw_command(cmd).await.unwrap();
+        assert_eq!(crate::bson_util::get_int(got.get("ok").unwrap()), Some(1));
+    }
+
+    // Create a collection with a single document
+    {
+        let coll = database.collection("coll");
+        coll.drop().await.expect("should drop");
+        coll.insert_one(doc! {"foo": "bar"})
+            .await
+            .expect("should insert");
+    }
+
+    // Test run_cursor_command
+    {
+        let cursor = database
+            .run_cursor_command(doc! {"find": "coll", "filter": {}})
+            .await
+            .unwrap();
+        let v: Vec<Result<Document>> = cursor.collect().await;
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].as_ref().unwrap().get_str("foo"), Ok("bar"));
+    }
+
+    // Test run_raw_cursor_command
+    {
+        let mut cmd = RawDocumentBuf::new();
+        cmd.append("find", "coll");
+        cmd.append("filter", RawDocumentBuf::new());
+
+        let cursor = database.run_raw_cursor_command(cmd).await.unwrap();
+        let v: Vec<Result<Document>> = cursor.collect().await;
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].as_ref().unwrap().get_str("foo"), Ok("bar"));
+    }
 }

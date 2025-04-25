@@ -3,11 +3,11 @@ pub mod options;
 
 use std::{fmt, fmt::Debug, str::FromStr, sync::Arc};
 
+use bson::rawdoc;
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
 
 use self::options::*;
 use crate::{
-    bson::doc,
     client::options::ServerAddress,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
@@ -199,13 +199,13 @@ where
 
         let op = crate::operation::run_command::RunCommand::new(
             ns.db,
-            doc! {
+            rawdoc! {
                 "killCursors": ns.coll.as_str(),
                 "cursors": [cursor_id]
             },
             drop_address.map(SelectionCriteria::from_address),
             pinned_connection,
-        )?;
+        );
         self.client().execute_operation(op, None).await?;
         Ok(())
     }
