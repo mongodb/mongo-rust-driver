@@ -89,6 +89,7 @@ const OP_MSG_OVERHEAD_BYTES: usize = 1_000;
 pub(crate) struct ExecutionContext<'a> {
     pub(crate) connection: &'a mut PooledConnection,
     pub(crate) session: Option<&'a mut ClientSession>,
+    pub(crate) effective_criteria: SelectionCriteria,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]

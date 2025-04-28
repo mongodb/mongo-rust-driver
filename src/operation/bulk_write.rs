@@ -114,6 +114,7 @@ where
                     &mut context.session,
                     txn_number,
                     Retryability::None,
+                    context.effective_criteria.clone(),
                 )
                 .await;
 
@@ -135,6 +136,7 @@ where
                                 &mut context.session,
                                 txn_number,
                                 Retryability::None,
+                                context.effective_criteria.clone(),
                             )
                             .await;
                     }

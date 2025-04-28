@@ -94,6 +94,7 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         let inner_context = ExecutionContext {
             connection: context.connection,
             session: context.session.as_deref_mut(),
+            effective_criteria: context.effective_criteria,
         };
         let spec = self.inner.handle_response(response, inner_context)?;
 
