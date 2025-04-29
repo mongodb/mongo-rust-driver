@@ -53,7 +53,7 @@ use find::{
     FindOneAndUpdate,
 };
 use futures::{future::BoxFuture, FutureExt};
-use gridfs::{Delete, DeleteByName, Download, DownloadByName, RenameByName, Upload};
+use gridfs::{Delete, DeleteByName, Download, DownloadByName, RenameById, RenameByName, Upload};
 use index::{
     AssertIndexExists,
     AssertIndexNotExists,
@@ -426,6 +426,7 @@ impl<'de> Deserialize<'de> for Operation {
             "delete" => deserialize_op::<Delete>(definition.arguments),
             "deleteByName" => deserialize_op::<DeleteByName>(definition.arguments),
             "upload" => deserialize_op::<Upload>(definition.arguments),
+            "renameById" => deserialize_op::<RenameById>(definition.arguments),
             "renameByName" => deserialize_op::<RenameByName>(definition.arguments),
             #[cfg(feature = "in-use-encryption")]
             "getKeyByAltName" => deserialize_op::<GetKeyByAltName>(definition.arguments),

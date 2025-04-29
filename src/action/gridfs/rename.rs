@@ -72,13 +72,21 @@ impl<'a> Action for Rename<'a> {
     type Future = RenameFuture;
 
     async fn execute(self) -> Result<()> {
-        self.bucket
+        let count = self
+            .bucket
             .files()
             .update_one(
-                doc! { "_id": self.id },
+                doc! { "_id": self.id.clone() },
                 doc! { "$set": { "filename": self.new_filename } },
             )
-            .await?;
+            .await?
+            .matched_count;
+        if count == 0 {
+            return Err(ErrorKind::GridFs(GridFsErrorKind::FileNotFound {
+                identifier: GridFsFileIdentifier::Id(self.id),
+            })
+            .into());
+        }
 
         Ok(())
     }
