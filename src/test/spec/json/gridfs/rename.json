@@ -93,7 +93,7 @@
       "description": "rename by id",
       "operations": [
         {
-          "name": "renameById",
+          "name": "rename",
           "object": "bucket0",
           "arguments": {
             "id": {
@@ -161,7 +161,7 @@
       "description": "rename when file id does not exist",
       "operations": [
         {
-          "name": "renameById",
+          "name": "rename",
           "object": "bucket0",
           "arguments": {
             "id": {

@@ -51,7 +51,7 @@ initialData:
 tests:
   - description: "rename by id"
     operations:
-      - name: renameById
+      - name: rename
         object: *bucket0
         arguments:
           id: { "$oid": "000000000000000000000001" }
@@ -70,7 +70,7 @@ tests:
           - *file2_chunk0
   - description: "rename when file id does not exist"
     operations:
-      - name: renameById
+      - name: rename
         object: *bucket0
         arguments:
           id: { "$oid": "000000000000000000000003" }
