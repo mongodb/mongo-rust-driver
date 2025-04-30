@@ -13,6 +13,7 @@ mod index;
 mod insert;
 mod iteration;
 mod list;
+mod rename;
 mod search_index;
 mod session;
 mod thread;
@@ -37,7 +38,6 @@ use collection::{
     AssertCollectionNotExists,
     CreateCollection,
     DropCollection,
-    RenameCollection,
 };
 use command::{CreateCommandCursor, RunCommand, RunCursorCommand};
 use connection::{AssertNumberConnectionsCheckedOut, Close};
@@ -53,7 +53,7 @@ use find::{
     FindOneAndUpdate,
 };
 use futures::{future::BoxFuture, FutureExt};
-use gridfs::{Delete, DeleteByName, Download, DownloadByName, RenameById, RenameByName, Upload};
+use gridfs::{Delete, DeleteByName, Download, DownloadByName, RenameByName, Upload};
 use index::{
     AssertIndexExists,
     AssertIndexNotExists,
@@ -65,6 +65,7 @@ use index::{
 use insert::{InsertMany, InsertOne};
 use iteration::{IterateOnce, IterateUntilDocumentOrError};
 use list::{ListCollectionNames, ListCollections, ListDatabaseNames, ListDatabases};
+use rename::Rename;
 use serde::{
     de::{DeserializeOwned, Deserializer},
     Deserialize,
@@ -408,7 +409,7 @@ impl<'de> Deserialize<'de> for Operation {
             }
             "close" => deserialize_op::<Close>(definition.arguments),
             "createChangeStream" => deserialize_op::<CreateChangeStream>(definition.arguments),
-            "rename" => deserialize_op::<RenameCollection>(definition.arguments),
+            "rename" => deserialize_op::<Rename>(definition.arguments),
             "loop" => deserialize_op::<Loop>(definition.arguments),
             "waitForEvent" => deserialize_op::<WaitForEvent>(definition.arguments),
             "assertEventCount" => deserialize_op::<AssertEventCount>(definition.arguments),
@@ -426,7 +427,6 @@ impl<'de> Deserialize<'de> for Operation {
             "delete" => deserialize_op::<Delete>(definition.arguments),
             "deleteByName" => deserialize_op::<DeleteByName>(definition.arguments),
             "upload" => deserialize_op::<Upload>(definition.arguments),
-            "renameById" => deserialize_op::<RenameById>(definition.arguments),
             "renameByName" => deserialize_op::<RenameByName>(definition.arguments),
             #[cfg(feature = "in-use-encryption")]
             "getKeyByAltName" => deserialize_op::<GetKeyByAltName>(definition.arguments),
