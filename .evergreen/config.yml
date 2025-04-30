@@ -66,6 +66,13 @@ buildvariants:
     tasks:
       - name: .lint
 
+  - name: cargo-deny
+    display_name: "Cargo Deny"
+    run_on:
+      - rhel87-small
+    tasks:
+      - name: check-cargo-deny
+
   - name: rhel-8
     display_name: "RHEL 8"
     run_on:
@@ -791,7 +798,6 @@ tasks:
           RUST_VERSION: 1.74.0
 
   - name: check-cargo-deny
-    tags: [lint]
     commands:
       - func: "check cargo deny"
 
