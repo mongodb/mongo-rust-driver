@@ -1335,3 +1335,8 @@ async fn aggregate_with_generics() {
     let lens: Vec<B> = cursor.try_collect().await.unwrap();
     assert_eq!(lens[0].len as usize, len);
 }
+
+#[test]
+fn foo() {
+    dbg!("bar");
+}
