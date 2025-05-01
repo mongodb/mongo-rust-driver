@@ -120,35 +120,6 @@ impl TestOperation for DropCollection {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct RenameCollection {
-    to: String,
-}
-
-impl TestOperation for RenameCollection {
-    fn execute_entity_operation<'a>(
-        &'a self,
-        id: &'a str,
-        test_runner: &'a TestRunner,
-    ) -> BoxFuture<'a, Result<Option<Entity>>> {
-        async move {
-            let target = test_runner.get_collection(id).await;
-            let ns = target.namespace();
-            let mut to_ns = ns.clone();
-            to_ns.coll.clone_from(&self.to);
-            let cmd = doc! {
-                "renameCollection": crate::bson::to_bson(&ns)?,
-                "to": crate::bson::to_bson(&to_ns)?,
-            };
-            let admin = test_runner.internal_client.database("admin");
-            admin.run_command(cmd).await?;
-            Ok(None)
-        }
-        .boxed()
-    }
-}
-
-#[derive(Debug, Deserialize)]
 pub(super) struct Aggregate {
     pipeline: Vec<Document>,
     session: Option<String>,
