@@ -200,7 +200,7 @@ impl Topology {
         &self,
         server_address: &ServerAddress,
         command: &mut Command,
-        criteria: Option<&SelectionCriteria>,
+        criteria: &SelectionCriteria,
     ) {
         self.watcher
             .peek_latest()

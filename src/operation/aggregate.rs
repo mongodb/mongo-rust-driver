@@ -7,7 +7,7 @@ use crate::{
     cursor::CursorSpecification,
     error::Result,
     operation::{append_options, remove_empty_write_concern, Retryability},
-    options::{AggregateOptions, SelectionCriteria, WriteConcern},
+    options::{AggregateOptions, ReadPreference, SelectionCriteria, WriteConcern},
     Namespace,
 };
 
@@ -132,6 +132,27 @@ impl OperationWithDefaults for Aggregate {
             Retryability::None
         } else {
             Retryability::Read
+        }
+    }
+
+    fn override_criteria(&self) -> super::OverrideCriteriaFn {
+        if !self.is_out_or_merge() {
+            return |_, _| None;
+        }
+        |criteria, topology| {
+            if criteria == &SelectionCriteria::ReadPreference(ReadPreference::Primary)
+                || topology.topology_type() == crate::TopologyType::LoadBalanced
+            {
+                return None;
+            }
+            for server in topology.servers.values() {
+                if let Ok(Some(v)) = server.max_wire_version() {
+                    if v < super::SERVER_5_0_0_WIRE_VERSION {
+                        return Some(SelectionCriteria::ReadPreference(ReadPreference::Primary));
+                    }
+                }
+            }
+            None
         }
     }
 }

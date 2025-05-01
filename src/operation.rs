@@ -76,6 +76,7 @@ pub(crate) use update::{Update, UpdateOrReplace};
 
 const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
 const SERVER_4_4_0_WIRE_VERSION: i32 = 9;
+const SERVER_5_0_0_WIRE_VERSION: i32 = 13;
 const SERVER_8_0_0_WIRE_VERSION: i32 = 25;
 // The maximum number of bytes that may be included in a write payload when auto-encryption is
 // enabled.
@@ -88,6 +89,7 @@ const OP_MSG_OVERHEAD_BYTES: usize = 1_000;
 pub(crate) struct ExecutionContext<'a> {
     pub(crate) connection: &'a mut PooledConnection,
     pub(crate) session: Option<&'a mut ClientSession>,
+    pub(crate) effective_criteria: SelectionCriteria,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -148,10 +150,17 @@ pub(crate) trait Operation {
     /// Updates this operation as needed for a retry.
     fn update_for_retry(&mut self);
 
+    /// Returns a function handle to potentially override selection criteria based on server
+    /// topology.
+    fn override_criteria(&self) -> OverrideCriteriaFn;
+
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle>;
 
     fn name(&self) -> &str;
 }
+
+pub(crate) type OverrideCriteriaFn =
+    fn(&SelectionCriteria, &crate::sdam::TopologyDescription) -> Option<SelectionCriteria>;
 
 // A mirror of the `Operation` trait, with default behavior where appropriate.  Should only be
 // implemented by operation types that do not delegate to other operations.
@@ -235,6 +244,12 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     /// Updates this operation as needed for a retry.
     fn update_for_retry(&mut self) {}
 
+    /// Returns a function handle to potentially override selection criteria based on server
+    /// topology.
+    fn override_criteria(&self) -> OverrideCriteriaFn {
+        |_, _| None
+    }
+
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         None
     }
@@ -286,6 +301,9 @@ where
     }
     fn update_for_retry(&mut self) {
         self.update_for_retry()
+    }
+    fn override_criteria(&self) -> OverrideCriteriaFn {
+        self.override_criteria()
     }
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.pinned_connection()

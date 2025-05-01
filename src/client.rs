@@ -35,6 +35,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
     event::command::CommandEvent,
     id_set::IdSet,
+    operation::OverrideCriteriaFn,
     options::{ClientOptions, DatabaseOptions, ReadPreference, SelectionCriteria, ServerAddress},
     sdam::{
         server_selection::{self, attempt_to_select_server},
@@ -446,8 +447,8 @@ impl Client {
         &self,
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
-        let server = self
-            .select_server(criteria, "Test select server", None)
+        let (server, _) = self
+            .select_server(criteria, "Test select server", None, |_, _| None)
             .await?;
         Ok(server.address.clone())
     }
@@ -460,7 +461,8 @@ impl Client {
         #[allow(unused_variables)] // we only use the operation_name for tracing.
         operation_name: &str,
         deprioritized: Option<&ServerAddress>,
-    ) -> Result<SelectedServer> {
+        override_criteria: OverrideCriteriaFn,
+    ) -> Result<(SelectedServer, SelectionCriteria)> {
         let criteria =
             criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
 
@@ -488,9 +490,16 @@ impl Client {
         let mut watcher = self.inner.topology.watch();
         loop {
             let state = watcher.observe_latest();
-
+            let override_slot;
+            let effective_criteria =
+                if let Some(oc) = override_criteria(criteria, &state.description) {
+                    override_slot = oc;
+                    &override_slot
+                } else {
+                    criteria
+                };
             let result = server_selection::attempt_to_select_server(
-                criteria,
+                effective_criteria,
                 &state.description,
                 &state.servers(),
                 deprioritized,
@@ -507,7 +516,7 @@ impl Client {
                         #[cfg(feature = "tracing-unstable")]
                         event_emitter.emit_succeeded_event(&state.description, &server);
 
-                        return Ok(server);
+                        return Ok((server, effective_criteria.clone()));
                     } else {
                         #[cfg(feature = "tracing-unstable")]
                         if !emitted_waiting_message {

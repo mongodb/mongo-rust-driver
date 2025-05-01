@@ -205,7 +205,7 @@ impl TopologyDescription {
         &self,
         address: &ServerAddress,
         command: &mut Command,
-        criteria: Option<&SelectionCriteria>,
+        criteria: &SelectionCriteria,
     ) {
         let server_type = self
             .get_server_description(address)
@@ -220,8 +220,7 @@ impl TopologyDescription {
             }
             (TopologyType::Single, ServerType::Standalone) => {}
             (TopologyType::Single, _) => {
-                let specified_read_pref =
-                    criteria.and_then(SelectionCriteria::as_read_pref).cloned();
+                let specified_read_pref = criteria.as_read_pref().cloned();
 
                 let resolved_read_pref = match specified_read_pref {
                     Some(ReadPreference::Primary) | None => ReadPreference::PrimaryPreferred {
@@ -235,11 +234,10 @@ impl TopologyDescription {
             }
             _ => {
                 let read_pref = match criteria {
-                    Some(SelectionCriteria::ReadPreference(rp)) => rp.clone(),
-                    Some(SelectionCriteria::Predicate(_)) => ReadPreference::PrimaryPreferred {
+                    SelectionCriteria::ReadPreference(rp) => rp.clone(),
+                    SelectionCriteria::Predicate(_) => ReadPreference::PrimaryPreferred {
                         options: Default::default(),
                     },
-                    None => ReadPreference::Primary,
                 };
                 if read_pref != ReadPreference::Primary {
                     command.set_read_preference(read_pref)
@@ -251,10 +249,10 @@ impl TopologyDescription {
     fn update_command_read_pref_for_mongos(
         &self,
         command: &mut Command,
-        criteria: Option<&SelectionCriteria>,
+        criteria: &SelectionCriteria,
     ) {
         let read_preference = match criteria {
-            Some(SelectionCriteria::ReadPreference(rp)) => rp,
+            SelectionCriteria::ReadPreference(rp) => rp,
             _ => return,
         };
         match read_preference {

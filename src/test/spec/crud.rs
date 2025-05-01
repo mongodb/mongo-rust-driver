@@ -43,13 +43,6 @@ async fn run_unified() {
          pre-5.0 server",
         "Requesting unacknowledged write with verboseResults is a client-side error",
         "Requesting unacknowledged write with ordered is a client-side error",
-        // TODO RUST-663: Unskip these tests.
-        "Aggregate with $out includes read preference for 5.0+ server",
-        "Aggregate with $out omits read preference for pre-5.0 server",
-        "Aggregate with $merge includes read preference for 5.0+ server",
-        "Aggregate with $merge omits read preference for pre-5.0 server",
-        "Database-level aggregate with $out omits read preference for pre-5.0 server",
-        "Database-level aggregate with $merge omits read preference for pre-5.0 server",
     ];
     // TODO: remove this manual skip when this test is fixed to skip on serverless
     if *SERVERLESS {
