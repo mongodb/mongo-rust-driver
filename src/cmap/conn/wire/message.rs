@@ -274,6 +274,7 @@ impl Message {
     pub(crate) async fn write_op_msg_to<T: AsyncWrite + Send + Unpin>(
         &self,
         mut writer: T,
+        max_message_size_bytes: Option<i32>,
     ) -> Result<()> {
         let sections = self.get_sections_bytes()?;
 
@@ -285,6 +286,15 @@ impl Message {
                 .as_ref()
                 .map(std::mem::size_of_val)
                 .unwrap_or(0);
+
+        let max_len =
+            Checked::try_from(max_message_size_bytes.unwrap_or(DEFAULT_MAX_MESSAGE_SIZE_BYTES))?;
+        if total_length > max_len {
+            return Err(ErrorKind::InvalidArgument {
+                message: format!("Message length {} over maximum {}", total_length, max_len),
+            }
+            .into());
+        }
 
         let header = Header {
             length: total_length.try_into()?,
@@ -316,6 +326,7 @@ impl Message {
         &self,
         mut writer: T,
         compressor: &Compressor,
+        max_message_size_bytes: Option<i32>,
     ) -> Result<()> {
         let flag_bytes = &self.flags.bits().to_le_bytes();
         let section_bytes = self.get_sections_bytes()?;
@@ -328,6 +339,15 @@ impl Message {
             + std::mem::size_of::<i32>()
             + std::mem::size_of::<u8>()
             + compressed_bytes.len();
+
+        let max_len =
+            Checked::try_from(max_message_size_bytes.unwrap_or(DEFAULT_MAX_MESSAGE_SIZE_BYTES))?;
+        if total_length > max_len {
+            return Err(ErrorKind::InvalidArgument {
+                message: format!("Message length {} over maximum {}", total_length, max_len),
+            }
+            .into());
+        }
 
         let header = Header {
             length: total_length.try_into()?,
