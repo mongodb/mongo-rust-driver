@@ -99,6 +99,68 @@ impl<'a> Action for StartTransaction<&'a mut ClientSession> {
     }
 }
 
+macro_rules! convenient_run {
+    ($self:ident, $callback:expr) => {{
+        let timeout = Duration::from_secs(120);
+        #[cfg(test)]
+        let timeout = $self
+            .session
+            .convenient_transaction_timeout
+            .unwrap_or(timeout);
+        let start = Instant::now();
+
+        use crate::error::{TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT};
+
+        'transaction: loop {
+            $self
+                .session
+                .start_transaction()
+                .with_options($self.options.clone())
+                .await?;
+            let ret = match $callback {
+                Ok(v) => v,
+                Err(e) => {
+                    if matches!(
+                        $self.session.transaction.state,
+                        TransactionState::Starting | TransactionState::InProgress
+                    ) {
+                        $self.session.abort_transaction().await?;
+                    }
+                    if e.contains_label(TRANSIENT_TRANSACTION_ERROR) && start.elapsed() < timeout {
+                        continue 'transaction;
+                    }
+                    return Err(e);
+                }
+            };
+            if matches!(
+                $self.session.transaction.state,
+                TransactionState::None
+                    | TransactionState::Aborted
+                    | TransactionState::Committed { .. }
+            ) {
+                return Ok(ret);
+            }
+            'commit: loop {
+                match $self.session.commit_transaction().await {
+                    Ok(()) => return Ok(ret),
+                    Err(e) => {
+                        if e.is_max_time_ms_expired_error() || start.elapsed() >= timeout {
+                            return Err(e);
+                        }
+                        if e.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
+                            continue 'commit;
+                        }
+                        if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
+                            continue 'transaction;
+                        }
+                        return Err(e);
+                    }
+                }
+            }
+        }
+    }};
+}
+
 impl StartTransaction<&mut ClientSession> {
     /// Starts a transaction, runs the given callback, and commits or aborts the transaction.
     /// Transient transaction errors will cause the callback or the commit to be retried;
@@ -150,62 +212,16 @@ impl StartTransaction<&mut ClientSession> {
     where
         F: for<'b> FnMut(&'b mut ClientSession, &'b mut C) -> BoxFuture<'b, Result<R>>,
     {
-        let timeout = Duration::from_secs(120);
-        #[cfg(test)]
-        let timeout = self
-            .session
-            .convenient_transaction_timeout
-            .unwrap_or(timeout);
-        let start = Instant::now();
+        convenient_run!(self, callback(self.session, &mut context).await)
+    }
 
-        use crate::error::{TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT};
-
-        'transaction: loop {
-            self.session
-                .start_transaction()
-                .with_options(self.options.clone())
-                .await?;
-            let ret = match callback(self.session, &mut context).await {
-                Ok(v) => v,
-                Err(e) => {
-                    if matches!(
-                        self.session.transaction.state,
-                        TransactionState::Starting | TransactionState::InProgress
-                    ) {
-                        self.session.abort_transaction().await?;
-                    }
-                    if e.contains_label(TRANSIENT_TRANSACTION_ERROR) && start.elapsed() < timeout {
-                        continue 'transaction;
-                    }
-                    return Err(e);
-                }
-            };
-            if matches!(
-                self.session.transaction.state,
-                TransactionState::None
-                    | TransactionState::Aborted
-                    | TransactionState::Committed { .. }
-            ) {
-                return Ok(ret);
-            }
-            'commit: loop {
-                match self.session.commit_transaction().await {
-                    Ok(()) => return Ok(ret),
-                    Err(e) => {
-                        if e.is_max_time_ms_expired_error() || start.elapsed() >= timeout {
-                            return Err(e);
-                        }
-                        if e.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
-                            continue 'commit;
-                        }
-                        if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
-                            continue 'transaction;
-                        }
-                        return Err(e);
-                    }
-                }
-            }
-        }
+    /// TODO
+    #[rustversion::since(1.85)]
+    pub async fn and_run2<R, F>(self, mut callback: F) -> Result<R>
+    where
+        F: for<'b> AsyncFnMut(&'b mut ClientSession) -> Result<R>,
+    {
+        convenient_run!(self, callback(self.session).await)
     }
 }
 
