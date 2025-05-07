@@ -264,36 +264,3 @@ async fn convenient_api_retry_timeout_commit_transient() {
     let err = result.unwrap_err();
     assert!(err.contains_label(TRANSIENT_TRANSACTION_ERROR));
 }
-
-#[tokio::test]
-async fn context() {
-    let client = Client::for_test().await;
-    let mut session = client.start_session().await.unwrap();
-    let coll = client
-        .database("test_convenient")
-        .collection::<Document>("test_convenient");
-    let my_data = "my data".to_string();
-    /*
-    session
-        .start_transaction()
-        .and_run((), |session, _| {
-            async move {
-                coll.insert_one(doc! { "data": my_data })
-                    .session(session)
-                    .await
-            }
-            .boxed()
-        })
-        .await
-        .unwrap();
-    */
-    session
-        .start_transaction()
-        .and_run2(async move |session| {
-            coll.insert_one(doc! { "data": my_data.clone() })
-                .session(session)
-                .await
-        })
-        .await
-        .unwrap();
-}
