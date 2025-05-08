@@ -271,10 +271,10 @@ impl StartTransaction<&mut ClientSession> {
     /// # }
     /// ```
     #[rustversion::since(1.85)]
-    pub async fn and_run2<R>(
-        self,
-        mut callback: impl AsyncFnMut(&mut ClientSession) -> Result<R>,
-    ) -> Result<R> {
+    pub async fn and_run2<R, F>(self, mut callback: F) -> Result<R>
+    where
+        F: for<'b> AsyncFnMut(&'b mut ClientSession) -> Result<R>,
+    {
         convenient_run!(
             self.session,
             self.session
