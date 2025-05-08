@@ -207,6 +207,7 @@ impl StartTransaction<&mut ClientSession> {
     /// # Ok(())
     /// # }
     /// ```
+    #[rustversion::attr(since(1.85), deprecated = "use and_run2")]
     pub async fn and_run<R, C, F>(self, mut context: C, mut callback: F) -> Result<R>
     where
         F: for<'b> FnMut(&'b mut ClientSession, &'b mut C) -> BoxFuture<'b, Result<R>>,
@@ -238,6 +239,10 @@ impl StartTransaction<&mut ClientSession> {
     /// errors within the callback. If the application needs to handle errors within the
     /// callback, it MUST return them after doing so.
     ///
+    /// This version of the method uses an async closure, which means it's both more convenient and
+    /// avoids the lifetime issues of `and_run`, but is only available in Rust versions 1.85 and
+    /// above.
+    ///
     /// Because the callback can be repeatedly executed, code within the callback cannot consume
     /// owned values, even values owned by the callback itself:
     ///
@@ -266,10 +271,14 @@ impl StartTransaction<&mut ClientSession> {
     /// # }
     /// ```
     #[rustversion::since(1.85)]
-    pub async fn and_run2<R, F>(self, mut callback: F) -> Result<R>
+    pub async fn and_run2<R>(
+        self,
+        mut callback: impl AsyncFnMut(&mut ClientSession) -> Result<R>,
+    ) -> Result<R>
+/*
     where
         F: for<'b> AsyncFnMut(&'b mut ClientSession) -> Result<R>,
-    {
+        */ {
         convenient_run!(
             self.session,
             self.session

@@ -1675,7 +1675,6 @@ async fn change_streams_examples() -> Result<()> {
 
 async fn convenient_transaction_examples() -> Result<()> {
     use crate::ClientSession;
-    use futures::FutureExt;
     if !transactions_supported().await {
         log_uncaptured(
             "skipping convenient transaction API examples due to no transaction support",
@@ -1734,12 +1733,9 @@ async fn convenient_transaction_examples() -> Result<()> {
     // Step 2: Start a client session.
     let mut session = client.start_session().await?;
 
-    // Step 3: Use and_run to start a transaction, execute the callback, and commit (or
+    // Step 3: Use and_run2 to start a transaction, execute the callback, and commit (or
     // abort on error).
-    session
-        .start_transaction()
-        .and_run((), |session, _| callback(session).boxed())
-        .await?;
+    session.start_transaction().and_run2(callback).await?;
 
     // End Transactions withTxn API Example 1
 

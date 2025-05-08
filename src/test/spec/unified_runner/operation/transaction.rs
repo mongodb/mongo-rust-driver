@@ -100,6 +100,8 @@ impl TestOperation for WithTransaction {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             with_mut_session!(test_runner, id, |session| async move {
+                // `and_run2` runs afoul of a rustc bug here: https://github.com/rust-lang/rust/issues/64552
+                #[allow(deprecated)]
                 session
                     .start_transaction()
                     .with_options(self.options.clone())

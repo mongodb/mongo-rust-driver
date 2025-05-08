@@ -157,7 +157,7 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
 /// so that we can continue to borrow the entity map in other ways even when we're using a session,
 /// which we'd have to borrow mutably from the map.
 macro_rules! with_mut_session {
-    ($test_runner:ident, $id:expr, |$session:ident| $body:expr) => {
+    ($test_runner:expr, $id:expr, |$session:ident| $body:expr) => {
         async {
             let id = $id;
             let entity = $test_runner.entities.write().await.remove(id).unwrap();

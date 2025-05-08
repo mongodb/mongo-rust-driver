@@ -1420,6 +1420,8 @@ impl TestOperation for WithTransaction {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             let session = sessions.session0.unwrap();
+            // `and_run2` runs afoul of a rustc bug here: https://github.com/rust-lang/rust/issues/64552
+            #[allow(deprecated)]
             session
                 .start_transaction()
                 .with_options(self.options.clone())
