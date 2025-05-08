@@ -274,11 +274,7 @@ impl StartTransaction<&mut ClientSession> {
     pub async fn and_run2<R>(
         self,
         mut callback: impl AsyncFnMut(&mut ClientSession) -> Result<R>,
-    ) -> Result<R>
-/*
-    where
-        F: for<'b> AsyncFnMut(&'b mut ClientSession) -> Result<R>,
-        */ {
+    ) -> Result<R> {
         convenient_run!(
             self.session,
             self.session
