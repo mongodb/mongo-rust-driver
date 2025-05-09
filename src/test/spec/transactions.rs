@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -104,12 +103,9 @@ async fn convenient_api_custom_error() {
     struct MyErr;
     let result: Result<()> = session
         .start_transaction()
-        .and_run(coll, |session, coll| {
-            async move {
-                coll.find_one(doc! {}).session(session).await?;
-                Err(Error::custom(MyErr))
-            }
-            .boxed()
+        .and_run2(async move |session| {
+            coll.find_one(doc! {}).session(session).await?;
+            Err(Error::custom(MyErr))
         })
         .await;
 
@@ -136,12 +132,9 @@ async fn convenient_api_returned_value() {
 
     let value = session
         .start_transaction()
-        .and_run(coll, |session, coll| {
-            async move {
-                coll.find_one(doc! {}).session(session).await?;
-                Ok(42)
-            }
-            .boxed()
+        .and_run2(async move |session| {
+            coll.find_one(doc! {}).session(session).await?;
+            Ok(42)
         })
         .await
         .unwrap();
@@ -165,14 +158,11 @@ async fn convenient_api_retry_timeout_callback() {
 
     let result: Result<()> = session
         .start_transaction()
-        .and_run(coll, |session, coll| {
-            async move {
-                coll.find_one(doc! {}).session(session).await?;
-                let mut err = Error::custom(42);
-                err.add_label(TRANSIENT_TRANSACTION_ERROR);
-                Err(err)
-            }
-            .boxed()
+        .and_run2(async move |session| {
+            coll.find_one(doc! {}).session(session).await?;
+            let mut err = Error::custom(42);
+            err.add_label(TRANSIENT_TRANSACTION_ERROR);
+            Err(err)
         })
         .await;
 
@@ -210,12 +200,9 @@ async fn convenient_api_retry_timeout_commit_unknown() {
 
     let result = session
         .start_transaction()
-        .and_run(coll, |session, coll| {
-            async move {
-                coll.find_one(doc! {}).session(session).await?;
-                Ok(())
-            }
-            .boxed()
+        .and_run2(async move |session| {
+            coll.find_one(doc! {}).session(session).await?;
+            Ok(())
         })
         .await;
 
@@ -252,12 +239,9 @@ async fn convenient_api_retry_timeout_commit_transient() {
 
     let result = session
         .start_transaction()
-        .and_run(coll, |session, coll| {
-            async move {
-                coll.find_one(doc! {}).session(session).await?;
-                Ok(())
-            }
-            .boxed()
+        .and_run2(async move |session| {
+            coll.find_one(doc! {}).session(session).await?;
+            Ok(())
         })
         .await;
 
