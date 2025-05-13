@@ -9,6 +9,9 @@ source ./.evergreen/env.sh
 if [ "$RUST_VERSION" != "" ]; then
   rustup toolchain install $RUST_VERSION
   TOOLCHAIN="+${RUST_VERSION}"
+  # Remove the local git dependencies for bson and mongocrypt, which don't work properly with the MSRV resolver.
+  sed -i "s/bson =.*/bson = \"2\"/" Cargo.toml
+  sed -i "s/mongocrypt =.*/mongocrypt = { version = \"0.2\", optional = true }/" Cargo.toml
   CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo +nightly -Zmsrv-policy generate-lockfile
 fi
 
