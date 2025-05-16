@@ -95,3 +95,9 @@ async fn atlas_tls12_srv() {
     run_test("ATLAS_SRV_TLS12", None).await;
     run_test("ATLAS_SRV_TLS12", Some(ResolverConfig::cloudflare())).await;
 }
+
+#[tokio::test]
+async fn atlas_x509() {
+    run_test("ATLAS_X509_DEV_WITH_CERT", None).await;
+    run_test("ATLAS_X509_DEV_WITH_CERT", Some(ResolverConfig::cloudflare())).await;
+}
