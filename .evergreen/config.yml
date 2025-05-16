@@ -214,7 +214,7 @@ buildvariants:
 
   - name: atlas-connectivity
     display_name: "Atlas Connectivity"
-    patchable: false
+    patchable: true
     run_on:
       - rhel87-small
     tasks:
