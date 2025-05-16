@@ -1567,6 +1567,7 @@ dependencies = [
  "reqwest",
  "rustc_version_runtime",
  "rustls",
+ "rustversion",
  "semver",
  "serde",
  "serde-hex",

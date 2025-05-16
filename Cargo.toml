@@ -118,6 +118,7 @@ typed-builder = "0.20.0"
 webpki-roots = "0.26"
 zstd = { version = "0.11.2", optional = true }
 macro_magic = "0.5.1"
+rustversion = "1.0.20"
 
 [dependencies.pbkdf2]
 version = "0.11.0"
