@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    # Only bump to the latest version compatible with the dependency's version
+    # in Cargo.toml. This is the equivalent of running `cargo update`.
+    versioning-strategy: lockfile-only
+    # Update all dependencies in a single PR.
+    groups:
+      rust-dependencies:
+        patterns:
+          - "*"
+    # Include transitive dependencies.
+    allow:
+      - dependency-type: all
+    ignore:
+      - dependency-name: "mongocrypt-sys"
