@@ -32,8 +32,8 @@ impl IndexModel {
             .and_then(|o| o.name.as_ref())
             .is_none()
         {
-            fn format_kv(kv: (&String, &bson::Bson)) -> String {
-                if let bson::Bson::String(s) = kv.1 {
+            fn format_kv(kv: (&String, &crate::bson::Bson)) -> String {
+                if let crate::bson::Bson::String(s) = kv.1 {
                     format!("{}_{}", kv.0, s)
                 } else {
                     format!("{}_{}", kv.0, kv.1)

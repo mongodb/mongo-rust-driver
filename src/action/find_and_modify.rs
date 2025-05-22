@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, time::Duration};
 
-use bson::{Bson, Document, RawDocumentBuf};
+use crate::bson::{Bson, Document, RawDocumentBuf};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -107,7 +107,7 @@ impl<T: Serialize + DeserializeOwned + Send + Sync> Collection<T> {
         FindOneAndReplace {
             coll: self,
             filter,
-            replacement: bson::to_raw_document_buf(replacement.borrow()).map_err(Into::into),
+            replacement: crate::bson::to_raw_document_buf(replacement.borrow()).map_err(Into::into),
             options: None,
             session: None,
         }

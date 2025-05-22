@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use bson::{Bson, Document};
+use crate::bson::{Bson, Document};
 
 #[cfg(feature = "sync")]
 use crate::sync::Client as SyncClient;
@@ -106,7 +106,8 @@ impl<'a> Action for ListDatabases<'a, ListSpecifications> {
             .and_then(|dbs| {
                 dbs.into_iter()
                     .map(|db_spec| {
-                        bson::from_slice(db_spec.as_bytes()).map_err(crate::error::Error::from)
+                        crate::bson::from_slice(db_spec.as_bytes())
+                            .map_err(crate::error::Error::from)
                     })
                     .collect()
             })

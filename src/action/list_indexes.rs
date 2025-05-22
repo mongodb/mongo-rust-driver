@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, time::Duration};
 
-use bson::Bson;
+use crate::bson::Bson;
 use futures_util::stream::TryStreamExt;
 
 use crate::{

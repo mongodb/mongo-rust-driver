@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, time::Duration};
 
-use bson::Bson;
+use crate::bson::Bson;
 
 use crate::{
     coll::options::{CommitQuorum, CreateIndexOptions},

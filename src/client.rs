@@ -221,7 +221,7 @@ impl Client {
         kms_providers: impl IntoIterator<
             Item = (
                 mongocrypt::ctx::KmsProvider,
-                bson::Document,
+                crate::bson::Document,
                 Option<options::TlsOptions>,
             ),
         >,
@@ -429,7 +429,7 @@ impl Client {
     }
 
     #[cfg(test)]
-    pub(crate) async fn is_session_checked_in(&self, id: &bson::Document) -> bool {
+    pub(crate) async fn is_session_checked_in(&self, id: &crate::bson::Document) -> bool {
         self.inner.session_pool.contains(id).await
     }
 
