@@ -74,8 +74,8 @@ impl OperationWithDefaults for Aggregate {
 
     fn extract_at_cluster_time(
         &self,
-        response: &bson::RawDocument,
-    ) -> Result<Option<bson::Timestamp>> {
+        response: &crate::bson::RawDocument,
+    ) -> Result<Option<crate::bson::Timestamp>> {
         CursorBody::extract_at_cluster_time(response)
     }
 

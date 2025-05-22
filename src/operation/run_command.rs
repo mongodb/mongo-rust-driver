@@ -65,8 +65,8 @@ impl OperationWithDefaults for RunCommand<'_> {
 
     fn extract_at_cluster_time(
         &self,
-        response: &bson::RawDocument,
-    ) -> Result<Option<bson::Timestamp>> {
+        response: &crate::bson::RawDocument,
+    ) -> Result<Option<crate::bson::Timestamp>> {
         if let Some(RawBsonRef::Timestamp(ts)) = response.get("atClusterTime")? {
             Ok(Some(ts))
         } else {

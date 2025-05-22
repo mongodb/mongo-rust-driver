@@ -83,7 +83,10 @@ impl OperationWithDefaults for CountDocuments {
         self.aggregate.build(description)
     }
 
-    fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<bson::Timestamp>> {
+    fn extract_at_cluster_time(
+        &self,
+        response: &RawDocument,
+    ) -> Result<Option<crate::bson::Timestamp>> {
         self.aggregate.extract_at_cluster_time(response)
     }
 

@@ -17,7 +17,7 @@ use std::{
     time::Duration,
 };
 
-use bson::UuidRepresentation;
+use crate::bson::UuidRepresentation;
 use derive_where::derive_where;
 use macro_magic::export_tokens;
 use once_cell::sync::Lazy;

@@ -61,7 +61,9 @@ impl ClientEncryption {
     pub fn new(
         key_vault_client: Client,
         key_vault_namespace: Namespace,
-        kms_providers: impl IntoIterator<Item = (KmsProvider, bson::Document, Option<TlsOptions>)>,
+        kms_providers: impl IntoIterator<
+            Item = (KmsProvider, crate::bson::Document, Option<TlsOptions>),
+        >,
     ) -> Result<Self> {
         Self::builder(key_vault_client, key_vault_namespace, kms_providers).build()
     }
@@ -93,7 +95,9 @@ impl ClientEncryption {
     pub fn builder(
         key_vault_client: Client,
         key_vault_namespace: Namespace,
-        kms_providers: impl IntoIterator<Item = (KmsProvider, bson::Document, Option<TlsOptions>)>,
+        kms_providers: impl IntoIterator<
+            Item = (KmsProvider, crate::bson::Document, Option<TlsOptions>),
+        >,
     ) -> ClientEncryptionBuilder {
         ClientEncryptionBuilder {
             key_vault_client,
@@ -183,7 +187,7 @@ impl ClientEncryption {
 
     /// Decrypts an encrypted value (BSON binary of subtype 6).
     /// Returns the original BSON value.
-    pub async fn decrypt(&self, value: RawBinaryRef<'_>) -> Result<bson::RawBson> {
+    pub async fn decrypt(&self, value: RawBinaryRef<'_>) -> Result<crate::bson::RawBson> {
         if value.subtype != BinarySubtype::Encrypted {
             return Err(Error::invalid_argument(format!(
                 "Invalid binary subtype for decrypt: expected {:?}, got {:?}",
@@ -208,7 +212,7 @@ impl ClientEncryption {
 pub struct ClientEncryptionBuilder {
     key_vault_client: Client,
     key_vault_namespace: Namespace,
-    kms_providers: Vec<(KmsProvider, bson::Document, Option<TlsOptions>)>,
+    kms_providers: Vec<(KmsProvider, crate::bson::Document, Option<TlsOptions>)>,
     key_cache_expiration: Option<Duration>,
 }
 

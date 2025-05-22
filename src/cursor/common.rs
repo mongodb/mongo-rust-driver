@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use bson::{RawDocument, RawDocumentBuf};
+use crate::bson::{RawDocument, RawDocumentBuf};
 use derive_where::derive_where;
 use futures_core::{future::BoxFuture, Future};
 #[cfg(test)]
@@ -277,7 +277,7 @@ where
             Poll::Pending => return Poll::Pending,
             Poll::Ready(bv) => match bv? {
                 BatchValue::Some { doc, .. } => {
-                    return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)))
+                    return Poll::Ready(Some(Ok(crate::bson::from_slice(doc.as_bytes())?)))
                 }
                 BatchValue::Empty => continue,
                 BatchValue::Exhausted => return Poll::Ready(None),
@@ -589,7 +589,7 @@ impl AsRef<VecDeque<RawDocumentBuf>> for CursorBuffer {
 
 #[test]
 fn test_buffer() {
-    use bson::rawdoc;
+    use crate::bson::rawdoc;
 
     let queue: VecDeque<RawDocumentBuf> =
         [rawdoc! { "x": 1 }, rawdoc! { "x": 2 }, rawdoc! { "x": 3 }].into();

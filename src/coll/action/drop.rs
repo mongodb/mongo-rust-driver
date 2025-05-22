@@ -35,7 +35,7 @@ where
         options: Option<&crate::coll::DropCollectionOptions>,
         mut session: Option<&mut crate::ClientSession>,
     ) -> Result<()> {
-        use bson::doc;
+        use crate::bson::doc;
         use futures_util::TryStreamExt;
 
         // Find associated `encrypted_fields`:

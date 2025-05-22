@@ -14,7 +14,7 @@ mod x509;
 
 use std::{borrow::Cow, fmt::Debug, str::FromStr};
 
-use bson::RawDocumentBuf;
+use crate::bson::RawDocumentBuf;
 use derive_where::derive_where;
 use hmac::{digest::KeyInit, Mac};
 use rand::Rng;

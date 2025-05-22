@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::doc;
+use crate::bson::doc;
 use macro_magic::export_tokens;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;

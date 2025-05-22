@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::rawdoc;
+use crate::bson::rawdoc;
 
 use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
