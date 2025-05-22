@@ -1,6 +1,6 @@
 use std::{any::Any, fmt::Debug, time::Duration};
 
-use bson::spec::ElementType;
+use crate::bson::spec::ElementType;
 
 use crate::{
     bson::{Bson, Document},
