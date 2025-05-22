@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, time::Duration};
 
-use bson::{rawdoc, RawBson};
+use crate::bson::{rawdoc, RawBson};
 use serde::Deserialize;
 
 use crate::{

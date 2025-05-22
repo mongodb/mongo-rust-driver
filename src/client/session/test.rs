@@ -2,7 +2,7 @@ mod causal_consistency;
 
 use std::{future::Future, sync::Arc, time::Duration};
 
-use bson::Document;
+use crate::bson::Document;
 use futures::stream::StreamExt;
 
 use crate::{
@@ -54,7 +54,7 @@ macro_rules! collection_op {
         |client| async move {
             let $coll = client
                 .database($test_name)
-                .collection::<bson::Document>($test_name);
+                .collection::<crate::bson::Document>($test_name);
             $body.await.unwrap();
         }
     };

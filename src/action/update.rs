@@ -1,4 +1,4 @@
-use bson::{Bson, Document};
+use crate::bson::{Bson, Document};
 
 use crate::{
     coll::options::{Hint, UpdateModifications, UpdateOptions},

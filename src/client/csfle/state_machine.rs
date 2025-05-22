@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
+use crate::bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
 use mongocrypt::ctx::{Ctx, KmsCtx, KmsProviderType, State};
 use rayon::ThreadPool;
@@ -452,7 +452,7 @@ fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
 
 #[cfg(feature = "azure-kms")]
 pub(crate) mod azure {
-    use bson::{rawdoc, RawDocumentBuf};
+    use crate::bson::{rawdoc, RawDocumentBuf};
     use serde::Deserialize;
     use std::time::{Duration, Instant};
     use tokio::sync::Mutex;

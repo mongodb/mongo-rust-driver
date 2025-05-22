@@ -45,7 +45,7 @@ fn write_concern_is_acknowledged() {
 #[test]
 fn write_concern_deserialize() {
     let w_1 = doc! { "w": 1 };
-    let wc: WriteConcern = bson::from_bson(Bson::Document(w_1)).unwrap();
+    let wc: WriteConcern = crate::bson::from_bson(Bson::Document(w_1)).unwrap();
     assert_eq!(
         wc,
         WriteConcern {
@@ -56,7 +56,7 @@ fn write_concern_deserialize() {
     );
 
     let w_majority = doc! { "w": "majority" };
-    let wc: WriteConcern = bson::from_bson(Bson::Document(w_majority)).unwrap();
+    let wc: WriteConcern = crate::bson::from_bson(Bson::Document(w_majority)).unwrap();
     assert_eq!(
         wc,
         WriteConcern {
@@ -67,7 +67,7 @@ fn write_concern_deserialize() {
     );
 
     let w_timeout = doc! { "w": "majority", "wtimeout": 100 };
-    let wc: WriteConcern = bson::from_bson(Bson::Document(w_timeout)).unwrap();
+    let wc: WriteConcern = crate::bson::from_bson(Bson::Document(w_timeout)).unwrap();
     assert_eq!(
         wc,
         WriteConcern {
@@ -78,7 +78,7 @@ fn write_concern_deserialize() {
     );
 
     let journal = doc! { "w": "majority", "j": true };
-    let wc: WriteConcern = bson::from_bson(Bson::Document(journal)).unwrap();
+    let wc: WriteConcern = crate::bson::from_bson(Bson::Document(journal)).unwrap();
     assert_eq!(
         wc,
         WriteConcern {

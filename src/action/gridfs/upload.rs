@@ -1,4 +1,4 @@
-use bson::{oid::ObjectId, Bson, Document};
+use crate::bson::{oid::ObjectId, Bson, Document};
 
 #[cfg(docsrs)]
 use crate::gridfs::FilesCollectionDocument;

@@ -1,6 +1,6 @@
 #[cfg(feature = "in-use-encryption")]
-use bson::RawDocumentBuf;
-use bson::{doc, RawBsonRef, RawDocument, Timestamp};
+use crate::bson::RawDocumentBuf;
+use crate::bson::{doc, RawBsonRef, RawDocument, Timestamp};
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
 use once_cell::sync::Lazy;
@@ -835,7 +835,7 @@ impl Client {
         let cluster_time: Option<ClusterTime> = raw_doc
             .get("$clusterTime")?
             .and_then(RawBsonRef::as_document)
-            .map(|d| bson::from_slice(d.as_bytes()))
+            .map(|d| crate::bson::from_slice(d.as_bytes()))
             .transpose()?;
 
         let at_cluster_time = op.extract_at_cluster_time(raw_doc)?;
@@ -858,7 +858,7 @@ impl Client {
                     let recovery_token = raw_doc
                         .get("recoveryToken")?
                         .and_then(RawBsonRef::as_document)
-                        .map(|d| bson::from_slice(d.as_bytes()))
+                        .map(|d| crate::bson::from_slice(d.as_bytes()))
                         .transpose()?;
                     session.transaction.recovery_token = recovery_token;
                 }

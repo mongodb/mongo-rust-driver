@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use bson::RawDocument;
+use crate::bson::RawDocument;
 use futures_core::Stream;
 use futures_util::StreamExt;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -306,7 +306,7 @@ impl<T> SessionCursor<T> {
     where
         T: Deserialize<'a>,
     {
-        bson::from_slice(self.current().as_bytes()).map_err(Error::from)
+        crate::bson::from_slice(self.current().as_bytes()).map_err(Error::from)
     }
 
     /// Update the type streamed values will be parsed as.
