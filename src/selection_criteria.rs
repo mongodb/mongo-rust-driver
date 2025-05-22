@@ -370,7 +370,7 @@ mod test {
         );
 
         let read_pref = ReadPreference::Secondary { options };
-        let doc = bson::to_document(&read_pref).unwrap();
+        let doc = crate::bson::to_document(&read_pref).unwrap();
 
         assert_eq!(
             doc,

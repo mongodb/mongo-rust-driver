@@ -84,7 +84,7 @@ pub(crate) fn to_raw_bson_array(docs: &[Document]) -> Result<RawBson> {
 pub(crate) fn to_raw_bson_array_ser<T: Serialize>(values: &[T]) -> Result<RawBson> {
     let mut array = RawArrayBuf::new();
     for value in values {
-        array.push(bson::to_raw_document_buf(value)?);
+        array.push(crate::bson::to_raw_document_buf(value)?);
     }
     Ok(RawBson::Array(array))
 }
@@ -213,7 +213,7 @@ pub(crate) fn append_ser(
     struct Helper<T> {
         value: T,
     }
-    let raw_doc = bson::to_raw_document_buf(&Helper { value })?;
+    let raw_doc = crate::bson::to_raw_document_buf(&Helper { value })?;
     this.append_ref(
         key,
         raw_doc

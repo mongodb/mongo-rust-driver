@@ -548,20 +548,20 @@ where
     }
 }
 
-impl From<bson::de::Error> for ErrorKind {
-    fn from(err: bson::de::Error) -> Self {
+impl From<crate::bson::de::Error> for ErrorKind {
+    fn from(err: crate::bson::de::Error) -> Self {
         Self::BsonDeserialization(err)
     }
 }
 
-impl From<bson::ser::Error> for ErrorKind {
-    fn from(err: bson::ser::Error) -> Self {
+impl From<crate::bson::ser::Error> for ErrorKind {
+    fn from(err: crate::bson::ser::Error) -> Self {
         Self::BsonSerialization(err)
     }
 }
 
-impl From<bson::raw::Error> for ErrorKind {
-    fn from(err: bson::raw::Error) -> Self {
+impl From<crate::bson::raw::Error> for ErrorKind {
+    fn from(err: crate::bson::raw::Error) -> Self {
         Self::InvalidResponse {
             message: err.to_string(),
         }

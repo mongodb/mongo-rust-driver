@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::Bson;
+use crate::bson::Bson;
 
 use crate::{
     coll::options::DropIndexOptions,

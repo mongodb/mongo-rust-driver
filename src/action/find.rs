@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::{Bson, Document};
+use crate::bson::{Bson, Document};
 use serde::de::DeserializeOwned;
 
 use crate::{

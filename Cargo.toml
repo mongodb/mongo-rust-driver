@@ -30,7 +30,10 @@ exclude = [
 
 [features]
 default = ["compat-3-0-0", "rustls-tls", "dns-resolver"]
-compat-3-0-0 = []
+compat-3-0-0 = ["compat-3-3-0", "bson-2"]
+compat-3-3-0 = []
+bson-2 = ["dep:bson2", "mongocrypt/bson-2"]
+bson-3 = ["dep:bson3", "mongocrypt/bson-3"]
 sync = []
 rustls-tls = ["dep:rustls", "dep:tokio-rustls"]
 openssl-tls = ["dep:openssl", "dep:openssl-probe", "dep:tokio-openssl"]
@@ -73,7 +76,6 @@ tracing-unstable = ["dep:tracing", "dep:log"]
 async-trait = "0.1.42"
 base64 = "0.13.0"
 bitflags = "1.1.0"
-bson = { git = "https://github.com/mongodb/bson-rust", branch = "main", version = "2.14.0" }
 chrono = { version = "0.4.7", default-features = false, features = [
     "clock",
     "std",
@@ -92,7 +94,6 @@ hmac = "0.12.1"
 once_cell = "1.19.0"
 log = { version = "0.4.17", optional = true }
 md-5 = "0.10.1"
-mongocrypt = { git = "https://github.com/mongodb/libmongocrypt-rust.git", branch = "main", optional = true, version = "0.2.1" }
 mongodb-internal-macros = { path = "macros", version = "3.2.3" }
 num_cpus = { version = "1.13.1", optional = true }
 openssl = { version = "0.10.38", optional = true }
@@ -119,6 +120,27 @@ webpki-roots = "0.26"
 zstd = { version = "0.11.2", optional = true }
 macro_magic = "0.5.1"
 rustversion = "1.0.20"
+
+[dependencies.bson2]
+git = "https://github.com/mongodb/bson-rust"
+branch = "2.15.x"
+package = "bson"
+version = "2.15.0"
+optional = true
+
+[dependencies.bson3]
+git = "https://github.com/mongodb/bson-rust"
+branch = "main"
+package = "bson"
+version = "3.0.0"
+optional = true
+
+[dependencies.mongocrypt]
+git = "https://github.com/abr-egn/libmongocrypt-rust.git"
+branch = "RUST-2217/additive-bson"
+version = "0.3.0"
+default-features = false
+optional = true
 
 [dependencies.pbkdf2]
 version = "0.11.0"
