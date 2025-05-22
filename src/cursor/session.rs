@@ -117,8 +117,7 @@ where
     /// the stream before using the session.
     ///
     /// ```
-    /// # use bson::{doc, Document};
-    /// # use mongodb::{Client, error::Result};
+    /// # use mongodb::{Client, bson::{doc, Document}, error::Result};
     /// # fn main() {
     /// # async {
     /// # let client = Client::with_uri_str("foo").await?;
@@ -165,8 +164,7 @@ where
     /// functionality of `Stream` is not needed.
     ///
     /// ```
-    /// # use bson::{doc, Document};
-    /// # use mongodb::Client;
+    /// # use mongodb::{Client, bson::{doc, Document}};
     /// # fn main() {
     /// # async {
     /// # let client = Client::with_uri_str("foo").await?;

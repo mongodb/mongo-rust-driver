@@ -195,10 +195,8 @@ impl Client {
     /// Return an `EncryptedClientBuilder` for constructing a `Client` with auto-encryption enabled.
     ///
     /// ```no_run
-    /// # use bson::doc;
     /// # use mongocrypt::ctx::KmsProvider;
-    /// # use mongodb::Client;
-    /// # use mongodb::error::Result;
+    /// # use mongodb::{Client, bson::{self, doc}, error::Result};
     /// # async fn func() -> Result<()> {
     /// # let client_options = todo!();
     /// # let key_vault_namespace = todo!();
@@ -207,7 +205,7 @@ impl Client {
     /// let encrypted_client = Client::encrypted_builder(
     ///     client_options,
     ///     key_vault_namespace,
-    ///     [(KmsProvider::Local, doc! { "key": local_key }, None)],
+    ///     [(KmsProvider::local(), doc! { "key": local_key }, None)],
     /// )?
     /// .key_vault_client(key_vault_client)
     /// .build()

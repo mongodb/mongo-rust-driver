@@ -39,10 +39,8 @@ impl ClientEncryption {
     /// Initialize a new `ClientEncryption`.
     ///
     /// ```no_run
-    /// # use bson::doc;
     /// # use mongocrypt::ctx::KmsProvider;
-    /// # use mongodb::client_encryption::ClientEncryption;
-    /// # use mongodb::error::Result;
+    /// # use mongodb::{bson::doc, client_encryption::ClientEncryption, error::Result};
     /// # fn func() -> Result<()> {
     /// # let kv_client = todo!();
     /// # let kv_namespace = todo!();
@@ -51,8 +49,8 @@ impl ClientEncryption {
     ///     kv_client,
     ///     kv_namespace,
     ///     [
-    ///         (KmsProvider::Local, doc! { "key": local_key }, None),
-    ///         (KmsProvider::Kmip, doc! { "endpoint": "localhost:5698" }, None),
+    ///         (KmsProvider::local(), doc! { "key": local_key }, None),
+    ///         (KmsProvider::kmip(), doc! { "endpoint": "localhost:5698" }, None),
     ///     ]
     /// )?;
     /// # Ok(())
@@ -72,10 +70,8 @@ impl ClientEncryption {
     /// [`ClientEncryptionBuilder`] can be chained to set options.
     ///
     /// ```no_run
-    /// # use bson::doc;
     /// # use mongocrypt::ctx::KmsProvider;
-    /// # use mongodb::client_encryption::ClientEncryption;
-    /// # use mongodb::error::Result;
+    /// # use mongodb::{bson::doc, client_encryption::ClientEncryption, error::Result};
     /// # fn func() -> Result<()> {
     /// # let kv_client = todo!();
     /// # let kv_namespace = todo!();
@@ -84,8 +80,8 @@ impl ClientEncryption {
     ///     kv_client,
     ///     kv_namespace,
     ///     [
-    ///         (KmsProvider::Local, doc! { "key": local_key }, None),
-    ///         (KmsProvider::Kmip, doc! { "endpoint": "localhost:5698" }, None),
+    ///         (KmsProvider::local(), doc! { "key": local_key }, None),
+    ///         (KmsProvider::kmip(), doc! { "endpoint": "localhost:5698" }, None),
     ///     ]
     /// )
     /// .build()?;

@@ -74,8 +74,7 @@ where
     /// The session provided must be the same session used to create the change stream.
     ///
     /// ```
-    /// # use bson::{doc, Document};
-    /// # use mongodb::Client;
+    /// # use mongodb::{Client, bson::{self, doc, Document}};
     /// # fn main() {
     /// # async {
     /// # let client = Client::with_uri_str("foo").await?;
