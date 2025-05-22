@@ -914,10 +914,10 @@ pub struct ConnectionString {
     /// Default read preference for the client.
     pub read_preference: Option<ReadPreference>,
 
-    /// The [`UuidRepresentation`] to use when decoding [`Binary`](bson::Binary) values with the
-    /// [`UuidOld`](bson::spec::BinarySubtype::UuidOld) subtype. This is not used by the
-    /// driver; client code can use this when deserializing relevant values with
-    /// [`Binary::to_uuid_with_representation`](bson::binary::Binary::to_uuid_with_representation).
+    /// The [`UuidRepresentation`] to use when decoding [`Binary`](crate::bson::Binary) values with
+    /// the [`UuidOld`](crate::bson::spec::BinarySubtype::UuidOld) subtype. This is not used by
+    /// the driver; client code can use this when deserializing relevant values with
+    /// [`Binary::to_uuid_with_representation`](crate::bson::binary::Binary::to_uuid_with_representation).
     pub uuid_representation: Option<UuidRepresentation>,
 
     /// Limit on the number of mongos connections that may be created for sharded topologies.
