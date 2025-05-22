@@ -1,7 +1,7 @@
 # MongoDB Rust Driver
 [![Crates.io](https://img.shields.io/crates/v/mongodb.svg)](https://crates.io/crates/mongodb) [![docs.rs](https://docs.rs/mongodb/badge.svg)](https://docs.rs/mongodb) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/mongodb/mongo-rust-driver/blob/main/LICENSE)
 
-This is the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/latest) crate for BSON support. The driver contains a fully async API that requires [`tokio`](https://docs.rs/tokio). The driver also has a sync API that may be enabled via feature flags.
+This is the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/latest) crate for BSON support. The driver contains a fully async API that requires [`tokio`](https://docs.rs/tokio). The driver also has a sync API that may be enabled via feature flags. The MongoDB Rust driver follows [semantic versioning](https://semver.org/) for its releases.
 
 For more details, including features, runnable examples, troubleshooting resources, and more, please see the [official documentation](https://www.mongodb.com/docs/drivers/rust/current/).
 
