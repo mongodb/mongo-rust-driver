@@ -193,7 +193,7 @@ pub(crate) fn tracing_events_match(
         };
     }
 
-    let serialized_fields = bson::to_document(&actual.fields)
+    let serialized_fields = crate::bson::to_document(&actual.fields)
         .map_err(|e| format!("Failed to serialize tracing fields to document: {}", e))?;
 
     results_match(

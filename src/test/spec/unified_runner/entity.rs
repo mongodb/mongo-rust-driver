@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use bson::to_document;
+use crate::bson::to_document;
 use time::OffsetDateTime;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 
@@ -70,7 +70,7 @@ impl std::fmt::Debug for crate::client_encryption::ClientEncryption {
 pub(crate) struct ClientEntity {
     /// This is None if a `close` operation has been executed for this entity.
     pub(crate) client: Option<Client>,
-    pub(crate) topology_id: bson::oid::ObjectId,
+    pub(crate) topology_id: crate::bson::oid::ObjectId,
     events: EventBuffer,
     observe_events: Option<Vec<ObserveEvent>>,
     ignore_command_names: Option<Vec<String>>,
@@ -505,7 +505,7 @@ impl Entity {
     }
 
     /// If this entity is descended from a client entity, returns the topology ID for that client.
-    pub(crate) async fn client_topology_id(&self) -> Option<bson::oid::ObjectId> {
+    pub(crate) async fn client_topology_id(&self) -> Option<crate::bson::oid::ObjectId> {
         match self {
             Entity::Client(client_entity) => Some(client_entity.topology_id),
             Entity::Database(database) => Some(database.client().topology().id),

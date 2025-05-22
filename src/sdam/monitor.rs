@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bson::doc;
+use crate::bson::doc;
 use tokio::sync::watch;
 
 use super::{

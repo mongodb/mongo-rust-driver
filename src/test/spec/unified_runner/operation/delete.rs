@@ -1,4 +1,5 @@
 use crate::{
+    bson::{to_bson, Document},
     error::Result,
     options::DeleteOptions,
     test::spec::unified_runner::{
@@ -7,7 +8,6 @@ use crate::{
         TestRunner,
     },
 };
-use bson::{to_bson, Document};
 use futures::future::BoxFuture;
 use futures_util::FutureExt;
 use serde::Deserialize;

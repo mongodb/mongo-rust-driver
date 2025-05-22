@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::{doc, Document};
+use crate::bson::{doc, Document};
 
 use crate::{
     event::sdam::SdamEvent,
