@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use bson::Document;
+use crate::bson::Document;
 use serde::Deserialize;
 
 use super::TestSdamEvent;
@@ -754,7 +754,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     // get the one server in the topology
     let server = topology.servers().into_values().next().unwrap();
 
-    let heartbeat_response: HelloCommandResponse = bson::from_document(doc! {
+    let heartbeat_response: HelloCommandResponse = crate::bson::from_document(doc! {
         "ok": 1,
         "isWritablePrimary": true,
         "minWireVersion": 0,

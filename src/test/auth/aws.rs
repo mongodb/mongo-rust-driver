@@ -35,7 +35,7 @@ async fn credential_caching() {
     coll.find_one(doc! {}).await.unwrap();
     assert!(cached_credential().await.is_some());
 
-    let now = bson::DateTime::now();
+    let now = crate::bson::DateTime::now();
     set_cached_expiration(now).await;
 
     let client = get_client().await;

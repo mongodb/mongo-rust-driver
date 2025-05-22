@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use bson::Bson;
+use crate::bson::Bson;
 use tokio::sync::Mutex;
 
 use crate::{
@@ -338,7 +338,7 @@ async fn retry_write_different_mongos() {
         .await;
     let result = client
         .database("test")
-        .collection::<bson::Document>("retry_write_different_mongos")
+        .collection::<crate::bson::Document>("retry_write_different_mongos")
         .insert_one(doc! {})
         .await;
     assert!(result.is_err());
@@ -393,7 +393,7 @@ async fn retry_write_same_mongos() {
         .await;
     let result = client
         .database("test")
-        .collection::<bson::Document>("retry_write_same_mongos")
+        .collection::<crate::bson::Document>("retry_write_same_mongos")
         .insert_one(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);

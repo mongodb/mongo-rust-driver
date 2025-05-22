@@ -1,5 +1,6 @@
 use crate::{
     action::Action,
+    bson::{Bson, Document},
     error::Result,
     options::ListCollectionsOptions,
     test::spec::unified_runner::{
@@ -8,7 +9,6 @@ use crate::{
         TestRunner,
     },
 };
-use bson::{Bson, Document};
 use futures::{future::BoxFuture, TryStreamExt};
 use futures_util::FutureExt;
 use serde::Deserialize;
@@ -35,7 +35,7 @@ impl TestOperation for ListDatabases {
                 client.list_databases().with_options(self.options.clone()),
             )
             .await?;
-            Ok(Some(bson::to_bson(&result)?.into()))
+            Ok(Some(crate::bson::to_bson(&result)?.into()))
         }
         .boxed()
     }
@@ -103,7 +103,7 @@ impl TestOperation for ListCollections {
                     cursor.try_collect::<Vec<_>>().await?
                 }
             };
-            Ok(Some(bson::to_bson(&result)?.into()))
+            Ok(Some(crate::bson::to_bson(&result)?.into()))
         }
         .boxed()
     }

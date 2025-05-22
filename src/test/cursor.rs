@@ -238,12 +238,13 @@ async fn session_cursor_with_type() {
         .await
         .unwrap();
 
-    let mut cursor: crate::SessionCursor<bson::Document> =
+    let mut cursor: crate::SessionCursor<crate::bson::Document> =
         coll.find(doc! {}).session(&mut session).await.unwrap();
 
     let _ = cursor.next(&mut session).await.unwrap().unwrap();
 
-    let mut cursor_with_type: crate::SessionCursor<bson::RawDocumentBuf> = cursor.with_type();
+    let mut cursor_with_type: crate::SessionCursor<crate::bson::RawDocumentBuf> =
+        cursor.with_type();
 
     let _ = cursor_with_type.next(&mut session).await.unwrap().unwrap();
 }

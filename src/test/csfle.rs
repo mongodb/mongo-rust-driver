@@ -20,8 +20,8 @@ mod spec; // requires environment variables listed below
 
 use std::{env, path::PathBuf};
 
+use crate::bson::{doc, Document, RawBson};
 use anyhow::Context;
-use bson::{doc, Document, RawBson};
 use mongocrypt::ctx::{Algorithm, KmsProvider, KmsProviderType};
 use once_cell::sync::Lazy;
 
@@ -127,8 +127,8 @@ pub(crate) static LOCAL_KMS: Lazy<KmsInfo> = Lazy::new(|| {
     (
         KmsProvider::local(),
         doc! {
-            "key": bson::Binary {
-                subtype: bson::spec::BinarySubtype::Generic,
+            "key": crate::bson::Binary {
+                subtype: crate::bson::spec::BinarySubtype::Generic,
                 bytes: base64::decode(&*CSFLE_LOCAL_KEY).unwrap(),
             },
         },
@@ -262,7 +262,7 @@ async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
 
 async fn validate_roundtrip(
     client_encryption: &ClientEncryption,
-    key_id: bson::Binary,
+    key_id: crate::bson::Binary,
 ) -> Result<()> {
     let value = RawBson::String("test".to_string());
     let encrypted = client_encryption

@@ -105,7 +105,7 @@ fn deserialize_spec_tests_common<T: DeserializeOwned>(
             )
         });
 
-        let deserializer = bson::Deserializer::new(test_bson);
+        let deserializer = crate::bson::Deserializer::new(test_bson);
         let test: T = serde_path_to_error::deserialize(deserializer).unwrap_or_else(|e| {
             panic!(
                 "Failed to deserialize test BSON to {} in {:?}: {}",

@@ -465,7 +465,7 @@ fn topology_description_tracing_representation() {
         ServerDescription::new(&ServerAddress::default()),
     );
 
-    let oid = bson::oid::ObjectId::new();
+    let oid = crate::bson::oid::ObjectId::new();
     let description = TopologyDescription {
         single_seed: false,
         set_name: Some("myReplicaSet".to_string()),
