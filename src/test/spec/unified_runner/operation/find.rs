@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use crate::{
+    bson::{to_bson, Bson, Document},
     error::Result,
     options::{
         Collation,
@@ -21,7 +22,6 @@ use crate::{
         TestRunner,
     },
 };
-use bson::{to_bson, Bson, Document};
 use futures::{future::BoxFuture, TryStreamExt};
 use futures_util::FutureExt;
 use serde::{Deserialize, Deserializer};

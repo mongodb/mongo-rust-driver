@@ -167,7 +167,7 @@ pub(crate) struct AwsCredential {
         default,
         deserialize_with = "serde_util::deserialize_datetime_option_from_double_or_string"
     )]
-    expiration: Option<bson::DateTime>,
+    expiration: Option<crate::bson::DateTime>,
 }
 
 fn non_empty(s: Option<String>) -> Option<String> {
@@ -287,7 +287,7 @@ impl AwsCredential {
             .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?
             .to_owned();
 
-        Ok(bson::from_document(credential)?)
+        Ok(crate::bson::from_document(credential)?)
     }
 
     /// Obtains credentials from the ECS endpoint.
@@ -474,7 +474,7 @@ impl AwsCredential {
     fn is_expired(&self) -> bool {
         match self.expiration {
             Some(expiration) => {
-                expiration.saturating_duration_since(bson::DateTime::now())
+                expiration.saturating_duration_since(crate::bson::DateTime::now())
                     < Duration::from_secs(5 * 60)
             }
             None => true,
@@ -512,7 +512,7 @@ impl ServerFirst {
         let ServerFirstPayload {
             server_nonce,
             sts_host,
-        } = bson::from_slice(payload.as_slice())
+        } = crate::bson::from_slice(payload.as_slice())
             .map_err(|_| Error::invalid_authentication_response(MECH_NAME))?;
 
         Ok(Self {
@@ -591,11 +591,11 @@ pub(crate) mod test_utils {
         cached_credential().await.unwrap().session_token
     }
 
-    pub(crate) async fn cached_expiration() -> bson::DateTime {
+    pub(crate) async fn cached_expiration() -> crate::bson::DateTime {
         cached_credential().await.unwrap().expiration.unwrap()
     }
 
-    pub(crate) async fn set_cached_expiration(expiration: bson::DateTime) {
+    pub(crate) async fn set_cached_expiration(expiration: crate::bson::DateTime) {
         CACHED_CREDENTIAL.lock().await.as_mut().unwrap().expiration = Some(expiration);
     }
 }

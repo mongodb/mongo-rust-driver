@@ -41,7 +41,7 @@ impl TestOperation for GetKeyByAltName {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct DeleteKey {
-    id: bson::Binary,
+    id: crate::bson::Binary,
 }
 
 impl TestOperation for DeleteKey {
@@ -53,9 +53,9 @@ impl TestOperation for DeleteKey {
         async move {
             let ce = test_runner.get_client_encryption(id).await;
             let result = ce.delete_key(&self.id).await?;
-            Ok(Some(Entity::Bson(Bson::Document(bson::to_document(
-                &result,
-            )?))))
+            Ok(Some(Entity::Bson(Bson::Document(
+                crate::bson::to_document(&result)?,
+            ))))
         }
         .boxed()
     }
@@ -64,7 +64,7 @@ impl TestOperation for DeleteKey {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct GetKey {
-    id: bson::Binary,
+    id: crate::bson::Binary,
 }
 
 impl TestOperation for GetKey {
@@ -88,7 +88,7 @@ impl TestOperation for GetKey {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct AddKeyAltName {
-    id: bson::Binary,
+    id: crate::bson::Binary,
     key_alt_name: String,
 }
 
@@ -127,7 +127,7 @@ impl<'de> Deserialize<'de> for CreateDataKey {
         struct TestOptions {
             master_key: Option<MasterKey>,
             key_alt_names: Option<Vec<String>>,
-            key_material: Option<bson::Binary>,
+            key_material: Option<crate::bson::Binary>,
         }
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -197,7 +197,7 @@ impl TestOperation for GetKeys {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct RemoveKeyAltName {
-    id: bson::Binary,
+    id: crate::bson::Binary,
     key_alt_name: String,
 }
 

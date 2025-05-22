@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::Document;
+use crate::bson::Document;
 
 use crate::{
     action::{action_impl, deeplink, export_doc, option_setters, options_doc},

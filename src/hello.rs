@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::{rawdoc, RawDocumentBuf};
+use crate::bson::{rawdoc, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 

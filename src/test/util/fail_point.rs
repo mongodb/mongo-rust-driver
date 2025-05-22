@@ -16,7 +16,7 @@ impl Client {
     /// method should remain in scope while the fail point is intended for use. Upon drop, the
     /// guard will disable the fail point on the server.
     pub(crate) async fn enable_fail_point(&self, fail_point: FailPoint) -> Result<FailPointGuard> {
-        let command = bson::to_document(&fail_point)?;
+        let command = crate::bson::to_document(&fail_point)?;
         self.database("admin")
             .run_command(command)
             .selection_criteria(fail_point.selection_criteria.clone())

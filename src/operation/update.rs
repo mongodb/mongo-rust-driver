@@ -120,7 +120,7 @@ impl OperationWithDefaults for Update {
             }
 
             if let Some(ref collation) = options.collation {
-                update.append("collation", bson::to_raw_document_buf(&collation)?);
+                update.append("collation", crate::bson::to_raw_document_buf(&collation)?);
             }
 
             if let Some(bypass_doc_validation) = options.bypass_document_validation {
@@ -129,12 +129,15 @@ impl OperationWithDefaults for Update {
 
             if let Some(ref write_concern) = options.write_concern {
                 if !write_concern.is_empty() {
-                    body.append("writeConcern", bson::to_raw_document_buf(write_concern)?);
+                    body.append(
+                        "writeConcern",
+                        crate::bson::to_raw_document_buf(write_concern)?,
+                    );
                 }
             }
 
             if let Some(ref let_vars) = options.let_vars {
-                body.append("let", bson::to_raw_document_buf(&let_vars)?);
+                body.append("let", crate::bson::to_raw_document_buf(&let_vars)?);
             }
 
             if let Some(ref comment) = options.comment {

@@ -1,4 +1,4 @@
-use bson::{RawDocument, RawDocumentBuf};
+use crate::bson::{RawDocument, RawDocumentBuf};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::wire::{message::DocumentSequence, Message};
@@ -202,7 +202,7 @@ impl RawCommandResponse {
     }
 
     pub(crate) fn body<'a, T: Deserialize<'a>>(&'a self) -> Result<T> {
-        bson::from_slice(self.raw.as_bytes()).map_err(|e| {
+        crate::bson::from_slice(self.raw.as_bytes()).map_err(|e| {
             Error::from(ErrorKind::InvalidResponse {
                 message: format!("{}", e),
             })
@@ -212,7 +212,7 @@ impl RawCommandResponse {
     /// Used to handle decoding responses where the server may return invalid UTF-8 in error
     /// messages.
     pub(crate) fn body_utf8_lossy<'a, T: Deserialize<'a>>(&'a self) -> Result<T> {
-        bson::from_slice_utf8_lossy(self.raw.as_bytes()).map_err(|e| {
+        crate::bson::from_slice_utf8_lossy(self.raw.as_bytes()).map_err(|e| {
             Error::from(ErrorKind::InvalidResponse {
                 message: format!("{}", e),
             })

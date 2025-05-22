@@ -1,6 +1,6 @@
 use std::borrow::Borrow;
 
-use bson::{Bson, Document, RawDocumentBuf};
+use crate::bson::{Bson, Document, RawDocumentBuf};
 use serde::Serialize;
 
 use crate::{
@@ -31,7 +31,7 @@ impl<T: Serialize + Send + Sync> Collection<T> {
         ReplaceOne {
             coll: CollRef::new(self),
             query,
-            replacement: bson::to_raw_document_buf(replacement.borrow()).map_err(Into::into),
+            replacement: crate::bson::to_raw_document_buf(replacement.borrow()).map_err(Into::into),
             options: None,
             session: None,
         }

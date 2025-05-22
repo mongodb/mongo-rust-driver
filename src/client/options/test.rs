@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::UuidRepresentation;
+use crate::bson::UuidRepresentation;
 use once_cell::sync::Lazy;
 use pretty_assertions::assert_eq;
 use serde::Deserialize;
@@ -122,7 +122,7 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                 }
 
                 let mut actual_options =
-                    bson::to_document(&client_options).expect(&test_case.description);
+                    crate::bson::to_document(&client_options).expect(&test_case.description);
 
                 if let Some(mode) = actual_options.remove("mode") {
                     actual_options.insert("readPreference", mode);
@@ -381,7 +381,7 @@ fn unix_domain_socket_not_allowed() {
 async fn tls_cert_key_password_connect() {
     use std::path::PathBuf;
 
-    use bson::doc;
+    use crate::bson::doc;
 
     use crate::{
         options::TlsOptions,

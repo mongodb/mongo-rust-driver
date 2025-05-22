@@ -1,4 +1,4 @@
-use bson::{doc, Bson, Document};
+use crate::bson::{doc, Bson, Document};
 use futures_util::{StreamExt, TryStreamExt};
 
 use crate::{
@@ -681,8 +681,8 @@ async fn transaction_fields() -> Result<()> {
 // run because it's just asserting that this compiles.
 #[allow(unreachable_code, unused_variables, clippy::diverging_sub_expression)]
 async fn _collection_watch_typed() {
-    let coll: Collection<bson::RawDocumentBuf> = unimplemented!();
+    let coll: Collection<crate::bson::RawDocumentBuf> = unimplemented!();
     let mut stream = coll.watch().await.unwrap();
-    let _: Option<crate::error::Result<ChangeStreamEvent<bson::RawDocumentBuf>>> =
+    let _: Option<crate::error::Result<ChangeStreamEvent<crate::bson::RawDocumentBuf>>> =
         stream.next().await;
 }

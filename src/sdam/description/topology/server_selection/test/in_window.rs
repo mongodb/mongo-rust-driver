@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
+use crate::bson::{doc, Document};
 use approx::abs_diff_eq;
-use bson::{doc, Document};
 use serde::Deserialize;
 
 use crate::{

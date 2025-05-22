@@ -5,11 +5,11 @@ use super::{
     SERVER_SELECTION_TRACING_EVENT_TARGET,
 };
 use crate::{
+    bson::oid::ObjectId,
     error::Error,
     sdam::{SelectedServer, TopologyDescription},
     selection_criteria::SelectionCriteria,
 };
-use bson::oid::ObjectId;
 use std::time::{Duration, Instant};
 
 impl TracingRepresentation for SelectionCriteria {

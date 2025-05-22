@@ -23,8 +23,8 @@ impl<Op: Operation> Operation for RawOutput<Op> {
 
     fn extract_at_cluster_time(
         &self,
-        response: &bson::RawDocument,
-    ) -> Result<Option<bson::Timestamp>> {
+        response: &crate::bson::RawDocument,
+    ) -> Result<Option<crate::bson::Timestamp>> {
         self.0.extract_at_cluster_time(response)
     }
 

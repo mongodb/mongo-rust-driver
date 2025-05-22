@@ -1,4 +1,5 @@
 use crate::{
+    bson::{Bson, Document},
     error::Result,
     options::{CountOptions, DistinctOptions, EstimatedDocumentCountOptions},
     test::spec::unified_runner::{
@@ -8,7 +9,6 @@ use crate::{
         TestRunner,
     },
 };
-use bson::{Bson, Document};
 use futures::future::BoxFuture;
 use futures_util::FutureExt;
 use serde::Deserialize;

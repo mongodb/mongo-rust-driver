@@ -1,5 +1,8 @@
-use crate::{bson::Document, event, test::Matchable};
-use bson::Bson;
+use crate::{
+    bson::{Bson, Document},
+    event,
+    test::Matchable,
+};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]

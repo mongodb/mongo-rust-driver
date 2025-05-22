@@ -578,7 +578,7 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
         .unwrap()
         .get("hint")
         .cloned()
-        .map(|bson| bson::from_bson(bson).unwrap());
+        .map(|bson| crate::bson::from_bson(bson).unwrap());
     let expected_hint = options.and_then(|options| options.hint);
     assert_eq!(event_hint, expected_hint);
 }
@@ -626,7 +626,7 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
         .command
         .get("hint")
         .cloned()
-        .map(|bson| bson::from_bson(bson).unwrap());
+        .map(|bson| crate::bson::from_bson(bson).unwrap());
     let expected_hint = options.and_then(|options| options.hint);
     assert_eq!(event_hint, expected_hint);
 }

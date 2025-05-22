@@ -1,6 +1,6 @@
 use crate::bson::Document;
 
-use bson::doc;
+use crate::bson::doc;
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 

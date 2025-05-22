@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use bson::rawdoc;
+use crate::bson::rawdoc;
 
 use super::Handshaker;
 use crate::{cmap::establish::handshake::HandshakerOptions, options::DriverInfo};

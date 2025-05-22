@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, time::Duration};
 
-use bson::{Bson, Document, Timestamp};
+use crate::bson::{Bson, Document, Timestamp};
 use serde::de::DeserializeOwned;
 
 use super::{

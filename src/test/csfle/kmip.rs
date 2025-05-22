@@ -460,7 +460,7 @@ mod corpus {
             }
             if allowed {
                 let bin = match value {
-                    bson::Bson::Binary(b) => b,
+                    crate::bson::Bson::Binary(b) => b,
                     _ => {
                         return Err(failure!(
                             "expected value {:?} should be Binary, got {:?}",
@@ -470,7 +470,7 @@ mod corpus {
                     }
                 };
                 let actual_bin = match actual_value {
-                    bson::Bson::Binary(b) => b,
+                    crate::bson::Bson::Binary(b) => b,
                     _ => {
                         return Err(failure!(
                             "actual value {:?} should be Binary, got {:?}",
@@ -503,9 +503,9 @@ mod corpus {
             }
             new_obj.insert(name.clone(), value.clone());
         }
-        let bson: bson::Bson = serde_json::Value::Object(new_obj).try_into()?;
+        let bson: crate::bson::Bson = serde_json::Value::Object(new_obj).try_into()?;
         match bson {
-            bson::Bson::Document(d) => Ok(d),
+            crate::bson::Bson::Document(d) => Ok(d),
             _ => Err(failure!("expected document, got {:?}", bson)),
         }
     }

@@ -1,5 +1,5 @@
 #[cfg(feature = "in-use-encryption")]
-use bson::Document;
+use crate::bson::Document;
 
 use crate::{
     coll::options::DropCollectionOptions,

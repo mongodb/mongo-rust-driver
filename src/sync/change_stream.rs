@@ -181,8 +181,7 @@ where
     /// The session provided must be the same session used to create the change stream.
     ///
     /// ```
-    /// # use bson::{doc, Document};
-    /// # use mongodb::sync::Client;
+    /// # use mongodb::{bson::{self, doc, Document}, sync::Client};
     /// # fn main() {
     /// # async {
     /// # let client = Client::with_uri_str("foo")?;

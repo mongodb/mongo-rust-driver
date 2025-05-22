@@ -320,8 +320,7 @@ where
     /// functionality of `Iterator` is not needed.
     ///
     /// ```
-    /// # use bson::{doc, Document};
-    /// # use mongodb::sync::Client;
+    /// # use mongodb::{bson::{doc, Document}, sync::Client};
     /// # fn foo() -> mongodb::error::Result<()> {
     /// # let client = Client::with_uri_str("foo")?;
     /// # let coll = client.database("foo").collection::<Document>("bar");

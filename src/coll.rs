@@ -3,7 +3,7 @@ pub mod options;
 
 use std::{fmt, fmt::Debug, str::FromStr, sync::Arc};
 
-use bson::rawdoc;
+use crate::bson::rawdoc;
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
 
 use self::options::*;

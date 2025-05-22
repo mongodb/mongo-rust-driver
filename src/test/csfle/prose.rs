@@ -97,7 +97,7 @@ async fn custom_key_material() -> Result<()> {
         .await?
         .unwrap();
     datakeys.delete_one(doc! { "_id": id}).await?;
-    let new_key_id = bson::Binary::from_uuid(bson::Uuid::from_bytes([0; 16]));
+    let new_key_id = crate::bson::Binary::from_uuid(crate::bson::Uuid::from_bytes([0; 16]));
     key_doc.insert("_id", new_key_id.clone());
     datakeys.insert_one(key_doc).await?;
 

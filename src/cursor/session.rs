@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use bson::RawDocument;
+use crate::bson::RawDocument;
 use futures_core::Stream;
 use futures_util::StreamExt;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -117,8 +117,7 @@ where
     /// the stream before using the session.
     ///
     /// ```
-    /// # use bson::{doc, Document};
-    /// # use mongodb::{Client, error::Result};
+    /// # use mongodb::{Client, bson::{doc, Document}, error::Result};
     /// # fn main() {
     /// # async {
     /// # let client = Client::with_uri_str("foo").await?;
@@ -165,8 +164,7 @@ where
     /// functionality of `Stream` is not needed.
     ///
     /// ```
-    /// # use bson::{doc, Document};
-    /// # use mongodb::Client;
+    /// # use mongodb::{Client, bson::{doc, Document}};
     /// # fn main() {
     /// # async {
     /// # let client = Client::with_uri_str("foo").await?;
@@ -306,7 +304,7 @@ impl<T> SessionCursor<T> {
     where
         T: Deserialize<'a>,
     {
-        bson::from_slice(self.current().as_bytes()).map_err(Error::from)
+        crate::bson::from_slice(self.current().as_bytes()).map_err(Error::from)
     }
 
     /// Update the type streamed values will be parsed as.

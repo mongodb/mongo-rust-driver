@@ -3,7 +3,7 @@ mod test;
 
 use std::env;
 
-use bson::{rawdoc, RawBson, RawDocumentBuf};
+use crate::bson::{rawdoc, RawBson, RawDocumentBuf};
 use once_cell::sync::Lazy;
 use tokio::sync::broadcast;
 
@@ -388,7 +388,7 @@ impl Handshaker {
                 compressors
                     .iter()
                     .map(|compressor| compressor.name())
-                    .collect::<bson::RawArrayBuf>(),
+                    .collect::<crate::bson::RawArrayBuf>(),
             );
         }
 
