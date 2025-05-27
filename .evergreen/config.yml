@@ -795,7 +795,7 @@ tasks:
       - func: "compile only"
         vars:
           # Our minimum supported Rust version. This should be updated whenever the MSRV is bumped.
-          RUST_VERSION: 1.74.0
+          RUST_VERSION: 1.81.0
 
   - name: check-cargo-deny
     commands:

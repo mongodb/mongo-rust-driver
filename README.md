@@ -7,7 +7,7 @@ For more details, including features, runnable examples, troubleshooting resourc
 
 ## Installation
 ### Requirements
-- Rust 1.74.0+ (See the [MSRV policy](#minimum-supported-rust-version-msrv-policy) for more information)
+- Rust 1.81.0+ (See the [MSRV policy](#minimum-supported-rust-version-msrv-policy) for more information)
 - MongoDB 4.0+
 
 #### Supported Platforms
@@ -149,7 +149,7 @@ Commits to main are run automatically on [evergreen](https://evergreen.mongodb.c
 
 ## Minimum supported Rust version (MSRV) policy
 
-The MSRV for this crate is currently 1.74.0. Increases to the MSRV will only happen in a minor or major version release, and will be to a Rust version at least six months old.
+The MSRV for this crate is currently 1.81.0. Increases to the MSRV will only happen in a minor or major version release, and will be to a Rust version at least six months old.
 
 ## License
 
