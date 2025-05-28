@@ -5,8 +5,8 @@ use std::convert::TryInto;
 use crate::{cursor::CursorSpecification, options::ChangeStreamOptions};
 
 #[cfg(test)]
-use bson::Bson;
-use bson::{DateTime, Document, RawBson, RawDocumentBuf, Timestamp};
+use crate::bson::Bson;
+use crate::bson::{DateTime, Document, RawBson, RawDocumentBuf, Timestamp};
 use serde::{Deserialize, Serialize};
 
 /// An opaque token used for resuming an interrupted
@@ -43,7 +43,7 @@ impl ResumeToken {
     }
 
     #[cfg(test)]
-    pub(crate) fn parsed(self) -> std::result::Result<Bson, bson::raw::Error> {
+    pub(crate) fn parsed(self) -> std::result::Result<Bson, crate::bson::raw::Error> {
         self.0.try_into()
     }
 }

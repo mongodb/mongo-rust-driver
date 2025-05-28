@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::oid::ObjectId;
+use crate::bson::oid::ObjectId;
 
 use crate::{client::options::ServerAddress, hello::HelloReply, sdam::ServerType};
 

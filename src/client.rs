@@ -85,9 +85,10 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// way to achieve maximum performance, as the driver is designed to work well in such situations.
 ///
 /// Additionally, using a custom Rust type that implements `Serialize` and `Deserialize` as the
-/// generic parameter of [`Collection`](../struct.Collection.html) instead of [`bson::Document`] can
-/// reduce the amount of time the driver and your application spends serializing and deserializing
-/// BSON, which can also lead to increased performance.
+/// generic parameter of [`Collection`](../struct.Collection.html) instead of
+/// [`Document`](crate::bson::Document) can reduce the amount of time the driver and your
+/// application spends serializing and deserializing BSON, which can also lead to increased
+/// performance.
 ///
 /// ## TCP Keepalive
 /// TCP keepalive is enabled by default with ``tcp_keepalive_time`` set to 120 seconds. The
@@ -194,10 +195,8 @@ impl Client {
     /// Return an `EncryptedClientBuilder` for constructing a `Client` with auto-encryption enabled.
     ///
     /// ```no_run
-    /// # use bson::doc;
     /// # use mongocrypt::ctx::KmsProvider;
-    /// # use mongodb::Client;
-    /// # use mongodb::error::Result;
+    /// # use mongodb::{Client, bson::{self, doc}, error::Result};
     /// # async fn func() -> Result<()> {
     /// # let client_options = todo!();
     /// # let key_vault_namespace = todo!();
@@ -206,7 +205,7 @@ impl Client {
     /// let encrypted_client = Client::encrypted_builder(
     ///     client_options,
     ///     key_vault_namespace,
-    ///     [(KmsProvider::Local, doc! { "key": local_key }, None)],
+    ///     [(KmsProvider::local(), doc! { "key": local_key }, None)],
     /// )?
     /// .key_vault_client(key_vault_client)
     /// .build()
@@ -221,7 +220,7 @@ impl Client {
         kms_providers: impl IntoIterator<
             Item = (
                 mongocrypt::ctx::KmsProvider,
-                bson::Document,
+                crate::bson::Document,
                 Option<options::TlsOptions>,
             ),
         >,
@@ -429,7 +428,7 @@ impl Client {
     }
 
     #[cfg(test)]
-    pub(crate) async fn is_session_checked_in(&self, id: &bson::Document) -> bool {
+    pub(crate) async fn is_session_checked_in(&self, id: &crate::bson::Document) -> bool {
         self.inner.session_pool.contains(id).await
     }
 

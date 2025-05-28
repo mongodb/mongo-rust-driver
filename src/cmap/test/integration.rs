@@ -1,4 +1,4 @@
-use bson::rawdoc;
+use crate::bson::rawdoc;
 use serde::Deserialize;
 
 use super::EVENT_TIMEOUT;
@@ -52,7 +52,7 @@ async fn acquire_connection_and_send_command() {
         ConnectionEstablisher::new(EstablisherOptions::from_client_options(&client_options))
             .unwrap(),
         TopologyUpdater::channel().0,
-        bson::oid::ObjectId::new(),
+        crate::bson::oid::ObjectId::new(),
         Some(pool_options),
     );
     let mut connection = pool.check_out().await.unwrap();
@@ -72,7 +72,7 @@ async fn acquire_connection_and_send_command() {
 
     assert!(doc_response.is_success());
 
-    let response: ListDatabasesResponse = bson::from_document(doc_response.body).unwrap();
+    let response: ListDatabasesResponse = crate::bson::from_document(doc_response.body).unwrap();
 
     let names: Vec<_> = response
         .databases
@@ -126,7 +126,7 @@ async fn concurrent_connections() {
         ConnectionEstablisher::new(EstablisherOptions::from_client_options(&client_options))
             .unwrap(),
         TopologyUpdater::channel().0,
-        bson::oid::ObjectId::new(),
+        crate::bson::oid::ObjectId::new(),
         Some(options),
     );
 
@@ -211,7 +211,7 @@ async fn connection_error_during_establishment() {
         ConnectionEstablisher::new(EstablisherOptions::from_client_options(&client_options))
             .unwrap(),
         TopologyUpdater::channel().0,
-        bson::oid::ObjectId::new(),
+        crate::bson::oid::ObjectId::new(),
         Some(options),
     );
 

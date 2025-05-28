@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::{bson, rawdoc, Bson, RawBson};
+use crate::bson::{bson, rawdoc, Bson, RawBson};
 use serde::{Deserialize, Serialize};
 
 use crate::{

@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use bson::{doc, Document};
+use crate::bson::{doc, Document};
 
 use super::{
     action_impl,

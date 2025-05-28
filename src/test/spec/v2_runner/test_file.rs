@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bson::{doc, from_document, Bson};
+use crate::bson::{doc, from_document, Bson};
 use futures::TryStreamExt;
 use serde::{Deserialize, Deserializer};
 
@@ -134,7 +134,7 @@ impl<'de> Deserialize<'de> for ClientOptions {
         #[cfg(feature = "in-use-encryption")]
         let auto_encrypt_opts = uri_options
             .remove("autoEncryptOpts")
-            .map(bson::from_bson)
+            .map(crate::bson::from_bson)
             .transpose()
             .map_err(D::Error::custom)?;
         let uri = merge_uri_options(&DEFAULT_URI, Some(&uri_options), true);

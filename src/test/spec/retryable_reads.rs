@@ -1,6 +1,6 @@
 use std::{future::IntoFuture, time::Duration};
 
-use bson::doc;
+use crate::bson::doc;
 
 use crate::{
     error::Result,
@@ -193,7 +193,7 @@ async fn retry_read_different_mongos() {
         .await;
     let result = client
         .database("test")
-        .collection::<bson::Document>("retry_read_different_mongos")
+        .collection::<crate::bson::Document>("retry_read_different_mongos")
         .find(doc! {})
         .await;
     assert!(result.is_err());
@@ -247,7 +247,7 @@ async fn retry_read_same_mongos() {
         .await;
     let result = client
         .database("test")
-        .collection::<bson::Document>("retry_read_same_mongos")
+        .collection::<crate::bson::Document>("retry_read_same_mongos")
         .find(doc! {})
         .await;
     assert!(result.is_ok(), "{:?}", result);

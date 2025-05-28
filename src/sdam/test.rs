@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bson::doc;
+use crate::bson::doc;
 
 use crate::{
     client::options::{ClientOptions, ServerAddress},
@@ -346,7 +346,7 @@ fn ipv6_invalid_me() {
                 me: Some("[::1]:8191".to_string()),
                 ..Default::default()
             },
-            raw_command_response: bson::RawDocumentBuf::new(),
+            raw_command_response: crate::bson::RawDocumentBuf::new(),
             cluster_time: None,
         })),
     };

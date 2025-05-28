@@ -167,7 +167,7 @@ impl Executor {
             ))
             .unwrap(),
             updater,
-            bson::oid::ObjectId::new(),
+            crate::bson::oid::ObjectId::new(),
             Some(self.pool_options),
         );
 

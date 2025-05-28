@@ -39,10 +39,8 @@ impl ClientEncryption {
     /// Initialize a new `ClientEncryption`.
     ///
     /// ```no_run
-    /// # use bson::doc;
     /// # use mongocrypt::ctx::KmsProvider;
-    /// # use mongodb::client_encryption::ClientEncryption;
-    /// # use mongodb::error::Result;
+    /// # use mongodb::{bson::doc, client_encryption::ClientEncryption, error::Result};
     /// # fn func() -> Result<()> {
     /// # let kv_client = todo!();
     /// # let kv_namespace = todo!();
@@ -51,8 +49,8 @@ impl ClientEncryption {
     ///     kv_client,
     ///     kv_namespace,
     ///     [
-    ///         (KmsProvider::Local, doc! { "key": local_key }, None),
-    ///         (KmsProvider::Kmip, doc! { "endpoint": "localhost:5698" }, None),
+    ///         (KmsProvider::local(), doc! { "key": local_key }, None),
+    ///         (KmsProvider::kmip(), doc! { "endpoint": "localhost:5698" }, None),
     ///     ]
     /// )?;
     /// # Ok(())
@@ -61,7 +59,9 @@ impl ClientEncryption {
     pub fn new(
         key_vault_client: Client,
         key_vault_namespace: Namespace,
-        kms_providers: impl IntoIterator<Item = (KmsProvider, bson::Document, Option<TlsOptions>)>,
+        kms_providers: impl IntoIterator<
+            Item = (KmsProvider, crate::bson::Document, Option<TlsOptions>),
+        >,
     ) -> Result<Self> {
         Self::builder(key_vault_client, key_vault_namespace, kms_providers).build()
     }
@@ -70,10 +70,8 @@ impl ClientEncryption {
     /// [`ClientEncryptionBuilder`] can be chained to set options.
     ///
     /// ```no_run
-    /// # use bson::doc;
     /// # use mongocrypt::ctx::KmsProvider;
-    /// # use mongodb::client_encryption::ClientEncryption;
-    /// # use mongodb::error::Result;
+    /// # use mongodb::{bson::doc, client_encryption::ClientEncryption, error::Result};
     /// # fn func() -> Result<()> {
     /// # let kv_client = todo!();
     /// # let kv_namespace = todo!();
@@ -82,8 +80,8 @@ impl ClientEncryption {
     ///     kv_client,
     ///     kv_namespace,
     ///     [
-    ///         (KmsProvider::Local, doc! { "key": local_key }, None),
-    ///         (KmsProvider::Kmip, doc! { "endpoint": "localhost:5698" }, None),
+    ///         (KmsProvider::local(), doc! { "key": local_key }, None),
+    ///         (KmsProvider::kmip(), doc! { "endpoint": "localhost:5698" }, None),
     ///     ]
     /// )
     /// .build()?;
@@ -93,7 +91,9 @@ impl ClientEncryption {
     pub fn builder(
         key_vault_client: Client,
         key_vault_namespace: Namespace,
-        kms_providers: impl IntoIterator<Item = (KmsProvider, bson::Document, Option<TlsOptions>)>,
+        kms_providers: impl IntoIterator<
+            Item = (KmsProvider, crate::bson::Document, Option<TlsOptions>),
+        >,
     ) -> ClientEncryptionBuilder {
         ClientEncryptionBuilder {
             key_vault_client,
@@ -183,7 +183,7 @@ impl ClientEncryption {
 
     /// Decrypts an encrypted value (BSON binary of subtype 6).
     /// Returns the original BSON value.
-    pub async fn decrypt(&self, value: RawBinaryRef<'_>) -> Result<bson::RawBson> {
+    pub async fn decrypt(&self, value: RawBinaryRef<'_>) -> Result<crate::bson::RawBson> {
         if value.subtype != BinarySubtype::Encrypted {
             return Err(Error::invalid_argument(format!(
                 "Invalid binary subtype for decrypt: expected {:?}, got {:?}",
@@ -208,7 +208,7 @@ impl ClientEncryption {
 pub struct ClientEncryptionBuilder {
     key_vault_client: Client,
     key_vault_namespace: Namespace,
-    kms_providers: Vec<(KmsProvider, bson::Document, Option<TlsOptions>)>,
+    kms_providers: Vec<(KmsProvider, crate::bson::Document, Option<TlsOptions>)>,
     key_cache_expiration: Option<Duration>,
 }
 

@@ -1,4 +1,4 @@
-use bson::{doc, Bson};
+use crate::bson::{doc, Bson};
 
 #[cfg(docsrs)]
 use crate::gridfs::FilesCollectionDocument;
@@ -108,7 +108,7 @@ impl<'a> Action for DeleteByName<'a> {
             .find(doc! { "filename": self.filename.clone() })
             .projection(doc! { "_id": 1 })
             .await?
-            .with_type::<bson::Document>()
+            .with_type::<crate::bson::Document>()
             .map(|r| match r {
                 Ok(mut d) => d
                     .remove("_id")

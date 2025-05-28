@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bson::{doc, to_bson, Bson, Document};
+use crate::bson::{doc, to_bson, Bson, Document};
 use serde::Deserialize;
 
 use crate::{

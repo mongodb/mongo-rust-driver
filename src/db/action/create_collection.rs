@@ -40,8 +40,10 @@ impl<'a> Action for CreateCollection<'a> {
 
         #[cfg(feature = "in-use-encryption")]
         if has_encrypted_fields {
-            use crate::action::Action;
-            use bson::{doc, Document};
+            use crate::{
+                action::Action,
+                bson::{doc, Document},
+            };
             let coll = self.db.collection::<Document>(&ns.coll);
             coll.create_index(crate::IndexModel {
                 keys: doc! {"__safeContent__": 1},
@@ -90,8 +92,7 @@ impl Database {
         options: &Option<crate::db::options::CreateCollectionOptions>,
         mut session: Option<&mut crate::ClientSession>,
     ) -> Result<()> {
-        use crate::error::ErrorKind;
-        use bson::doc;
+        use crate::{bson::doc, error::ErrorKind};
 
         let opts = match options {
             Some(o) => o,

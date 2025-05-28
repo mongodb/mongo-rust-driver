@@ -1,4 +1,5 @@
 use crate::{
+    bson::{doc, Bson, Document},
     error::Result,
     options::{AggregateOptions, CreateCollectionOptions, DropCollectionOptions},
     test::spec::unified_runner::{
@@ -9,7 +10,6 @@ use crate::{
     Collection,
     Database,
 };
-use bson::{doc, Bson, Document};
 use futures::{future::BoxFuture, TryStreamExt};
 use futures_util::FutureExt;
 use serde::Deserialize;

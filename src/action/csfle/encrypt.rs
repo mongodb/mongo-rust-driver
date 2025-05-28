@@ -1,4 +1,4 @@
-use bson::{Binary, Bson, RawDocumentBuf};
+use crate::bson::{Binary, Bson, RawDocumentBuf};
 use macro_magic::export_tokens;
 use mongocrypt::ctx::Algorithm;
 use serde::Serialize;
@@ -22,7 +22,7 @@ impl ClientEncryption {
     #[options_doc(encrypt)]
     pub fn encrypt(
         &self,
-        value: impl Into<bson::RawBson>,
+        value: impl Into<crate::bson::RawBson>,
         key: impl Into<EncryptKey>,
         algorithm: Algorithm,
     ) -> Encrypt {
@@ -101,7 +101,7 @@ pub struct Encrypt<'a, Mode = Value> {
 }
 
 pub struct Value {
-    pub(crate) value: bson::RawBson,
+    pub(crate) value: crate::bson::RawBson,
 }
 
 pub struct Expression {

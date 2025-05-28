@@ -1,7 +1,7 @@
 use std::io::Read;
 
+use crate::bson::{doc, Array, Document};
 use bitflags::bitflags;
-use bson::{doc, Array, Document};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 #[cfg(any(
@@ -62,7 +62,7 @@ impl TryFrom<Command> for Message {
     type Error = Error;
 
     fn try_from(command: Command) -> Result<Self> {
-        let document_payload = bson::to_raw_document_buf(&command)?;
+        let document_payload = crate::bson::to_raw_document_buf(&command)?;
         #[cfg(any(
             feature = "zstd-compression",
             feature = "zlib-compression",

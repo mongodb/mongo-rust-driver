@@ -275,7 +275,7 @@ impl TestContext {
     async fn run_operation(
         &mut self,
         operation: &Operation,
-    ) -> Option<Result<Option<bson::Bson>, crate::error::Error>> {
+    ) -> Option<Result<Option<crate::bson::Bson>, crate::error::Error>> {
         if operation.name == "endSession" {
             let session = match &operation.object {
                 Some(OperationObject::Session0) => &mut self.session0,
@@ -361,7 +361,7 @@ impl OpRunner<'_> {
         &mut self,
         operation: &Operation,
         mut sessions: OpSessions<'_>,
-    ) -> Option<Result<Option<bson::Bson>, crate::error::Error>> {
+    ) -> Option<Result<Option<crate::bson::Bson>, crate::error::Error>> {
         if operation.name == "withTransaction" {
             if !matches!(&operation.object, Some(OperationObject::Session0)) {
                 panic!("invalid object for withTransaction: {:?}", operation.object);

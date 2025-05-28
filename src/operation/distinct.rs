@@ -58,8 +58,8 @@ impl OperationWithDefaults for Distinct {
 
     fn extract_at_cluster_time(
         &self,
-        response: &bson::RawDocument,
-    ) -> Result<Option<bson::Timestamp>> {
+        response: &crate::bson::RawDocument,
+    ) -> Result<Option<crate::bson::Timestamp>> {
         Ok(response
             .get("atClusterTime")?
             .and_then(RawBsonRef::as_timestamp))

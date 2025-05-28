@@ -73,7 +73,7 @@ pub(crate) fn serialize_u32_option_as_i32<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(ref val) => bson::serde_helpers::serialize_u32_as_i32(val, serializer),
+        Some(ref val) => crate::bson::serde_helpers::serialize_u32_as_i32(val, serializer),
         None => serializer.serialize_none(),
     }
 }
@@ -101,7 +101,7 @@ pub(crate) fn serialize_u64_option_as_i64<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(ref v) => bson::serde_helpers::serialize_u64_as_i64(v, serializer),
+        Some(ref v) => crate::bson::serde_helpers::serialize_u64_as_i64(v, serializer),
         None => serializer.serialize_none(),
     }
 }
@@ -137,7 +137,7 @@ pub(crate) fn serialize_result_error_as_string<S: Serializer, T: Serialize>(
 #[cfg(feature = "aws-auth")]
 pub(crate) fn deserialize_datetime_option_from_double_or_string<'de, D>(
     deserializer: D,
-) -> std::result::Result<Option<bson::DateTime>, D::Error>
+) -> std::result::Result<Option<crate::bson::DateTime>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -152,9 +152,9 @@ where
         #[allow(clippy::cast_possible_truncation)]
         AwsDateTime::Double(seconds) => {
             let millis = seconds * 1000.0;
-            bson::DateTime::from_millis(millis as i64)
+            crate::bson::DateTime::from_millis(millis as i64)
         }
-        AwsDateTime::String(string) => bson::DateTime::parse_rfc3339_str(string)
+        AwsDateTime::String(string) => crate::bson::DateTime::parse_rfc3339_str(string)
             .map_err(|e| serde::de::Error::custom(format!("invalid RFC 3339 string: {}", e)))?,
     };
 

@@ -1,4 +1,4 @@
-use bson::{Binary, Document};
+use crate::bson::{Binary, Document};
 use mongocrypt::ctx::{Algorithm, CtxBuilder};
 
 use crate::{
@@ -86,7 +86,7 @@ impl ClientEncryption {
             builder = builder.query_type(qtype)?;
         }
         if let Some(range_options) = &opts.range_options {
-            let options_doc = bson::to_document(range_options)?;
+            let options_doc = crate::bson::to_document(range_options)?;
             builder = builder.algorithm_range(options_doc)?;
         }
         Ok(builder)

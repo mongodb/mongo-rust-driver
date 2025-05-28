@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, future::IntoFuture, net::Ipv6Addr, time::Duration};
 
-use bson::Document;
+use crate::bson::Document;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -74,7 +74,7 @@ async fn metadata_sent_in_handshake() {
         .get_document("clientMetadata")
         .unwrap()
         .clone();
-    let metadata: ClientMetadata = bson::from_document(metadata_document).unwrap();
+    let metadata: ClientMetadata = crate::bson::from_document(metadata_document).unwrap();
 
     assert_eq!(metadata.driver.name, "mongo-rust-driver");
     assert_eq!(metadata.driver.version, env!("CARGO_PKG_VERSION"));

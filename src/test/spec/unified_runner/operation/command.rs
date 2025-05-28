@@ -1,5 +1,6 @@
 use crate::{
     action::Action,
+    bson::{to_bson, Document},
     error::Result,
     options::{RunCursorCommandOptions, SelectionCriteria},
     test::spec::unified_runner::{
@@ -9,7 +10,6 @@ use crate::{
         TestRunner,
     },
 };
-use bson::{to_bson, Document};
 use futures::{future::BoxFuture, TryStreamExt};
 use futures_util::FutureExt;
 use serde::Deserialize;
@@ -93,7 +93,7 @@ impl TestOperation for RunCursorCommand {
                 }
             };
 
-            Ok(Some(bson::to_bson(&result)?.into()))
+            Ok(Some(crate::bson::to_bson(&result)?.into()))
         }
         .boxed()
     }

@@ -76,8 +76,8 @@ impl OperationWithDefaults for ChangeStreamAggregate {
 
     fn extract_at_cluster_time(
         &self,
-        response: &bson::RawDocument,
-    ) -> Result<Option<bson::Timestamp>> {
+        response: &crate::bson::RawDocument,
+    ) -> Result<Option<crate::bson::Timestamp>> {
         self.inner.extract_at_cluster_time(response)
     }
 
@@ -89,7 +89,7 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         let op_time = response
             .raw_body()
             .get("operationTime")?
-            .and_then(bson::RawBsonRef::as_timestamp);
+            .and_then(crate::bson::RawBsonRef::as_timestamp);
 
         let inner_context = ExecutionContext {
             connection: context.connection,

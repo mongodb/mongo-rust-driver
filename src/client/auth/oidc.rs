@@ -8,12 +8,12 @@ use tokio::sync::Mutex;
 use typed_builder::TypedBuilder;
 
 use crate::{
+    bson::{doc, rawdoc, spec::BinarySubtype, Binary, Document},
     client::options::{ServerAddress, ServerApi},
     cmap::{Command, Connection},
     error::{Error, Result},
     BoxFuture,
 };
-use bson::{doc, rawdoc, spec::BinarySubtype, Binary, Document};
 
 use super::{
     sasl::{SaslContinue, SaslResponse, SaslStart},
@@ -688,7 +688,7 @@ async fn do_two_step_function(
     }
 
     let server_info: IdpServerInfo =
-        bson::from_slice(&response.payload).map_err(|_| invalid_auth_response())?;
+        crate::bson::from_slice(&response.payload).map_err(|_| invalid_auth_response())?;
     let idp_response = {
         let cb_context = CallbackContext {
             timeout: Some(Instant::now() + timeout),

@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, ops::Deref};
 
-use bson::{Bson, RawDocumentBuf};
+use crate::bson::{Bson, RawDocumentBuf};
 use serde::Serialize;
 
 use crate::{
@@ -32,7 +32,7 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
         InsertOne {
             coll: CollRef::new(self),
-            doc: bson::to_raw_document_buf(doc.borrow()).map_err(Into::into),
+            doc: crate::bson::to_raw_document_buf(doc.borrow()).map_err(Into::into),
             options: None,
             session: None,
         }

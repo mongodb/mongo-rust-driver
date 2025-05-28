@@ -156,7 +156,8 @@ impl TestClient {
         }
 
         if server_version_gte(4, 0).await && !mechanisms.is_empty() {
-            let ms: bson::Array = mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();
+            let ms: crate::bson::Array =
+                mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();
             cmd.insert("mechanisms", ms);
         }
         self.database(db.into().unwrap_or("admin"))
@@ -239,7 +240,7 @@ impl TestClient {
             .database("admin")
             .run_command(hello.body.try_into()?)
             .await?;
-        Ok(bson::from_document(hello_response_doc)?)
+        Ok(crate::bson::from_document(hello_response_doc)?)
     }
 }
 
