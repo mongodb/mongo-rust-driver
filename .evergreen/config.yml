@@ -675,6 +675,10 @@ task_groups:
       - func: init test-results
       - func: make files executable
       - func: install rust
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+          duration_seconds: 3600
       - command: subprocess.exec
         params:
           binary: bash
@@ -682,6 +686,10 @@ task_groups:
             AZUREOIDC_VMNAME_PREFIX: "RUST_DRIVER"
           args:
             - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/azure/create-and-setup-vm.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
     teardown_task:
       - command: subprocess.exec
         params:
@@ -702,6 +710,10 @@ task_groups:
       - func: init test-results
       - func: make files executable
       - func: install rust
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+          duration_seconds: 3600
       - command: subprocess.exec
         params:
           binary: bash
@@ -709,6 +721,10 @@ task_groups:
             GCPOIDC_VMNAME_PREFIX: "RUST_DRIVER"
           args:
             - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/gcp/setup.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
     teardown_task:
       - command: subprocess.exec
         params:
@@ -729,11 +745,19 @@ task_groups:
       - func: init test-results
       - func: make files executable
       - func: install rust
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+          duration_seconds: 3600
       - command: subprocess.exec
         params:
           binary: bash
           args:
             - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/setup.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
     teardown_task:
       - command: subprocess.exec
         params:
