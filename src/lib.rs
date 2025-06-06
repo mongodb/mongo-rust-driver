@@ -21,6 +21,8 @@ pub mod options;
 pub use ::mongocrypt;
 
 pub mod action;
+#[cfg(feature = "bson-3")]
+pub(crate) mod bson_compat;
 mod bson_util;
 pub mod change_stream;
 pub(crate) mod checked;

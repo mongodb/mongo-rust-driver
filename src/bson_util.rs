@@ -22,6 +22,9 @@ use crate::{
     runtime::SyncLittleEndianRead,
 };
 
+#[cfg(feature = "bson-3")]
+use crate::bson_compat::RawDocumentBufExt as _;
+
 /// Coerce numeric types into an `i64` if it would be lossless to do so. If this Bson is not numeric
 /// or the conversion would be lossy (e.g. 1.5 -> 1), this returns `None`.
 #[allow(clippy::cast_possible_truncation)]
