@@ -121,6 +121,17 @@ impl From<&OsMetadata> for RawBson {
     }
 }
 
+#[cfg(feature = "bson-3")]
+impl crate::bson::raw::BindRawBsonRef for &OsMetadata {
+    fn bind<F, R>(self, f: F) -> R
+    where
+        F: for<'a> FnOnce(bson3::RawBsonRef<'a>) -> R,
+    {
+        let raw: RawBson = self.into();
+        raw.bind(f)
+    }
+}
+
 impl From<&RuntimeEnvironment> for RawBson {
     fn from(env: &RuntimeEnvironment) -> Self {
         let RuntimeEnvironment {
@@ -155,6 +166,17 @@ impl From<&RuntimeEnvironment> for RawBson {
             out.append("container", c.clone());
         }
         RawBson::Document(out)
+    }
+}
+
+#[cfg(feature = "bson-3")]
+impl crate::bson::raw::BindRawBsonRef for &RuntimeEnvironment {
+    fn bind<F, R>(self, f: F) -> R
+    where
+        F: for<'a> FnOnce(bson3::RawBsonRef<'a>) -> R,
+    {
+        let raw: RawBson = self.into();
+        raw.bind(f)
     }
 }
 
