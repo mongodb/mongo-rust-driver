@@ -531,4 +531,3 @@ where
         Ok(SingleCursorResult(full_body.cursor.first_batch.pop()))
     }
 }
-

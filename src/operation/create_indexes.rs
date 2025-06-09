@@ -5,10 +5,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     index::IndexModel,
-    operation::{
-        append_options_to_raw_document,
-        OperationWithDefaults,
-    },
+    operation::{append_options_to_raw_document, OperationWithDefaults},
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
     Namespace,

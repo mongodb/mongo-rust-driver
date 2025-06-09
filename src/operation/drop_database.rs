@@ -4,11 +4,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::DropDatabaseOptions,
     error::Result,
-    operation::{
-        append_options_to_raw_document,
-        OperationWithDefaults,
-        WriteConcernOnlyBody,
-    },
+    operation::{append_options_to_raw_document, OperationWithDefaults, WriteConcernOnlyBody},
     options::WriteConcern,
 };
 

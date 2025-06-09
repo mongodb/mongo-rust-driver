@@ -4,12 +4,7 @@ use crate::{
     coll::Namespace,
     collation::Collation,
     error::{convert_insert_many_error, Result},
-    operation::{
-        append_options,
-        OperationWithDefaults,
-        Retryability,
-        WriteResponseBody,
-    },
+    operation::{append_options, OperationWithDefaults, Retryability, WriteResponseBody},
     options::{DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
 };

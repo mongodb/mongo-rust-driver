@@ -3,11 +3,7 @@ use crate::bson::rawdoc;
 use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, Result},
-    operation::{
-        append_options_to_raw_document,
-        OperationWithDefaults,
-        WriteConcernOnlyBody,
-    },
+    operation::{append_options_to_raw_document, OperationWithDefaults, WriteConcernOnlyBody},
     options::{DropCollectionOptions, WriteConcern},
     Namespace,
 };
