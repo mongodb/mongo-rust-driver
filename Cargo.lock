@@ -237,7 +237,7 @@ dependencies = [
 [[package]]
 name = "bson"
 version = "3.0.0"
-source = "git+https://github.com/mongodb/bson-rust?branch=main#c038fb569472936d26fee3b27bf5257470c3cc45"
+source = "git+https://github.com/mongodb/bson-rust?branch=main#328d540df28d01afa71da55d485e4b83e61913c7"
 dependencies = [
  "ahash",
  "base64 0.22.1",
@@ -252,6 +252,8 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
+ "simdutf8",
+ "thiserror 2.0.12",
  "time",
  "uuid",
 ]
@@ -2507,6 +2509,12 @@ checksum = "9203b8055f63a2a00e2f593bb0510367fe707d7ff1e5c872de2f537b339e5410"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "simdutf8"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
 name = "slab"

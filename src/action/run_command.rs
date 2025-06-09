@@ -150,11 +150,17 @@ impl crate::sync::Database {
     }
 }
 
+#[cfg(feature = "bson-3")]
+use crate::bson::error::Result as RawResult;
+
+#[cfg(not(feature = "bson-3"))]
+use crate::bson::raw::Result as RawResult;
+
 /// Run a database-level command.  Create with [`Database::run_command`].
 #[must_use]
 pub struct RunCommand<'a> {
     db: &'a Database,
-    command: crate::bson::raw::Result<RawDocumentBuf>,
+    command: RawResult<RawDocumentBuf>,
     options: Option<RunCommandOptions>,
     session: Option<&'a mut ClientSession>,
 }
@@ -214,7 +220,7 @@ impl<'a> Action for RunCommand<'a> {
 #[must_use]
 pub struct RunCursorCommand<'a, Session = ImplicitSession> {
     db: &'a Database,
-    command: crate::bson::raw::Result<RawDocumentBuf>,
+    command: RawResult<RawDocumentBuf>,
     options: Option<RunCursorCommandOptions>,
     session: Session,
 }

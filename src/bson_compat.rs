@@ -1,3 +1,4 @@
+#[cfg(feature = "bson-3")]
 pub(crate) trait RawDocumentBufExt {
     fn append_ref<'a>(
         &mut self,
@@ -6,6 +7,7 @@ pub(crate) trait RawDocumentBufExt {
     );
 }
 
+#[cfg(feature = "bson-3")]
 impl RawDocumentBufExt for crate::bson::RawDocumentBuf {
     fn append_ref<'a>(
         &mut self,
@@ -15,3 +17,9 @@ impl RawDocumentBufExt for crate::bson::RawDocumentBuf {
         self.append(key, value)
     }
 }
+
+#[cfg(feature = "bson-3")]
+pub(crate) use crate::bson::error::Error as RawError;
+
+#[cfg(not(feature = "bson-3"))]
+pub(crate) use crate::bson::raw::Error as RawError;

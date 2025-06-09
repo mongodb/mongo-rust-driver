@@ -246,7 +246,9 @@ async fn retry_write_retryable_write_error() {
             while let Some(msg) = event_rx.recv().await {
                 if let CommandEvent::Succeeded(ev) = &*msg {
                     if let Some(Bson::Document(wc_err)) = ev.reply.get("writeConcernError") {
-                        if ev.command_name == "insert" && wc_err.get_i32("code") == Ok(91) {
+                        if ev.command_name == "insert"
+                            && wc_err.get_i32("code").map_or(false, |c| c == 91)
+                        {
                             // Spawn a new task so events continue to process
                             let client = client.clone();
                             let fp_tx = fp_tx.clone();

@@ -976,7 +976,11 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
         )));
     }
     #[cfg(test)]
-    if environment == Ok(TEST_ENVIRONMENT_VALUE_STR) && credential.username.is_some() {
+    if environment
+        .as_ref()
+        .map_or(false, |ev| *ev == TEST_ENVIRONMENT_VALUE_STR)
+        && credential.username.is_some()
+    {
         return Err(Error::invalid_argument(format!(
             "username must not be set for {} authentication in the {} {}",
             MONGODB_OIDC_STR, TEST_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR,

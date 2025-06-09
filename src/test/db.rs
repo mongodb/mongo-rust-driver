@@ -451,7 +451,7 @@ async fn test_run_command() {
             .unwrap();
         let v: Vec<Result<Document>> = cursor.collect().await;
         assert_eq!(v.len(), 1);
-        assert_eq!(v[0].as_ref().unwrap().get_str("foo"), Ok("bar"));
+        assert_eq!(v[0].as_ref().unwrap().get_str("foo").unwrap(), "bar");
     }
 
     // Test run_raw_cursor_command
@@ -463,6 +463,6 @@ async fn test_run_command() {
         let cursor = database.run_raw_cursor_command(cmd).await.unwrap();
         let v: Vec<Result<Document>> = cursor.collect().await;
         assert_eq!(v.len(), 1);
-        assert_eq!(v[0].as_ref().unwrap().get_str("foo"), Ok("bar"));
+        assert_eq!(v[0].as_ref().unwrap().get_str("foo").unwrap(), "bar");
     }
 }
