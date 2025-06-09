@@ -13,6 +13,9 @@ use crate::{
 
 use super::ExecutionContext;
 
+#[cfg(feature = "bson-3")]
+use crate::bson_compat::RawDocumentBufExt as _;
+
 #[derive(Clone, Debug)]
 pub(crate) enum UpdateOrReplace {
     UpdateModifications(UpdateModifications),
