@@ -24,7 +24,7 @@ fi
 
 # Test with no default features.
 if [ "$RUST_VERSION" != "" ]; then
-  cargo $TOOLCHAIN build --no-default-features --features compat-3-3-0,rustls-tls
+  cargo $TOOLCHAIN build --no-default-features --features compat-3-0-0,rustls-tls
 else
   cargo $TOOLCHAIN build --no-default-features --features compat-3-3-0,bson-3,rustls-tls
 fi
