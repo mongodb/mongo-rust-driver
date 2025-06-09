@@ -14,7 +14,6 @@ use crate::{
     operation::{
         append_options_to_raw_document,
         find_and_modify::options::Modification,
-        remove_empty_write_concern,
         OperationWithDefaults,
         Retryability,
     },
@@ -82,9 +81,6 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
             }
         }
 
-        if let Some(ref mut options) = self.options {
-            remove_empty_write_concern!(Some(options));
-        }
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(

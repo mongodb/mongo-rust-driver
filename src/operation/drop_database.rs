@@ -6,7 +6,6 @@ use crate::{
     error::Result,
     operation::{
         append_options_to_raw_document,
-        remove_empty_write_concern,
         OperationWithDefaults,
         WriteConcernOnlyBody,
     },
@@ -37,7 +36,6 @@ impl OperationWithDefaults for DropDatabase {
             Self::NAME: 1,
         };
 
-        remove_empty_write_concern!(self.options);
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(

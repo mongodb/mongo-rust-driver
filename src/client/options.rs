@@ -43,7 +43,7 @@ use crate::{
     options::ReadConcernLevel,
     sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
-    serde_util,
+    serde_util::{self, write_concern_is_empty},
     srv::{OriginalSrvInfo, SrvResolver},
 };
 
@@ -2670,6 +2670,7 @@ pub struct TransactionOptions {
 
     /// The write concern to use when committing or aborting a transaction.
     #[builder(default)]
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// The selection criteria to use for all read operations in a transaction.

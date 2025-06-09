@@ -7,7 +7,6 @@ use crate::{
     index::IndexModel,
     operation::{
         append_options_to_raw_document,
-        remove_empty_write_concern,
         OperationWithDefaults,
     },
     options::{CreateIndexOptions, WriteConcern},
@@ -65,7 +64,6 @@ impl OperationWithDefaults for CreateIndexes {
             "indexes": indexes,
         };
 
-        remove_empty_write_concern!(self.options);
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
