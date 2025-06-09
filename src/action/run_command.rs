@@ -3,6 +3,7 @@ use std::time::Duration;
 use crate::bson::{Bson, Document, RawDocumentBuf};
 
 use crate::{
+    bson_compat::RawResult,
     client::session::TransactionState,
     coll::options::CursorType,
     db::options::{RunCommandOptions, RunCursorCommandOptions},
@@ -149,12 +150,6 @@ impl crate::sync::Database {
         self.async_database.run_raw_cursor_command(command)
     }
 }
-
-#[cfg(feature = "bson-3")]
-use crate::bson::error::Result as RawResult;
-
-#[cfg(not(feature = "bson-3"))]
-use crate::bson::raw::Result as RawResult;
 
 /// Run a database-level command.  Create with [`Database::run_command`].
 #[must_use]
