@@ -36,8 +36,7 @@ async fn search_index_create_list() {
     let found = 'outer: loop {
         let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name")
-                .map_or(false, |n| n == "test-search-index")
+            if d.get_str("name").is_ok_and(|n| n == "test-search-index")
                 && d.get_bool("queryable").unwrap_or(false)
             {
                 break 'outer d;
@@ -87,14 +86,11 @@ async fn search_index_create_multiple() {
     loop {
         let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name")
-                .map_or(false, |n| n == "test-search-index-1")
+            if d.get_str("name").is_ok_and(|n| n == "test-search-index-1")
                 && d.get_bool("queryable").unwrap_or(false)
             {
                 index1 = Some(d);
-            } else if d
-                .get_str("name")
-                .map_or(false, |n| n == "test-search-index-2")
+            } else if d.get_str("name").is_ok_and(|n| n == "test-search-index-2")
                 && d.get_bool("queryable").unwrap_or(false)
             {
                 index2 = Some(d);
@@ -145,8 +141,7 @@ async fn search_index_drop() {
     'outer: loop {
         let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name")
-                .map_or(false, |n| n == "test-search-index")
+            if d.get_str("name").is_ok_and(|n| n == "test-search-index")
                 && d.get_bool("queryable").unwrap_or(false)
             {
                 break 'outer;
@@ -198,8 +193,7 @@ async fn search_index_update() {
     'outer: loop {
         let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name")
-                .map_or(false, |n| n == "test-search-index")
+            if d.get_str("name").is_ok_and(|n| n == "test-search-index")
                 && d.get_bool("queryable").unwrap_or(false)
             {
                 break 'outer;
@@ -222,10 +216,9 @@ async fn search_index_update() {
     let found = 'find: loop {
         let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name")
-                .map_or(false, |n| n == "test-search-index")
+            if d.get_str("name").is_ok_and(|n| n == "test-search-index")
                 && d.get_bool("queryable").unwrap_or(false)
-                && d.get_str("status").map_or(false, |s| s == "READY")
+                && d.get_str("status").is_ok_and(|s| s == "READY")
             {
                 break 'find d;
             }
@@ -259,7 +252,7 @@ async fn wait_for_index(coll: &Collection<Document>, name: &str) -> Document {
     while Instant::now() < deadline {
         let mut cursor = coll.list_search_indexes().name(name).await.unwrap();
         while let Some(def) = cursor.try_next().await.unwrap() {
-            if def.get_str("name").map_or(false, |n| n == name)
+            if def.get_str("name").is_ok_and(|n| n == name)
                 && def.get_bool("queryable").unwrap_or(false)
             {
                 return def;

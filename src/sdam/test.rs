@@ -192,7 +192,7 @@ async fn hello_ok_true() {
     event_stream
         .next_match(Duration::from_millis(2000), |event| {
             if let Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) = event {
-                assert_eq!(e.reply.get_bool("helloOk").unwrap(), true);
+                assert!(e.reply.get_bool("helloOk").unwrap());
                 assert!(e.reply.get(LEGACY_HELLO_COMMAND_NAME_LOWERCASE).is_some());
                 assert!(e.reply.get("isWritablePrimary").is_none());
                 return true;

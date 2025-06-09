@@ -978,7 +978,7 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
     #[cfg(test)]
     if environment
         .as_ref()
-        .map_or(false, |ev| *ev == TEST_ENVIRONMENT_VALUE_STR)
+        .is_ok_and(|ev| *ev == TEST_ENVIRONMENT_VALUE_STR)
         && credential.username.is_some()
     {
         return Err(Error::invalid_argument(format!(
