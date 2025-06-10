@@ -1,5 +1,5 @@
-use std::{borrow::Cow, collections::HashMap, future::IntoFuture, net::Ipv6Addr, time::Duration};
-
+use std::{borrow::Cow, collections::HashMap, future::IntoFuture, time::Duration};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use crate::bson::Document;
 use serde::{Deserialize, Serialize};
 
@@ -981,4 +981,18 @@ async fn ipv6_connect() {
         .await
         .unwrap();
     assert_eq!(result.get_f64("ok"), Ok(1.0));
+}
+
+#[tokio::test]
+async fn server_address_from_socket_addr() {
+    let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 27017);
+    let server_address = ServerAddress::from(socket_addr);
+
+    match server_address {
+        ServerAddress::Tcp { host, port } => {
+            assert_eq!(host, "127.0.0.1", "Host was not correctly converted");
+            assert_eq!(port, Some(27017), "Port was not correctly converted");
+        },
+        _ => panic!("ServerAddress should have been Tcp variant"),
+    }
 }
