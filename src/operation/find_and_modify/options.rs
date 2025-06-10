@@ -15,7 +15,7 @@ use crate::{
     collation::Collation,
     concern::WriteConcern,
     operation::UpdateOrReplace,
-    serde_util,
+    serde_util::{self, write_concern_is_empty},
 };
 
 #[derive(Clone, Debug)]
@@ -37,6 +37,7 @@ pub(crate) struct FindAndModifyOptions {
 
     pub(crate) bypass_document_validation: Option<bool>,
 
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub(crate) write_concern: Option<WriteConcern>,
 
     pub(crate) array_filters: Option<Vec<Document>>,

@@ -1750,8 +1750,8 @@ mod range_explicit_encryption {
             assert_eq!(actual.len(), expected.len());
             for (idx, num) in expected.iter().enumerate() {
                 assert_eq!(
-                    actual[idx].get(&key),
-                    Ok(Some(bson_numbers[num].as_raw_bson_ref()))
+                    actual[idx].get(&key).unwrap(),
+                    Some(bson_numbers[num].as_raw_bson_ref())
                 );
             }
         };

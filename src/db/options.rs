@@ -11,7 +11,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     options::{Collation, CursorType},
     selection_criteria::SelectionCriteria,
-    serde_util,
+    serde_util::{self, write_concern_is_empty},
 };
 
 /// These are the valid options for creating a [`Database`](../struct.Database.html) with
@@ -84,6 +84,7 @@ pub struct CreateCollectionOptions {
     pub collation: Option<Collation>,
 
     /// The write concern for the operation.   
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// The default configuration for indexes created on this collection, including the _id index.
@@ -288,6 +289,7 @@ pub enum TimeseriesGranularity {
 #[export_tokens]
 pub struct DropDatabaseOptions {
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 }
 

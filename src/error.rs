@@ -47,7 +47,7 @@ pub const UNKNOWN_TRANSACTION_COMMIT_RESULT: &str = "UnknownTransactionCommitRes
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// An error that can occur in the `mongodb` crate. The inner
-/// [`ErrorKind`](enum.ErrorKind.html) is wrapped in an `Arc` to allow the errors to be
+/// [`ErrorKind`](enum.ErrorKind.html) is wrapped in an `Box` to allow the errors to be
 /// cloned.
 #[derive(Clone, Debug, Error)]
 #[cfg_attr(test, error("Kind: {kind}, labels: {labels:?}, backtrace: {bt}"))]
@@ -560,8 +560,8 @@ impl From<crate::bson::ser::Error> for ErrorKind {
     }
 }
 
-impl From<crate::bson::raw::Error> for ErrorKind {
-    fn from(err: crate::bson::raw::Error) -> Self {
+impl From<crate::bson_compat::RawError> for ErrorKind {
+    fn from(err: crate::bson_compat::RawError) -> Self {
         Self::InvalidResponse {
             message: err.to_string(),
         }
