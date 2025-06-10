@@ -173,7 +173,7 @@ impl OperationWithDefaults for Update {
         response: RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteResponseBody<UpdateBody> = response.body_utf8_lossy()?;
+        let response: WriteResponseBody<UpdateBody> = response.body()?;
         response.validate().map_err(convert_insert_many_error)?;
 
         let modified_count = response.n_modified;
