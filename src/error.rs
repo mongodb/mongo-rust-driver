@@ -560,8 +560,8 @@ impl From<crate::bson::ser::Error> for ErrorKind {
     }
 }
 
-impl From<crate::bson::raw::Error> for ErrorKind {
-    fn from(err: crate::bson::raw::Error) -> Self {
+impl From<crate::bson_compat::RawError> for ErrorKind {
+    fn from(err: crate::bson_compat::RawError) -> Self {
         Self::InvalidResponse {
             message: err.to_string(),
         }

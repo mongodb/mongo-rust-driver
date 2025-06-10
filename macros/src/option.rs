@@ -92,11 +92,7 @@ pub fn option_setters(
     });
     // Append setter fns to `impl` block item list
     for OptInfo { name, attrs, type_ } in opt_info {
-        if args
-            .skip
-            .as_ref()
-            .map_or(false, |skip| skip.contains(&name))
-        {
+        if args.skip.as_ref().is_some_and(|skip| skip.contains(&name)) {
             continue;
         }
         let (accept, value) = if type_.is_ident("String")

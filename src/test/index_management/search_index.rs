@@ -36,7 +36,9 @@ async fn search_index_create_list() {
     let found = 'outer: loop {
         let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) {
+            if d.get_str("name").is_ok_and(|n| n == "test-search-index")
+                && d.get_bool("queryable").unwrap_or(false)
+            {
                 break 'outer d;
             }
         }
@@ -47,8 +49,8 @@ async fn search_index_create_list() {
     };
 
     assert_eq!(
-        found.get_document("latestDefinition"),
-        Ok(&doc! { "mappings": { "dynamic": false } })
+        found.get_document("latestDefinition").unwrap(),
+        &doc! { "mappings": { "dynamic": false } }
     );
 }
 
@@ -84,11 +86,12 @@ async fn search_index_create_multiple() {
     loop {
         let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name") == Ok("test-search-index-1") && d.get_bool("queryable") == Ok(true)
+            if d.get_str("name").is_ok_and(|n| n == "test-search-index-1")
+                && d.get_bool("queryable").unwrap_or(false)
             {
                 index1 = Some(d);
-            } else if d.get_str("name") == Ok("test-search-index-2")
-                && d.get_bool("queryable") == Ok(true)
+            } else if d.get_str("name").is_ok_and(|n| n == "test-search-index-2")
+                && d.get_bool("queryable").unwrap_or(false)
             {
                 index2 = Some(d);
             }
@@ -103,12 +106,12 @@ async fn search_index_create_multiple() {
     }
 
     assert_eq!(
-        index1.unwrap().get_document("latestDefinition"),
-        Ok(&doc! { "mappings": { "dynamic": false } })
+        index1.unwrap().get_document("latestDefinition").unwrap(),
+        &doc! { "mappings": { "dynamic": false } }
     );
     assert_eq!(
-        index2.unwrap().get_document("latestDefinition"),
-        Ok(&doc! { "mappings": { "dynamic": false } })
+        index2.unwrap().get_document("latestDefinition").unwrap(),
+        &doc! { "mappings": { "dynamic": false } }
     );
 }
 
@@ -138,7 +141,9 @@ async fn search_index_drop() {
     'outer: loop {
         let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) {
+            if d.get_str("name").is_ok_and(|n| n == "test-search-index")
+                && d.get_bool("queryable").unwrap_or(false)
+            {
                 break 'outer;
             }
         }
@@ -188,7 +193,9 @@ async fn search_index_update() {
     'outer: loop {
         let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name") == Ok("test-search-index") && d.get_bool("queryable") == Ok(true) {
+            if d.get_str("name").is_ok_and(|n| n == "test-search-index")
+                && d.get_bool("queryable").unwrap_or(false)
+            {
                 break 'outer;
             }
         }
@@ -209,9 +216,9 @@ async fn search_index_update() {
     let found = 'find: loop {
         let mut cursor = coll0.list_search_indexes().await.unwrap();
         while let Some(d) = cursor.try_next().await.unwrap() {
-            if d.get_str("name") == Ok("test-search-index")
-                && d.get_bool("queryable") == Ok(true)
-                && d.get_str("status") == Ok("READY")
+            if d.get_str("name").is_ok_and(|n| n == "test-search-index")
+                && d.get_bool("queryable").unwrap_or(false)
+                && d.get_str("status").is_ok_and(|s| s == "READY")
             {
                 break 'find d;
             }
@@ -223,8 +230,8 @@ async fn search_index_update() {
     };
 
     assert_eq!(
-        found.get_document("latestDefinition"),
-        Ok(&doc! { "mappings": { "dynamic": true } })
+        found.get_document("latestDefinition").unwrap(),
+        &doc! { "mappings": { "dynamic": true } }
     );
 }
 
@@ -245,7 +252,9 @@ async fn wait_for_index(coll: &Collection<Document>, name: &str) -> Document {
     while Instant::now() < deadline {
         let mut cursor = coll.list_search_indexes().name(name).await.unwrap();
         while let Some(def) = cursor.try_next().await.unwrap() {
-            if def.get_str("name") == Ok(name) && def.get_bool("queryable") == Ok(true) {
+            if def.get_str("name").is_ok_and(|n| n == name)
+                && def.get_bool("queryable").unwrap_or(false)
+            {
                 return def;
             }
         }
@@ -274,7 +283,7 @@ async fn search_index_create_with_type() {
         .unwrap();
     assert_eq!(name, "test-search-index-case7-implicit");
     let index1 = wait_for_index(&coll0, &name).await;
-    assert_eq!(index1.get_str("type"), Ok("search"));
+    assert_eq!(index1.get_str("type").unwrap(), "search");
 
     let name = coll0
         .create_search_index(
@@ -288,7 +297,7 @@ async fn search_index_create_with_type() {
         .unwrap();
     assert_eq!(name, "test-search-index-case7-explicit");
     let index2 = wait_for_index(&coll0, &name).await;
-    assert_eq!(index2.get_str("type"), Ok("search"));
+    assert_eq!(index2.get_str("type").unwrap(), "search");
 
     let name = coll0
         .create_search_index(
@@ -309,7 +318,7 @@ async fn search_index_create_with_type() {
         .unwrap();
     assert_eq!(name, "test-search-index-case7-vector");
     let index3 = wait_for_index(&coll0, &name).await;
-    assert_eq!(index3.get_str("type"), Ok("vectorSearch"));
+    assert_eq!(index3.get_str("type").unwrap(), "vectorSearch");
 }
 
 // SearchIndex Case 8: Driver requires explicit type to create a vector search index

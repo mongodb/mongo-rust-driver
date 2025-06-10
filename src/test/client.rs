@@ -980,5 +980,5 @@ async fn ipv6_connect() {
         .run_command(doc! { "ping": 1 })
         .await
         .unwrap();
-    assert_eq!(result.get_f64("ok"), Ok(1.0));
+    assert_eq!(result.get_f64("ok").unwrap(), 1.0);
 }

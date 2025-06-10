@@ -3,6 +3,7 @@ use std::time::Duration;
 use crate::bson::{Bson, Document, RawDocumentBuf};
 
 use crate::{
+    bson_compat::RawResult,
     client::session::TransactionState,
     coll::options::CursorType,
     db::options::{RunCommandOptions, RunCursorCommandOptions},
@@ -154,7 +155,7 @@ impl crate::sync::Database {
 #[must_use]
 pub struct RunCommand<'a> {
     db: &'a Database,
-    command: crate::bson::raw::Result<RawDocumentBuf>,
+    command: RawResult<RawDocumentBuf>,
     options: Option<RunCommandOptions>,
     session: Option<&'a mut ClientSession>,
 }
@@ -214,7 +215,7 @@ impl<'a> Action for RunCommand<'a> {
 #[must_use]
 pub struct RunCursorCommand<'a, Session = ImplicitSession> {
     db: &'a Database,
-    command: crate::bson::raw::Result<RawDocumentBuf>,
+    command: RawResult<RawDocumentBuf>,
     options: Option<RunCursorCommandOptions>,
     session: Session,
 }
