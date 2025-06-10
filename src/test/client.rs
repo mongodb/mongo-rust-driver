@@ -1,7 +1,12 @@
-use std::{borrow::Cow, collections::HashMap, future::IntoFuture, time::Duration};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use crate::bson::Document;
 use serde::{Deserialize, Serialize};
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    future::IntoFuture,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    time::Duration,
+};
 
 use crate::{
     bson::{doc, Bson},
@@ -992,7 +997,7 @@ async fn server_address_from_socket_addr() {
         ServerAddress::Tcp { host, port } => {
             assert_eq!(host, "127.0.0.1", "Host was not correctly converted");
             assert_eq!(port, Some(27017), "Port was not correctly converted");
-        },
+        }
         _ => panic!("ServerAddress should have been Tcp variant"),
     }
 }

@@ -127,9 +127,9 @@ pub enum ServerAddress {
 
 impl From<SocketAddr> for ServerAddress {
     fn from(item: SocketAddr) -> Self {
-        ServerAddress::Tcp { 
-            host: item.ip().to_string(), 
-            port: Some(item.port()) 
+        ServerAddress::Tcp {
+            host: item.ip().to_string(),
+            port: Some(item.port()),
         }
     }
 }
