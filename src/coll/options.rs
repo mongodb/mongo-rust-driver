@@ -117,6 +117,7 @@ pub struct InsertOneOptions {
     pub bypass_document_validation: Option<bool>,
 
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
@@ -295,6 +296,7 @@ pub struct ReplaceOptions {
     pub hint: Option<Hint>,
 
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// Map of parameter names and values. Values must be constant or closed
@@ -335,6 +337,7 @@ pub struct DeleteOptions {
     pub collation: Option<Collation>,
 
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// The index to use for the operation.
@@ -379,6 +382,7 @@ pub struct FindOneAndDeleteOptions {
     pub sort: Option<Document>,
 
     /// The level of the write concern
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// The collation to use for the operation.
@@ -438,6 +442,7 @@ pub struct FindOneAndReplaceOptions {
     pub upsert: Option<bool>,
 
     /// The level of the write concern
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// The collation to use for the operation.
@@ -503,6 +508,7 @@ pub struct FindOneAndUpdateOptions {
     pub upsert: Option<bool>,
 
     /// The level of the write concern
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// The collation to use for the operation.
@@ -615,6 +621,7 @@ pub struct AggregateOptions {
     ///
     /// If none is specified, the write concern defined on the object executing this operation will
     /// be used.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// A document with any amount of parameter names, each followed by definitions of constants in
@@ -1056,6 +1063,7 @@ pub struct CreateIndexOptions {
     pub max_time: Option<Duration>,
 
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
@@ -1075,6 +1083,7 @@ pub struct CreateIndexOptions {
 #[export_tokens]
 pub struct DropCollectionOptions {
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// Map of encrypted fields for the collection.
@@ -1108,6 +1117,7 @@ pub struct DropIndexOptions {
     pub max_time: Option<Duration>,
 
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the

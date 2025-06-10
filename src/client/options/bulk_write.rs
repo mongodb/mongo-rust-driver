@@ -10,7 +10,7 @@ use crate::{
     bson_util::{get_or_prepend_id_field, replacement_document_check, update_document_check},
     error::Result,
     options::{UpdateModifications, WriteConcern},
-    serde_util::serialize_bool_or_true,
+    serde_util::{serialize_bool_or_true, write_concern_is_empty},
     Collection,
     Namespace,
 };
@@ -48,6 +48,7 @@ pub struct BulkWriteOptions {
     pub let_vars: Option<Document>,
 
     /// The write concern to use for this operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 }
 

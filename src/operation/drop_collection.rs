@@ -3,12 +3,7 @@ use crate::bson::rawdoc;
 use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, Result},
-    operation::{
-        append_options_to_raw_document,
-        remove_empty_write_concern,
-        OperationWithDefaults,
-        WriteConcernOnlyBody,
-    },
+    operation::{append_options_to_raw_document, OperationWithDefaults, WriteConcernOnlyBody},
     options::{DropCollectionOptions, WriteConcern},
     Namespace,
 };
@@ -37,7 +32,6 @@ impl OperationWithDefaults for DropCollection {
             Self::NAME: self.ns.coll.clone(),
         };
 
-        remove_empty_write_concern!(self.options);
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(

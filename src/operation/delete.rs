@@ -4,13 +4,7 @@ use crate::{
     coll::Namespace,
     collation::Collation,
     error::{convert_insert_many_error, Result},
-    operation::{
-        append_options,
-        remove_empty_write_concern,
-        OperationWithDefaults,
-        Retryability,
-        WriteResponseBody,
-    },
+    operation::{append_options, OperationWithDefaults, Retryability, WriteResponseBody},
     options::{DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
 };
@@ -70,7 +64,6 @@ impl OperationWithDefaults for Delete {
             "ordered": true, // command monitoring tests expect this (SPEC-1130)
         };
 
-        remove_empty_write_concern!(self.options);
         append_options(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
