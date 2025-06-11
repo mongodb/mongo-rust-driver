@@ -133,7 +133,7 @@ impl OperationWithDefaults for Insert<'_> {
         response: RawCommandResponse,
         _context: ExecutionContext<'b>,
     ) -> Result<Self::O> {
-        let response: WriteResponseBody = response.body_utf8_lossy()?;
+        let response: WriteResponseBody = response.body()?;
         let response_n = Checked::<usize>::try_from(response.n)?;
 
         let mut map = HashMap::new();
