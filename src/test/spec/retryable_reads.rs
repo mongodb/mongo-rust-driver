@@ -282,6 +282,8 @@ async fn retry_read_same_mongos() {
         .filter_map(|event| {
             if let CommandEvent::Failed(failed) = event {
                 Some(&failed.connection.address)
+            } else if let CommandEvent::Succeeded(succeeded) = event {
+                Some(&succeeded.connection.address)
             } else {
                 None
             }
