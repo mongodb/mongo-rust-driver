@@ -1,4 +1,4 @@
-use std::{future::IntoFuture, time::Duration};
+use std::{collections::HashSet, future::IntoFuture, time::Duration};
 
 use crate::bson::doc;
 
@@ -181,9 +181,7 @@ async fn retry_read_different_mongos() {
         opts.direct_connection = Some(true);
         let client = Client::for_test().options(opts).await;
 
-        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
-            .error_code(6)
-            .close_connection(true);
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(6);
         guards.push(client.enable_fail_point(fail_point).await.unwrap());
     }
 
@@ -211,6 +209,21 @@ async fn retry_read_different_mongos() {
         "unexpected events: {:#?}",
         events,
     );
+    let mongos_addresses: HashSet<_> = events
+        .iter()
+        .filter_map(|event| {
+            if let CommandEvent::Failed(failed) = event {
+                Some(&failed.connection.address)
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(
+        mongos_addresses.len(),
+        2,
+        "Failed commands did not occur on two different mongos instances"
+    );
 
     drop(guards); // enforce lifetime
 }
@@ -233,14 +246,13 @@ async fn retry_read_same_mongos() {
     let fp_guard = {
         let mut client_options = client_options.clone();
         client_options.direct_connection = Some(true);
-        let client = Client::for_test().options(client_options).await;
+        let s0 = Client::for_test().options(client_options).await;
 
-        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
-            .error_code(6)
-            .close_connection(true);
-        client.enable_fail_point(fail_point).await.unwrap()
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(6);
+        s0.enable_fail_point(fail_point).await.unwrap()
     };
 
+    client_options.direct_connection = Some(false);
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
@@ -264,6 +276,21 @@ async fn retry_read_same_mongos() {
         ),
         "unexpected events: {:#?}",
         events,
+    );
+    let mongos_addresses: HashSet<_> = events
+        .iter()
+        .filter_map(|event| {
+            if let CommandEvent::Failed(failed) = event {
+                Some(&failed.connection.address)
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(
+        mongos_addresses.len(),
+        1,
+        "Failed commands did not occur on the same mongos instance"
     );
 
     drop(fp_guard); // enforce lifetime
