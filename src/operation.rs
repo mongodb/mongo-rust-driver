@@ -433,19 +433,39 @@ impl WriteConcernOnlyBody {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug)]
 pub(crate) struct WriteResponseBody<T = SingleWriteBody> {
-    #[serde(flatten)]
     body: T,
-
-    #[serde(rename = "writeErrors")]
     write_errors: Option<Vec<IndexedWriteError>>,
-
-    #[serde(rename = "writeConcernError")]
     write_concern_error: Option<WriteConcernError>,
-
-    #[serde(rename = "errorLabels")]
     labels: Option<Vec<String>>,
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for WriteResponseBody<T> {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use bson::serde_helpers::Utf8LossyDeserialization;
+        #[derive(Deserialize)]
+        struct Helper<T> {
+            #[serde(flatten)]
+            body: T,
+            #[serde(rename = "writeErrors")]
+            write_errors: Option<Utf8LossyDeserialization<Vec<IndexedWriteError>>>,
+            #[serde(rename = "writeConcernError")]
+            write_concern_error: Option<Utf8LossyDeserialization<WriteConcernError>>,
+            #[serde(rename = "errorLabels")]
+            labels: Option<Vec<String>>,
+        }
+        let helper = Helper::deserialize(deserializer)?;
+        Ok(Self {
+            body: helper.body,
+            write_errors: helper.write_errors.map(|l| l.0),
+            write_concern_error: helper.write_concern_error.map(|l| l.0),
+            labels: helper.labels,
+        })
+    }
 }
 
 impl<T> WriteResponseBody<T> {
