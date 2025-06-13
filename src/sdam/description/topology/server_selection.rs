@@ -61,17 +61,24 @@ pub(crate) fn attempt_to_select_server<'a>(
     servers: &'a HashMap<ServerAddress, Arc<Server>>,
     deprioritized: Option<&ServerAddress>,
 ) -> Result<Option<SelectedServer>> {
-    let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
+    let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?; // is this where we're checking for sharded clusters?
+    println!("length of in_window before filter: {}", in_window.len());
     if let Some(addr) = deprioritized {
         if in_window.len() > 1 {
             in_window.retain(|d| &d.address != addr);
         }
     }
+    println!("length of in_window after filter: {}", in_window.len());
     let in_window_servers = in_window
         .into_iter()
         .flat_map(|desc| servers.get(&desc.address))
         .collect();
     let selected = select_server_in_latency_window(in_window_servers);
+    if let Some(server) = selected.clone() {
+        println!("Selected server address: {}", server.address,);
+    } else {
+        eprintln!("No server was selected.");
+    }
     Ok(selected.map(SelectedServer::new))
 }
 
