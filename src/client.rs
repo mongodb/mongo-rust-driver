@@ -497,6 +497,11 @@ impl Client {
                 } else {
                     criteria
                 };
+            if let Some(deprioritized) = deprioritized {
+                println!("Deprioritized: {:?}", deprioritized);
+            } else {
+                println!("Deprioritized: None");
+            }
             let result = server_selection::attempt_to_select_server(
                 effective_criteria,
                 &state.description,
