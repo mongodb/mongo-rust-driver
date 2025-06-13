@@ -1,4 +1,10 @@
-use std::{borrow::Cow, collections::HashMap, future::IntoFuture, net::Ipv6Addr, time::Duration};
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    future::IntoFuture,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    time::Duration,
+};
 
 use crate::bson::Document;
 use serde::{Deserialize, Serialize};
@@ -981,4 +987,35 @@ async fn ipv6_connect() {
         .await
         .unwrap();
     assert_eq!(result.get_f64("ok").unwrap(), 1.0);
+}
+
+#[test]
+fn server_address_from_socket_addr_ipv4() {
+    let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 27017);
+    let server_address = ServerAddress::from(socket_addr);
+
+    match server_address {
+        ServerAddress::Tcp { host, port } => {
+            assert_eq!(host, "127.0.0.1", "Host was not correctly converted");
+            assert_eq!(port, Some(27017), "Port was not correctly converted");
+        }
+        _ => panic!("ServerAddress should have been Tcp variant"),
+    }
+}
+
+#[test]
+fn server_address_from_socket_addr_ipv6() {
+    let socket_addr = SocketAddr::new(
+        IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)),
+        27017,
+    );
+    let server_address = ServerAddress::from(socket_addr);
+
+    match server_address {
+        ServerAddress::Tcp { host, port } => {
+            assert_eq!(host, "2001:db8::1", "Host was not correctly converted");
+            assert_eq!(port, Some(27017), "Port was not correctly converted");
+        }
+        _ => panic!("ServerAddress should have been Tcp variant"),
+    }
 }

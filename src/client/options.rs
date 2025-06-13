@@ -11,7 +11,7 @@ use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter, Write},
     hash::{Hash, Hasher},
-    net::{Ipv4Addr, Ipv6Addr},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
     path::PathBuf,
     str::FromStr,
     time::Duration,
@@ -123,6 +123,15 @@ pub enum ServerAddress {
         /// The path to the Unix Domain Socket.
         path: PathBuf,
     },
+}
+
+impl From<SocketAddr> for ServerAddress {
+    fn from(item: SocketAddr) -> Self {
+        ServerAddress::Tcp {
+            host: item.ip().to_string(),
+            port: Some(item.port()),
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for ServerAddress {
