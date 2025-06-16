@@ -55,6 +55,7 @@ impl Drop for SelectedServer {
 
 /// Attempt to select a server, returning None if no server could be selected
 /// that matched the provided criteria.
+// / this is the SDAM selection (file path)
 pub(crate) fn attempt_to_select_server<'a>(
     criteria: &'a SelectionCriteria,
     topology_description: &'a TopologyDescription,
@@ -63,12 +64,40 @@ pub(crate) fn attempt_to_select_server<'a>(
 ) -> Result<Option<SelectedServer>> {
     let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?; // is this where we're checking for sharded clusters?
     println!("length of in_window before filter: {}", in_window.len());
+    for server_desc in in_window.clone() {
+        if let Some(server) = servers.get(&server_desc.address) {
+            println!(
+                "[Before filter] Server address: {}, operation count: {}",
+                server.address,
+                server.operation_count()
+            );
+        } else {
+            println!(
+                "[Before filter] Server address: {}, operation count: <not found>",
+                server_desc.address
+            );
+        }
+    }
     if let Some(addr) = deprioritized {
         if in_window.len() > 1 {
             in_window.retain(|d| &d.address != addr);
         }
     }
     println!("length of in_window after filter: {}", in_window.len());
+    for server_desc in in_window.clone() {
+        if let Some(server) = servers.get(&server_desc.address) {
+            println!(
+                "[After filter] Server address: {}, operation count: {}",
+                server.address,
+                server.operation_count()
+            );
+        } else {
+            println!(
+                "[After filter] Server address: {}, operation count: <not found>",
+                server_desc.address
+            );
+        }
+    }
     let in_window_servers = in_window
         .into_iter()
         .flat_map(|desc| servers.get(&desc.address))
