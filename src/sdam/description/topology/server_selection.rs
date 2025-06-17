@@ -62,9 +62,39 @@ pub(crate) fn attempt_to_select_server<'a>(
     deprioritized: Option<&ServerAddress>,
 ) -> Result<Option<SelectedServer>> {
     let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
+    println!("length of in_window before filter: {}", in_window.len());
+    for server_desc in in_window.clone() {
+        if let Some(server) = servers.get(&server_desc.address) {
+            println!(
+                "[Before filter] Server address: {}, operation count: {}",
+                server.address,
+                server.operation_count()
+            );
+        } else {
+            println!(
+                "[Before filter] Server address: {}, operation count: <not found>",
+                server_desc.address
+            );
+        }
+    }
     if let Some(addr) = deprioritized {
         if in_window.len() > 1 {
             in_window.retain(|d| &d.address != addr);
+        }
+    }
+    println!("length of in_window after filter: {}", in_window.len());
+    for server_desc in in_window.clone() {
+        if let Some(server) = servers.get(&server_desc.address) {
+            println!(
+                "[After filter] Server address: {}, operation count: {}",
+                server.address,
+                server.operation_count()
+            );
+        } else {
+            println!(
+                "[After filter] Server address: {}, operation count: <not found>",
+                server_desc.address
+            );
         }
     }
     let in_window_servers = in_window
@@ -72,6 +102,11 @@ pub(crate) fn attempt_to_select_server<'a>(
         .flat_map(|desc| servers.get(&desc.address))
         .collect();
     let selected = select_server_in_latency_window(in_window_servers);
+    if let Some(server) = selected.clone() {
+        println!("Selected server address: {}", server.address,);
+    } else {
+        println!("No server was selected.");
+    }
     Ok(selected.map(SelectedServer::new))
 }
 

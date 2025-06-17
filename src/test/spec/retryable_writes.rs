@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use crate::bson::Bson;
 use tokio::sync::Mutex;
@@ -319,6 +319,7 @@ async fn retry_write_different_mongos() {
     }
     client_options.hosts.drain(2..);
     client_options.retry_writes = Some(true);
+    println!("\nstart retry_write_different_mongos");
 
     let mut guards = vec![];
     for ix in [0, 1] {
@@ -329,8 +330,7 @@ async fn retry_write_different_mongos() {
 
         let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
             .error_code(6)
-            .error_labels(vec![RETRYABLE_WRITE_ERROR])
-            .close_connection(true);
+            .error_labels(vec![RETRYABLE_WRITE_ERROR]);
         guards.push(client.enable_fail_point(fail_point).await.unwrap());
     }
 
@@ -358,6 +358,22 @@ async fn retry_write_different_mongos() {
         "unexpected events: {:#?}",
         events,
     );
+    let mongos_addresses: HashSet<_> = events
+        .iter()
+        .filter_map(|event| {
+            if let CommandEvent::Failed(failed) = event {
+                Some(&failed.connection.address)
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(
+        mongos_addresses.len(),
+        2,
+        "Failed commands did not occur on two different mongos instances"
+    );
+    println!("end retry_write_different_mongos\n");
 
     drop(guards); // enforce lifetime
 }
@@ -374,6 +390,7 @@ async fn retry_write_same_mongos() {
         return;
     }
 
+    println!("\nstart retry_write_same_mongos");
     let mut client_options = get_client_options().await.clone();
     client_options.hosts.drain(1..);
     client_options.retry_writes = Some(true);
@@ -384,11 +401,11 @@ async fn retry_write_same_mongos() {
 
         let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
             .error_code(6)
-            .error_labels(vec![RETRYABLE_WRITE_ERROR])
-            .close_connection(true);
+            .error_labels(vec![RETRYABLE_WRITE_ERROR]);
         client.enable_fail_point(fail_point).await.unwrap()
     };
 
+    client_options.direct_connection = Some(false);
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
@@ -413,6 +430,24 @@ async fn retry_write_same_mongos() {
         "unexpected events: {:#?}",
         events,
     );
+    let mongos_addresses: HashSet<_> = events
+        .iter()
+        .filter_map(|event| {
+            if let CommandEvent::Failed(failed) = event {
+                Some(&failed.connection.address)
+            } else if let CommandEvent::Succeeded(succeeded) = event {
+                Some(&succeeded.connection.address)
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(
+        mongos_addresses.len(),
+        1,
+        "Failed commands did not occur on the same mongos instance"
+    );
+    println!("end retry_write_same_mongos\n");
 
     drop(fp_guard); // enforce lifetime
 }
