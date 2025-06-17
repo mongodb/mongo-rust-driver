@@ -290,6 +290,14 @@ impl Error {
         .into()
     }
 
+    #[cfg(feature = "dns-resolver")]
+    pub(crate) fn from_resolve_proto_error(error: hickory_proto::error::ProtoError) -> Self {
+        ErrorKind::DnsResolve {
+            message: error.to_string(),
+        }
+        .into()
+    }
+
     pub(crate) fn is_non_timeout_network_error(&self) -> bool {
         matches!(self.kind.as_ref(), ErrorKind::Io(ref io_err) if io_err.kind() != std::io::ErrorKind::TimedOut)
     }
