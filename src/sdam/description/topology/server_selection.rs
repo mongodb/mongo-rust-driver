@@ -55,14 +55,13 @@ impl Drop for SelectedServer {
 
 /// Attempt to select a server, returning None if no server could be selected
 /// that matched the provided criteria.
-// / this is the SDAM selection (file path)
 pub(crate) fn attempt_to_select_server<'a>(
     criteria: &'a SelectionCriteria,
     topology_description: &'a TopologyDescription,
     servers: &'a HashMap<ServerAddress, Arc<Server>>,
     deprioritized: Option<&ServerAddress>,
 ) -> Result<Option<SelectedServer>> {
-    let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?; // is this where we're checking for sharded clusters?
+    let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
     println!("length of in_window before filter: {}", in_window.len());
     for server_desc in in_window.clone() {
         if let Some(server) = servers.get(&server_desc.address) {
@@ -106,7 +105,7 @@ pub(crate) fn attempt_to_select_server<'a>(
     if let Some(server) = selected.clone() {
         println!("Selected server address: {}", server.address,);
     } else {
-        eprintln!("No server was selected.");
+        println!("No server was selected.");
     }
     Ok(selected.map(SelectedServer::new))
 }

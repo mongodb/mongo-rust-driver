@@ -319,7 +319,7 @@ async fn retry_write_different_mongos() {
     }
     client_options.hosts.drain(2..);
     client_options.retry_writes = Some(true);
-    println!("start retry_write_different_mongos");
+    println!("\nstart retry_write_different_mongos");
 
     let mut guards = vec![];
     for ix in [0, 1] {
@@ -330,7 +330,8 @@ async fn retry_write_different_mongos() {
 
         let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
             .error_code(6)
-            .error_labels(vec![RETRYABLE_WRITE_ERROR]);
+            .error_labels(vec![RETRYABLE_WRITE_ERROR])
+            .close_connection(true);
         guards.push(client.enable_fail_point(fail_point).await.unwrap());
     }
 
@@ -373,7 +374,7 @@ async fn retry_write_different_mongos() {
         2,
         "Failed commands did not occur on two different mongos instances"
     );
-    println!("end retry_write_different_mongos");
+    println!("end retry_write_different_mongos\n");
 
     drop(guards); // enforce lifetime
 }
@@ -390,7 +391,7 @@ async fn retry_write_same_mongos() {
         return;
     }
 
-    println!("start retry_write_same_mongos");
+    println!("\nstart retry_write_same_mongos");
     let mut client_options = get_client_options().await.clone();
     client_options.hosts.drain(1..);
     client_options.retry_writes = Some(true);
@@ -447,7 +448,7 @@ async fn retry_write_same_mongos() {
         1,
         "Failed commands did not occur on the same mongos instance"
     );
-    println!("end retry_write_same_mongos");
+    println!("end retry_write_same_mongos\n");
 
     drop(fp_guard); // enforce lifetime
 }
