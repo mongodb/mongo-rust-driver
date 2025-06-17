@@ -330,8 +330,7 @@ async fn retry_write_different_mongos() {
 
         let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
             .error_code(6)
-            .error_labels(vec![RETRYABLE_WRITE_ERROR])
-            .close_connection(true);
+            .error_labels(vec![RETRYABLE_WRITE_ERROR]);
         guards.push(client.enable_fail_point(fail_point).await.unwrap());
     }
 

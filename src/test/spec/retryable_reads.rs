@@ -182,9 +182,7 @@ async fn retry_read_different_mongos() {
         opts.direct_connection = Some(true);
         let client = Client::for_test().options(opts).await;
 
-        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
-            .error_code(6)
-            .close_connection(true);
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(6);
         guards.push(client.enable_fail_point(fail_point).await.unwrap());
     }
 
