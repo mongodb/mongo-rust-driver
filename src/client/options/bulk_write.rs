@@ -7,6 +7,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{rawdoc, Array, Bson, Document, RawDocumentBuf},
+    bson_compat::RawDocumentBufExt as _,
     bson_util::{get_or_prepend_id_field, replacement_document_check, update_document_check},
     error::Result,
     options::{UpdateModifications, WriteConcern},
@@ -395,7 +396,7 @@ impl WriteModel {
         };
 
         if let Some(multi) = self.multi() {
-            model_document.append("multi", multi);
+            model_document.append_err("multi", multi)?;
         }
 
         Ok((model_document, inserted_id))

@@ -80,7 +80,7 @@ async fn authenticate_stream_inner(
         client_first_payload_bytes,
         server_api.cloned(),
     );
-    let client_first = sasl_start.into_command();
+    let client_first = sasl_start.into_command()?;
 
     let server_first_response = conn.send_message(client_first).await?;
 

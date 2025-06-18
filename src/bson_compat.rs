@@ -51,6 +51,8 @@ impl RawDocumentBufExt for crate::bson::RawDocumentBuf {
 
 pub(crate) trait RawArrayBufExt: Sized {
     fn from_iter_err<V: Into<RawBson>, I: IntoIterator<Item = V>>(iter: I) -> RawResult<Self>;
+
+    fn push_err(&mut self, value: impl Into<RawBson>) -> RawResult<()>;
 }
 
 #[cfg(feature = "bson-3")]
@@ -58,12 +60,20 @@ impl RawArrayBufExt for crate::bson::RawArrayBuf {
     fn from_iter_err<V: Into<RawBson>, I: IntoIterator<Item = V>>(iter: I) -> RawResult<Self> {
         Self::from_iter(iter.into_iter().map(|v| v.into()))
     }
+
+    fn push_err(&mut self, value: impl Into<RawBson>) -> RawResult<()> {
+        self.push(value.into())
+    }
 }
 
 #[cfg(not(feature = "bson-3"))]
 impl RawArrayBufExt for crate::bson::RawArrayBuf {
     fn from_iter_err<V: Into<RawBson>, I: IntoIterator<Item = V>>(iter: I) -> RawResult<Self> {
         Ok(Self::from_iter(iter))
+    }
+
+    fn push_err(&mut self, value: impl Into<RawBson>) -> RawResult<()> {
+        Ok(self.push(value))
     }
 }
 

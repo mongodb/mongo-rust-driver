@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     bson::{rawdoc, Bson, RawDocument},
+    bson_compat::RawDocumentBufExt as _,
     bson_util::{
         array_entry_size_bytes,
         extend_raw_document_buf,
@@ -119,7 +120,7 @@ impl OperationWithDefaults for Insert<'_> {
 
         if self.encrypted {
             // Auto-encryption does not support document sequences
-            body.append("documents", vec_to_raw_array_buf(docs));
+            body.append_err("documents", vec_to_raw_array_buf(docs)?)?;
             Ok(Command::new(Self::NAME, &self.ns.db, body))
         } else {
             let mut command = Command::new(Self::NAME, &self.ns.db, body);

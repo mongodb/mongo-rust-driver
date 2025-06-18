@@ -17,6 +17,7 @@ use crate::{
         RawBsonRef,
         RawDocumentBuf,
     },
+    bson_compat::RawArrayBufExt,
     checked::Checked,
     error::{Error, ErrorKind, Result},
     runtime::SyncLittleEndianRead,
@@ -80,14 +81,14 @@ pub(crate) fn to_bson_array(docs: &[Document]) -> Bson {
 pub(crate) fn to_raw_bson_array(docs: &[Document]) -> Result<RawBson> {
     let mut array = RawArrayBuf::new();
     for doc in docs {
-        array.push(RawDocumentBuf::from_document(doc)?);
+        array.push_err(RawDocumentBuf::from_document(doc)?)?;
     }
     Ok(RawBson::Array(array))
 }
 pub(crate) fn to_raw_bson_array_ser<T: Serialize>(values: &[T]) -> Result<RawBson> {
     let mut array = RawArrayBuf::new();
     for value in values {
-        array.push(crate::bson_compat::serialize_to_raw_document_buf(value)?);
+        array.push_err(crate::bson_compat::serialize_to_raw_document_buf(value)?)?;
     }
     Ok(RawBson::Array(array))
 }
@@ -149,12 +150,12 @@ pub(crate) fn array_entry_size_bytes(index: usize, doc_len: usize) -> Result<usi
     (Checked::new(1) + num_decimal_digits(index) + 1 + doc_len).get()
 }
 
-pub(crate) fn vec_to_raw_array_buf(docs: Vec<RawDocumentBuf>) -> RawArrayBuf {
+pub(crate) fn vec_to_raw_array_buf(docs: Vec<RawDocumentBuf>) -> Result<RawArrayBuf> {
     let mut array = RawArrayBuf::new();
     for doc in docs {
-        array.push(doc);
+        array.push_err(doc)?;
     }
-    array
+    Ok(array)
 }
 
 /// The number of digits in `n` in base 10.
@@ -202,7 +203,7 @@ pub(crate) fn extend_raw_document_buf(
                 k
             )));
         }
-        this.append(k, v.to_raw_bson());
+        this.append_err(k, v.to_raw_bson())?;
     }
     Ok(())
 }
