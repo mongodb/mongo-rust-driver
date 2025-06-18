@@ -424,6 +424,9 @@ enum MessageSection {
 impl MessageSection {
     /// Reads bytes from `reader` and deserializes them into a MessageSection.
     fn read<R: Read>(reader: &mut R) -> Result<Self> {
+        #[cfg(not(feature = "bson-3"))]
+        use crate::bson_compat::RawDocumentBufExt as _;
+
         let payload_type = reader.read_u8_sync()?;
 
         if payload_type == 0 {

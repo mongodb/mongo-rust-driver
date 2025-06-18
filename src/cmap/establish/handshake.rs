@@ -396,7 +396,7 @@ impl Handshaker {
             feature = "snappy-compression"
         ))]
         if let Some(ref compressors) = options.compressors {
-            use bson3::RawArrayBuf;
+            use crate::bson::RawArrayBuf;
 
             use crate::bson_compat::RawArrayBufExt as _;
 

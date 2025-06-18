@@ -185,6 +185,9 @@ pub(crate) struct RawCommandResponse {
 impl RawCommandResponse {
     #[cfg(test)]
     pub(crate) fn with_document_and_address(source: ServerAddress, doc: Document) -> Result<Self> {
+        #[cfg(not(feature = "bson-3"))]
+        use crate::bson_compat::{DocumentExt as _, RawDocumentBufExt as _};
+
         let raw = doc.encode_to_vec()?;
         Ok(Self {
             source,

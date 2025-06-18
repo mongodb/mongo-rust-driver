@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, rawdoc, Document, RawArrayBuf, RawBson, RawDocumentBuf},
-    bson_compat::RawArrayBufExt as _,
+    bson_compat::{RawArrayBufExt as _, RawDocumentBufExt as _},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{convert_insert_many_error, Result},
@@ -13,9 +13,6 @@ use crate::{
 };
 
 use super::ExecutionContext;
-
-#[cfg(feature = "bson-3")]
-use crate::bson_compat::RawDocumentBufExt as _;
 
 #[derive(Clone, Debug)]
 pub(crate) enum UpdateOrReplace {

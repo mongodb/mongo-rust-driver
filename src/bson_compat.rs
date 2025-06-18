@@ -1,6 +1,6 @@
 use crate::bson::RawBson;
 
-pub(crate) trait RawDocumentBufExt {
+pub(crate) trait RawDocumentBufExt: Sized {
     fn append_err(&mut self, key: impl AsRef<str>, value: impl Into<RawBson>) -> RawResult<()>;
 
     fn append_ref_err<'a>(
@@ -10,7 +10,7 @@ pub(crate) trait RawDocumentBufExt {
     ) -> RawResult<()>;
 
     #[cfg(not(feature = "bson-3"))]
-    fn decode_from_bytes(data: Vec<u8>) -> Self;
+    fn decode_from_bytes(data: Vec<u8>) -> RawResult<Self>;
 }
 
 #[cfg(feature = "bson-3")]
@@ -39,17 +39,18 @@ impl RawDocumentBufExt for crate::bson::RawDocumentBuf {
         &mut self,
         key: impl AsRef<str>,
         value: impl Into<crate::bson::raw::RawBsonRef<'a>>,
-    ) -> crate::error::Result<()> {
-        self.append(key, value);
+    ) -> RawResult<()> {
+        self.append_ref(key, value);
         Ok(())
     }
 
-    fn decode_from_bytes(data: Vec<u8>) -> Self {
+    fn decode_from_bytes(data: Vec<u8>) -> RawResult<Self> {
         Self::from_bytes(data)
     }
 }
 
 pub(crate) trait RawArrayBufExt: Sized {
+    #[allow(dead_code)]
     fn from_iter_err<V: Into<RawBson>, I: IntoIterator<Item = V>>(iter: I) -> RawResult<Self>;
 
     fn push_err(&mut self, value: impl Into<RawBson>) -> RawResult<()>;
@@ -78,25 +79,26 @@ impl RawArrayBufExt for crate::bson::RawArrayBuf {
 }
 
 #[cfg(not(feature = "bson-3"))]
-pub(crate) trait RawDocumentExt: ?Sized {
+pub(crate) trait RawDocumentExt {
     fn decode_from_bytes<D: AsRef<[u8]> + ?Sized>(data: &D) -> RawResult<&Self>;
 }
 
 #[cfg(not(feature = "bson-3"))]
-impl RawDocumentExt for RawDocument {
+impl RawDocumentExt for crate::bson::RawDocument {
     fn decode_from_bytes<D: AsRef<[u8]> + ?Sized>(data: &D) -> RawResult<&Self> {
         Self::from_bytes(data)
     }
 }
 
 #[cfg(not(feature = "bson-3"))]
+#[allow(dead_code)]
 pub(crate) trait DocumentExt {
-    fn encode_to_vec(&self) -> RawResult<Vec<u8>>;
+    fn encode_to_vec(&self) -> crate::bson::ser::Result<Vec<u8>>;
 }
 
 #[cfg(not(feature = "bson-3"))]
-impl DocumentExt for Document {
-    fn encode_to_vec(&self) -> RawResult<Vec<u8>> {
+impl DocumentExt for crate::bson::Document {
+    fn encode_to_vec(&self) -> crate::bson::ser::Result<Vec<u8>> {
         let mut out = vec![];
         self.to_writer(&mut out)?;
         Ok(out)
@@ -110,6 +112,7 @@ macro_rules! use_either {
             pub(crate) use crate::bson::{$path3 as $name};
 
             #[cfg(not(feature = "bson-3"))]
+            #[allow(unused_imports)]
             pub(crate) use crate::bson::{$path2 as $name};
         )+
     };

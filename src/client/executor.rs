@@ -1,6 +1,8 @@
 #[cfg(feature = "in-use-encryption")]
 use crate::bson::RawDocumentBuf;
 use crate::bson::{doc, RawBsonRef, RawDocument, Timestamp};
+#[cfg(not(feature = "bson-3"))]
+use crate::bson_compat::RawDocumentExt as _;
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
 use once_cell::sync::Lazy;

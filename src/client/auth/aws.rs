@@ -25,6 +25,9 @@ use crate::{
     serde_util,
 };
 
+#[cfg(not(feature = "bson-3"))]
+use crate::bson_compat::DocumentExt as _;
+
 const AWS_ECS_IP: &str = "169.254.170.2";
 const AWS_EC2_IP: &str = "169.254.169.254";
 const AWS_LONG_DATE_FMT: &str = "%Y%m%dT%H%M%SZ";
