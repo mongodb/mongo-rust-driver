@@ -364,7 +364,7 @@ pub(crate) static TEST_METADATA: std::sync::OnceLock<ClientMetadata> = std::sync
 
 impl Handshaker {
     /// Creates a new Handshaker.
-    pub(crate) fn new(options: HandshakerOptions) -> Self {
+    pub(crate) fn new(options: HandshakerOptions) -> Result<Self> {
         let mut metadata = BASE_CLIENT_METADATA.clone();
 
         let mut command = hello_command(
@@ -405,16 +405,17 @@ impl Handshaker {
             feature = "snappy-compression"
         ))]
         if let Some(ref compressors) = options.compressors {
+            use bson3::RawArrayBuf;
+
+            use crate::bson_compat::RawArrayBufExt as _;
+
             command.body.append(
                 "compression",
-                compressors
-                    .iter()
-                    .map(|compressor| compressor.name())
-                    .collect::<crate::bson::RawArrayBuf>(),
+                RawArrayBuf::from_iter_err(compressors.iter().map(|compressor| compressor.name()))?,
             );
         }
 
-        Self {
+        Ok(Self {
             command,
             #[cfg(any(
                 feature = "zstd-compression",
@@ -426,7 +427,7 @@ impl Handshaker {
             metadata,
             #[cfg(feature = "aws-auth")]
             http_client: crate::runtime::HttpClient::default(),
-        }
+        })
     }
 
     async fn build_command(
