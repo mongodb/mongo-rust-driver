@@ -122,7 +122,7 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                 }
 
                 let mut actual_options =
-                    crate::bson::to_document(&client_options).expect(&test_case.description);
+                    crate::bson_compat::serialize_to_document(&client_options).expect(&test_case.description);
 
                 if let Some(mode) = actual_options.remove("mode") {
                     actual_options.insert("readPreference", mode);

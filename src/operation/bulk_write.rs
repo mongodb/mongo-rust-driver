@@ -93,7 +93,7 @@ where
         loop {
             for response_document in &responses {
                 let response: SingleOperationResponse =
-                    crate::bson::from_slice(response_document.as_bytes())?;
+                    crate::bson_compat::deserialize_from_slice(response_document.as_bytes())?;
                 self.handle_individual_response(response, result, error)?;
             }
 
@@ -278,8 +278,8 @@ where
 
         let mut command_body = rawdoc! { Self::NAME: 1 };
         let mut options = match self.options {
-            Some(options) => crate::bson::to_raw_document_buf(options),
-            None => crate::bson::to_raw_document_buf(&BulkWriteOptions::default()),
+            Some(options) => crate::bson_compat::serialize_to_raw_document_buf(options),
+            None => crate::bson_compat::serialize_to_raw_document_buf(&BulkWriteOptions::default()),
         }?;
         options.append("errorsOnly", R::errors_only());
         bson_util::extend_raw_document_buf(&mut command_body, options)?;

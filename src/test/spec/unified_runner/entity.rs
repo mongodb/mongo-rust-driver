@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use crate::bson::to_document;
+use crate::bson_compat::serialize_to_document;
 use time::OffsetDateTime;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 
@@ -287,7 +287,7 @@ impl ClientEntity {
                 Event::Cmap(ev) => ev.planned_maintenance_testing_name(),
             };
             if names.contains(&name) {
-                let ev_doc = to_document(&event).unwrap();
+                let ev_doc = serialize_to_document(&event).unwrap();
                 write_json(ev_doc, name, &time);
             }
         }

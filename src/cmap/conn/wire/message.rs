@@ -62,7 +62,7 @@ impl TryFrom<Command> for Message {
     type Error = Error;
 
     fn try_from(command: Command) -> Result<Self> {
-        let document_payload = crate::bson::to_raw_document_buf(&command)?;
+        let document_payload = crate::bson_compat::serialize_to_raw_document_buf(&command)?;
         #[cfg(any(
             feature = "zstd-compression",
             feature = "zlib-compression",
@@ -428,7 +428,7 @@ impl MessageSection {
 
         if payload_type == 0 {
             let bytes = bson_util::read_document_bytes(reader)?;
-            let document = RawDocumentBuf::from_bytes(bytes)?;
+            let document = RawDocumentBuf::decode_from_bytes(bytes)?;
             return Ok(MessageSection::Document(document));
         }
 
@@ -443,7 +443,7 @@ impl MessageSection {
 
         while length_remaining.get()? > count_reader.bytes_read() {
             let bytes = bson_util::read_document_bytes(&mut count_reader)?;
-            let document = RawDocumentBuf::from_bytes(bytes)?;
+            let document = RawDocumentBuf::decode_from_bytes(bytes)?;
             documents.push(document);
         }
 

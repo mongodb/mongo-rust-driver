@@ -37,7 +37,7 @@ impl UpdateOrReplace {
             },
             Self::Replacement(replacement_doc) => {
                 bson_util::replacement_raw_document_check(replacement_doc)?;
-                doc.append_ref(key, replacement_doc);
+                doc.append_ref_err(key, replacement_doc)?;
             }
         }
 
@@ -123,7 +123,10 @@ impl OperationWithDefaults for Update {
             }
 
             if let Some(ref collation) = options.collation {
-                update.append("collation", crate::bson::to_raw_document_buf(&collation)?);
+                update.append(
+                    "collation",
+                    crate::bson_compat::serialize_to_raw_document_buf(&collation)?,
+                );
             }
 
             if let Some(bypass_doc_validation) = options.bypass_document_validation {
@@ -134,13 +137,16 @@ impl OperationWithDefaults for Update {
                 if !write_concern.is_empty() {
                     body.append(
                         "writeConcern",
-                        crate::bson::to_raw_document_buf(write_concern)?,
+                        crate::bson_compat::serialize_to_raw_document_buf(write_concern)?,
                     );
                 }
             }
 
             if let Some(ref let_vars) = options.let_vars {
-                body.append("let", crate::bson::to_raw_document_buf(&let_vars)?);
+                body.append(
+                    "let",
+                    crate::bson_compat::serialize_to_raw_document_buf(&let_vars)?,
+                );
             }
 
             if let Some(ref comment) = options.comment {

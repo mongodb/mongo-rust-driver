@@ -54,7 +54,7 @@ async fn run_connection_string_test(test_file: TestFile) {
                         &normalize_write_concern_doc(
                             options
                                 .write_concern
-                                .map(|w| crate::bson::to_document(&w).expect(&test_case.description))
+                                .map(|w| crate::bson_compat::serialize_to_document(&w).expect(&test_case.description))
                                 .unwrap_or_default()
                         ),
                         write_concern,

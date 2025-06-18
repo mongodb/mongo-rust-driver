@@ -31,7 +31,7 @@ async fn run_document_test(test_file: TestFile) {
 
         if let Some(specified_write_concern_document) = test_case.write_concern {
             let specified_write_concern =
-                match crate::bson::from_document::<WriteConcern>(specified_write_concern_document)
+                match crate::bson_compat::deserialize_from_document::<WriteConcern>(specified_write_concern_document)
                     .map_err(Error::from)
                     .and_then(|wc| wc.validate().map(|_| wc))
                 {
@@ -76,7 +76,7 @@ async fn run_document_test(test_file: TestFile) {
                 );
             }
 
-            let actual_write_concern_document = crate::bson::to_document(&specified_write_concern)
+            let actual_write_concern_document = crate::bson_compat::serialize_to_document(&specified_write_concern)
                 .unwrap_or_else(|err| {
                     panic!(
                         "Write concern serialization should succeed but got {:?}: {}",
@@ -101,14 +101,14 @@ async fn run_document_test(test_file: TestFile) {
             }
 
             let specified_read_concern: ReadConcern =
-                crate::bson::from_document(specified_read_concern_document).unwrap_or_else(|err| {
+                crate::bson_compat::deserialize_from_document(specified_read_concern_document).unwrap_or_else(|err| {
                     panic!(
                         "Read concern deserialization should succeed but got {:?}: {}",
                         err, description,
                     )
                 });
 
-            let actual_read_concern_document = crate::bson::to_document(&specified_read_concern)
+            let actual_read_concern_document = crate::bson_compat::serialize_to_document(&specified_read_concern)
                 .unwrap_or_else(|err| {
                     panic!(
                         "Read concern serialization should succeed but got: {:?}: {}",

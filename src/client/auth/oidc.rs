@@ -687,8 +687,8 @@ async fn do_two_step_function(
         return Err(invalid_auth_response());
     }
 
-    let server_info: IdpServerInfo =
-        crate::bson::from_slice(&response.payload).map_err(|_| invalid_auth_response())?;
+    let server_info: IdpServerInfo = crate::bson_compat::deserialize_from_slice(&response.payload)
+        .map_err(|_| invalid_auth_response())?;
     let idp_response = {
         let cb_context = CallbackContext {
             timeout: Some(Instant::now() + timeout),

@@ -318,7 +318,7 @@ pub(crate) enum Expectation {
 fn deserialize_op<'de, 'a, T: 'a + DeserializeOwned + TestOperation>(
     value: Document,
 ) -> std::result::Result<Box<dyn TestOperation + 'a>, crate::bson::de::Error> {
-    crate::bson::from_document::<T>(value).map(|op| Box::new(op) as Box<dyn TestOperation>)
+    crate::bson_compat::deserialize_from_document::<T>(value).map(|op| Box::new(op) as Box<dyn TestOperation>)
 }
 
 impl<'de> Deserialize<'de> for Operation {

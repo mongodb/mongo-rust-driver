@@ -31,7 +31,8 @@ impl<T: Serialize + Send + Sync> Collection<T> {
         ReplaceOne {
             coll: CollRef::new(self),
             query,
-            replacement: crate::bson::to_raw_document_buf(replacement.borrow()).map_err(Into::into),
+            replacement: crate::bson_compat::serialize_to_raw_document_buf(replacement.borrow())
+                .map_err(Into::into),
             options: None,
             session: None,
         }

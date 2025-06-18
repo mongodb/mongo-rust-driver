@@ -187,7 +187,7 @@ async fn collection_management() {
     assert_eq!(colls[0].name, format!("{}1", function_name!()));
     assert_eq!(colls[0].collection_type, CollectionType::Collection);
     assert_eq!(
-        crate::bson::to_document(&colls[0].options).expect("serialization should succeed"),
+        crate::bson_compat::serialize_to_document(&colls[0].options).expect("serialization should succeed"),
         doc! {}
     );
     assert!(!colls[0].info.read_only);
@@ -331,7 +331,7 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name:
 #[test]
 fn deserialize_clustered_index_option_from_bool() {
     let options_doc = doc! { "clusteredIndex": true };
-    let options: CreateCollectionOptions = crate::bson::from_document(options_doc).unwrap();
+    let options: CreateCollectionOptions = crate::bson_compat::deserialize_from_document(options_doc).unwrap();
     let clustered_index = options
         .clustered_index
         .expect("deserialized options should include clustered_index");

@@ -87,7 +87,7 @@ pub(crate) fn to_raw_bson_array(docs: &[Document]) -> Result<RawBson> {
 pub(crate) fn to_raw_bson_array_ser<T: Serialize>(values: &[T]) -> Result<RawBson> {
     let mut array = RawArrayBuf::new();
     for value in values {
-        array.push(crate::bson::to_raw_document_buf(value)?);
+        array.push(crate::bson_compat::serialize_to_raw_document_buf(value)?);
     }
     Ok(RawBson::Array(array))
 }
@@ -216,13 +216,13 @@ pub(crate) fn append_ser(
     struct Helper<T> {
         value: T,
     }
-    let raw_doc = crate::bson::to_raw_document_buf(&Helper { value })?;
-    this.append_ref(
+    let raw_doc = crate::bson_compat::serialize_to_raw_document_buf(&Helper { value })?;
+    this.append_ref_err(
         key,
         raw_doc
             .get("value")?
             .ok_or_else(|| Error::internal("no value"))?,
-    );
+    )?;
     Ok(())
 }
 
@@ -243,7 +243,7 @@ pub(crate) fn get_or_prepend_id_field(doc: &mut RawDocumentBuf) -> Result<Bson> 
             let new_length: i32 = Checked::new(new_bytes.len()).try_into()?;
             new_bytes[0..4].copy_from_slice(&new_length.to_le_bytes());
 
-            *doc = RawDocumentBuf::from_bytes(new_bytes)?;
+            *doc = RawDocumentBuf::decode_from_bytes(new_bytes)?;
 
             Ok(id.into())
         }

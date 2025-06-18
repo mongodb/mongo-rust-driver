@@ -104,9 +104,9 @@ fn validate_command_success(auth_mechanism: &str, response: &Document) -> Result
     match bson_util::get_int(ok) {
         Some(1) => Ok(()),
         Some(_) => {
-            let source = crate::bson::from_bson::<CommandResponse<CommandErrorBody>>(
-                Bson::Document(response.clone()),
-            )
+            let source = crate::bson_compat::deserialize_from_bson::<
+                CommandResponse<CommandErrorBody>,
+            >(Bson::Document(response.clone()))
             .map(|cmd_resp| cmd_resp.body.into())
             .ok();
             Err(Error::authentication_error(

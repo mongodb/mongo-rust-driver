@@ -84,7 +84,7 @@ impl TestOperation for IterateUntilDocumentOrError {
                 TestCursor::ChangeStream(stream) => {
                     let mut stream = stream.lock().await;
                     stream.next().await.map(|res| {
-                        res.map(|ev| match crate::bson::to_bson(&ev) {
+                        res.map(|ev| match crate::bson_compat::serialize_to_bson(&ev) {
                             Ok(Bson::Document(doc)) => doc,
                             _ => panic!("invalid serialization result"),
                         })

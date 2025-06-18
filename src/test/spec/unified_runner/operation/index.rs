@@ -78,7 +78,7 @@ impl TestOperation for ListIndexes {
             };
             let indexes: Vec<Document> = indexes
                 .iter()
-                .map(|index| crate::bson::to_document(index).unwrap())
+                .map(|index| crate::bson_compat::serialize_to_document(index).unwrap())
                 .collect();
             Ok(Some(Bson::from(indexes).into()))
         }

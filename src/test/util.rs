@@ -240,7 +240,7 @@ impl TestClient {
             .database("admin")
             .run_command(hello.body.try_into()?)
             .await?;
-        Ok(crate::bson::from_document(hello_response_doc)?)
+        Ok(crate::bson_compat::deserialize_from_document(hello_response_doc)?)
     }
 }
 

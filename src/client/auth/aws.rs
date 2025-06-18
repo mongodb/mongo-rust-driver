@@ -72,8 +72,7 @@ async fn authenticate_stream_inner(
         // channel binding is not supported.
         "p": 110i32,
     };
-    let mut client_first_payload_bytes = Vec::new();
-    client_first_payload.to_writer(&mut client_first_payload_bytes)?;
+    let client_first_payload_bytes = client_first_payload.encode_to_vec()?;
 
     let sasl_start = SaslStart::new(
         source.into(),
@@ -123,8 +122,7 @@ async fn authenticate_stream_inner(
         client_second_payload.insert("t", security_token);
     }
 
-    let mut client_second_payload_bytes = Vec::new();
-    client_second_payload.to_writer(&mut client_second_payload_bytes)?;
+    let client_second_payload_bytes = client_second_payload.encode_to_vec()?;
 
     let sasl_continue = SaslContinue::new(
         source.into(),
@@ -287,7 +285,7 @@ impl AwsCredential {
             .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?
             .to_owned();
 
-        Ok(crate::bson::from_document(credential)?)
+        Ok(crate::bson_compat::deserialize_from_document(credential)?)
     }
 
     /// Obtains credentials from the ECS endpoint.
@@ -512,7 +510,7 @@ impl ServerFirst {
         let ServerFirstPayload {
             server_nonce,
             sts_host,
-        } = crate::bson::from_slice(payload.as_slice())
+        } = crate::bson_compat::deserialize_from_slice(payload.as_slice())
             .map_err(|_| Error::invalid_authentication_response(MECH_NAME))?;
 
         Ok(Self {

@@ -64,7 +64,7 @@ impl OperationWithDefaults for Insert<'_> {
         let max_operations: usize = Checked::new(description.max_write_batch_size).try_into()?;
 
         let mut command_body = rawdoc! { Self::NAME: self.ns.coll.clone() };
-        let options = crate::bson::to_raw_document_buf(&self.options)?;
+        let options = crate::bson_compat::serialize_to_raw_document_buf(&self.options)?;
         extend_raw_document_buf(&mut command_body, options)?;
 
         let max_document_sequence_size: usize = (Checked::new(max_message_size)
@@ -75,7 +75,7 @@ impl OperationWithDefaults for Insert<'_> {
         let mut docs = Vec::new();
         let mut current_size = Checked::new(0);
         for (i, document) in self.documents.iter().take(max_operations).enumerate() {
-            let mut document = crate::bson::to_raw_document_buf(document)?;
+            let mut document = crate::bson_compat::serialize_to_raw_document_buf(document)?;
             let id = get_or_prepend_id_field(&mut document)?;
 
             let doc_size = document.as_bytes().len();
@@ -114,7 +114,7 @@ impl OperationWithDefaults for Insert<'_> {
             Self::NAME: self.ns.coll.clone(),
         };
 
-        let options_doc = crate::bson::to_raw_document_buf(&self.options)?;
+        let options_doc = crate::bson_compat::serialize_to_raw_document_buf(&self.options)?;
         extend_raw_document_buf(&mut body, options_doc)?;
 
         if self.encrypted {
