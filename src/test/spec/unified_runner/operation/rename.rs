@@ -30,7 +30,8 @@ impl TestOperation for Rename {
                     args.run(c.clone(), test_runner).await
                 }
                 Entity::Bucket(b) => {
-                    let args: RenameBucket = crate::bson_compat::deserialize_from_document(self.0.clone()).unwrap();
+                    let args: RenameBucket =
+                        crate::bson_compat::deserialize_from_document(self.0.clone()).unwrap();
                     args.run(b.clone()).await
                 }
                 other => panic!("cannot execute rename on {:?}", other),

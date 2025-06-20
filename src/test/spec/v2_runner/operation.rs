@@ -880,7 +880,8 @@ impl TestOperation for TargetedFailPoint {
         _client: &'a TestClient,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let command_document = crate::bson_compat::serialize_to_document(&self.fail_point).unwrap();
+            let command_document =
+                crate::bson_compat::serialize_to_document(&self.fail_point).unwrap();
             Ok(Some(command_document.into()))
         }
         .boxed()

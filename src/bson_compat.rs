@@ -74,7 +74,8 @@ impl RawArrayBufExt for crate::bson::RawArrayBuf {
     }
 
     fn push_err(&mut self, value: impl Into<RawBson>) -> RawResult<()> {
-        Ok(self.push(value))
+        self.push(value);
+        Ok(())
     }
 }
 
