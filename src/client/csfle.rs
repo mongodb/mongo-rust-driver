@@ -102,10 +102,11 @@ impl ClientState {
             .retry_kms(true)?
             .use_range_v2()?;
         if let Some(m) = &opts.schema_map {
-            builder = builder.schema_map(&crate::bson::to_document(m)?)?;
+            builder = builder.schema_map(&crate::bson_compat::serialize_to_document(m)?)?;
         }
         if let Some(m) = &opts.encrypted_fields_map {
-            builder = builder.encrypted_field_config_map(&crate::bson::to_document(m)?)?;
+            builder = builder
+                .encrypted_field_config_map(&crate::bson_compat::serialize_to_document(m)?)?;
         }
         #[cfg(not(test))]
         let disable_crypt_shared = false;

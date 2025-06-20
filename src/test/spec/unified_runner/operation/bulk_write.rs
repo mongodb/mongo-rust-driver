@@ -3,7 +3,7 @@ use futures_util::FutureExt;
 use serde::Deserialize;
 
 use crate::{
-    bson::to_bson,
+    bson_compat::serialize_to_bson,
     error::Result,
     options::{
         BulkWriteOptions,
@@ -71,11 +71,11 @@ impl TestOperation for BulkWrite {
             let result = if let Some(true) = self.verbose_results {
                 with_opt_session!(test_runner, &self.session, action.verbose_results())
                     .await
-                    .and_then(|result| Ok(to_bson(&result)?))
+                    .and_then(|result| Ok(serialize_to_bson(&result)?))
             } else {
                 with_opt_session!(test_runner, &self.session, action)
                     .await
-                    .and_then(|result| Ok(to_bson(&result)?))
+                    .and_then(|result| Ok(serialize_to_bson(&result)?))
             }?;
             Ok(Some(result.into()))
         }

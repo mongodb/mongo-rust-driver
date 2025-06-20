@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::bson::{doc, to_bson, Bson, Document};
+use crate::{
+    bson::{doc, Bson, Document},
+    bson_compat::serialize_to_bson,
+};
 use serde::Deserialize;
 
 use crate::{
@@ -39,7 +42,7 @@ impl TestOperation for InsertOne {
                     .with_options(self.options.clone()),
             )
             .await?;
-            let result = to_bson(&result)?;
+            let result = serialize_to_bson(&result)?;
             Ok(Some(result.into()))
         }
         .boxed()
@@ -76,7 +79,7 @@ impl TestOperation for InsertMany {
                 .into_iter()
                 .map(|(k, v)| (k.to_string(), v))
                 .collect();
-            let ids = to_bson(&ids)?;
+            let ids = serialize_to_bson(&ids)?;
             Ok(Some(Bson::from(doc! { "insertedIds": ids }).into()))
         }
         .boxed()

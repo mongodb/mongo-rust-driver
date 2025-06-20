@@ -148,7 +148,9 @@ where
                     match bv {
                         BatchValue::Some { doc, .. } => {
                             self.data.document_returned = true;
-                            return Ok(Some(crate::bson::from_slice(doc.as_bytes())?));
+                            return Ok(Some(crate::bson_compat::deserialize_from_slice(
+                                doc.as_bytes(),
+                            )?));
                         }
                         BatchValue::Empty | BatchValue::Exhausted => return Ok(None),
                     }

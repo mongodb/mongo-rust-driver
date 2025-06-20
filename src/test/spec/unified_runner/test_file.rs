@@ -562,9 +562,9 @@ impl ExpectError {
                 ErrorKind::BulkWrite(BulkWriteError {
                     ref partial_result, ..
                 }) => {
-                    let actual_result = partial_result
-                        .as_ref()
-                        .map(|result| crate::bson::to_bson(result).expect(&context));
+                    let actual_result = partial_result.as_ref().map(|result| {
+                        crate::bson_compat::serialize_to_bson(result).expect(&context)
+                    });
                     results_match(actual_result.as_ref(), expected_result, false, None)
                         .expect(&context);
                 }
@@ -586,7 +586,7 @@ impl ExpectError {
 
             for (expected_index, expected_error) in write_errors {
                 let actual_error = actual_write_errors.get(expected_index).expect(&context);
-                let actual_error = crate::bson::to_bson(&actual_error)
+                let actual_error = crate::bson_compat::serialize_to_bson(&actual_error)
                     .map_err(|e| e.to_string())
                     .expect(&context);
                 results_match(Some(&actual_error), expected_error, true, None).expect(&context);
@@ -609,7 +609,7 @@ impl ExpectError {
             );
 
             for (actual, expected) in actual_write_concern_errors.iter().zip(write_concern_errors) {
-                let actual = crate::bson::to_bson(&actual)
+                let actual = crate::bson_compat::serialize_to_bson(&actual)
                     .map_err(|e| e.to_string())
                     .expect(&context);
                 results_match(Some(&actual), expected, true, None).expect(&context);

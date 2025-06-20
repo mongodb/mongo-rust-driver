@@ -1,6 +1,7 @@
 use crate::bson::rawdoc;
 
 use crate::{
+    bson_compat::RawDocumentBufExt as _,
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
@@ -35,7 +36,7 @@ impl OperationWithDefaults for ListIndexes {
         };
         if let Some(size) = self.options.as_ref().and_then(|o| o.batch_size) {
             let size = Checked::from(size).try_into::<i32>()?;
-            body.append("cursor", rawdoc! { "batchSize": size });
+            body.append_err("cursor", rawdoc! { "batchSize": size })?;
         }
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 

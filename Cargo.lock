@@ -237,7 +237,7 @@ dependencies = [
 [[package]]
 name = "bson"
 version = "3.0.0"
-source = "git+https://github.com/mongodb/bson-rust?branch=main#8389d37175a6e9018ac82dacd62b20415e9c4469"
+source = "git+https://github.com/mongodb/bson-rust?branch=main#1669bc07652999f15e15d73ba658e63c0dace815"
 dependencies = [
  "ahash",
  "base64 0.22.1",
@@ -1524,8 +1524,8 @@ dependencies = [
 
 [[package]]
 name = "mongocrypt"
-version = "0.3.0"
-source = "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#6e4bb967f47ea564102e0a0a6d27468d2949e381"
+version = "0.3.1"
+source = "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#66c4ee29a2184c26ff5d7b290a23b5fdcf9c7d26"
 dependencies = [
  "bson 2.15.0",
  "bson 3.0.0",
@@ -1537,7 +1537,7 @@ dependencies = [
 [[package]]
 name = "mongocrypt-sys"
 version = "0.1.4+1.12.0"
-source = "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#6e4bb967f47ea564102e0a0a6d27468d2949e381"
+source = "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#66c4ee29a2184c26ff5d7b290a23b5fdcf9c7d26"
 
 [[package]]
 name = "mongodb"

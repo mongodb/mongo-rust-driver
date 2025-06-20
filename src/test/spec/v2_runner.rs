@@ -9,7 +9,8 @@ use std::{future::IntoFuture, sync::Arc, time::Duration};
 use futures::{future::BoxFuture, FutureExt};
 
 use crate::{
-    bson::{doc, from_bson},
+    bson::doc,
+    bson_compat::deserialize_from_bson,
     coll::options::DropCollectionOptions,
     concern::WriteConcern,
     options::{ClientOptions, CreateCollectionOptions},
@@ -444,7 +445,7 @@ impl OpRunner<'_> {
                             .unwrap();
                     }
                     "targetedFailPoint" => {
-                        let fail_point: FailPoint = from_bson(
+                        let fail_point: FailPoint = deserialize_from_bson(
                             operation
                                 .execute_on_client(&self.internal_client)
                                 .await

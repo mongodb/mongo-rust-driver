@@ -35,7 +35,7 @@ impl TestOperation for ListDatabases {
                 client.list_databases().with_options(self.options.clone()),
             )
             .await?;
-            Ok(Some(crate::bson::to_bson(&result)?.into()))
+            Ok(Some(crate::bson_compat::serialize_to_bson(&result)?.into()))
         }
         .boxed()
     }
@@ -103,7 +103,7 @@ impl TestOperation for ListCollections {
                     cursor.try_collect::<Vec<_>>().await?
                 }
             };
-            Ok(Some(crate::bson::to_bson(&result)?.into()))
+            Ok(Some(crate::bson_compat::serialize_to_bson(&result)?.into()))
         }
         .boxed()
     }

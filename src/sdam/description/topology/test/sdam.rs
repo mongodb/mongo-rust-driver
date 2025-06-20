@@ -754,16 +754,17 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     // get the one server in the topology
     let server = topology.servers().into_values().next().unwrap();
 
-    let heartbeat_response: HelloCommandResponse = crate::bson::from_document(doc! {
-        "ok": 1,
-        "isWritablePrimary": true,
-        "minWireVersion": 0,
-        "maxWireVersion": 6,
-        "maxBsonObjectSize": 16_000,
-        "maxWriteBatchSize": 10_000,
-        "maxMessageSizeBytes": 48_000_000,
-    })
-    .unwrap();
+    let heartbeat_response: HelloCommandResponse =
+        crate::bson_compat::deserialize_from_document(doc! {
+            "ok": 1,
+            "isWritablePrimary": true,
+            "minWireVersion": 0,
+            "maxWireVersion": 6,
+            "maxBsonObjectSize": 16_000,
+            "maxWriteBatchSize": 10_000,
+            "maxMessageSizeBytes": 48_000_000,
+        })
+        .unwrap();
 
     // discover the node
     topology

@@ -80,7 +80,8 @@ async fn metadata_sent_in_handshake() {
         .get_document("clientMetadata")
         .unwrap()
         .clone();
-    let metadata: ClientMetadata = crate::bson::from_document(metadata_document).unwrap();
+    let metadata: ClientMetadata =
+        crate::bson_compat::deserialize_from_document(metadata_document).unwrap();
 
     assert_eq!(metadata.driver.name, "mongo-rust-driver");
     assert_eq!(metadata.driver.version, env!("CARGO_PKG_VERSION"));

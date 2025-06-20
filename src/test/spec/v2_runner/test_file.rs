@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::bson::{doc, from_document, Bson};
+use crate::{
+    bson::{doc, Bson},
+    bson_compat::deserialize_from_document,
+};
 use futures::TryStreamExt;
 use serde::{Deserialize, Deserializer};
 
@@ -134,7 +137,7 @@ impl<'de> Deserialize<'de> for ClientOptions {
         #[cfg(feature = "in-use-encryption")]
         let auto_encrypt_opts = uri_options
             .remove("autoEncryptOpts")
-            .map(crate::bson::from_bson)
+            .map(crate::bson_compat::deserialize_from_bson)
             .transpose()
             .map_err(D::Error::custom)?;
         let uri = merge_uri_options(&DEFAULT_URI, Some(&uri_options), true);
@@ -245,7 +248,7 @@ where
         docs.iter()
             .map(|doc| {
                 let event = doc.get_document("command_started_event").unwrap();
-                from_document(event.clone()).unwrap()
+                deserialize_from_document(event.clone()).unwrap()
             })
             .collect(),
     ))

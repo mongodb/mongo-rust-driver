@@ -9,6 +9,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, rawdoc, spec::BinarySubtype, Binary, Document},
+    bson_compat::RawDocumentBufExt as _,
     client::options::{ServerAddress, ServerApi},
     cmap::{Command, Connection},
     error::{Error, Result},
@@ -619,9 +620,9 @@ async fn send_sasl_start_command(
 ) -> Result<SaslResponse> {
     let mut start_doc = rawdoc! {};
     if let Some(access_token) = access_token {
-        start_doc.append("jwt", access_token);
+        start_doc.append_err("jwt", access_token)?;
     } else if let Some(username) = credential.username.as_deref() {
-        start_doc.append("n", username);
+        start_doc.append_err("n", username)?;
     }
     let sasl_start = SaslStart::new(
         source.to_string(),
@@ -629,7 +630,7 @@ async fn send_sasl_start_command(
         start_doc.into_bytes(),
         server_api.cloned(),
     )
-    .into_command();
+    .into_command()?;
     send_sasl_command(conn, sasl_start).await
 }
 
@@ -687,8 +688,8 @@ async fn do_two_step_function(
         return Err(invalid_auth_response());
     }
 
-    let server_info: IdpServerInfo =
-        crate::bson::from_slice(&response.payload).map_err(|_| invalid_auth_response())?;
+    let server_info: IdpServerInfo = crate::bson_compat::deserialize_from_slice(&response.payload)
+        .map_err(|_| invalid_auth_response())?;
     let idp_response = {
         let cb_context = CallbackContext {
             timeout: Some(Instant::now() + timeout),

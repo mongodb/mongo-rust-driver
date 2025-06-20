@@ -51,11 +51,14 @@ impl OperationWithDefaults for Delete {
         };
 
         if let Some(ref collation) = self.collation {
-            delete.insert("collation", crate::bson::to_bson(&collation)?);
+            delete.insert(
+                "collation",
+                crate::bson_compat::serialize_to_bson(&collation)?,
+            );
         }
 
         if let Some(ref hint) = self.hint {
-            delete.insert("hint", crate::bson::to_bson(&hint)?);
+            delete.insert("hint", crate::bson_compat::serialize_to_bson(&hint)?);
         }
 
         let mut body = doc! {

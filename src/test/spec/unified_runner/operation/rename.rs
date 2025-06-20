@@ -26,11 +26,12 @@ impl TestOperation for Rename {
             match test_runner.entities.read().await.get(id).unwrap() {
                 Entity::Collection(c) => {
                     let args: RenameCollection =
-                        crate::bson::from_document(self.0.clone()).unwrap();
+                        crate::bson_compat::deserialize_from_document(self.0.clone()).unwrap();
                     args.run(c.clone(), test_runner).await
                 }
                 Entity::Bucket(b) => {
-                    let args: RenameBucket = crate::bson::from_document(self.0.clone()).unwrap();
+                    let args: RenameBucket =
+                        crate::bson_compat::deserialize_from_document(self.0.clone()).unwrap();
                     args.run(b.clone()).await
                 }
                 other => panic!("cannot execute rename on {:?}", other),
@@ -56,8 +57,8 @@ impl RenameCollection {
         let mut to_ns = ns.clone();
         to_ns.coll.clone_from(&self.to);
         let cmd = doc! {
-            "renameCollection": crate::bson::to_bson(&ns)?,
-            "to": crate::bson::to_bson(&to_ns)?,
+            "renameCollection": crate::bson_compat::serialize_to_bson(&ns)?,
+            "to": crate::bson_compat::serialize_to_bson(&to_ns)?,
         };
         let admin = test_runner.internal_client.database("admin");
         admin.run_command(cmd).await?;

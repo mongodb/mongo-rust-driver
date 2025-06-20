@@ -1,7 +1,8 @@
 use std::time::Duration;
 
 use crate::{
-    bson::{to_bson, Bson, Document},
+    bson::{Bson, Document},
+    bson_compat::serialize_to_bson,
     error::Result,
     options::{
         Collation,
@@ -292,7 +293,7 @@ impl TestOperation for FindOneAndUpdate {
                     .with_options(self.options.clone()),
             )
             .await?;
-            let result = to_bson(&result)?;
+            let result = serialize_to_bson(&result)?;
             Ok(Some(result.into()))
         }
         .boxed()
@@ -325,7 +326,7 @@ impl TestOperation for FindOneAndReplace {
                     .with_options(self.options.clone())
             )
             .await?;
-            let result = to_bson(&result)?;
+            let result = serialize_to_bson(&result)?;
 
             Ok(Some(result.into()))
         }
@@ -358,7 +359,7 @@ impl TestOperation for FindOneAndDelete {
                     .with_options(self.options.clone())
             )
             .await?;
-            let result = to_bson(&result)?;
+            let result = serialize_to_bson(&result)?;
             Ok(Some(result.into()))
         }
         .boxed()

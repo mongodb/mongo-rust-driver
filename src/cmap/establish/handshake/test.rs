@@ -18,7 +18,8 @@ async fn metadata_no_options() {
         driver_info: None,
         server_api: None,
         load_balanced: false,
-    });
+    })
+    .unwrap();
 
     let command = handshaker.build_command(None).await.unwrap().0;
     let metadata = command.body.get_document("client").unwrap();
@@ -67,7 +68,7 @@ async fn metadata_with_options() {
         load_balanced: false,
     };
 
-    let handshaker = Handshaker::new(options);
+    let handshaker = Handshaker::new(options).unwrap();
     let command = handshaker.build_command(None).await.unwrap().0;
     let metadata = command.body.get_document("client").unwrap();
     assert_eq!(

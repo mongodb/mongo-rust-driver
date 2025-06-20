@@ -36,7 +36,7 @@ async fn plain_auth() {
         authenticated: String,
     }
 
-    let doc: TestDocument = crate::bson::from_document(doc).unwrap();
+    let doc: TestDocument = crate::bson_compat::deserialize_from_document(doc).unwrap();
 
     assert_eq!(
         doc,

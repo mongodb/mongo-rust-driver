@@ -70,7 +70,7 @@ fn negotiate_mangled() {
 
 fn scram_sasl_first_options(mechanism: AuthMechanism) {
     let sasl_first = SaslStart::new(String::new(), mechanism, Vec::new(), None);
-    let command = sasl_first.into_command();
+    let command = sasl_first.into_command().unwrap();
     let options = match command.body.get_document("options") {
         Ok(options) => options,
         Err(_) => panic!("SaslStart should contain options document"),
@@ -93,7 +93,7 @@ fn sasl_first_options_specified() {
 #[test]
 fn sasl_first_options_not_specified() {
     let sasl_first = SaslStart::new(String::new(), AuthMechanism::MongoDbX509, Vec::new(), None);
-    let command = sasl_first.into_command();
+    let command = sasl_first.into_command().unwrap();
     assert!(
         command.body.get_document("options").is_err(),
         "SaslStart should not contain options document for X.509 authentication"

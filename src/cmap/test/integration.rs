@@ -72,7 +72,8 @@ async fn acquire_connection_and_send_command() {
 
     assert!(doc_response.is_success());
 
-    let response: ListDatabasesResponse = crate::bson::from_document(doc_response.body).unwrap();
+    let response: ListDatabasesResponse =
+        crate::bson_compat::deserialize_from_document(doc_response.body).unwrap();
 
     let names: Vec<_> = response
         .databases
