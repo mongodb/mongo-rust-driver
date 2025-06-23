@@ -7,6 +7,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{rawdoc, Array, Bson, Document, RawDocumentBuf},
+    bson_compat::RawDocumentBufExt as _,
     bson_util::{get_or_prepend_id_field, replacement_document_check, update_document_check},
     error::Result,
     options::{UpdateModifications, WriteConcern},
@@ -299,7 +300,7 @@ where
     /// Note that the returned value must be provided to [`bulk_write`](crate::Client::bulk_write)
     /// for the insert to be performed.
     pub fn insert_one_model(&self, document: impl Borrow<T>) -> Result<InsertOneModel> {
-        let document = crate::bson::to_document(document.borrow())?;
+        let document = crate::bson_compat::serialize_to_document(document.borrow())?;
         Ok(InsertOneModel::builder()
             .namespace(self.namespace())
             .document(document)
@@ -316,7 +317,7 @@ where
         filter: Document,
         replacement: impl Borrow<T>,
     ) -> Result<ReplaceOneModel> {
-        let replacement = crate::bson::to_document(replacement.borrow())?;
+        let replacement = crate::bson_compat::serialize_to_document(replacement.borrow())?;
         Ok(ReplaceOneModel::builder()
             .namespace(self.namespace())
             .filter(filter)
@@ -389,13 +390,13 @@ impl WriteModel {
                 (rawdoc! { "document": insert_document }, Some(inserted_id))
             }
             _ => {
-                let model_document = crate::bson::to_raw_document_buf(&self)?;
+                let model_document = crate::bson_compat::serialize_to_raw_document_buf(&self)?;
                 (model_document, None)
             }
         };
 
         if let Some(multi) = self.multi() {
-            model_document.append("multi", multi);
+            model_document.append_err("multi", multi)?;
         }
 
         Ok((model_document, inserted_id))

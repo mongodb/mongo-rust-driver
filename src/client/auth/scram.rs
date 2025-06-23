@@ -19,6 +19,7 @@ use tokio::sync::RwLock;
 
 use crate::{
     bson::{Bson, Document},
+    bson_compat::RawDocumentBufExt as _,
     client::{
         auth::{
             self,
@@ -149,7 +150,7 @@ impl ScramVersion {
     ) -> Result<FirstRound> {
         let client_first = self.build_client_first(credential, false, server_api)?;
 
-        let command = client_first.to_command(self);
+        let command = client_first.to_command(self)?;
 
         let server_first = conn.send_message(command).await?;
 
@@ -447,7 +448,7 @@ impl ClientFirst {
         &self.message[..]
     }
 
-    pub(super) fn to_command(&self, scram: &ScramVersion) -> Command {
+    pub(super) fn to_command(&self, scram: &ScramVersion) -> Result<Command> {
         let payload = self.message().as_bytes().to_vec();
         let auth_mech = AuthMechanism::from_scram_version(scram);
         let sasl_start = SaslStart::new(
@@ -457,13 +458,13 @@ impl ClientFirst {
             self.server_api.clone(),
         );
 
-        let mut cmd = sasl_start.into_command();
+        let mut cmd = sasl_start.into_command()?;
 
         if self.include_db {
-            cmd.body.append("db", self.source.clone());
+            cmd.body.append_err("db", self.source.clone())?;
         }
 
-        cmd
+        Ok(cmd)
     }
 }
 

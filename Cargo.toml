@@ -134,11 +134,12 @@ branch = "main"
 package = "bson"
 version = "3.0.0"
 optional = true
+features = ["serde"]
 
 [dependencies.mongocrypt]
 git = "https://github.com/mongodb/libmongocrypt-rust.git"
 branch = "main"
-version = "0.3.0"
+version = "0.3.1"
 default-features = false
 optional = true
 

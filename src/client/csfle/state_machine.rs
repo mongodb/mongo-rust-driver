@@ -5,7 +5,10 @@ use std::{
     time::Duration,
 };
 
-use crate::bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
+use crate::{
+    bson::{rawdoc, Document, RawDocument, RawDocumentBuf},
+    bson_compat::RawDocumentBufExt as _,
+};
 use futures_util::{stream, TryStreamExt};
 use mongocrypt::ctx::{Ctx, KmsCtx, KmsProviderType, State};
 use rayon::ThreadPool;
@@ -261,9 +264,9 @@ impl CryptExecutor {
                                         "secretAccessKey": aws_creds.secret_key(),
                                     };
                                     if let Some(token) = aws_creds.session_token() {
-                                        creds.append("sessionToken", token);
+                                        creds.append_err("sessionToken", token)?;
                                     }
-                                    kms_providers.append(provider.as_string(), creds);
+                                    kms_providers.append_err(provider.as_string(), creds)?;
                                 }
                                 #[cfg(not(feature = "aws-auth"))]
                                 {
@@ -276,10 +279,10 @@ impl CryptExecutor {
                             KmsProviderType::Azure => {
                                 #[cfg(feature = "azure-kms")]
                                 {
-                                    kms_providers.append(
+                                    kms_providers.append_err(
                                         provider.as_string(),
                                         self.azure.get_token().await?,
-                                    );
+                                    )?;
                                 }
                                 #[cfg(not(feature = "azure-kms"))]
                                 {
@@ -327,10 +330,10 @@ impl CryptExecutor {
                                         .send()
                                         .await
                                         .map_err(|e| kms_error(e.to_string()))?;
-                                    kms_providers.append(
+                                    kms_providers.append_err(
                                         "gcp",
                                         rawdoc! { "accessToken": response.access_token },
-                                    );
+                                    )?;
                                 }
                                 #[cfg(not(feature = "gcp-kms"))]
                                 {

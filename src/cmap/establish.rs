@@ -74,7 +74,7 @@ impl EstablisherOptions {
 impl ConnectionEstablisher {
     /// Creates a new ConnectionEstablisher from the given options.
     pub(crate) fn new(options: EstablisherOptions) -> Result<Self> {
-        let handshaker = Handshaker::new(options.handshake_options);
+        let handshaker = Handshaker::new(options.handshake_options)?;
 
         let tls_config = if let Some(tls_options) = options.tls_options {
             Some(TlsConfig::new(tls_options)?)

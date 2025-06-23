@@ -106,7 +106,7 @@ impl<'a> Action for ListDatabases<'a, ListSpecifications> {
             .and_then(|dbs| {
                 dbs.into_iter()
                     .map(|db_spec| {
-                        crate::bson::from_slice(db_spec.as_bytes())
+                        crate::bson_compat::deserialize_from_slice(db_spec.as_bytes())
                             .map_err(crate::error::Error::from)
                     })
                     .collect()

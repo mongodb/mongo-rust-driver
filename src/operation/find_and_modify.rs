@@ -6,7 +6,8 @@ use serde::{de::DeserializeOwned, Deserialize};
 
 use self::options::FindAndModifyOptions;
 use crate::{
-    bson::{doc, from_slice, rawdoc, Document, RawBson, RawDocumentBuf},
+    bson::{doc, rawdoc, Document, RawBson, RawDocumentBuf},
+    bson_compat::{deserialize_from_slice, RawDocumentBufExt as _},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::UpdateModifications, Namespace},
@@ -75,7 +76,7 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
         };
 
         match &self.modification {
-            Modification::Delete => body.append("remove", true),
+            Modification::Delete => body.append_err("remove", true)?,
             Modification::Update(update_or_replace) => {
                 update_or_replace.append_to_rawdoc(&mut body, "update")?
             }
@@ -102,7 +103,7 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
         let response: Response = response.body()?;
 
         match response.value {
-            RawBson::Document(doc) => Ok(Some(from_slice(doc.as_bytes())?)),
+            RawBson::Document(doc) => Ok(Some(deserialize_from_slice(doc.as_bytes())?)),
             RawBson::Null => Ok(None),
             other => Err(ErrorKind::InvalidResponse {
                 message: format!(

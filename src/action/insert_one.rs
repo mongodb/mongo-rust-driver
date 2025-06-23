@@ -32,7 +32,8 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
         InsertOne {
             coll: CollRef::new(self),
-            doc: crate::bson::to_raw_document_buf(doc.borrow()).map_err(Into::into),
+            doc: crate::bson_compat::serialize_to_raw_document_buf(doc.borrow())
+                .map_err(Into::into),
             options: None,
             session: None,
         }

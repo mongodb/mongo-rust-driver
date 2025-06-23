@@ -54,7 +54,7 @@ impl TestOperation for DeleteKey {
             let ce = test_runner.get_client_encryption(id).await;
             let result = ce.delete_key(&self.id).await?;
             Ok(Some(Entity::Bson(Bson::Document(
-                crate::bson::to_document(&result)?,
+                crate::bson_compat::serialize_to_document(&result)?,
             ))))
         }
         .boxed()

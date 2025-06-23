@@ -1,6 +1,6 @@
 use std::cmp::Ord;
 
-use crate::bson::RawDocumentBuf;
+use crate::{bson::RawDocumentBuf, bson_compat::RawDocumentBufExt as _};
 use futures::{stream::TryStreamExt, StreamExt};
 use serde::Deserialize;
 
@@ -187,7 +187,8 @@ async fn collection_management() {
     assert_eq!(colls[0].name, format!("{}1", function_name!()));
     assert_eq!(colls[0].collection_type, CollectionType::Collection);
     assert_eq!(
-        crate::bson::to_document(&colls[0].options).expect("serialization should succeed"),
+        crate::bson_compat::serialize_to_document(&colls[0].options)
+            .expect("serialization should succeed"),
         doc! {}
     );
     assert!(!colls[0].info.read_only);
@@ -331,7 +332,8 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name:
 #[test]
 fn deserialize_clustered_index_option_from_bool() {
     let options_doc = doc! { "clusteredIndex": true };
-    let options: CreateCollectionOptions = crate::bson::from_document(options_doc).unwrap();
+    let options: CreateCollectionOptions =
+        crate::bson_compat::deserialize_from_document(options_doc).unwrap();
     let clustered_index = options
         .clustered_index
         .expect("deserialized options should include clustered_index");
@@ -429,7 +431,7 @@ async fn test_run_command() {
     // Test run_raw_command
     {
         let mut cmd = RawDocumentBuf::new();
-        cmd.append("ping", 1);
+        cmd.append_err("ping", 1).unwrap();
         let got = database.run_raw_command(cmd).await.unwrap();
         assert_eq!(crate::bson_util::get_int(got.get("ok").unwrap()), Some(1));
     }
@@ -457,8 +459,8 @@ async fn test_run_command() {
     // Test run_raw_cursor_command
     {
         let mut cmd = RawDocumentBuf::new();
-        cmd.append("find", "coll");
-        cmd.append("filter", RawDocumentBuf::new());
+        cmd.append_err("find", "coll").unwrap();
+        cmd.append_err("filter", RawDocumentBuf::new()).unwrap();
 
         let cursor = database.run_raw_cursor_command(cmd).await.unwrap();
         let v: Vec<Result<Document>> = cursor.collect().await;

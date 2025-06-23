@@ -344,7 +344,7 @@ impl TestOperation for DeleteMany {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = crate::bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -370,7 +370,7 @@ impl TestOperation for DeleteOne {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = crate::bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -440,7 +440,7 @@ impl TestOperation for InsertMany {
                 .into_iter()
                 .map(|(k, v)| (k.to_string(), v))
                 .collect();
-            let ids = crate::bson::to_bson(&ids)?;
+            let ids = crate::bson_compat::serialize_to_bson(&ids)?;
             Ok(Some(Bson::from(doc! { "insertedIds": ids })))
         }
         .boxed()
@@ -468,7 +468,7 @@ impl TestOperation for InsertOne {
                 .with_options(options)
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = crate::bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -495,7 +495,7 @@ impl TestOperation for UpdateMany {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = crate::bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -522,7 +522,7 @@ impl TestOperation for UpdateOne {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = crate::bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -729,7 +729,7 @@ impl TestOperation for ListCollections {
                     cursor.try_collect::<Vec<_>>().await?
                 }
             };
-            Ok(Some(crate::bson::to_bson(&result)?))
+            Ok(Some(crate::bson_compat::serialize_to_bson(&result)?))
         }
         .boxed()
     }
@@ -781,7 +781,7 @@ impl TestOperation for ReplaceOne {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = crate::bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -808,7 +808,7 @@ impl TestOperation for FindOneAndUpdate {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = crate::bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -835,7 +835,7 @@ impl TestOperation for FindOneAndReplace {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = crate::bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -861,7 +861,7 @@ impl TestOperation for FindOneAndDelete {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = crate::bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -880,7 +880,8 @@ impl TestOperation for TargetedFailPoint {
         _client: &'a TestClient,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let command_document = crate::bson::to_document(&self.fail_point).unwrap();
+            let command_document =
+                crate::bson_compat::serialize_to_document(&self.fail_point).unwrap();
             Ok(Some(command_document.into()))
         }
         .boxed()
@@ -935,7 +936,7 @@ impl TestOperation for ListDatabases {
                 .list_databases()
                 .with_options(self.options.clone())
                 .await?;
-            Ok(Some(crate::bson::to_bson(&result)?))
+            Ok(Some(crate::bson_compat::serialize_to_bson(&result)?))
         }
         .boxed()
     }
@@ -1267,7 +1268,7 @@ impl TestOperation for ListIndexes {
             };
             let indexes: Vec<Document> = indexes
                 .iter()
-                .map(|index| crate::bson::to_document(index).unwrap())
+                .map(|index| crate::bson_compat::serialize_to_document(index).unwrap())
                 .collect();
             Ok(Some(indexes.into()))
         }

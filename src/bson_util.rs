@@ -17,13 +17,11 @@ use crate::{
         RawBsonRef,
         RawDocumentBuf,
     },
+    bson_compat::{RawArrayBufExt, RawDocumentBufExt as _},
     checked::Checked,
     error::{Error, ErrorKind, Result},
     runtime::SyncLittleEndianRead,
 };
-
-#[cfg(feature = "bson-3")]
-use crate::bson_compat::RawDocumentBufExt as _;
 
 /// Coerce numeric types into an `i64` if it would be lossless to do so. If this Bson is not numeric
 /// or the conversion would be lossy (e.g. 1.5 -> 1), this returns `None`.
@@ -80,14 +78,14 @@ pub(crate) fn to_bson_array(docs: &[Document]) -> Bson {
 pub(crate) fn to_raw_bson_array(docs: &[Document]) -> Result<RawBson> {
     let mut array = RawArrayBuf::new();
     for doc in docs {
-        array.push(RawDocumentBuf::from_document(doc)?);
+        array.push_err(RawDocumentBuf::from_document(doc)?)?;
     }
     Ok(RawBson::Array(array))
 }
 pub(crate) fn to_raw_bson_array_ser<T: Serialize>(values: &[T]) -> Result<RawBson> {
     let mut array = RawArrayBuf::new();
     for value in values {
-        array.push(crate::bson::to_raw_document_buf(value)?);
+        array.push_err(crate::bson_compat::serialize_to_raw_document_buf(value)?)?;
     }
     Ok(RawBson::Array(array))
 }
@@ -149,12 +147,12 @@ pub(crate) fn array_entry_size_bytes(index: usize, doc_len: usize) -> Result<usi
     (Checked::new(1) + num_decimal_digits(index) + 1 + doc_len).get()
 }
 
-pub(crate) fn vec_to_raw_array_buf(docs: Vec<RawDocumentBuf>) -> RawArrayBuf {
+pub(crate) fn vec_to_raw_array_buf(docs: Vec<RawDocumentBuf>) -> Result<RawArrayBuf> {
     let mut array = RawArrayBuf::new();
     for doc in docs {
-        array.push(doc);
+        array.push_err(doc)?;
     }
-    array
+    Ok(array)
 }
 
 /// The number of digits in `n` in base 10.
@@ -202,7 +200,7 @@ pub(crate) fn extend_raw_document_buf(
                 k
             )));
         }
-        this.append(k, v.to_raw_bson());
+        this.append_err(k, v.to_raw_bson())?;
     }
     Ok(())
 }
@@ -216,13 +214,13 @@ pub(crate) fn append_ser(
     struct Helper<T> {
         value: T,
     }
-    let raw_doc = crate::bson::to_raw_document_buf(&Helper { value })?;
-    this.append_ref(
+    let raw_doc = crate::bson_compat::serialize_to_raw_document_buf(&Helper { value })?;
+    this.append_ref_err(
         key,
         raw_doc
             .get("value")?
             .ok_or_else(|| Error::internal("no value"))?,
-    );
+    )?;
     Ok(())
 }
 
@@ -243,7 +241,7 @@ pub(crate) fn get_or_prepend_id_field(doc: &mut RawDocumentBuf) -> Result<Bson> 
             let new_length: i32 = Checked::new(new_bytes.len()).try_into()?;
             new_bytes[0..4].copy_from_slice(&new_length.to_le_bytes());
 
-            *doc = RawDocumentBuf::from_bytes(new_bytes)?;
+            *doc = RawDocumentBuf::decode_from_bytes(new_bytes)?;
 
             Ok(id.into())
         }

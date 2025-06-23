@@ -2,6 +2,7 @@ use crate::bson::rawdoc;
 
 use crate::{
     bson::Document,
+    bson_compat::RawDocumentBufExt as _,
     client::options::ServerApi,
     cmap::{Command, Connection, RawCommandResponse},
     error::{Error, Result},
@@ -9,7 +10,7 @@ use crate::{
 };
 
 /// Constructs the first client message in the X.509 handshake for speculative authentication
-pub(crate) fn build_speculative_client_first(credential: &Credential) -> Command {
+pub(crate) fn build_speculative_client_first(credential: &Credential) -> Result<Command> {
     self::build_client_first(credential, None)
 }
 
@@ -17,14 +18,14 @@ pub(crate) fn build_speculative_client_first(credential: &Credential) -> Command
 pub(crate) fn build_client_first(
     credential: &Credential,
     server_api: Option<&ServerApi>,
-) -> Command {
+) -> Result<Command> {
     let mut auth_command_doc = rawdoc! {
         "authenticate": 1,
         "mechanism": "MONGODB-X509",
     };
 
     if let Some(ref username) = credential.username {
-        auth_command_doc.append("username", username.as_str());
+        auth_command_doc.append_err("username", username.as_str())?;
     }
 
     let mut command = Command::new("authenticate", "$external", auth_command_doc);
@@ -32,7 +33,7 @@ pub(crate) fn build_client_first(
         command.set_server_api(server_api);
     }
 
-    command
+    Ok(command)
 }
 
 /// Sends the first client message in the X.509 handshake.
@@ -41,7 +42,7 @@ pub(crate) async fn send_client_first(
     credential: &Credential,
     server_api: Option<&ServerApi>,
 ) -> Result<RawCommandResponse> {
-    let command = build_client_first(credential, server_api);
+    let command = build_client_first(credential, server_api)?;
 
     conn.send_message(command).await
 }

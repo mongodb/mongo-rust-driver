@@ -3,7 +3,10 @@ mod test;
 
 use std::env;
 
-use crate::bson::{rawdoc, RawBson, RawDocumentBuf};
+use crate::{
+    bson::{rawdoc, RawBson, RawDocumentBuf},
+    bson_compat::RawDocumentBufExt as _,
+};
 use once_cell::sync::Lazy;
 use tokio::sync::broadcast;
 
@@ -74,66 +77,63 @@ pub(crate) enum FaasEnvironmentName {
     Vercel,
 }
 
-impl From<&ClientMetadata> for RawDocumentBuf {
-    fn from(metadata: &ClientMetadata) -> Self {
+impl TryFrom<&ClientMetadata> for RawDocumentBuf {
+    type Error = crate::error::Error;
+    fn try_from(metadata: &ClientMetadata) -> Result<Self> {
         let mut metadata_doc = RawDocumentBuf::new();
 
         if let Some(application) = &metadata.application {
-            metadata_doc.append("application", rawdoc! { "name": application.name.as_str() });
+            metadata_doc
+                .append_err("application", rawdoc! { "name": application.name.as_str() })?;
         }
 
-        metadata_doc.append(
+        metadata_doc.append_err(
             "driver",
             rawdoc! {
                 "name": metadata.driver.name.as_str(),
                 "version": metadata.driver.version.as_str(),
             },
-        );
+        )?;
 
-        metadata_doc.append("os", &metadata.os);
-        metadata_doc.append("platform", metadata.platform.as_str());
+        let raw_os: RawBson = (&metadata.os).try_into()?;
+        metadata_doc.append_err("os", raw_os)?;
+        metadata_doc.append_err("platform", metadata.platform.as_str())?;
 
         if let Some(env) = &metadata.env {
-            metadata_doc.append("env", env);
+            let raw_env: RawBson = env.try_into()?;
+            metadata_doc.append_err("env", raw_env)?;
         }
 
-        metadata_doc
+        Ok(metadata_doc)
     }
 }
 
-impl From<&OsMetadata> for RawBson {
-    fn from(metadata: &OsMetadata) -> Self {
+impl TryFrom<&OsMetadata> for RawBson {
+    type Error = crate::error::Error;
+
+    fn try_from(metadata: &OsMetadata) -> Result<Self> {
         let mut doc = rawdoc! { "type": metadata.os_type.as_str() };
 
         if let Some(name) = &metadata.name {
-            doc.append("name", name.as_str());
+            doc.append_err("name", name.as_str())?;
         }
 
         if let Some(arch) = &metadata.architecture {
-            doc.append("architecture", arch.as_str());
+            doc.append_err("architecture", arch.as_str())?;
         }
 
         if let Some(version) = &metadata.version {
-            doc.append("version", version.as_str());
+            doc.append_err("version", version.as_str())?;
         }
 
-        RawBson::Document(doc)
+        Ok(RawBson::Document(doc))
     }
 }
 
-#[cfg(feature = "bson-3")]
-impl crate::bson::raw::BindRawBsonRef for &OsMetadata {
-    fn bind<F, R>(self, f: F) -> R
-    where
-        F: for<'a> FnOnce(bson3::RawBsonRef<'a>) -> R,
-    {
-        let raw: RawBson = self.into();
-        raw.bind(f)
-    }
-}
+impl TryFrom<&RuntimeEnvironment> for RawBson {
+    type Error = crate::error::Error;
 
-impl From<&RuntimeEnvironment> for RawBson {
-    fn from(env: &RuntimeEnvironment) -> Self {
+    fn try_from(env: &RuntimeEnvironment) -> Result<Self> {
         let RuntimeEnvironment {
             name,
             runtime,
@@ -145,38 +145,27 @@ impl From<&RuntimeEnvironment> for RawBson {
         } = env;
         let mut out = rawdoc! {};
         if let Some(name) = name {
-            out.append("name", name.name());
+            out.append_err("name", name.name())?;
         }
         if let Some(rt) = runtime {
-            out.append("runtime", rt.as_str());
+            out.append_err("runtime", rt.as_str())?;
         }
         if let Some(t) = timeout_sec {
-            out.append("timeout_sec", *t);
+            out.append_err("timeout_sec", *t)?;
         }
         if let Some(m) = memory_mb {
-            out.append("memory_mb", *m);
+            out.append_err("memory_mb", *m)?;
         }
         if let Some(r) = region {
-            out.append("region", r.as_str());
+            out.append_err("region", r.as_str())?;
         }
         if let Some(u) = url {
-            out.append("url", u.as_str());
+            out.append_err("url", u.as_str())?;
         }
         if let Some(c) = container {
-            out.append("container", c.clone());
+            out.append_err("container", c.clone())?;
         }
-        RawBson::Document(out)
-    }
-}
-
-#[cfg(feature = "bson-3")]
-impl crate::bson::raw::BindRawBsonRef for &RuntimeEnvironment {
-    fn bind<F, R>(self, f: F) -> R
-    where
-        F: for<'a> FnOnce(bson3::RawBsonRef<'a>) -> R,
-    {
-        let raw: RawBson = self.into();
-        raw.bind(f)
+        Ok(RawBson::Document(out))
     }
 }
 
@@ -222,10 +211,12 @@ impl RuntimeEnvironment {
         }
         let mut container = rawdoc! {};
         if std::path::Path::new("/.dockerenv").exists() {
-            container.append("runtime", "docker");
+            // Unwrap safety: key and value are static known-valid strings.
+            container.append_err("runtime", "docker").unwrap();
         }
         if var_set("KUBERNETES_SERVICE_HOST") {
-            container.append("orchestrator", "kubernetes");
+            // Unwrap safety: key and value are static known-valid strings.
+            container.append_err("orchestrator", "kubernetes").unwrap();
         }
         if !container.is_empty() {
             out.container = Some(container);
@@ -364,7 +355,7 @@ pub(crate) static TEST_METADATA: std::sync::OnceLock<ClientMetadata> = std::sync
 
 impl Handshaker {
     /// Creates a new Handshaker.
-    pub(crate) fn new(options: HandshakerOptions) -> Self {
+    pub(crate) fn new(options: HandshakerOptions) -> Result<Self> {
         let mut metadata = BASE_CLIENT_METADATA.clone();
 
         let mut command = hello_command(
@@ -396,7 +387,7 @@ impl Handshaker {
         metadata.env = RuntimeEnvironment::new();
 
         if options.load_balanced {
-            command.body.append("loadBalanced", true);
+            command.body.append_err("loadBalanced", true)?;
         }
 
         #[cfg(any(
@@ -405,16 +396,17 @@ impl Handshaker {
             feature = "snappy-compression"
         ))]
         if let Some(ref compressors) = options.compressors {
-            command.body.append(
+            use crate::bson::RawArrayBuf;
+
+            use crate::bson_compat::RawArrayBufExt as _;
+
+            command.body.append_err(
                 "compression",
-                compressors
-                    .iter()
-                    .map(|compressor| compressor.name())
-                    .collect::<crate::bson::RawArrayBuf>(),
-            );
+                RawArrayBuf::from_iter_err(compressors.iter().map(|compressor| compressor.name()))?,
+            )?;
         }
 
-        Self {
+        Ok(Self {
             command,
             #[cfg(any(
                 feature = "zstd-compression",
@@ -426,7 +418,7 @@ impl Handshaker {
             metadata,
             #[cfg(feature = "aws-auth")]
             http_client: crate::runtime::HttpClient::default(),
-        }
+        })
     }
 
     async fn build_command(
@@ -436,7 +428,7 @@ impl Handshaker {
         let mut command = self.command.clone();
 
         if let Some(cred) = credential {
-            cred.append_needed_mechanism_negotiation(&mut command.body);
+            cred.append_needed_mechanism_negotiation(&mut command.body)?;
             command.target_db = cred.resolved_source().to_string();
         }
 
@@ -445,19 +437,19 @@ impl Handshaker {
         let body = &mut command.body;
         let body_size = body.as_bytes().len();
         let mut metadata = self.metadata.clone();
-        let mut meta_doc: RawDocumentBuf = (&metadata).into();
+        let mut meta_doc: RawDocumentBuf = (&metadata).try_into()?;
         const OVERHEAD: usize = 1 /* tag */ + 6 /* name */ + 1 /* null */;
         for trunc_fn in METADATA_TRUNCATIONS {
             if body_size + OVERHEAD + meta_doc.as_bytes().len() <= MAX_HELLO_SIZE {
                 break;
             }
             trunc_fn(&mut metadata);
-            meta_doc = (&metadata).into();
+            meta_doc = (&metadata).try_into()?;
         }
         #[cfg(test)]
         #[allow(clippy::incompatible_msrv)]
         let _ = TEST_METADATA.set(metadata);
-        body.append("client", meta_doc);
+        body.append_err("client", meta_doc)?;
 
         Ok((command, client_first))
     }
@@ -575,7 +567,7 @@ async fn set_speculative_auth_info(
         None => return Ok(None),
     };
 
-    command.append("speculativeAuthenticate", client_first.to_document());
+    command.append_err("speculativeAuthenticate", client_first.to_document()?)?;
 
     Ok(Some(client_first))
 }
