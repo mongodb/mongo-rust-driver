@@ -2,6 +2,7 @@ use crate::bson::RawDocumentBuf;
 
 use crate::{
     bson::{rawdoc, Document},
+    bson_compat::RawDocumentBufExt as _,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{Error, Result},
@@ -41,7 +42,7 @@ impl OperationWithDefaults for Find {
         if let Some(ref mut options) = self.options {
             // negative limits should be interpreted as request for single batch as per crud spec.
             if options.limit.map(|limit| limit < 0) == Some(true) {
-                body.append("singleBatch", true);
+                body.append_err("singleBatch", true)?;
             }
 
             if let Some(ref mut batch_size) = options.batch_size {
@@ -59,11 +60,11 @@ impl OperationWithDefaults for Find {
 
             match options.cursor_type {
                 Some(CursorType::Tailable) => {
-                    body.append("tailable", true);
+                    body.append_err("tailable", true)?;
                 }
                 Some(CursorType::TailableAwait) => {
-                    body.append("tailable", true);
-                    body.append("awaitData", true);
+                    body.append_err("tailable", true)?;
+                    body.append_err("awaitData", true)?;
                 }
                 _ => {}
             };
@@ -72,7 +73,7 @@ impl OperationWithDefaults for Find {
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         let raw_filter: RawDocumentBuf = (&self.filter).try_into()?;
-        body.append("filter", raw_filter);
+        body.append_err("filter", raw_filter)?;
 
         Ok(Command::new_read(
             Self::NAME.to_string(),

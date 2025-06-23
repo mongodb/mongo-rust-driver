@@ -14,7 +14,7 @@ mod x509;
 
 use std::{borrow::Cow, fmt::Debug, str::FromStr};
 
-use crate::bson::RawDocumentBuf;
+use crate::{bson::RawDocumentBuf, bson_compat::RawDocumentBufExt as _};
 use derive_where::derive_where;
 use hmac::{digest::KeyInit, Mac};
 use rand::Rng;
@@ -240,7 +240,7 @@ impl AuthMechanism {
                 Ok(Some(ClientFirst::Scram(ScramVersion::Sha256, client_first)))
             }
             Self::MongoDbX509 => Ok(Some(ClientFirst::X509(Box::new(
-                x509::build_speculative_client_first(credential),
+                x509::build_speculative_client_first(credential)?,
             )))),
             Self::Plain => Ok(None),
             Self::MongoDbOidc => Ok(oidc::build_speculative_client_first(credential)
@@ -447,13 +447,17 @@ impl Credential {
 
     /// If the mechanism is missing, append the appropriate mechanism negotiation key-value-pair to
     /// the provided hello or legacy hello command document.
-    pub(crate) fn append_needed_mechanism_negotiation(&self, command: &mut RawDocumentBuf) {
+    pub(crate) fn append_needed_mechanism_negotiation(
+        &self,
+        command: &mut RawDocumentBuf,
+    ) -> Result<()> {
         if let (Some(username), None) = (self.username.as_ref(), self.mechanism.as_ref()) {
-            command.append(
+            command.append_err(
                 "saslSupportedMechs",
                 format!("{}.{}", self.resolved_source(), username),
-            );
+            )?;
         }
+        Ok(())
     }
 
     /// Attempts to authenticate a stream according to this credential, returning an error
@@ -551,12 +555,12 @@ pub(crate) enum ClientFirst {
 }
 
 impl ClientFirst {
-    pub(crate) fn to_document(&self) -> RawDocumentBuf {
-        match self {
-            Self::Scram(version, client_first) => client_first.to_command(version).body,
+    pub(crate) fn to_document(&self) -> Result<RawDocumentBuf> {
+        Ok(match self {
+            Self::Scram(version, client_first) => client_first.to_command(version)?.body,
             Self::X509(command) => command.body.clone(),
             Self::Oidc(command) => command.body.clone(),
-        }
+        })
     }
 
     pub(crate) fn into_first_round(self, server_first: Document) -> FirstRound {

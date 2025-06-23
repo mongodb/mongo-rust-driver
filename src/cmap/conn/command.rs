@@ -185,11 +185,13 @@ pub(crate) struct RawCommandResponse {
 impl RawCommandResponse {
     #[cfg(test)]
     pub(crate) fn with_document_and_address(source: ServerAddress, doc: Document) -> Result<Self> {
-        let mut raw = Vec::new();
-        doc.to_writer(&mut raw)?;
+        #[cfg(not(feature = "bson-3"))]
+        use crate::bson_compat::{DocumentExt as _, RawDocumentBufExt as _};
+
+        let raw = doc.encode_to_vec()?;
         Ok(Self {
             source,
-            raw: RawDocumentBuf::from_bytes(raw)?,
+            raw: RawDocumentBuf::decode_from_bytes(raw)?,
         })
     }
 
@@ -202,7 +204,7 @@ impl RawCommandResponse {
     }
 
     pub(crate) fn body<'a, T: Deserialize<'a>>(&'a self) -> Result<T> {
-        crate::bson::from_slice(self.raw.as_bytes()).map_err(|e| {
+        crate::bson_compat::deserialize_from_slice(self.raw.as_bytes()).map_err(|e| {
             Error::from(ErrorKind::InvalidResponse {
                 message: format!("{}", e),
             })

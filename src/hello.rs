@@ -1,6 +1,9 @@
 use std::time::Duration;
 
-use crate::bson::{rawdoc, RawDocumentBuf};
+use crate::{
+    bson::{rawdoc, RawDocumentBuf},
+    bson_compat::RawDocumentBufExt,
+};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
@@ -48,20 +51,24 @@ pub(crate) fn hello_command(
     } else {
         let mut body = rawdoc! { LEGACY_HELLO_COMMAND_NAME: 1 };
         if hello_ok.is_none() {
-            body.append("helloOk", true);
+            // Unwrap safety: key and value are static known-good values.
+            body.append_err("helloOk", true).unwrap();
         }
         (body, LEGACY_HELLO_COMMAND_NAME)
     };
 
     if let Some(opts) = awaitable_options {
-        body.append("topologyVersion", opts.topology_version);
-        body.append(
+        // Unwrap safety: keys are static and values are types without cstrings.
+        body.append_err("topologyVersion", opts.topology_version)
+            .unwrap();
+        body.append_err(
             "maxAwaitTimeMS",
             opts.max_await_time
                 .as_millis()
                 .try_into()
                 .unwrap_or(i64::MAX),
-        );
+        )
+        .unwrap();
     }
 
     let mut command = Command::new(command_name, "admin", body);

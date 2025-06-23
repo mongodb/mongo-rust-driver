@@ -34,7 +34,10 @@ impl<T: Serialize + Send + Sync> Collection<T> {
             coll: CollRef::new(self),
             docs: docs
                 .into_iter()
-                .map(|v| crate::bson::to_raw_document_buf(v.borrow()).map_err(Into::into))
+                .map(|v| {
+                    crate::bson_compat::serialize_to_raw_document_buf(v.borrow())
+                        .map_err(Into::into)
+                })
                 .collect(),
             options: None,
             session: None,

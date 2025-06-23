@@ -389,7 +389,7 @@ pub(crate) fn append_options<T: Serialize + Debug>(
     options: Option<&T>,
 ) -> Result<()> {
     if let Some(options) = options {
-        let options_doc = bson::to_document(options)?;
+        let options_doc = crate::bson_compat::serialize_to_document(options)?;
         doc.extend(options_doc);
     }
     Ok(())
@@ -400,7 +400,7 @@ pub(crate) fn append_options_to_raw_document<T: Serialize>(
     options: Option<&T>,
 ) -> Result<()> {
     if let Some(options) = options {
-        let options_raw_doc = bson::to_raw_document_buf(options)?;
+        let options_raw_doc = crate::bson_compat::serialize_to_raw_document_buf(options)?;
         extend_raw_document_buf(doc, options_raw_doc)?;
     }
     Ok(())

@@ -129,7 +129,9 @@ impl KmsProviders {
     }
 
     pub(crate) fn credentials_doc(&self) -> Result<Document> {
-        Ok(crate::bson::to_document(&self.credentials)?)
+        Ok(crate::bson_compat::serialize_to_document(
+            &self.credentials,
+        )?)
     }
 
     pub(crate) fn tls_options(&self) -> Option<&KmsProvidersTlsOptions> {

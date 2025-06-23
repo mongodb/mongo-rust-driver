@@ -1,6 +1,7 @@
 use crate::bson::rawdoc;
 
 use crate::{
+    bson_compat::RawDocumentBufExt as _,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
@@ -47,7 +48,7 @@ impl OperationWithDefaults for ListCollections {
                 name_only = false;
             }
         }
-        body.append("nameOnly", name_only);
+        body.append_err("nameOnly", name_only)?;
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 

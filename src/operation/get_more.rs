@@ -1,6 +1,9 @@
 use std::{collections::VecDeque, time::Duration};
 
-use crate::bson::{rawdoc, RawBson};
+use crate::{
+    bson::{rawdoc, RawBson},
+    bson_compat::RawDocumentBufExt as _,
+};
 use serde::Deserialize;
 
 use crate::{
@@ -60,20 +63,20 @@ impl OperationWithDefaults for GetMore<'_> {
         if let Some(batch_size) = self.batch_size {
             let batch_size = Checked::from(batch_size).try_into::<i32>()?;
             if batch_size != 0 {
-                body.append("batchSize", batch_size);
+                body.append_err("batchSize", batch_size)?;
             }
         }
 
         if let Some(ref max_time) = self.max_time {
-            body.append(
+            body.append_err(
                 "maxTimeMS",
                 max_time.as_millis().try_into().unwrap_or(i32::MAX),
-            );
+            )?;
         }
 
         if let Some(comment) = &self.comment {
             let raw_comment: RawBson = comment.clone().try_into()?;
-            body.append("comment", raw_comment);
+            body.append_err("comment", raw_comment)?;
         }
 
         Ok(Command::new(
