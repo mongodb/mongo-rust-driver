@@ -72,7 +72,7 @@ tracing-unstable = ["dep:tracing", "dep:log"]
 async-trait = "0.1.42"
 base64 = "0.13.0"
 bitflags = "1.1.0"
-bson = { git = "https://github.com/mongodb/bson-rust", branch = "main", version = "2.14.0" }
+bson = "2.14.0"
 chrono = { version = "0.4.7", default-features = false, features = [
     "clock",
     "std",
@@ -91,7 +91,7 @@ hmac = "0.12.1"
 once_cell = "1.19.0"
 log = { version = "0.4.17", optional = true }
 md-5 = "0.10.1"
-mongocrypt = { git = "https://github.com/mongodb/libmongocrypt-rust.git", branch = "main", optional = true, version = "0.2.1" }
+mongocrypt = { optional = true, version = "0.2.1" }
 mongodb-internal-macros = { path = "macros", version = "3.2.3" }
 num_cpus = { version = "1.13.1", optional = true }
 openssl = { version = "0.10.38", optional = true }
