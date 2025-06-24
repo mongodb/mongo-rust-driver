@@ -1583,7 +1583,15 @@ impl ConnectionString {
                             let val = match &s.to_lowercase()[..] {
                                 "true" => Bson::Boolean(true),
                                 "false" => Bson::Boolean(false),
-                                _ => Bson::String(s),
+                                "none" | "forward" | "forwardandreverse" => Bson::String(s),
+                                _ => {
+                                    return Err(ErrorKind::InvalidArgument {
+                                        message: format!(
+                                            "Invalid CANONICALIZE_HOST_NAME value: {}. Valid values are 'none', 'forward', 'forwardAndReverse', 'true', 'false'",
+                                            s
+                                        ),
+                                    }.into());
+                                }
                             };
                             doc.insert("CANONICALIZE_HOST_NAME", val);
                         }
@@ -1593,6 +1601,16 @@ impl ConnectionString {
                         None => {}
                     }
 
+                    credential.mechanism_properties = Some(doc);
+                }
+
+                #[cfg(feature = "gssapi-auth")]
+                if mechanism == &crate::options::AuthMechanism::Gssapi
+                    && credential.mechanism_properties.is_none()
+                {
+                    // If no auth_mechanism_properties are provided, set mongodb as the default SERVICE_NAME
+                    let mut doc = crate::bson::Document::new();
+                    doc.insert("SERVICE_NAME", "mongodb");
                     credential.mechanism_properties = Some(doc);
                 }
 
