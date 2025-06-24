@@ -1605,12 +1605,18 @@ impl ConnectionString {
                 }
 
                 #[cfg(feature = "gssapi-auth")]
-                if mechanism == &crate::options::AuthMechanism::Gssapi
-                    && credential.mechanism_properties.is_none()
-                {
-                    // If no auth_mechanism_properties are provided, set mongodb as the default SERVICE_NAME
-                    let mut doc = crate::bson::Document::new();
-                    doc.insert("SERVICE_NAME", "mongodb");
+                if mechanism == &AuthMechanism::Gssapi {
+                    // Set mongodb as the default SERVICE_NAME if none is provided
+                    let mut doc = if let Some(doc) = credential.mechanism_properties.take() {
+                        doc
+                    } else {
+                        Document::new()
+                    };
+
+                    if !doc.contains_key("SERVICE_NAME") {
+                        doc.insert("SERVICE_NAME", "mongodb");
+                    }
+
                     credential.mechanism_properties = Some(doc);
                 }
 

@@ -149,6 +149,25 @@ impl AuthMechanism {
 
                 Ok(())
             }
+            #[cfg(feature = "gssapi-auth")]
+            AuthMechanism::Gssapi => {
+                if credential.username.is_none() {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: "No username provided for GSSAPI authentication".to_string(),
+                    }
+                    .into());
+                }
+
+                if credential.source.as_deref().unwrap_or("$external") != "$external" {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: "only $external may be specified as an auth source for GSSAPI"
+                            .to_string(),
+                    }
+                    .into());
+                }
+
+                Ok(())
+            }
             AuthMechanism::Plain => {
                 if credential.username.is_none() {
                     return Err(ErrorKind::InvalidArgument {
@@ -187,25 +206,6 @@ impl AuthMechanism {
                 Ok(())
             }
             AuthMechanism::MongoDbOidc => oidc::validate_credential(credential),
-            #[cfg(feature = "gssapi-auth")]
-            AuthMechanism::Gssapi => {
-                if credential.username.is_none() {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "No username provided for GSSAPI authentication".to_string(),
-                    }
-                    .into());
-                }
-
-                if credential.source.as_deref().unwrap_or("$external") != "$external" {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "only $external may be specified as an auth source for GSSAPI"
-                            .to_string(),
-                    }
-                    .into());
-                }
-
-                Ok(())
-            }
             _ => Ok(()),
         }
     }
@@ -264,14 +264,14 @@ impl AuthMechanism {
             Self::MongoDbX509 => Ok(Some(ClientFirst::X509(Box::new(
                 x509::build_speculative_client_first(credential)?,
             )))),
+            #[cfg(feature = "gssapi-auth")]
+            AuthMechanism::Gssapi => Ok(None),
             Self::Plain => Ok(None),
             Self::MongoDbOidc => Ok(oidc::build_speculative_client_first(credential)
                 .await
                 .map(|comm| ClientFirst::Oidc(Box::new(comm)))),
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => Ok(None),
-            #[cfg(feature = "gssapi-auth")]
-            AuthMechanism::Gssapi => Ok(None),
             AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
                 message: "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM \
                           for password-based authentication instead"
@@ -308,6 +308,10 @@ impl AuthMechanism {
             AuthMechanism::MongoDbX509 => {
                 x509::authenticate_stream(stream, credential, server_api, None).await
             }
+            #[cfg(feature = "gssapi-auth")]
+            AuthMechanism::Gssapi => {
+                gssapi::authenticate_stream(stream, credential, server_api, None).await
+            }
             AuthMechanism::Plain => {
                 plain::authenticate_stream(stream, credential, server_api).await
             }
@@ -323,10 +327,6 @@ impl AuthMechanism {
             .into()),
             AuthMechanism::MongoDbOidc => {
                 oidc::authenticate_stream(stream, credential, server_api, None).await
-            }
-            #[cfg(feature = "gssapi-auth")]
-            AuthMechanism::Gssapi => {
-                gssapi::authenticate_stream(stream, credential, server_api, None).await
             }
             _ => Err(ErrorKind::Authentication {
                 message: format!("Authentication mechanism {:?} not yet implemented.", self),
@@ -349,6 +349,14 @@ impl AuthMechanism {
             | AuthMechanism::MongoDbX509
             | AuthMechanism::Plain
             | AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
+                message: format!(
+                    "Reauthentication for authentication mechanism {:?} is not supported.",
+                    self
+                ),
+            }
+            .into()),
+            #[cfg(feature = "gssapi-auth")]
+            AuthMechanism::Gssapi => Err(ErrorKind::Authentication {
                 message: format!(
                     "Reauthentication for authentication mechanism {:?} is not supported.",
                     self
