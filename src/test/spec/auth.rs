@@ -52,6 +52,8 @@ async fn run_auth_test(test_file: TestFile) {
         test_case.description = test_case.description.replace('$', "%");
 
         let skipped_mechanisms = [
+            #[cfg(not(feature = "gssapi-auth"))]
+            "GSSAPI",
             "MONGODB-CR",
             #[cfg(not(feature = "aws-auth"))]
             "MONGODB-AWS",
@@ -60,6 +62,14 @@ async fn run_auth_test(test_file: TestFile) {
         if skipped_mechanisms
             .iter()
             .any(|mech| test_case.description.contains(mech))
+        {
+            continue;
+        }
+        #[cfg(not(feature = "gssapi-auth"))]
+        // This one's GSSAPI but doesn't include it in the description
+        if test_case
+            .description
+            .contains("must raise an error when the hostname canonicalization is invalid")
         {
             continue;
         }
