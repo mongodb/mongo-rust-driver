@@ -1,6 +1,6 @@
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
-use crate::bson::Bson;
+use crate::{bson::Bson, options::SelectionCriteria};
 use tokio::sync::Mutex;
 
 use crate::{
@@ -319,25 +319,25 @@ async fn retry_write_different_mongos() {
     }
     client_options.hosts.drain(2..);
     client_options.retry_writes = Some(true);
+    let hosts = client_options.hosts.clone();
     println!("\nstart retry_write_different_mongos");
-
-    let mut guards = vec![];
-    for ix in [0, 1] {
-        let mut opts = client_options.clone();
-        opts.hosts.remove(ix);
-        opts.direct_connection = Some(true);
-        let client = Client::for_test().options(opts).await;
-
-        let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
-            .error_code(6)
-            .error_labels(vec![RETRYABLE_WRITE_ERROR]);
-        guards.push(client.enable_fail_point(fail_point).await.unwrap());
-    }
-
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
         .await;
+
+    let mut guards = Vec::new();
+    for address in hosts {
+        let address = address.clone();
+        let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
+            .error_code(6)
+            .error_labels([RETRYABLE_WRITE_ERROR])
+            .selection_criteria(SelectionCriteria::Predicate(Arc::new(move |info| {
+                info.description.address == address
+            })));
+        guards.push(client.enable_fail_point(fail_point).await.unwrap());
+    }
+
     let result = client
         .database("test")
         .collection::<crate::bson::Document>("retry_write_different_mongos")
@@ -358,19 +358,12 @@ async fn retry_write_different_mongos() {
         "unexpected events: {:#?}",
         events,
     );
-    let mongos_addresses: HashSet<_> = events
-        .iter()
-        .filter_map(|event| {
-            if let CommandEvent::Failed(failed) = event {
-                Some(&failed.connection.address)
-            } else {
-                None
-            }
-        })
-        .collect();
-    assert_eq!(
-        mongos_addresses.len(),
-        2,
+    let first_failed = events[1].as_command_failed().unwrap();
+    let first_address = &first_failed.connection.address;
+    let second_failed = events[3].as_command_failed().unwrap();
+    let second_address = &second_failed.connection.address;
+    assert_ne!(
+        first_address, second_address,
         "Failed commands did not occur on two different mongos instances"
     );
     println!("end retry_write_different_mongos\n");

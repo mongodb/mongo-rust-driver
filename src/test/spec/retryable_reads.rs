@@ -1,4 +1,4 @@
-use std::{collections::HashSet, future::IntoFuture, time::Duration};
+use std::{future::IntoFuture, sync::Arc, time::Duration};
 
 use crate::bson::doc;
 
@@ -8,6 +8,7 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
+    options::SelectionCriteria,
     runtime::{self, AsyncJoinHandle},
     test::{
         block_connection_supported,
@@ -175,21 +176,23 @@ async fn retry_read_different_mongos() {
     client_options.retry_reads = Some(true);
     println!("\nstart retry_read_different_mongos");
 
-    let mut guards = vec![];
-    for ix in [0, 1] {
-        let mut opts = client_options.clone();
-        opts.hosts.remove(ix);
-        opts.direct_connection = Some(true);
-        let client = Client::for_test().options(opts).await;
-
-        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(6);
-        guards.push(client.enable_fail_point(fail_point).await.unwrap());
-    }
-
+    let hosts = client_options.hosts.clone();
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
         .await;
+
+    let mut guards = Vec::new();
+    for address in hosts {
+        let address = address.clone();
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
+            .error_code(6)
+            .selection_criteria(SelectionCriteria::Predicate(Arc::new(move |info| {
+                info.description.address == address
+            })));
+        guards.push(client.enable_fail_point(fail_point).await.unwrap());
+    }
+
     let result = client
         .database("test")
         .collection::<crate::bson::Document>("retry_read_different_mongos")
@@ -210,19 +213,12 @@ async fn retry_read_different_mongos() {
         "unexpected events: {:#?}",
         events,
     );
-    let mongos_addresses: HashSet<_> = events
-        .iter()
-        .filter_map(|event| {
-            if let CommandEvent::Failed(failed) = event {
-                Some(&failed.connection.address)
-            } else {
-                None
-            }
-        })
-        .collect();
-    assert_eq!(
-        mongos_addresses.len(),
-        2,
+    let first_failed = events[1].as_command_failed().unwrap();
+    let first_address = &first_failed.connection.address;
+    let second_failed = events[3].as_command_failed().unwrap();
+    let second_address = &second_failed.connection.address;
+    assert_ne!(
+        first_address, second_address,
         "Failed commands did not occur on two different mongos instances"
     );
     println!("end retry_read_different_mongos\n");
@@ -280,23 +276,12 @@ async fn retry_read_same_mongos() {
         "unexpected events: {:#?}",
         events,
     );
-    let mongos_addresses: HashSet<_> = events
-        .iter()
-        .filter_map(|event| {
-            if let CommandEvent::Failed(failed) = event {
-                Some(&failed.connection.address)
-            } else if let CommandEvent::Succeeded(succeeded) = event {
-                Some(&succeeded.connection.address)
-            } else {
-                None
-            }
-        })
-        .collect();
-    assert_eq!(
-        mongos_addresses.len(),
-        1,
-        "Failed commands did not occur on the same mongos instance"
-    );
+    let first_failed = events[1].as_command_failed().unwrap();
+    let first_address = &first_failed.connection.address;
+    let second_failed = events[3].as_command_succeeded().unwrap();
+    let second_address = &second_failed.connection.address;
+    assert_ne!(first_address, second_address);
+
     println!("end retry_read_same_mongos\n");
 
     drop(fp_guard); // enforce lifetime

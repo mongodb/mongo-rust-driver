@@ -497,10 +497,12 @@ impl Client {
                 } else {
                     criteria
                 };
-            if let Some(deprioritized) = deprioritized {
-                println!("Deprioritized: {:?}", deprioritized);
-            } else {
-                println!("Deprioritized: None");
+            if operation_name == "insert" {
+                let servers = &state.description.servers;
+                for (address, description) in servers {
+                    dbg!("address: {}", address);
+                    dbg!("type: {}", description.server_type);
+                }
             }
             let result = server_selection::attempt_to_select_server(
                 effective_criteria,

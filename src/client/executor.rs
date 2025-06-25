@@ -306,7 +306,7 @@ impl Client {
         op: &mut T,
         mut session: Option<&mut ClientSession>,
     ) -> Result<ExecutionDetails<T>> {
-        println!("Executing operation: {}", op.name());
+        println!("\nExecuting operation: {}", op.name());
         let mut retry: Option<ExecutionRetry> = None;
         let mut implicit_session: Option<ClientSession> = None;
         loop {
@@ -318,6 +318,11 @@ impl Client {
                 .as_ref()
                 .and_then(|s| s.transaction.pinned_mongos())
                 .or_else(|| op.selection_criteria());
+
+            if op.name() == "insert" || op.name() == "find" {
+                let first_server = retry.as_ref().map(|r| &r.first_server);
+                dbg!("deprioritized: {}", &first_server);
+            }
 
             let (server, effective_criteria) = match self
                 .select_server(
