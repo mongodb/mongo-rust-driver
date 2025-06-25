@@ -217,7 +217,7 @@ impl RuntimeEnvironment {
 }
 
 fn var_set(name: &str) -> bool {
-    env::var_os(name).map_or(false, |v| !v.is_empty())
+    env::var_os(name).is_some_and(|v| !v.is_empty())
 }
 
 impl FaasEnvironmentName {
@@ -225,7 +225,7 @@ impl FaasEnvironmentName {
         use FaasEnvironmentName::*;
         let mut found: Option<Self> = None;
         let lambda_env = env::var_os("AWS_EXECUTION_ENV")
-            .map_or(false, |v| v.to_string_lossy().starts_with("AWS_Lambda_"));
+            .is_some_and(|v| v.to_string_lossy().starts_with("AWS_Lambda_"));
         if lambda_env || var_set("AWS_LAMBDA_RUNTIME_API") {
             found = Some(AwsLambda);
         }

@@ -5,11 +5,11 @@ set -o xtrace
 
 source ./.evergreen/env.sh
 
-# Install the MSRV and pin dependencies who have bumped their MSRVs to > ours in recent releases.
+# Install the MSRV and generate a new lockfile with MSRV-compatible dependencies.
 if [ "$RUST_VERSION" != "" ]; then
   rustup toolchain install $RUST_VERSION
   TOOLCHAIN="+${RUST_VERSION}"
-  patch Cargo.toml .evergreen/MSRV-Cargo.toml.diff
+  CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo +nightly -Zmsrv-policy generate-lockfile
 fi
 
 # Test with default features.

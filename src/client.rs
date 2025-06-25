@@ -261,7 +261,7 @@ impl Client {
             .read()
             .await
             .as_ref()
-            .map_or(false, |cs| cs.exec().mongocryptd_spawned())
+            .is_some_and(|cs| cs.exec().mongocryptd_spawned())
     }
 
     #[cfg(all(test, feature = "in-use-encryption"))]
@@ -271,7 +271,7 @@ impl Client {
             .read()
             .await
             .as_ref()
-            .map_or(false, |cs| cs.exec().has_mongocryptd_client())
+            .is_some_and(|cs| cs.exec().has_mongocryptd_client())
     }
 
     fn test_command_event_channel(&self) -> Option<&options::TestEventSender> {
