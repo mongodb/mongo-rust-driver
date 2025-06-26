@@ -62,10 +62,10 @@ pub(crate) fn attempt_to_select_server<'a>(
     deprioritized: Option<&ServerAddress>,
 ) -> Result<Option<SelectedServer>> {
     let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
-    println!("length of in_window before filter: {}", in_window.len());
+    dbg!("length of in_window before filter: {}", in_window.len());
     for server_desc in in_window.clone() {
         if let Some(server) = servers.get(&server_desc.address) {
-            println!("[Before filter] Server address: {}", server.address,);
+            dbg!("[Before filter] Server address: {}", &server.address);
         }
     }
     if let Some(addr) = deprioritized {
@@ -73,10 +73,10 @@ pub(crate) fn attempt_to_select_server<'a>(
             in_window.retain(|d| &d.address != addr);
         }
     }
-    println!("length of in_window after filter: {}", in_window.len());
+    dbg!("length of in_window after filter: {}", in_window.len());
     for server_desc in in_window.clone() {
         if let Some(server) = servers.get(&server_desc.address) {
-            println!("[After filter] Server address: {}", server.address,);
+            dbg!("[After filter] Server address: {}", &server.address);
         }
     }
     let in_window_servers = in_window
@@ -85,9 +85,9 @@ pub(crate) fn attempt_to_select_server<'a>(
         .collect();
     let selected = select_server_in_latency_window(in_window_servers);
     if let Some(server) = selected.clone() {
-        println!("Selected server address: {}", server.address,);
+        dbg!("Selected server address: {}", &server.address);
     } else {
-        println!("No server was selected.");
+        dbg!("No server was selected.");
     }
     Ok(selected.map(SelectedServer::new))
 }
