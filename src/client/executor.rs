@@ -306,7 +306,6 @@ impl Client {
         op: &mut T,
         mut session: Option<&mut ClientSession>,
     ) -> Result<ExecutionDetails<T>> {
-        println!("\nExecuting operation: {}", op.name());
         let mut retry: Option<ExecutionRetry> = None;
         let mut implicit_session: Option<ClientSession> = None;
         loop {

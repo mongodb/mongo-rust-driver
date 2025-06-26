@@ -65,16 +65,7 @@ pub(crate) fn attempt_to_select_server<'a>(
     println!("length of in_window before filter: {}", in_window.len());
     for server_desc in in_window.clone() {
         if let Some(server) = servers.get(&server_desc.address) {
-            println!(
-                "[Before filter] Server address: {}, operation count: {}",
-                server.address,
-                server.operation_count()
-            );
-        } else {
-            println!(
-                "[Before filter] Server address: {}, operation count: <not found>",
-                server_desc.address
-            );
+            println!("[Before filter] Server address: {}", server.address,);
         }
     }
     if let Some(addr) = deprioritized {
@@ -85,16 +76,7 @@ pub(crate) fn attempt_to_select_server<'a>(
     println!("length of in_window after filter: {}", in_window.len());
     for server_desc in in_window.clone() {
         if let Some(server) = servers.get(&server_desc.address) {
-            println!(
-                "[After filter] Server address: {}, operation count: {}",
-                server.address,
-                server.operation_count()
-            );
-        } else {
-            println!(
-                "[After filter] Server address: {}, operation count: <not found>",
-                server_desc.address
-            );
+            println!("[After filter] Server address: {}", server.address,);
         }
     }
     let in_window_servers = in_window
