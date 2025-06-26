@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use crate::{bson::Bson, options::SelectionCriteria};
 use tokio::sync::Mutex;
