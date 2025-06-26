@@ -280,7 +280,10 @@ async fn retry_read_same_mongos() {
     let first_address = &first_failed.connection.address;
     let second_failed = events[3].as_command_succeeded().unwrap();
     let second_address = &second_failed.connection.address;
-    assert_ne!(first_address, second_address);
+    assert_eq!(
+        first_address, second_address,
+        "Failed command and retry did not occur on the same mongos instance",
+    );
 
     println!("end retry_read_same_mongos\n");
 

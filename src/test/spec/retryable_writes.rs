@@ -423,22 +423,13 @@ async fn retry_write_same_mongos() {
         "unexpected events: {:#?}",
         events,
     );
-    let mongos_addresses: HashSet<_> = events
-        .iter()
-        .filter_map(|event| {
-            if let CommandEvent::Failed(failed) = event {
-                Some(&failed.connection.address)
-            } else if let CommandEvent::Succeeded(succeeded) = event {
-                Some(&succeeded.connection.address)
-            } else {
-                None
-            }
-        })
-        .collect();
+    let first_failed = events[1].as_command_failed().unwrap();
+    let first_address = &first_failed.connection.address;
+    let second_failed = events[3].as_command_succeeded().unwrap();
+    let second_address = &second_failed.connection.address;
     assert_eq!(
-        mongos_addresses.len(),
-        1,
-        "Failed commands did not occur on the same mongos instance"
+        first_address, second_address,
+        "Failed commands did not occur on the same mongos instance",
     );
     println!("end retry_write_same_mongos\n");
 
