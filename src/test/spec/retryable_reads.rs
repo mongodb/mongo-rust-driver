@@ -1,4 +1,4 @@
-use std::{future::IntoFuture, time::Duration};
+use std::{future::IntoFuture, sync::Arc, time::Duration};
 
 use crate::bson::doc;
 
@@ -8,6 +8,7 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
+    options::SelectionCriteria,
     runtime::{self, AsyncJoinHandle},
     test::{
         block_connection_supported,
@@ -173,24 +174,25 @@ async fn retry_read_different_mongos() {
     }
     client_options.hosts.drain(2..);
     client_options.retry_reads = Some(true);
+    dbg!("\nstart retry_read_different_mongos");
 
-    let mut guards = vec![];
-    for ix in [0, 1] {
-        let mut opts = client_options.clone();
-        opts.hosts.remove(ix);
-        opts.direct_connection = Some(true);
-        let client = Client::for_test().options(opts).await;
-
-        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
-            .error_code(6)
-            .close_connection(true);
-        guards.push(client.enable_fail_point(fail_point).await.unwrap());
-    }
-
+    let hosts = client_options.hosts.clone();
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
         .await;
+
+    let mut guards = Vec::new();
+    for address in hosts {
+        let address = address.clone();
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
+            .error_code(6)
+            .selection_criteria(SelectionCriteria::Predicate(Arc::new(move |info| {
+                info.description.address == address
+            })));
+        guards.push(client.enable_fail_point(fail_point).await.unwrap());
+    }
+
     let result = client
         .database("test")
         .collection::<crate::bson::Document>("retry_read_different_mongos")
@@ -211,6 +213,15 @@ async fn retry_read_different_mongos() {
         "unexpected events: {:#?}",
         events,
     );
+    let first_failed = events[1].as_command_failed().unwrap();
+    let first_address = &first_failed.connection.address;
+    let second_failed = events[3].as_command_failed().unwrap();
+    let second_address = &second_failed.connection.address;
+    assert_ne!(
+        first_address, second_address,
+        "Failed commands did not occur on two different mongos instances"
+    );
+    dbg!("end retry_read_different_mongos\n");
 
     drop(guards); // enforce lifetime
 }
@@ -226,6 +237,7 @@ async fn retry_read_same_mongos() {
         log_uncaptured("skipping retry_read_same_mongos: requires sharded cluster");
         return;
     }
+    dbg!("\nstart retry_read_same_mongos");
 
     let mut client_options = get_client_options().await.clone();
     client_options.hosts.drain(1..);
@@ -233,14 +245,13 @@ async fn retry_read_same_mongos() {
     let fp_guard = {
         let mut client_options = client_options.clone();
         client_options.direct_connection = Some(true);
-        let client = Client::for_test().options(client_options).await;
+        let s0 = Client::for_test().options(client_options).await;
 
-        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
-            .error_code(6)
-            .close_connection(true);
-        client.enable_fail_point(fail_point).await.unwrap()
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(6);
+        s0.enable_fail_point(fail_point).await.unwrap()
     };
 
+    client_options.direct_connection = Some(false);
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
@@ -265,6 +276,16 @@ async fn retry_read_same_mongos() {
         "unexpected events: {:#?}",
         events,
     );
+    let first_failed = events[1].as_command_failed().unwrap();
+    let first_address = &first_failed.connection.address;
+    let second_failed = events[3].as_command_succeeded().unwrap();
+    let second_address = &second_failed.connection.address;
+    assert_eq!(
+        first_address, second_address,
+        "Failed command and retry did not occur on the same mongos instance",
+    );
+
+    dbg!("end retry_read_same_mongos\n");
 
     drop(fp_guard); // enforce lifetime
 }
