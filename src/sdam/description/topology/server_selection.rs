@@ -150,7 +150,17 @@ impl TopologyDescription {
                 .collect(),
         };
 
+        dbg!(
+            "suitable servers before latency window filter: {}",
+            suitable_servers.len()
+        );
+
         self.retain_servers_within_latency_window(&mut suitable_servers);
+
+        dbg!(
+            "suitable servers after latency window filter: {}",
+            suitable_servers.len()
+        );
 
         Ok(suitable_servers)
     }
