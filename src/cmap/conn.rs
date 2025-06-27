@@ -222,6 +222,7 @@ impl Connection {
 
         self.command_executing = true;
 
+        let max_message_size = self.max_message_size_bytes();
         #[cfg(any(
             feature = "zstd-compression",
             feature = "zlib-compression",
@@ -230,30 +231,30 @@ impl Connection {
         let write_result = match self.compressor {
             Some(ref compressor) if message.should_compress => {
                 message
-                    .write_op_compressed_to(&mut self.stream, compressor)
+                    .write_op_compressed_to(&mut self.stream, compressor, max_message_size)
                     .await
             }
-            _ => message.write_op_msg_to(&mut self.stream).await,
+            _ => {
+                message
+                    .write_op_msg_to(&mut self.stream, max_message_size)
+                    .await
+            }
         };
         #[cfg(all(
             not(feature = "zstd-compression"),
             not(feature = "zlib-compression"),
             not(feature = "snappy-compression")
         ))]
-        let write_result = message.write_op_msg_to(&mut self.stream).await;
+        let write_result = message
+            .write_op_msg_to(&mut self.stream, max_message_size)
+            .await;
 
         if let Err(ref err) = write_result {
             self.error = Some(err.clone());
         }
         write_result?;
 
-        let response_message_result = Message::read_from(
-            &mut self.stream,
-            self.stream_description
-                .as_ref()
-                .map(|d| d.max_message_size_bytes),
-        )
-        .await;
+        let response_message_result = Message::read_from(&mut self.stream, max_message_size).await;
         self.command_executing = false;
         if let Err(ref err) = response_message_result {
             self.error = Some(err.clone());
@@ -305,6 +306,12 @@ impl Connection {
     /// more responses without another request.
     pub(crate) fn is_streaming(&self) -> bool {
         self.more_to_come
+    }
+
+    fn max_message_size_bytes(&self) -> Option<i32> {
+        self.stream_description
+            .as_ref()
+            .map(|d| d.max_message_size_bytes)
     }
 }
 
