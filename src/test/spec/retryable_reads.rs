@@ -174,7 +174,6 @@ async fn retry_read_different_mongos() {
     }
     client_options.hosts.drain(2..);
     client_options.retry_reads = Some(true);
-    dbg!("\nstart retry_read_different_mongos");
 
     let hosts = client_options.hosts.clone();
     let client = Client::for_test()
@@ -221,7 +220,6 @@ async fn retry_read_different_mongos() {
         first_address, second_address,
         "Failed commands did not occur on two different mongos instances"
     );
-    dbg!("end retry_read_different_mongos\n");
 
     drop(guards); // enforce lifetime
 }
@@ -237,7 +235,6 @@ async fn retry_read_same_mongos() {
         log_uncaptured("skipping retry_read_same_mongos: requires sharded cluster");
         return;
     }
-    dbg!("\nstart retry_read_same_mongos");
 
     let mut client_options = get_client_options().await.clone();
     client_options.hosts.drain(1..);
@@ -284,8 +281,6 @@ async fn retry_read_same_mongos() {
         first_address, second_address,
         "Failed command and retry did not occur on the same mongos instance",
     );
-
-    dbg!("end retry_read_same_mongos\n");
 
     drop(fp_guard); // enforce lifetime
 }

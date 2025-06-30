@@ -62,21 +62,9 @@ pub(crate) fn attempt_to_select_server<'a>(
     deprioritized: Option<&ServerAddress>,
 ) -> Result<Option<SelectedServer>> {
     let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
-    dbg!("length of in_window before filter: {}", in_window.len());
-    for server_desc in in_window.clone() {
-        if let Some(server) = servers.get(&server_desc.address) {
-            dbg!("[Before filter] Server address: {}", &server.address);
-        }
-    }
     if let Some(addr) = deprioritized {
         if in_window.len() > 1 {
             in_window.retain(|d| &d.address != addr);
-        }
-    }
-    dbg!("length of in_window after filter: {}", in_window.len());
-    for server_desc in in_window.clone() {
-        if let Some(server) = servers.get(&server_desc.address) {
-            dbg!("[After filter] Server address: {}", &server.address);
         }
     }
     let in_window_servers = in_window
@@ -84,11 +72,6 @@ pub(crate) fn attempt_to_select_server<'a>(
         .flat_map(|desc| servers.get(&desc.address))
         .collect();
     let selected = select_server_in_latency_window(in_window_servers);
-    if let Some(server) = selected.clone() {
-        dbg!("Selected server address: {}", &server.address);
-    } else {
-        dbg!("No server was selected.");
-    }
     Ok(selected.map(SelectedServer::new))
 }
 
@@ -150,17 +133,7 @@ impl TopologyDescription {
                 .collect(),
         };
 
-        dbg!(
-            "suitable servers before latency window filter: {}",
-            suitable_servers.len()
-        );
-
         self.retain_servers_within_latency_window(&mut suitable_servers);
-
-        dbg!(
-            "suitable servers after latency window filter: {}",
-            suitable_servers.len()
-        );
 
         Ok(suitable_servers)
     }

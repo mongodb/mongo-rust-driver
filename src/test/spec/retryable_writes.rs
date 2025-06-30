@@ -320,7 +320,6 @@ async fn retry_write_different_mongos() {
     client_options.hosts.drain(2..);
     client_options.retry_writes = Some(true);
     let hosts = client_options.hosts.clone();
-    dbg!("\nstart retry_write_different_mongos");
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
@@ -366,7 +365,6 @@ async fn retry_write_different_mongos() {
         first_address, second_address,
         "Failed commands did not occur on two different mongos instances"
     );
-    dbg!("end retry_write_different_mongos\n");
 
     drop(guards); // enforce lifetime
 }
@@ -383,7 +381,6 @@ async fn retry_write_same_mongos() {
         return;
     }
 
-    dbg!("\nstart retry_write_same_mongos");
     let mut client_options = get_client_options().await.clone();
     client_options.hosts.drain(1..);
     client_options.retry_writes = Some(true);
@@ -431,7 +428,6 @@ async fn retry_write_same_mongos() {
         first_address, second_address,
         "Failed commands did not occur on the same mongos instance",
     );
-    dbg!("end retry_write_same_mongos\n");
 
     drop(fp_guard); // enforce lifetime
 }
