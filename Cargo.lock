@@ -1530,7 +1530,7 @@ checksum = "dda42df21d035f88030aad8e877492fac814680e1d7336a57b2a091b989ae388"
 
 [[package]]
 name = "mongodb"
-version = "3.2.3"
+version = "3.2.4"
 dependencies = [
  "anyhow",
  "approx",
@@ -1607,7 +1607,7 @@ dependencies = [
 
 [[package]]
 name = "mongodb-internal-macros"
-version = "3.2.3"
+version = "3.2.4"
 dependencies = [
  "macro_magic",
  "proc-macro2",
