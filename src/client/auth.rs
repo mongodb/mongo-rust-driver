@@ -278,10 +278,6 @@ impl AuthMechanism {
                     .into(),
             }
             .into()),
-            _ => Err(ErrorKind::Authentication {
-                message: format!("Authentication mechanism {:?} not yet implemented.", self),
-            }
-            .into()),
         }
     }
 
@@ -310,7 +306,7 @@ impl AuthMechanism {
             }
             #[cfg(feature = "gssapi-auth")]
             AuthMechanism::Gssapi => {
-                gssapi::authenticate_stream(stream, credential, server_api, None).await
+                gssapi::authenticate_stream(stream, credential, server_api).await
             }
             AuthMechanism::Plain => {
                 plain::authenticate_stream(stream, credential, server_api).await
@@ -328,10 +324,6 @@ impl AuthMechanism {
             AuthMechanism::MongoDbOidc => {
                 oidc::authenticate_stream(stream, credential, server_api, None).await
             }
-            _ => Err(ErrorKind::Authentication {
-                message: format!("Authentication mechanism {:?} not yet implemented.", self),
-            }
-            .into()),
         }
     }
 
@@ -374,10 +366,6 @@ impl AuthMechanism {
             AuthMechanism::MongoDbOidc => {
                 oidc::reauthenticate_stream(stream, credential, server_api).await
             }
-            _ => Err(ErrorKind::Authentication {
-                message: format!("Authentication mechanism {:?} not yet implemented.", self),
-            }
-            .into()),
         }
     }
 }
