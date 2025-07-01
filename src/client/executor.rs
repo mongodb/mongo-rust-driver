@@ -318,6 +318,11 @@ impl Client {
                 .and_then(|s| s.transaction.pinned_mongos())
                 .or_else(|| op.selection_criteria());
 
+            if op.name() == "insert" || op.name() == "find" {
+                let first_server = retry.as_ref().map(|r| &r.first_server);
+                dbg!("deprioritized: {}", &first_server);
+            }
+
             let (server, effective_criteria) = match self
                 .select_server(
                     selection_criteria,
