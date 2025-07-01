@@ -242,10 +242,10 @@ async fn retry_read_same_mongos() {
     let fp_guard = {
         let mut client_options = client_options.clone();
         client_options.direct_connection = Some(true);
-        let s0 = Client::for_test().options(client_options).await;
+        let client = Client::for_test().options(client_options).await;
 
         let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(6);
-        s0.enable_fail_point(fail_point).await.unwrap()
+        client.enable_fail_point(fail_point).await.unwrap()
     };
 
     client_options.direct_connection = Some(false);
