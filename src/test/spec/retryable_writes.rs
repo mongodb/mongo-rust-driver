@@ -317,6 +317,19 @@ async fn retry_write_different_mongos() {
         );
         return;
     }
+
+    // NOTE: This test places all failpoints on a single mongos server to avoid flakiness caused by
+    // incomplete server discovery.
+    //
+    // In MongoDB versions 4.2 and 4.4, the SDAM process can be slow or non-deterministic,
+    // especially immediately after creating the cluster. The driver may not have sent "hello"
+    // messages to all connected servers yet, which means some mongos instances may still be in
+    // the "Unknown" state and not selectable for retryable writes.
+    //
+    // This caused test failures because the retry logic expected to find a second eligible server,
+    // but the driver was unaware of its existence. By placing all failpoints on a single mongos
+    // host, we ensure that server selection and retries happen within a single fully discovered
+    // router, avoiding issues caused by prematurely filtered or undiscovered servers.
     client_options.hosts.drain(2..);
     client_options.retry_writes = Some(true);
     let hosts = client_options.hosts.clone();
