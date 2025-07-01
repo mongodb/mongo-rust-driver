@@ -173,6 +173,15 @@ async fn retry_read_different_mongos() {
         return;
     }
 
+    client_options.hosts.drain(2..);
+    client_options.retry_reads = Some(true);
+
+    let hosts = client_options.hosts.clone();
+    let client = Client::for_test()
+        .options(client_options)
+        .monitor_events()
+        .await;
+
     // NOTE: This test places all failpoints on a single mongos server to avoid flakiness caused by
     // incomplete server discovery.
     //
@@ -185,15 +194,6 @@ async fn retry_read_different_mongos() {
     // but the driver was unaware of its existence. By placing all failpoints on a single mongos
     // host, we ensure that server selection and retries happen within a single fully discovered
     // router, avoiding issues caused by prematurely filtered or undiscovered servers.
-    client_options.hosts.drain(2..);
-    client_options.retry_reads = Some(true);
-
-    let hosts = client_options.hosts.clone();
-    let client = Client::for_test()
-        .options(client_options)
-        .monitor_events()
-        .await;
-
     let mut guards = Vec::new();
     for address in hosts {
         let address = address.clone();
