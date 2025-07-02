@@ -1,4 +1,4 @@
-use cross_krb5::{ClientCtx, InitiateFlags, Step};
+use cross_krb5::{ClientCtx, InitiateFlags, K5Ctx, PendingClientCtx, Step};
 use dns_lookup::getnameinfo;
 use std::net::SocketAddr;
 
@@ -79,11 +79,7 @@ pub(crate) async fn authenticate_stream(
 
     for i in 0..10 {
         println!("loop iteration {i}");
-        let challenge = if payload.is_empty() {
-            None
-        } else {
-            Some(payload.as_slice())
-        };
+        let challenge = payload.as_slice();
         println!("\tstart authenticator.step() - challenge = {challenge:?}");
         let output_token = authenticator.step(challenge).await?;
         println!("\tfinish authenticator.step() - output_token = {output_token:?}");
@@ -105,8 +101,12 @@ pub(crate) async fn authenticate_stream(
         conversation_id = Some(sasl_response.conversation_id);
         payload = sasl_response.payload;
 
-        if sasl_response.done && authenticator.is_complete() {
+        if sasl_response.done {
             return Ok(());
+        }
+
+        if authenticator.is_complete() {
+            break;
         }
 
         // if let Some(token) = output_token {
@@ -140,6 +140,28 @@ pub(crate) async fn authenticate_stream(
         // } else if authenticator.is_complete() {
         //     return Ok(());
         // }
+    }
+
+    println!("starting do_unwrap_wrap - payload = {payload:?}");
+    if let Some(output_token) = authenticator.do_unwrap_wrap(payload.as_slice())? {
+        println!("finished do_unwrap_wrap - output_token = {output_token:?}");
+        let command = SaslContinue::new(
+            source.to_string(),
+            conversation_id.unwrap(),
+            output_token,
+            server_api.cloned(),
+        )
+        .into_command();
+
+        println!("\tstart conn.send_message() - command = {command:?}");
+        let response_doc = conn.send_message(command).await?.body()?;
+        println!("\tfinish conn.send_message() - response_doc = {response_doc:?}");
+        let sasl_response = SaslResponse::parse("GSSAPI", response_doc)?;
+
+        if sasl_response.done {
+            println!("got done");
+            return Ok(());
+        }
     }
 
     Err(Error::authentication_error(
@@ -202,7 +224,8 @@ impl GssapiProperties {
 }
 
 struct GssapiAuthenticator {
-    pending_ctx: Option<cross_krb5::PendingClientCtx>,
+    pending_ctx: Option<PendingClientCtx>,
+    established_ctx: Option<ClientCtx>,
     service_principal: String,
     user_principal: Option<String>,
     is_complete: bool,
@@ -218,17 +241,18 @@ impl GssapiAuthenticator {
         let mut service_principal = format!("{}/{}", service_name, hostname);
         if let Some(service_realm) = properties.service_realm.as_ref() {
             service_principal = format!("{}@{}", service_principal, service_realm);
-        } else if let Some(user_principal) = user_principal.as_ref() {
-            if let Some(idx) = user_principal.find('@') {
-                // If no SERVICE_REALM was specified, use realm specified in the
-                // username. Note that `realm` starts with '@'.
-                let (_, realm) = user_principal.split_at(idx);
-                service_principal = format!("{}{}", service_principal, realm);
-            }
-        }
+        } /*else if let Some(user_principal) = user_principal.as_ref() {
+              if let Some(idx) = user_principal.find('@') {
+                  // If no SERVICE_REALM was specified, use realm specified in the
+                  // username. Note that `realm` starts with '@'.
+                  let (_, realm) = user_principal.split_at(idx);
+                  service_principal = format!("{}{}", service_principal, realm);
+              }
+          }*/
 
         Ok(Self {
             pending_ctx: None,
+            established_ctx: None,
             service_principal,
             user_principal,
             is_complete: false,
@@ -253,33 +277,21 @@ impl GssapiAuthenticator {
         return Ok(initial_token.to_vec());
     }
 
-    async fn step(&mut self, challenge: Option<&[u8]>) -> Result<Option<Vec<u8>>> {
-        if self.pending_ctx.is_none() {
-            let (pending_ctx, initial_token) = ClientCtx::new(
-                InitiateFlags::empty(),
-                self.user_principal.as_deref(), // Use provided credentials
-                &self.service_principal,
-                None, // No channel bindings
-            )
-            .map_err(|e| {
-                Error::authentication_error(
-                    "GSSAPI",
-                    &format!("Failed to initialize GSSAPI context: {}", e),
-                )
-            })?;
-
-            self.pending_ctx = Some(pending_ctx);
-            return Ok(Some(initial_token.to_vec()));
-        }
-
-        if let Some(challenge_data) = challenge {
+    async fn step(&mut self, challenge: &[u8]) -> Result<Option<Vec<u8>>> {
+        if challenge.is_empty() {
+            Err(Error::authentication_error(
+                "GSSAPI",
+                "Expected challenge data for GSSAPI continuation",
+            ))
+        } else {
             if let Some(pending_ctx) = self.pending_ctx.take() {
                 println!("\t\tabout to call pending_ctx.step()");
-                match pending_ctx.step(challenge_data).map_err(|e| {
+                match pending_ctx.step(challenge).map_err(|e| {
                     Error::authentication_error("GSSAPI", &format!("GSSAPI step failed: {}", e))
                 })? {
                     Step::Finished((ctx, token)) => {
                         self.is_complete = true;
+                        self.established_ctx = Some(ctx);
                         Ok(token.map(|t| t.to_vec()))
                     }
                     Step::Continue((ctx, token)) => {
@@ -293,10 +305,32 @@ impl GssapiAuthenticator {
                     "Authentication context not initialized",
                 ))
             }
+        }
+    }
+
+    fn do_unwrap_wrap(&mut self, payload: &[u8]) -> Result<Option<Vec<u8>>> {
+        if let Some(mut established_ctx) = self.established_ctx.take() {
+            let _ = established_ctx.unwrap(payload).map_err(|e| {
+                Error::authentication_error("GSSAPI", &format!("GSSAPI unwrap failed: {}", e))
+            })?;
+
+            if let Some(user_principal) = self.user_principal.take() {
+                let output_token = established_ctx
+                    .wrap(true, user_principal.as_bytes())
+                    .map_err(|e| {
+                        Error::authentication_error("GSSAPI", &format!("GSSAPI wrap failed: {}", e))
+                    })?;
+                Ok(Some(output_token.to_vec()))
+            } else {
+                Err(Error::authentication_error(
+                    "GSSAPI",
+                    "User principal not specified",
+                ))
+            }
         } else {
             Err(Error::authentication_error(
                 "GSSAPI",
-                "Expected challenge data for GSSAPI continuation",
+                "Authentication context not established",
             ))
         }
     }

@@ -4,7 +4,7 @@ mod aws;
 use serde::Deserialize;
 
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     options::{AuthMechanism, ClientOptions, Credential, ServerAddress},
     Client,
 };
@@ -52,7 +52,7 @@ async fn krb5() {
     let uri = "mongodb://testuser%40EXAMPLE.COM@localhost:27017/admin?authSource=%24external&authMechanism=GSSAPI";
     let client = Client::with_uri_str(uri).await.unwrap();
 
-    let coll = client.database("test").collection("foo");
+    let coll = client.database("test").collection::<Document>("foo");
 
     let doc = coll.find_one(doc! {}).await.unwrap().unwrap();
 
