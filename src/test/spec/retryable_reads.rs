@@ -182,18 +182,23 @@ async fn retry_read_different_mongos() {
         .monitor_events()
         .await;
 
-    // NOTE: This test places all failpoints on a single mongos server to avoid flakiness caused by
-    // incomplete server discovery.
-    //
-    // In MongoDB versions 4.2 and 4.4, the SDAM process can be slow or non-deterministic,
-    // especially immediately after creating the cluster. The driver may not have sent "hello"
-    // messages to all connected servers yet, which means some mongos instances may still be in
-    // the "Unknown" state and not selectable for retryable reads.
-    //
-    // This caused test failures because the retry logic expected to find a second eligible server,
-    // but the driver was unaware of its existence. By placing all failpoints on a single mongos
-    // host, we ensure that server selection and retries happen within a single fully discovered
-    // router, avoiding issues caused by prematurely filtered or undiscovered servers.
+    // NOTE: This test uses a single client to set failpoints on each mongos and run the find
+    // operation. This avoids flakiness caused by a race between server discovery and server
+    // selection.
+
+    // When a client is first created, it initializes its view of the topology with all configured
+    // mongos addresses, but marks each as Unknown until it completes the server discovery process
+    // by sending and receiving "hello" messages Unknown servers are not eligible for server
+    // selection.
+
+    // Previously, we created a new client for each call to `enable_fail_point` and for the find
+    // operation. Each new client restarted the discovery process, and sometimes had not yet marked
+    // both mongos servers as usable, leading to test failures when the retry logic couldn't find a
+    // second eligible server.
+
+    // By reusing a single client, each `enable_fail_point` call forces discovery to complete for
+    // the corresponding mongos. As a result, when the find operation runs, the client has a
+    // fully discovered topology and can reliably select between both servers.
     let mut guards = Vec::new();
     for address in hosts {
         let address = address.clone();
