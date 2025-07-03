@@ -172,7 +172,6 @@ async fn retry_read_different_mongos() {
         );
         return;
     }
-
     client_options.hosts.drain(2..);
     client_options.retry_reads = Some(true);
 

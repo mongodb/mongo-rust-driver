@@ -497,7 +497,6 @@ impl Client {
                 } else {
                     criteria
                 };
-
             let result = server_selection::attempt_to_select_server(
                 effective_criteria,
                 &state.description,

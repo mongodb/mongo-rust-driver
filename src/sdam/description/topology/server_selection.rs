@@ -62,7 +62,6 @@ pub(crate) fn attempt_to_select_server<'a>(
     deprioritized: Option<&ServerAddress>,
 ) -> Result<Option<SelectedServer>> {
     let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
-
     if let Some(addr) = deprioritized {
         if in_window.len() > 1 {
             in_window.retain(|d| &d.address != addr);
