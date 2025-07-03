@@ -498,14 +498,6 @@ impl Client {
                     criteria
                 };
 
-            if operation_name == "insert" || operation_name == "find" {
-                let servers = &state.description.servers;
-                for (address, description) in servers {
-                    dbg!("address: {}", address);
-                    dbg!("type: {}", description.server_type);
-                }
-            }
-
             let result = server_selection::attempt_to_select_server(
                 effective_criteria,
                 &state.description,

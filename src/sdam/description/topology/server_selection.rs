@@ -61,12 +61,7 @@ pub(crate) fn attempt_to_select_server<'a>(
     servers: &'a HashMap<ServerAddress, Arc<Server>>,
     deprioritized: Option<&ServerAddress>,
 ) -> Result<Option<SelectedServer>> {
-    let log = deprioritized.is_some();
-
     let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
-    if log {
-        dbg!("in window: {}", &in_window);
-    }
 
     if let Some(addr) = deprioritized {
         if in_window.len() > 1 {
