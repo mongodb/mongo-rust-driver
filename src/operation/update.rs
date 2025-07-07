@@ -35,7 +35,7 @@ impl UpdateOrReplace {
             },
             Self::Replacement(replacement_doc) => {
                 bson_util::replacement_raw_document_check(replacement_doc)?;
-                doc.append_ref_err(key, replacement_doc)?;
+                doc.append_ref_compat(key, replacement_doc)?;
             }
         }
 
