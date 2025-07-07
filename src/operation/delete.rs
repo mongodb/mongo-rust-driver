@@ -1,5 +1,6 @@
 use crate::{
     bson::{doc, Document},
+    bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::Namespace,
     collation::Collation,
@@ -42,7 +43,7 @@ impl Delete {
 impl OperationWithDefaults for Delete {
     type O = DeleteResult;
 
-    const NAME: &'static str = "delete";
+    const NAME: &'static CStr = cstr!("delete");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut delete = doc! {
@@ -62,7 +63,7 @@ impl OperationWithDefaults for Delete {
         }
 
         let mut body = doc! {
-            Self::NAME: self.ns.coll.clone(),
+            Self::NAME.as_str(): self.ns.coll.clone(),
             "deletes": [delete],
             "ordered": true, // command monitoring tests expect this (SPEC-1130)
         };

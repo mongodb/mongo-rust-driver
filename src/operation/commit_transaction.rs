@@ -3,6 +3,7 @@ use std::time::Duration;
 use crate::bson::rawdoc;
 
 use crate::{
+    bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options_to_raw_document, OperationWithDefaults, Retryability},
@@ -24,7 +25,7 @@ impl CommitTransaction {
 impl OperationWithDefaults for CommitTransaction {
     type O = ();
 
-    const NAME: &'static str = "commitTransaction";
+    const NAME: &'static CStr = cstr!("commitTransaction");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {

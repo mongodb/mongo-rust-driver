@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::doc,
+    bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     error::{Error, Result},
@@ -26,7 +27,7 @@ impl Count {
 impl OperationWithDefaults for Count {
     type O = u64;
 
-    const NAME: &'static str = "count";
+    const NAME: &'static CStr = cstr!("count");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {

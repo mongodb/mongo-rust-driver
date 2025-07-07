@@ -2,6 +2,7 @@ pub(crate) mod change_stream;
 
 use crate::{
     bson::{doc, Bson, Document},
+    bson_compat::{cstr, CStr},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
@@ -46,11 +47,11 @@ impl Aggregate {
 impl OperationWithDefaults for Aggregate {
     type O = CursorSpecification;
 
-    const NAME: &'static str = "aggregate";
+    const NAME: &'static CStr = cstr!("aggregate");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
-            Self::NAME: self.target.to_bson(),
+            Self::NAME.as_str(): self.target.to_bson(),
             "pipeline": bson_util::to_bson_array(&self.pipeline),
             "cursor": {}
         };

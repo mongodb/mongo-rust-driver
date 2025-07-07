@@ -1,6 +1,7 @@
 use crate::bson::rawdoc;
 
 use crate::{
+    bson_compat::{cstr, CStr},
     bson_util::append_ser,
     client::session::TransactionPin,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
@@ -29,7 +30,7 @@ impl AbortTransaction {
 impl OperationWithDefaults for AbortTransaction {
     type O = ();
 
-    const NAME: &'static str = "abortTransaction";
+    const NAME: &'static CStr = cstr!("abortTransaction");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
@@ -37,7 +38,11 @@ impl OperationWithDefaults for AbortTransaction {
         };
         if let Some(ref write_concern) = self.write_concern() {
             if !write_concern.is_empty() {
-                append_ser(&mut body, "writeConcern", write_concern)?;
+                append_ser(
+                    &mut body,
+                    crate::bson_compat::cstr!("writeConcern"),
+                    write_concern,
+                )?;
             }
         }
 

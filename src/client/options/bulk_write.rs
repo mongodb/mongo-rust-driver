@@ -362,11 +362,12 @@ impl WriteModel {
         }
     }
 
-    pub(crate) fn operation_name(&self) -> &'static str {
+    pub(crate) fn operation_name(&self) -> &'static crate::bson_compat::CStr {
+        use crate::bson_compat::cstr;
         match self.operation_type() {
-            OperationType::Insert => "insert",
-            OperationType::Update => "update",
-            OperationType::Delete => "delete",
+            OperationType::Insert => cstr!("insert"),
+            OperationType::Update => cstr!("update"),
+            OperationType::Delete => cstr!("delete"),
         }
     }
 

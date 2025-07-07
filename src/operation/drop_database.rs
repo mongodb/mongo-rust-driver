@@ -1,6 +1,7 @@
 use crate::bson::rawdoc;
 
 use crate::{
+    bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::DropDatabaseOptions,
     error::Result,
@@ -25,7 +26,7 @@ impl DropDatabase {
 impl OperationWithDefaults for DropDatabase {
     type O = ();
 
-    const NAME: &'static str = "dropDatabase";
+    const NAME: &'static CStr = cstr!("dropDatabase");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {

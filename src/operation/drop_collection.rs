@@ -1,6 +1,7 @@
 use crate::bson::rawdoc;
 
 use crate::{
+    bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, Result},
     operation::{append_options_to_raw_document, OperationWithDefaults, WriteConcernOnlyBody},
@@ -25,7 +26,7 @@ impl DropCollection {
 impl OperationWithDefaults for DropCollection {
     type O = ();
 
-    const NAME: &'static str = "drop";
+    const NAME: &'static CStr = cstr!("drop");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {

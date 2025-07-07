@@ -447,7 +447,12 @@ impl Client {
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
         let (server, _) = self
-            .select_server(criteria, "Test select server", None, |_, _| None)
+            .select_server(
+                criteria,
+                crate::bson_compat::cstr!("Test select server"),
+                None,
+                |_, _| None,
+            )
             .await?;
         Ok(server.address.clone())
     }
@@ -458,7 +463,7 @@ impl Client {
         &self,
         criteria: Option<&SelectionCriteria>,
         #[allow(unused_variables)] // we only use the operation_name for tracing.
-        operation_name: &str,
+        operation_name: &crate::bson_compat::CStr,
         deprioritized: Option<&ServerAddress>,
         override_criteria: OverrideCriteriaFn,
     ) -> Result<(SelectedServer, SelectionCriteria)> {

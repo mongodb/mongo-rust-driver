@@ -7,7 +7,7 @@ use futures_util::{FutureExt, TryStreamExt};
 
 use crate::{
     bson::{rawdoc, Bson, RawDocumentBuf},
-    bson_compat::RawDocumentBufExt as _,
+    bson_compat::{cstr, CStr},
     bson_util::{self, extend_raw_document_buf},
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -263,7 +263,7 @@ where
 {
     type O = R;
 
-    const NAME: &'static str = "bulkWrite";
+    const NAME: &'static CStr = cstr!("bulkWrite");
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if description.max_wire_version.unwrap_or(0) < SERVER_8_0_0_WIRE_VERSION {
@@ -282,7 +282,7 @@ where
             Some(options) => crate::bson_compat::serialize_to_raw_document_buf(options),
             None => crate::bson_compat::serialize_to_raw_document_buf(&BulkWriteOptions::default()),
         }?;
-        options.append_err("errorsOnly", R::errors_only())?;
+        options.append(cstr!("errorsOnly"), R::errors_only());
         bson_util::extend_raw_document_buf(&mut command_body, options)?;
 
         let max_document_sequences_size: usize = (Checked::new(max_message_size)
