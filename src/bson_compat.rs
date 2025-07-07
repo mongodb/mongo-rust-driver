@@ -110,6 +110,7 @@ macro_rules! use_either {
     ($($name:ident => $path3:path | $path2:path);+;) => {
         $(
             #[cfg(feature = "bson-3")]
+            #[allow(unused_imports)]
             pub(crate) use crate::bson::{$path3 as $name};
 
             #[cfg(not(feature = "bson-3"))]
@@ -123,6 +124,8 @@ macro_rules! use_either {
 use_either! {
     RawResult                       => error::Result                    | raw::Result;
     RawError                        => error::Error                     | raw::Error;
+    DeError                         => error::Error                     | de::Error;
+    SerError                        => error::Error                     | ser::Error;
     serialize_to_raw_document_buf   => serialize_to_raw_document_buf    | to_raw_document_buf;
     serialize_to_document           => serialize_to_document            | to_document;
     serialize_to_bson               => serialize_to_bson                | to_bson;
