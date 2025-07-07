@@ -74,9 +74,6 @@ pub(crate) async fn authenticate_stream(
     let mut conversation_id = Some(sasl_response.conversation_id);
     let mut payload = sasl_response.payload;
 
-    // let mut conversation_id = None;
-    // let mut payload = Vec::new();
-
     for i in 0..10 {
         println!("loop iteration {i}");
         let challenge = payload.as_slice();
@@ -108,38 +105,6 @@ pub(crate) async fn authenticate_stream(
         if authenticator.is_complete() {
             break;
         }
-
-        // if let Some(token) = output_token {
-        //     let command = if conversation_id.is_none() {
-        //         SaslStart::new(
-        //             source.to_string(),
-        //             crate::client::auth::AuthMechanism::Gssapi,
-        //             token,
-        //             server_api.cloned(),
-        //         )
-        //         .into_command()
-        //     } else {
-        //         SaslContinue::new(
-        //             source.to_string(),
-        //             conversation_id.clone().unwrap(),
-        //             token,
-        //             server_api.cloned(),
-        //         )
-        //         .into_command()
-        //     };
-        //
-        //     let response_doc = conn.send_message(command).await?.body()?;
-        //     let sasl_response = SaslResponse::parse("GSSAPI", response_doc)?;
-        //
-        //     conversation_id = Some(sasl_response.conversation_id);
-        //     payload = sasl_response.payload;
-        //
-        //     if sasl_response.done && authenticator.is_complete() {
-        //         return Ok(());
-        //     }
-        // } else if authenticator.is_complete() {
-        //     return Ok(());
-        // }
     }
 
     println!("starting do_unwrap_wrap - payload = {payload:?}");
@@ -241,14 +206,14 @@ impl GssapiAuthenticator {
         let mut service_principal = format!("{}/{}", service_name, hostname);
         if let Some(service_realm) = properties.service_realm.as_ref() {
             service_principal = format!("{}@{}", service_principal, service_realm);
-        } /*else if let Some(user_principal) = user_principal.as_ref() {
-              if let Some(idx) = user_principal.find('@') {
-                  // If no SERVICE_REALM was specified, use realm specified in the
-                  // username. Note that `realm` starts with '@'.
-                  let (_, realm) = user_principal.split_at(idx);
-                  service_principal = format!("{}{}", service_principal, realm);
-              }
-          }*/
+        } else if let Some(user_principal) = user_principal.as_ref() {
+            if let Some(idx) = user_principal.find('@') {
+                // If no SERVICE_REALM was specified, use realm specified in the
+                // username. Note that `realm` starts with '@'.
+                let (_, realm) = user_principal.split_at(idx);
+                service_principal = format!("{}{}", service_principal, realm);
+            }
+        }
 
         Ok(Self {
             pending_ctx: None,
@@ -274,7 +239,7 @@ impl GssapiAuthenticator {
         })?;
 
         self.pending_ctx = Some(pending_ctx);
-        return Ok(initial_token.to_vec());
+        Ok(initial_token.to_vec())
     }
 
     async fn step(&mut self, challenge: &[u8]) -> Result<Option<Vec<u8>>> {
@@ -314,12 +279,29 @@ impl GssapiAuthenticator {
                 Error::authentication_error("GSSAPI", &format!("GSSAPI unwrap failed: {}", e))
             })?;
 
+            // // todo: instead of wrapping the user principal, try wrapping the byte array
+            // //    [ 0x1, 0x0, 0x0, 0x0 ]
+            // // bytesReceivedFromServer = new byte[length];
+            // // bytesReceivedFromServer[0] = 0x1; // NO_PROTECTION
+            // // bytesReceivedFromServer[1] = 0x0; // NO_PROTECTION
+            // // bytesReceivedFromServer[2] = 0x0; // NO_PROTECTION
+            // // bytesReceivedFromServer[3] = 0x0; // NO_PROTECTION
+            //
+            // let bytes: &[u8] = &[0x00, 0xFF, 0xFF, 0xFF];
+            // let output_token = established_ctx.wrap(true, bytes).map_err(|e| {
+            //     Error::authentication_error("GSSAPI", &format!("GSSAPI wrap failed: {}", e))
+            // })?;
+            // Ok(Some(output_token.to_vec()))
+
             if let Some(user_principal) = self.user_principal.take() {
-                let output_token = established_ctx
-                    .wrap(true, user_principal.as_bytes())
-                    .map_err(|e| {
-                        Error::authentication_error("GSSAPI", &format!("GSSAPI wrap failed: {}", e))
-                    })?;
+                let bytes: &[u8] = &[0x1, 0x0, 0x0, 0x0];
+                // let bytes: &[u8] = &[0x00, 0xFF, 0xFF, 0xFF];
+                let bytes = [bytes, user_principal.as_bytes()].concat();
+                println!("user principal: {user_principal}");
+                println!("user principal bytes: {:?}", user_principal.as_bytes());
+                let output_token = established_ctx.wrap(false, bytes.as_slice()).map_err(|e| {
+                    Error::authentication_error("GSSAPI", &format!("GSSAPI wrap failed: {}", e))
+                })?;
                 Ok(Some(output_token.to_vec()))
             } else {
                 Err(Error::authentication_error(
