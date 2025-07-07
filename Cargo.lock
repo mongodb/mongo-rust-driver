@@ -281,9 +281,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.27"
+version = "1.2.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d487aa071b5f64da6f19a3e848e3578944b726ee5a4854b82172f02aa876bfdc"
+checksum = "5c1599538de2394445747c8cf7935946e3cc27e9625f889d979bfb2aaf569362"
 dependencies = [
  "jobserver",
  "libc",
@@ -830,9 +830,9 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 
 [[package]]
 name = "h2"
-version = "0.4.10"
+version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9421a676d1b147b16b82c9225157dc629087ef8ec4d5e2960f9437a90dac0a5"
+checksum = "17da50a276f1e01e0ba6c029e47b7100754904ee8a278f886546e98575380785"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -1277,6 +1277,17 @@ checksum = "879f10e63c20629ecabbb64a8010319738c66a5cd0c29b02d63d272b03751d01"
 dependencies = [
  "block-padding",
  "generic-array",
+]
+
+[[package]]
+name = "io-uring"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b86e202f00093dcba4275d4636b93ef9dd75d025ae560d2521b45ea28ab49013"
+dependencies = [
+ "bitflags 2.9.0",
+ "cfg-if",
+ "libc",
 ]
 
 [[package]]
@@ -2154,9 +2165,9 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "reqwest"
-version = "0.12.20"
+version = "0.12.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eabf4c97d9130e2bf606614eb937e86edac8292eaa6f422f995d7e8de1eb1813"
+checksum = "cbc931937e6ca3a06e3b6c0aa7841849b160a90351d6ab467a8b9b9959767531"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -2339,6 +2350,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "schemars"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82d20c4491bc164fa2f6c5d44565947a52ad80b9505d8e36f8d54c27c739fcd0"
+dependencies = [
+ "dyn-clone",
+ "ref-cast",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2461,16 +2484,17 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "3.13.0"
+version = "3.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf65a400f8f66fb7b0552869ad70157166676db75ed8181f8104ea91cf9d0b42"
+checksum = "f2c45cd61fefa9db6f254525d46e392b852e0e61d9a1fd36e5bd183450a556d5"
 dependencies = [
  "base64 0.22.1",
  "chrono",
  "hex",
  "indexmap 1.9.3",
  "indexmap 2.9.0",
- "schemars",
+ "schemars 0.9.0",
+ "schemars 1.0.4",
  "serde",
  "serde_derive",
  "serde_json",
@@ -2480,9 +2504,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "3.13.0"
+version = "3.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81679d9ed988d5e9a5e6531dc3f2c28efbd639cbd1dfb628df08edea6004da77"
+checksum = "de90945e6565ce0d9a25098082ed4ee4002e047cb59892c318d66821e14bb30f"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -2822,17 +2846,19 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.45.1"
+version = "1.46.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75ef51a33ef1da925cea3e4eb122833cb377c61439ca401b770f54902b806779"
+checksum = "0cc3a2344dafbe23a245241fe8b09735b521110d30fcefbbd5feb1797ca35d17"
 dependencies = [
  "backtrace",
  "bytes",
+ "io-uring",
  "libc",
  "mio",
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
+ "slab",
  "socket2",
  "tokio-macros",
  "windows-sys 0.52.0",
