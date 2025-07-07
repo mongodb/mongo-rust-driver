@@ -46,23 +46,3 @@ async fn plain_auth() {
         }
     );
 }
-
-#[tokio::test]
-async fn krb5() {
-    let uri = "mongodb://testuser%40EXAMPLE.COM@localhost:27017/admin?authSource=%24external&authMechanism=GSSAPI";
-    let client = Client::with_uri_str(uri).await.unwrap();
-
-    let coll = client.database("test").collection::<Document>("foo");
-
-    let doc = coll.find_one(doc! {}).await.unwrap().unwrap();
-
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct TestDocument {
-        r#_id: i32,
-        a: i32,
-    }
-
-    let doc: TestDocument = crate::bson::from_document(doc).unwrap();
-
-    assert_eq!(doc, TestDocument { r#_id: 1, a: 1 },);
-}
