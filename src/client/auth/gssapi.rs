@@ -47,17 +47,15 @@ pub(crate) async fn authenticate_stream(
     let hostname = canonicalize_hostname(hostname, &properties.canonicalize_host_name)?;
 
     let user_principal = credential.username.clone();
-    let mut authenticator =
-        GssapiAuthenticator::new(user_principal, properties.clone(), &hostname).await?;
-
-    let output_token = authenticator.init().await?;
+    let (mut authenticator, initial_token) =
+        GssapiAuthenticator::init(user_principal, properties.clone(), &hostname).await?;
 
     let source = credential.source.as_deref().unwrap_or("$external");
 
     let command = SaslStart::new(
         source.to_string(),
         crate::client::auth::AuthMechanism::Gssapi,
-        output_token,
+        initial_token,
         server_api.cloned(),
     )
     .into_command()?;
@@ -188,17 +186,18 @@ impl GssapiProperties {
 struct GssapiAuthenticator {
     pending_ctx: Option<PendingClientCtx>,
     established_ctx: Option<ClientCtx>,
-    service_principal: String,
     user_principal: Option<String>,
     is_complete: bool,
 }
 
 impl GssapiAuthenticator {
-    async fn new(
+    // Initialize the GssapiAuthenticator by creating a PendingClientCtx and
+    // getting an initial token to send to the server.
+    async fn init(
         user_principal: Option<String>,
         properties: GssapiProperties,
         hostname: &str,
-    ) -> Result<Self> {
+    ) -> Result<(Self, Vec<u8>)> {
         let service_name: &str = properties.service_name.as_ref();
         let mut service_principal = format!("{}/{}", service_name, hostname);
         if let Some(service_realm) = properties.service_realm.as_ref() {
@@ -212,22 +211,10 @@ impl GssapiAuthenticator {
             }
         }
 
-        Ok(Self {
-            pending_ctx: None,
-            established_ctx: None,
-            service_principal,
-            user_principal,
-            is_complete: false,
-        })
-    }
-
-    // Initialize the GssapiAuthenticator by creating a PendingClientCtx and
-    // getting an initial token to send to the server.
-    async fn init(&mut self) -> Result<Vec<u8>> {
         let (pending_ctx, initial_token) = ClientCtx::new(
             InitiateFlags::empty(),
-            self.user_principal.as_deref(),
-            &self.service_principal,
+            user_principal.as_deref(),
+            &service_principal,
             None, // No channel bindings
         )
         .map_err(|e| {
@@ -237,8 +224,15 @@ impl GssapiAuthenticator {
             )
         })?;
 
-        self.pending_ctx = Some(pending_ctx);
-        Ok(initial_token.to_vec())
+        Ok((
+            Self {
+                pending_ctx: Some(pending_ctx),
+                established_ctx: None,
+                user_principal,
+                is_complete: false,
+            },
+            initial_token.to_vec(),
+        ))
     }
 
     // Issue the server provided token to the client context. If the ClientCtx
