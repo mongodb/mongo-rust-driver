@@ -4,7 +4,7 @@ mod aws;
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Document},
+    bson::doc,
     options::{AuthMechanism, ClientOptions, Credential, ServerAddress},
     Client,
 };

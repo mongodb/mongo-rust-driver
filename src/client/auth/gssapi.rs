@@ -1,6 +1,5 @@
 use cross_krb5::{ClientCtx, InitiateFlags, K5Ctx, PendingClientCtx, Step};
-use dns_lookup::getnameinfo;
-use std::net::SocketAddr;
+use dns_lookup::{lookup_addr, lookup_host};
 
 use crate::{
     bson::Bson,
@@ -29,7 +28,7 @@ pub(crate) struct GssapiProperties {
     pub service_host: Option<String>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub(crate) enum CanonicalizeHostName {
     #[default]
     None,
@@ -46,7 +45,7 @@ pub(crate) async fn authenticate_stream(
 
     let conn_host = conn.address.host().to_string();
     let hostname = properties.service_host.as_ref().unwrap_or(&conn_host);
-    let hostname = canonicalize_hostname(hostname, &properties.canonicalize_host_name).await?;
+    let hostname = canonicalize_hostname(hostname, &properties.canonicalize_host_name)?;
 
     let user_principal = credential.username.clone();
     let mut authenticator =
@@ -309,49 +308,38 @@ impl GssapiAuthenticator {
     }
 }
 
-async fn canonicalize_hostname(hostname: &str, mode: &CanonicalizeHostName) -> Result<String> {
-    match mode {
-        CanonicalizeHostName::None => Ok(hostname.to_string()),
-        CanonicalizeHostName::Forward => {
-            let (canonical_host, _address) = resolve_hostname_with_canonical(hostname).await?;
-            Ok(canonical_host.to_lowercase())
-        }
-        CanonicalizeHostName::ForwardAndReverse => {
-            let (canonical_host, address) = resolve_hostname_with_canonical(hostname).await?;
-            match perform_reverse_dns_lookup(address).await {
-                Ok(reversed_hostname) => Ok(reversed_hostname.to_lowercase()),
-                Err(_) => Ok(canonical_host.to_lowercase()),
-            }
-        }
+fn canonicalize_hostname(hostname: &str, mode: &CanonicalizeHostName) -> Result<String> {
+    if mode == &CanonicalizeHostName::None {
+        return Ok(hostname.to_string());
     }
-}
 
-async fn resolve_hostname_with_canonical(hostname: &str) -> Result<(String, std::net::IpAddr)> {
-    match tokio::net::lookup_host((hostname, 0)).await {
-        Ok(mut addrs) => {
-            if let Some(addr) = addrs.next() {
-                Ok((hostname.to_string(), addr.ip()))
-            } else {
-                return Err(Error::authentication_error(
-                    "GSSAPI",
-                    &format!("No addresses found for hostname '{}'", hostname),
-                ));
+    // Forward lookup
+    let ip_addrs = lookup_host(hostname).map_err(|e| {
+        Error::authentication_error(
+            "GSSAPI",
+            &format!("Failed to look up hostname for canonicalization: {:?}", e),
+        )
+    })?;
+
+    if let Some(ip_addr) = ip_addrs.first() {
+        match mode {
+            CanonicalizeHostName::Forward => {
+                // Return the original host, but lowercased to match FQDN convention
+                Ok(hostname.to_ascii_lowercase())
             }
+            CanonicalizeHostName::ForwardAndReverse => {
+                // Reverse-lookup for FQDN, fallback to hostname
+                match lookup_addr(ip_addr) {
+                    Ok(fqdn) => Ok(fqdn.to_ascii_lowercase()),
+                    Err(_) => Ok(hostname.to_ascii_lowercase()),
+                }
+            }
+            CanonicalizeHostName::None => unreachable!(),
         }
-        Err(e) => Err(Error::authentication_error(
+    } else {
+        Err(Error::authentication_error(
             "GSSAPI",
-            &format!("DNS resolution failed for hostname '{}': {}", hostname, e),
-        )),
-    }
-}
-
-async fn perform_reverse_dns_lookup(ip: std::net::IpAddr) -> Result<String> {
-    let sockaddr = SocketAddr::new(ip, 0);
-    match tokio::task::spawn_blocking(move || getnameinfo(&sockaddr, 0)).await {
-        Ok(Ok((hostname, _))) => Ok(hostname),
-        Ok(Err(_)) | Err(_) => Err(Error::authentication_error(
-            "GSSAPI",
-            "Reverse DNS lookup failed",
-        )),
+            &format!("No addresses found for hostname: {}", hostname),
+        ))
     }
 }
