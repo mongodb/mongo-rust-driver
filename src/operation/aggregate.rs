@@ -50,8 +50,9 @@ impl OperationWithDefaults for Aggregate {
     const NAME: &'static CStr = cstr!("aggregate");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+        let name: &str = Self::NAME.into();
         let mut body = doc! {
-            Self::NAME.as_str(): self.target.to_bson(),
+            name: self.target.to_bson(),
             "pipeline": bson_util::to_bson_array(&self.pipeline),
             "cursor": {}
         };

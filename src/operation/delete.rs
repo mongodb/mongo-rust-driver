@@ -62,8 +62,9 @@ impl OperationWithDefaults for Delete {
             delete.insert("hint", crate::bson_compat::serialize_to_bson(&hint)?);
         }
 
+        let name: &str = Self::NAME.into();
         let mut body = doc! {
-            Self::NAME.as_str(): self.ns.coll.clone(),
+            name: self.ns.coll.clone(),
             "deletes": [delete],
             "ordered": true, // command monitoring tests expect this (SPEC-1130)
         };

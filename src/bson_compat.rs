@@ -15,6 +15,8 @@ macro_rules! cstr {
         $text
     };
 }
+#[cfg(not(feature = "bson-3"))]
+pub(crate) use cstr;
 
 pub(crate) trait RawDocumentBufExt: Sized {
     fn append_ref_compat<'a>(
@@ -40,13 +42,12 @@ impl RawDocumentBufExt for crate::bson::RawDocumentBuf {
 
 #[cfg(not(feature = "bson-3"))]
 impl RawDocumentBufExt for crate::bson::RawDocumentBuf {
-    fn append_ref_err<'a>(
+    fn append_ref_compat<'a>(
         &mut self,
-        key: impl AsRef<str>,
+        key: impl AsRef<CStr>,
         value: impl Into<crate::bson::raw::RawBsonRef<'a>>,
-    ) -> RawResult<()> {
-        self.append_ref(key, value);
-        Ok(())
+    ) {
+        self.append_ref(key, value)
     }
 
     fn decode_from_bytes(data: Vec<u8>) -> RawResult<Self> {
