@@ -237,6 +237,7 @@ dependencies = [
 [[package]]
 name = "bson"
 version = "3.0.0"
+source = "git+https://github.com/abr-egn/bson-rust?branch=RUST-1992%2Fcstr-driver#5d3355d9501edded6d1c031f75eb9a2daee9ddb5"
 dependencies = [
  "ahash",
  "base64 0.22.1",
