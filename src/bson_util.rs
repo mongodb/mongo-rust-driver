@@ -127,8 +127,7 @@ pub(crate) fn replacement_document_check(replacement: &Document) -> Result<()> {
 
 pub(crate) fn replacement_raw_document_check(replacement: &RawDocumentBuf) -> Result<()> {
     if let Some((key, _)) = replacement.iter().next().transpose()? {
-        let key: &str = key.into();
-        if key.starts_with('$') {
+        if crate::bson_compat::cstr_to_str(key).starts_with('$') {
             return Err(ErrorKind::InvalidArgument {
                 message: "replacement document must not contain update modifiers".to_string(),
             }

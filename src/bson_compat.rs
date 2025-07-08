@@ -18,6 +18,17 @@ macro_rules! cstr {
 #[cfg(not(feature = "bson-3"))]
 pub(crate) use cstr;
 
+pub(crate) fn cstr_to_str(cs: &CStr) -> &str {
+    #[cfg(feature = "bson-3")]
+    {
+        cs.as_str()
+    }
+    #[cfg(not(feature = "bson-3"))]
+    {
+        cs
+    }
+}
+
 pub(crate) trait RawDocumentBufExt: Sized {
     fn append_ref_compat<'a>(
         &mut self,

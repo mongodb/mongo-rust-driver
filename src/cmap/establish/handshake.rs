@@ -430,14 +430,14 @@ impl Handshaker {
         let body = &mut command.body;
         let body_size = body.as_bytes().len();
         let mut metadata = self.metadata.clone();
-        let mut meta_doc: RawDocumentBuf = (&metadata).try_into()?;
+        let mut meta_doc: RawDocumentBuf = (&metadata).into();
         const OVERHEAD: usize = 1 /* tag */ + 6 /* name */ + 1 /* null */;
         for trunc_fn in METADATA_TRUNCATIONS {
             if body_size + OVERHEAD + meta_doc.as_bytes().len() <= MAX_HELLO_SIZE {
                 break;
             }
             trunc_fn(&mut metadata);
-            meta_doc = (&metadata).try_into()?;
+            meta_doc = (&metadata).into();
         }
         #[cfg(test)]
         #[allow(clippy::incompatible_msrv)]

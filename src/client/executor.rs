@@ -320,11 +320,10 @@ impl Client {
                 .and_then(|s| s.transaction.pinned_mongos())
                 .or_else(|| op.selection_criteria());
 
-            let op_name: &str = op.name().into();
             let (server, effective_criteria) = match self
                 .select_server(
                     selection_criteria,
-                    op_name,
+                    crate::bson_compat::cstr_to_str(op.name()),
                     retry.as_ref().map(|r| &r.first_server),
                     op.override_criteria(),
                 )
