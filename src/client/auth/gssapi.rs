@@ -18,7 +18,6 @@ const SERVICE_NAME: &str = "SERVICE_NAME";
 const CANONICALIZE_HOST_NAME: &str = "CANONICALIZE_HOST_NAME";
 const SERVICE_REALM: &str = "SERVICE_REALM";
 const SERVICE_HOST: &str = "SERVICE_HOST";
-const MECH_NAME: &str = "GSSAPI";
 
 #[derive(Debug, Clone)]
 pub(crate) struct GssapiProperties {
@@ -156,14 +155,14 @@ impl GssapiProperties {
                         "forward" => CanonicalizeHostName::Forward,
                         "forwardAndReverse" => CanonicalizeHostName::ForwardAndReverse,
                         _ => return Err(Error::authentication_error(
-                            MECH_NAME,
+                            GSSAPI_STR,
                             format!("Invalid CANONICALIZE_HOST_NAME value: {}. Valid values are 'none', 'forward', 'forwardAndReverse'", s).as_str()
                         )),
                     },
                     Bson::Boolean(true) => CanonicalizeHostName::ForwardAndReverse,
                     Bson::Boolean(false) => CanonicalizeHostName::None,
                     _ => return Err(Error::authentication_error(
-                        MECH_NAME,
+                        GSSAPI_STR,
                         "CANONICALIZE_HOST_NAME must be a string or boolean",
                     )),
                 };
