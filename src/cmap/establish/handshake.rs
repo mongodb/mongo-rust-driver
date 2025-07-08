@@ -391,14 +391,12 @@ impl Handshaker {
             feature = "snappy-compression"
         ))]
         if let Some(ref compressors) = options.compressors {
-            use crate::bson::RawArrayBuf;
-
-            use crate::bson_compat::RawArrayBufExt as _;
-
-            command.body.append_err(
-                "compression",
-                RawArrayBuf::from_iter_err(compressors.iter().map(|compressor| compressor.name()))?,
-            )?;
+            command.body.append(
+                crate::bson_compat::cstr!("compression"),
+                crate::bson::RawArrayBuf::from_iter(
+                    compressors.iter().map(|compressor| compressor.name()),
+                ),
+            );
         }
 
         Ok(Self {

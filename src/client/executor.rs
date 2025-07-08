@@ -320,10 +320,11 @@ impl Client {
                 .and_then(|s| s.transaction.pinned_mongos())
                 .or_else(|| op.selection_criteria());
 
+            let op_name: &str = op.name().into();
             let (server, effective_criteria) = match self
                 .select_server(
                     selection_criteria,
-                    op.name(),
+                    op_name,
                     retry.as_ref().map(|r| &r.first_server),
                     op.override_criteria(),
                 )
@@ -879,10 +880,7 @@ impl Client {
         }
     }
 
-    async fn select_data_bearing_server(
-        &self,
-        operation_name: &crate::bson_compat::CStr,
-    ) -> Result<()> {
+    async fn select_data_bearing_server(&self, operation_name: &str) -> Result<()> {
         let topology_type = self.inner.topology.topology_type();
         let criteria = SelectionCriteria::Predicate(Arc::new(move |server_info| {
             let server_type = server_info.server_type();
@@ -905,10 +903,8 @@ impl Client {
         // sessions are supported or not.
         match initial_status {
             TransactionSupportStatus::Undetermined => {
-                self.select_data_bearing_server(crate::bson_compat::cstr!(
-                    "Check transactions support status"
-                ))
-                .await?;
+                self.select_data_bearing_server("Check transactions support status")
+                    .await?;
                 Ok(self.inner.topology.transaction_support_status())
             }
             _ => Ok(initial_status),
