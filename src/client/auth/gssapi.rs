@@ -6,7 +6,7 @@ use crate::{
     client::{
         auth::{
             sasl::{SaslContinue, SaslResponse, SaslStart},
-            Credential,
+            Credential, GSSAPI_STR,
         },
         options::ServerApi,
     },
@@ -61,10 +61,11 @@ pub(crate) async fn authenticate_stream(
         output_token,
         server_api.cloned(),
     )
-    .into_command();
+    .into_command()?;
 
-    let response_doc = conn.send_message(command).await?.body()?;
-    let sasl_response = SaslResponse::parse("GSSAPI", response_doc)?;
+    let response_doc = conn.send_message(command).await?;
+    let sasl_response =
+        SaslResponse::parse(GSSAPI_STR, response_doc.auth_response_body(GSSAPI_STR)?)?;
 
     let mut conversation_id = Some(sasl_response.conversation_id);
     let mut payload = sasl_response.payload;
@@ -87,8 +88,9 @@ pub(crate) async fn authenticate_stream(
         )
         .into_command();
 
-        let response_doc = conn.send_message(command).await?.body()?;
-        let sasl_response = SaslResponse::parse("GSSAPI", response_doc)?;
+        let response_doc = conn.send_message(command).await?;
+        let sasl_response =
+            SaslResponse::parse(GSSAPI_STR, response_doc.auth_response_body(GSSAPI_STR)?)?;
 
         conversation_id = Some(sasl_response.conversation_id);
         payload = sasl_response.payload;
@@ -117,14 +119,15 @@ pub(crate) async fn authenticate_stream(
     )
     .into_command();
 
-    let response_doc = conn.send_message(command).await?.body()?;
-    let sasl_response = SaslResponse::parse("GSSAPI", response_doc)?;
+    let response_doc = conn.send_message(command).await?;
+    let sasl_response =
+        SaslResponse::parse(GSSAPI_STR, response_doc.auth_response_body(GSSAPI_STR)?)?;
 
     if sasl_response.done {
         Ok(())
     } else {
         Err(Error::authentication_error(
-            "GSSAPI",
+            GSSAPI_STR,
             "GSSAPI authentication failed after 10 attempts",
         ))
     }
@@ -230,7 +233,7 @@ impl GssapiAuthenticator {
         )
         .map_err(|e| {
             Error::authentication_error(
-                "GSSAPI",
+                GSSAPI_STR,
                 &format!("Failed to initialize GSSAPI context: {}", e),
             )
         })?;
@@ -246,13 +249,13 @@ impl GssapiAuthenticator {
     async fn step(&mut self, challenge: &[u8]) -> Result<Option<Vec<u8>>> {
         if challenge.is_empty() {
             Err(Error::authentication_error(
-                "GSSAPI",
+                GSSAPI_STR,
                 "Expected challenge data for GSSAPI continuation",
             ))
         } else {
             if let Some(pending_ctx) = self.pending_ctx.take() {
                 match pending_ctx.step(challenge).map_err(|e| {
-                    Error::authentication_error("GSSAPI", &format!("GSSAPI step failed: {}", e))
+                    Error::authentication_error(GSSAPI_STR, &format!("GSSAPI step failed: {}", e))
                 })? {
                     Step::Finished((ctx, token)) => {
                         self.is_complete = true;
@@ -266,7 +269,7 @@ impl GssapiAuthenticator {
                 }
             } else {
                 Err(Error::authentication_error(
-                    "GSSAPI",
+                    GSSAPI_STR,
                     "Authentication context not initialized",
                 ))
             }
@@ -279,25 +282,25 @@ impl GssapiAuthenticator {
     fn do_unwrap_wrap(&mut self, payload: &[u8]) -> Result<Vec<u8>> {
         if let Some(mut established_ctx) = self.established_ctx.take() {
             let _ = established_ctx.unwrap(payload).map_err(|e| {
-                Error::authentication_error("GSSAPI", &format!("GSSAPI unwrap failed: {}", e))
+                Error::authentication_error(GSSAPI_STR, &format!("GSSAPI unwrap failed: {}", e))
             })?;
 
             if let Some(user_principal) = self.user_principal.take() {
                 let bytes: &[u8] = &[0x1, 0x0, 0x0, 0x0];
                 let bytes = [bytes, user_principal.as_bytes()].concat();
                 let output_token = established_ctx.wrap(false, bytes.as_slice()).map_err(|e| {
-                    Error::authentication_error("GSSAPI", &format!("GSSAPI wrap failed: {}", e))
+                    Error::authentication_error(GSSAPI_STR, &format!("GSSAPI wrap failed: {}", e))
                 })?;
                 Ok(output_token.to_vec())
             } else {
                 Err(Error::authentication_error(
-                    "GSSAPI",
+                    GSSAPI_STR,
                     "User principal not specified",
                 ))
             }
         } else {
             Err(Error::authentication_error(
-                "GSSAPI",
+                GSSAPI_STR,
                 "Authentication context not established",
             ))
         }
@@ -316,7 +319,7 @@ fn canonicalize_hostname(hostname: &str, mode: &CanonicalizeHostName) -> Result<
     // Forward lookup
     let ip_addrs = lookup_host(hostname).map_err(|e| {
         Error::authentication_error(
-            "GSSAPI",
+            GSSAPI_STR,
             &format!("Failed to look up hostname for canonicalization: {:?}", e),
         )
     })?;
@@ -338,7 +341,7 @@ fn canonicalize_hostname(hostname: &str, mode: &CanonicalizeHostName) -> Result<
         }
     } else {
         Err(Error::authentication_error(
-            "GSSAPI",
+            GSSAPI_STR,
             &format!("No addresses found for hostname: {}", hostname),
         ))
     }
