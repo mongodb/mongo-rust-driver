@@ -37,8 +37,8 @@ impl OperationWithDefaults for Count {
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new_read(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
+            Self::NAME,
+            &self.ns.db,
             self.options.as_ref().and_then(|o| o.read_concern.clone()),
             body,
         ))

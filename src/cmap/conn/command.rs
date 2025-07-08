@@ -76,14 +76,14 @@ impl Command {
     }
 
     pub(crate) fn new_read(
-        name: String,
-        target_db: String,
+        name: impl ToString,
+        target_db: impl ToString,
         read_concern: Option<ReadConcern>,
         body: RawDocumentBuf,
     ) -> Self {
         Self {
-            name,
-            target_db,
+            name: name.to_string(),
+            target_db: target_db.to_string(),
             exhaust_allowed: false,
             body,
             document_sequences: Vec::new(),

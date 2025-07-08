@@ -65,8 +65,8 @@ impl OperationWithDefaults for Aggregate {
         }
 
         Ok(Command::new_read(
-            Self::NAME.to_string(),
-            self.target.db_name().to_string(),
+            Self::NAME,
+            self.target.db_name(),
             self.options.as_ref().and_then(|o| o.read_concern.clone()),
             (&body).try_into()?,
         ))

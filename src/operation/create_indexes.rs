@@ -64,11 +64,7 @@ impl OperationWithDefaults for CreateIndexes {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
-            body,
-        ))
+        Ok(Command::new(Self::NAME, &self.ns.db, body))
     }
 
     fn handle_response<'a>(

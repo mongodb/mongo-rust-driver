@@ -318,7 +318,7 @@ where
 
 fn should_redact_body(body: &RawDocumentBuf) -> bool {
     if let Some(Ok((command_name, _))) = body.into_iter().next() {
-        HELLO_COMMAND_NAMES.contains(command_name.as_str().to_lowercase().as_str())
+        HELLO_COMMAND_NAMES.contains(command_name.to_lowercase().as_str())
             && body.get("speculativeAuthenticate").ok().flatten().is_some()
     } else {
         false

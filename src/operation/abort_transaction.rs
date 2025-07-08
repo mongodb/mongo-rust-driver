@@ -38,19 +38,11 @@ impl OperationWithDefaults for AbortTransaction {
         };
         if let Some(ref write_concern) = self.write_concern() {
             if !write_concern.is_empty() {
-                append_ser(
-                    &mut body,
-                    crate::bson_compat::cstr!("writeConcern"),
-                    write_concern,
-                )?;
+                append_ser(&mut body, cstr!("writeConcern"), write_concern)?;
             }
         }
 
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            "admin".to_string(),
-            body,
-        ))
+        Ok(Command::new(Self::NAME, "admin", body))
     }
 
     fn handle_response<'a>(

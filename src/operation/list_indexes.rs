@@ -1,7 +1,7 @@
 use crate::bson::rawdoc;
 
 use crate::{
-    bson_compat::RawDocumentBufExt as _,
+    bson_compat::{cstr, CStr},
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
@@ -28,23 +28,19 @@ impl ListIndexes {
 impl OperationWithDefaults for ListIndexes {
     type O = CursorSpecification;
 
-    const NAME: &'static str = "listIndexes";
+    const NAME: &'static CStr = cstr!("listIndexes");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
-            "listIndexes": self.ns.coll.clone(),
+            Self::NAME: self.ns.coll.clone(),
         };
         if let Some(size) = self.options.as_ref().and_then(|o| o.batch_size) {
             let size = Checked::from(size).try_into::<i32>()?;
-            body.append_err("cursor", rawdoc! { "batchSize": size })?;
+            body.append(cstr!("cursor"), rawdoc! { "batchSize": size });
         }
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
-            body,
-        ))
+        Ok(Command::new(Self::NAME, &self.ns.db, body))
     }
 
     fn handle_response<'a>(
