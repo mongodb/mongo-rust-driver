@@ -141,10 +141,8 @@ impl GssapiProperties {
         };
 
         if let Some(mechanism_properties) = &credential.mechanism_properties {
-            if let Some(service_name) = mechanism_properties.get(SERVICE_NAME) {
-                if let Bson::String(name) = service_name {
-                    properties.service_name = name.clone();
-                }
+            if let Some(Bson::String(name)) = mechanism_properties.get(SERVICE_NAME) {
+                properties.service_name = name.clone();
             }
 
             if let Some(canonicalize) = mechanism_properties.get(CANONICALIZE_HOST_NAME) {
@@ -176,16 +174,12 @@ impl GssapiProperties {
                 };
             }
 
-            if let Some(service_realm) = mechanism_properties.get(SERVICE_REALM) {
-                if let Bson::String(realm) = service_realm {
-                    properties.service_realm = Some(realm.clone());
-                }
+            if let Some(Bson::String(realm)) = mechanism_properties.get(SERVICE_REALM) {
+                properties.service_realm = Some(realm.clone());
             }
 
-            if let Some(service_host) = mechanism_properties.get(SERVICE_HOST) {
-                if let Bson::String(host) = service_host {
-                    properties.service_host = Some(host.clone());
-                }
+            if let Some(Bson::String(host)) = mechanism_properties.get(SERVICE_HOST) {
+                properties.service_host = Some(host.clone());
             }
         }
 
@@ -255,27 +249,25 @@ impl GssapiAuthenticator {
                 GSSAPI_STR,
                 "Expected challenge data for GSSAPI continuation",
             ))
-        } else {
-            if let Some(pending_ctx) = self.pending_ctx.take() {
-                match pending_ctx.step(challenge).map_err(|e| {
-                    Error::authentication_error(GSSAPI_STR, &format!("GSSAPI step failed: {}", e))
-                })? {
-                    Step::Finished((ctx, token)) => {
-                        self.is_complete = true;
-                        self.established_ctx = Some(ctx);
-                        Ok(token.map(|t| t.to_vec()))
-                    }
-                    Step::Continue((ctx, token)) => {
-                        self.pending_ctx = Some(ctx);
-                        Ok(Some(token.to_vec()))
-                    }
+        } else if let Some(pending_ctx) = self.pending_ctx.take() {
+            match pending_ctx.step(challenge).map_err(|e| {
+                Error::authentication_error(GSSAPI_STR, &format!("GSSAPI step failed: {}", e))
+            })? {
+                Step::Finished((ctx, token)) => {
+                    self.is_complete = true;
+                    self.established_ctx = Some(ctx);
+                    Ok(token.map(|t| t.to_vec()))
                 }
-            } else {
-                Err(Error::authentication_error(
-                    GSSAPI_STR,
-                    "Authentication context not initialized",
-                ))
+                Step::Continue((ctx, token)) => {
+                    self.pending_ctx = Some(ctx);
+                    Ok(Some(token.to_vec()))
+                }
             }
+        } else {
+            Err(Error::authentication_error(
+                GSSAPI_STR,
+                "Authentication context not initialized",
+            ))
         }
     }
 
