@@ -6,7 +6,8 @@ use crate::{
     client::{
         auth::{
             sasl::{SaslContinue, SaslResponse, SaslStart},
-            Credential, GSSAPI_STR,
+            Credential,
+            GSSAPI_STR,
         },
         options::ServerApi,
     },
@@ -152,17 +153,26 @@ impl GssapiProperties {
                         "none" => CanonicalizeHostName::None,
                         "forward" => CanonicalizeHostName::Forward,
                         "forwardAndReverse" => CanonicalizeHostName::ForwardAndReverse,
-                        _ => return Err(Error::authentication_error(
-                            GSSAPI_STR,
-                            format!("Invalid CANONICALIZE_HOST_NAME value: {}. Valid values are 'none', 'forward', 'forwardAndReverse'", s).as_str()
-                        )),
+                        _ => {
+                            return Err(Error::authentication_error(
+                                GSSAPI_STR,
+                                format!(
+                                    "Invalid CANONICALIZE_HOST_NAME value: {}. Valid values are \
+                                     'none', 'forward', 'forwardAndReverse'",
+                                    s
+                                )
+                                .as_str(),
+                            ))
+                        }
                     },
                     Bson::Boolean(true) => CanonicalizeHostName::ForwardAndReverse,
                     Bson::Boolean(false) => CanonicalizeHostName::None,
-                    _ => return Err(Error::authentication_error(
-                        GSSAPI_STR,
-                        "CANONICALIZE_HOST_NAME must be a string or boolean",
-                    )),
+                    _ => {
+                        return Err(Error::authentication_error(
+                            GSSAPI_STR,
+                            "CANONICALIZE_HOST_NAME must be a string or boolean",
+                        ))
+                    }
                 };
             }
 

@@ -1587,10 +1587,13 @@ impl ConnectionString {
                                 _ => {
                                     return Err(ErrorKind::InvalidArgument {
                                         message: format!(
-                                            "Invalid CANONICALIZE_HOST_NAME value: {}. Valid values are 'none', 'forward', 'forwardAndReverse', 'true', 'false'",
+                                            "Invalid CANONICALIZE_HOST_NAME value: {}. Valid \
+                                             values are 'none', 'forward', 'forwardAndReverse', \
+                                             'true', 'false'",
                                             s
                                         ),
-                                    }.into());
+                                    }
+                                    .into());
                                 }
                             };
                             doc.insert("CANONICALIZE_HOST_NAME", val);
