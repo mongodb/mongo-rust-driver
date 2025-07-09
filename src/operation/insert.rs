@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     bson::{rawdoc, Bson, RawDocument},
-    bson_compat::RawDocumentBufExt as _,
+    bson_compat::{cstr, CStr},
     bson_util::{
         array_entry_size_bytes,
         extend_raw_document_buf,
@@ -54,7 +54,7 @@ impl<'a> Insert<'a> {
 impl OperationWithDefaults for Insert<'_> {
     type O = InsertManyResult;
 
-    const NAME: &'static str = "insert";
+    const NAME: &'static CStr = cstr!("insert");
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.inserted_ids.clear();
@@ -120,7 +120,7 @@ impl OperationWithDefaults for Insert<'_> {
 
         if self.encrypted {
             // Auto-encryption does not support document sequences
-            body.append_err("documents", vec_to_raw_array_buf(docs)?)?;
+            body.append(cstr!("documents"), vec_to_raw_array_buf(docs));
             Ok(Command::new(Self::NAME, &self.ns.db, body))
         } else {
             let mut command = Command::new(Self::NAME, &self.ns.db, body);

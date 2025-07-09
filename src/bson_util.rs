@@ -17,7 +17,7 @@ use crate::{
         RawBsonRef,
         RawDocumentBuf,
     },
-    bson_compat::{RawArrayBufExt, RawDocumentBufExt as _},
+    bson_compat::RawDocumentBufExt as _,
     checked::Checked,
     error::{Error, ErrorKind, Result},
     runtime::SyncLittleEndianRead,
@@ -78,14 +78,14 @@ pub(crate) fn to_bson_array(docs: &[Document]) -> Bson {
 pub(crate) fn to_raw_bson_array(docs: &[Document]) -> Result<RawBson> {
     let mut array = RawArrayBuf::new();
     for doc in docs {
-        array.push_err(RawDocumentBuf::from_document(doc)?)?;
+        array.push(RawDocumentBuf::from_document(doc)?);
     }
     Ok(RawBson::Array(array))
 }
 pub(crate) fn to_raw_bson_array_ser<T: Serialize>(values: &[T]) -> Result<RawBson> {
     let mut array = RawArrayBuf::new();
     for value in values {
-        array.push_err(crate::bson_compat::serialize_to_raw_document_buf(value)?)?;
+        array.push(crate::bson_compat::serialize_to_raw_document_buf(value)?);
     }
     Ok(RawBson::Array(array))
 }
@@ -127,7 +127,7 @@ pub(crate) fn replacement_document_check(replacement: &Document) -> Result<()> {
 
 pub(crate) fn replacement_raw_document_check(replacement: &RawDocumentBuf) -> Result<()> {
     if let Some((key, _)) = replacement.iter().next().transpose()? {
-        if key.starts_with('$') {
+        if crate::bson_compat::cstr_to_str(key).starts_with('$') {
             return Err(ErrorKind::InvalidArgument {
                 message: "replacement document must not contain update modifiers".to_string(),
             }
@@ -147,12 +147,12 @@ pub(crate) fn array_entry_size_bytes(index: usize, doc_len: usize) -> Result<usi
     (Checked::new(1) + num_decimal_digits(index) + 1 + doc_len).get()
 }
 
-pub(crate) fn vec_to_raw_array_buf(docs: Vec<RawDocumentBuf>) -> Result<RawArrayBuf> {
+pub(crate) fn vec_to_raw_array_buf(docs: Vec<RawDocumentBuf>) -> RawArrayBuf {
     let mut array = RawArrayBuf::new();
     for doc in docs {
-        array.push_err(doc)?;
+        array.push(doc);
     }
-    Ok(array)
+    array
 }
 
 /// The number of digits in `n` in base 10.
@@ -188,7 +188,7 @@ pub(crate) fn extend_raw_document_buf(
     this: &mut RawDocumentBuf,
     other: RawDocumentBuf,
 ) -> Result<()> {
-    let mut keys: HashSet<String> = HashSet::new();
+    let mut keys: HashSet<crate::bson_compat::CString> = HashSet::new();
     for elem in this.iter_elements() {
         keys.insert(elem?.key().to_owned());
     }
@@ -200,14 +200,14 @@ pub(crate) fn extend_raw_document_buf(
                 k
             )));
         }
-        this.append_err(k, v.to_raw_bson())?;
+        this.append(k, v.to_raw_bson());
     }
     Ok(())
 }
 
 pub(crate) fn append_ser(
     this: &mut RawDocumentBuf,
-    key: impl AsRef<str>,
+    key: impl AsRef<crate::bson_compat::CStr>,
     value: impl Serialize,
 ) -> Result<()> {
     #[derive(Serialize)]
@@ -215,12 +215,12 @@ pub(crate) fn append_ser(
         value: T,
     }
     let raw_doc = crate::bson_compat::serialize_to_raw_document_buf(&Helper { value })?;
-    this.append_ref_err(
+    this.append_ref_compat(
         key,
         raw_doc
             .get("value")?
             .ok_or_else(|| Error::internal("no value"))?,
-    )?;
+    );
     Ok(())
 }
 

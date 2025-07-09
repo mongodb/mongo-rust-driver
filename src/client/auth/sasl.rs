@@ -2,7 +2,7 @@ use crate::bson::{rawdoc, RawBson};
 
 use crate::{
     bson::{spec::BinarySubtype, Binary, Bson, Document},
-    bson_compat::RawDocumentBufExt as _,
+    bson_compat::cstr,
     bson_util,
     client::{auth::AuthMechanism, options::ServerApi},
     cmap::Command,
@@ -42,7 +42,7 @@ impl SaslStart {
         if self.mechanism == AuthMechanism::ScramSha1
             || self.mechanism == AuthMechanism::ScramSha256
         {
-            body.append_err("options", rawdoc! { "skipEmptyExchange": true })?;
+            body.append(cstr!("options"), rawdoc! { "skipEmptyExchange": true });
         }
 
         let mut command = Command::new("saslStart", self.source, body);

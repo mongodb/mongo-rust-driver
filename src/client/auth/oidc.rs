@@ -9,7 +9,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, rawdoc, spec::BinarySubtype, Binary, Document},
-    bson_compat::RawDocumentBufExt as _,
+    bson_compat::cstr,
     client::options::{ServerAddress, ServerApi},
     cmap::{Command, Connection},
     error::{Error, Result},
@@ -620,9 +620,9 @@ async fn send_sasl_start_command(
 ) -> Result<SaslResponse> {
     let mut start_doc = rawdoc! {};
     if let Some(access_token) = access_token {
-        start_doc.append_err("jwt", access_token)?;
+        start_doc.append(cstr!("jwt"), access_token);
     } else if let Some(username) = credential.username.as_deref() {
-        start_doc.append_err("n", username)?;
+        start_doc.append(cstr!("n"), username);
     }
     let sasl_start = SaslStart::new(
         source.to_string(),

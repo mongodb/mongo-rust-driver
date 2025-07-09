@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Document},
+    bson_compat::{cstr, CStr},
     bson_util::to_raw_bson_array_ser,
     cmap::{Command, RawCommandResponse},
     error::Result,
@@ -26,7 +27,7 @@ impl CreateSearchIndexes {
 
 impl OperationWithDefaults for CreateSearchIndexes {
     type O = Vec<String>;
-    const NAME: &'static str = "createSearchIndexes";
+    const NAME: &'static CStr = cstr!("createSearchIndexes");
 
     fn build(&mut self, _description: &crate::cmap::StreamDescription) -> Result<Command> {
         Ok(Command::new(
@@ -93,7 +94,7 @@ impl UpdateSearchIndex {
 
 impl OperationWithDefaults for UpdateSearchIndex {
     type O = ();
-    const NAME: &'static str = "updateSearchIndex";
+    const NAME: &'static CStr = cstr!("updateSearchIndex");
 
     fn build(
         &mut self,
@@ -101,8 +102,8 @@ impl OperationWithDefaults for UpdateSearchIndex {
     ) -> crate::error::Result<crate::cmap::Command> {
         let raw_def: RawDocumentBuf = (&self.definition).try_into()?;
         Ok(Command::new(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
+            Self::NAME,
+            &self.ns.db,
             rawdoc! {
                 Self::NAME: self.ns.coll.as_str(),
                 "name": self.name.as_str(),
@@ -142,12 +143,12 @@ impl DropSearchIndex {
 
 impl OperationWithDefaults for DropSearchIndex {
     type O = ();
-    const NAME: &'static str = "dropSearchIndex";
+    const NAME: &'static CStr = cstr!("dropSearchIndex");
 
     fn build(&mut self, _description: &crate::cmap::StreamDescription) -> Result<Command> {
         Ok(Command::new(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
+            Self::NAME,
+            &self.ns.db,
             rawdoc! {
                 Self::NAME: self.ns.coll.as_str(),
                 "name": self.name.as_str(),

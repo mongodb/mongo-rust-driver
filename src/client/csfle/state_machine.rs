@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     bson::{rawdoc, Document, RawDocument, RawDocumentBuf},
-    bson_compat::RawDocumentBufExt as _,
+    bson_compat::{cstr, CString},
 };
 use futures_util::{stream, TryStreamExt};
 use mongocrypt::ctx::{Ctx, KmsCtx, KmsProviderType, State};
@@ -245,6 +245,7 @@ impl CryptExecutor {
                             continue;
                         }
 
+                        let prov_name: CString = provider.as_string().try_into()?;
                         match provider.provider_type() {
                             KmsProviderType::Aws => {
                                 #[cfg(feature = "aws-auth")]
@@ -264,9 +265,9 @@ impl CryptExecutor {
                                         "secretAccessKey": aws_creds.secret_key(),
                                     };
                                     if let Some(token) = aws_creds.session_token() {
-                                        creds.append_err("sessionToken", token)?;
+                                        creds.append(cstr!("sessionToken"), token);
                                     }
-                                    kms_providers.append_err(provider.as_string(), creds)?;
+                                    kms_providers.append(prov_name, creds);
                                 }
                                 #[cfg(not(feature = "aws-auth"))]
                                 {
@@ -279,10 +280,7 @@ impl CryptExecutor {
                             KmsProviderType::Azure => {
                                 #[cfg(feature = "azure-kms")]
                                 {
-                                    kms_providers.append_err(
-                                        provider.as_string(),
-                                        self.azure.get_token().await?,
-                                    )?;
+                                    kms_providers.append(prov_name, self.azure.get_token().await?);
                                 }
                                 #[cfg(not(feature = "azure-kms"))]
                                 {
@@ -330,10 +328,10 @@ impl CryptExecutor {
                                         .send()
                                         .await
                                         .map_err(|e| kms_error(e.to_string()))?;
-                                    kms_providers.append_err(
-                                        "gcp",
+                                    kms_providers.append(
+                                        cstr!("gcp"),
                                         rawdoc! { "accessToken": response.access_token },
-                                    )?;
+                                    );
                                 }
                                 #[cfg(not(feature = "gcp-kms"))]
                                 {

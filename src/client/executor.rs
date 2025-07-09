@@ -323,7 +323,7 @@ impl Client {
             let (server, effective_criteria) = match self
                 .select_server(
                     selection_criteria,
-                    op.name(),
+                    crate::bson_compat::cstr_to_str(op.name()),
                     retry.as_ref().map(|r| &r.first_server),
                     op.override_criteria(),
                 )

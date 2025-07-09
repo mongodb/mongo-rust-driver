@@ -1757,10 +1757,11 @@ mod range_explicit_encryption {
         };
 
         // Case 2: Find encrypted range and return the maximum
+        let ckey: &crate::bson_compat::CStr = key.as_str().try_into()?;
         let query = rawdoc! {
             "$and": [
-                { &key: { "$gte": bson_numbers[&6].clone() } },
-                { &key: { "$lte": bson_numbers[&200].clone() } },
+                { ckey: { "$gte": bson_numbers[&6].clone() } },
+                { ckey: { "$lte": bson_numbers[&200].clone() } },
             ]
         };
         let find_payload = client_encryption
@@ -1780,8 +1781,8 @@ mod range_explicit_encryption {
         // Case 3: Find encrypted range and return the minimum
         let query = rawdoc! {
             "$and": [
-                { &key: { "$gte": bson_numbers[&0].clone() } },
-                { &key: { "$lte": bson_numbers[&6].clone() } },
+                { ckey: { "$gte": bson_numbers[&0].clone() } },
+                { ckey: { "$lte": bson_numbers[&6].clone() } },
             ]
         };
         let find_payload = client_encryption
@@ -1803,7 +1804,7 @@ mod range_explicit_encryption {
         // Case 4: Find encrypted range with an open range query
         let query = rawdoc! {
             "$and": [
-                { &key: { "$gt": bson_numbers[&30].clone() } },
+                { ckey: { "$gt": bson_numbers[&30].clone() } },
             ]
         };
         let find_payload = client_encryption
@@ -1855,9 +1856,9 @@ mod range_explicit_encryption {
         // Case 7: Encrypting a document of a different type errors
         if bson_type != "DoubleNoPrecision" && bson_type != "DecimalNoPrecision" {
             let value = if bson_type == "Int" {
-                rawdoc! { &key: { "$numberDouble": "6" } }
+                rawdoc! { ckey: { "$numberDouble": "6" } }
             } else {
-                rawdoc! { &key: { "$numberInt": "6" } }
+                rawdoc! { ckey: { "$numberInt": "6" } }
             };
             let error = client_encryption
                 .encrypt(value, key1_id.clone(), Algorithm::Range)

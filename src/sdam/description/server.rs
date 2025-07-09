@@ -113,13 +113,7 @@ impl From<TopologyVersion> for RawBson {
 
 #[cfg(feature = "bson-3")]
 impl crate::bson::raw::BindRawBsonRef for TopologyVersion {
-    fn bind<F, R>(self, f: F) -> R
-    where
-        F: for<'a> FnOnce(bson3::RawBsonRef<'a>) -> R,
-    {
-        let raw: RawBson = self.into();
-        raw.bind(f)
-    }
+    type Target = crate::bson::raw::BindValue<Self>;
 }
 
 /// A description of the most up-to-date information known about a server.

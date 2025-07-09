@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::doc,
+    bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     error::{Error, Result},
@@ -26,7 +27,7 @@ impl Count {
 impl OperationWithDefaults for Count {
     type O = u64;
 
-    const NAME: &'static str = "count";
+    const NAME: &'static CStr = cstr!("count");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
@@ -36,8 +37,8 @@ impl OperationWithDefaults for Count {
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new_read(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
+            Self::NAME,
+            &self.ns.db,
             self.options.as_ref().and_then(|o| o.read_concern.clone()),
             body,
         ))

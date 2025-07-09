@@ -7,7 +7,7 @@ use serde::{de::DeserializeOwned, Deserialize};
 use self::options::FindAndModifyOptions;
 use crate::{
     bson::{doc, rawdoc, Document, RawBson, RawDocumentBuf},
-    bson_compat::{deserialize_from_slice, RawDocumentBufExt as _},
+    bson_compat::{cstr, deserialize_from_slice, CStr},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::UpdateModifications, Namespace},
@@ -56,7 +56,7 @@ impl<T: DeserializeOwned> FindAndModify<T> {
 
 impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
     type O = Option<T>;
-    const NAME: &'static str = "findAndModify";
+    const NAME: &'static CStr = cstr!("findAndModify");
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if let Some(ref options) = self.options {
@@ -76,19 +76,15 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
         };
 
         match &self.modification {
-            Modification::Delete => body.append_err("remove", true)?,
+            Modification::Delete => body.append(cstr!("remove"), true),
             Modification::Update(update_or_replace) => {
-                update_or_replace.append_to_rawdoc(&mut body, "update")?
+                update_or_replace.append_to_rawdoc(&mut body, cstr!("update"))?
             }
         }
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
-            body,
-        ))
+        Ok(Command::new(Self::NAME, &self.ns.db, body))
     }
 
     fn handle_response<'a>(
