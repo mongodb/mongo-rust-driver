@@ -209,13 +209,19 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
 
 #[tokio::test]
 async fn run_uri_options_spec_tests() {
-    let skipped_files = vec!["single-threaded-options.json"];
+    let mut skipped_files = vec!["single-threaded-options.json"];
+    if cfg!(not(feature = "gssapi-auth")) {
+        skipped_files.push("auth-options.json");
+    }
     run_tests(&["uri-options"], &skipped_files).await;
 }
 
 #[tokio::test]
 async fn run_connection_string_spec_tests() {
     let mut skipped_files = Vec::new();
+    if cfg!(not(feature = "gssapi-auth")) {
+        skipped_files.push("valid-auth.json");
+    }
     if cfg!(not(unix)) {
         skipped_files.push("valid-unix_socket-absolute.json");
         skipped_files.push("valid-unix_socket-relative.json");
