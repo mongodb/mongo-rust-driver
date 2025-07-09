@@ -136,9 +136,6 @@ version = "3.0.0"
 optional = true
 features = ["serde"]
 
-[patch."https://github.com/mongodb/bson-rust"]
-bson3 = { package = "bson", git = "https://github.com/abr-egn/bson-rust", branch = "RUST-1992/cstr-driver" }
-
 [dependencies.mongocrypt]
 git = "https://github.com/mongodb/libmongocrypt-rust.git"
 branch = "main"
