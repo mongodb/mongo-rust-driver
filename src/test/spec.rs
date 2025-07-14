@@ -41,7 +41,7 @@ pub(crate) use self::{
     unified_runner::{merge_uri_options, ExpectedEventType, Topology},
     v2_runner::{operation::Operation, test_file::RunOn},
 };
-use crate::{bson::Bson, test::SERVERLESS};
+use crate::bson::Bson;
 
 use super::log_uncaptured;
 
@@ -142,10 +142,6 @@ pub(crate) enum Serverless {
 
 impl Serverless {
     pub(crate) fn can_run(&self) -> bool {
-        match self {
-            Self::Forbid if *SERVERLESS => false,
-            Self::Require if !*SERVERLESS => false,
-            _ => true,
-        }
+        *self != Self::Require
     }
 }

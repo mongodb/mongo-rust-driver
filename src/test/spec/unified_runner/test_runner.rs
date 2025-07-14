@@ -28,7 +28,6 @@ use crate::{
         DEFAULT_URI,
         LOAD_BALANCED_MULTIPLE_URI,
         LOAD_BALANCED_SINGLE_URI,
-        SERVERLESS,
         SERVER_API,
     },
     Client,
@@ -471,8 +470,7 @@ impl TestRunner {
                     let server_api = client.server_api.clone().or_else(|| SERVER_API.clone());
 
                     let given_uri = if get_client_options().await.load_balanced.unwrap_or(false) {
-                        // for serverless testing, ignore use_multiple_mongoses.
-                        if client.use_multiple_mongoses() && !*SERVERLESS {
+                        if client.use_multiple_mongoses() {
                             LOAD_BALANCED_MULTIPLE_URI.as_ref().expect(
                                 "Test requires URI for load balancer fronting multiple servers",
                             )

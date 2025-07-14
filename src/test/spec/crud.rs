@@ -1,11 +1,6 @@
 use crate::{
     bson::doc,
-    test::{
-        log_uncaptured,
-        server_version_lt,
-        spec::unified_runner::run_unified_tests,
-        SERVERLESS,
-    },
+    test::{log_uncaptured, server_version_lt, spec::unified_runner::run_unified_tests},
     Client,
 };
 
@@ -37,17 +32,13 @@ async fn run_unified() {
         "findOneAndUpdate-errorResponse.json",
     ];
 
-    let mut skipped_tests = vec![
+    let skipped_tests = vec![
         // Unacknowledged write; see above.
         "Unacknowledged write using dollar-prefixed or dotted keys may be silently rejected on \
          pre-5.0 server",
         "Requesting unacknowledged write with verboseResults is a client-side error",
         "Requesting unacknowledged write with ordered is a client-side error",
     ];
-    // TODO: remove this manual skip when this test is fixed to skip on serverless
-    if *SERVERLESS {
-        skipped_tests.push("inserting _id with type null via clientBulkWrite");
-    }
 
     run_unified_tests(&["crud", "unified"])
         .skip_files(&skipped_files)
@@ -74,7 +65,7 @@ async fn generated_id_first_field() {
     let (key, _) = insert_document.iter().next().unwrap();
     assert_eq!(key, "_id");
 
-    if server_version_lt(8, 0).await || *SERVERLESS {
+    if server_version_lt(8, 0).await {
         log_uncaptured("skipping bulk write test in generated_id_first_field");
         return;
     }

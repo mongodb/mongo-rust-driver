@@ -30,7 +30,6 @@ use crate::{
         },
         EventClient,
         TestClient,
-        SERVERLESS,
     },
     Client,
     ClientSession,
@@ -318,7 +317,7 @@ impl crate::test::util::TestClientBuilder {
 
         let default_options = if is_load_balanced {
             // for serverless testing, ignore use_multiple_mongoses.
-            let uri = if use_multiple_mongoses && !*SERVERLESS {
+            let uri = if use_multiple_mongoses {
                 crate::test::LOAD_BALANCED_MULTIPLE_URI
                     .as_ref()
                     .expect("MULTI_MONGOS_LB_URI is required")
@@ -520,21 +519,17 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
             continue;
         }
 
-        // `killAllSessions` isn't supported on serverless.
-        // TODO CLOUDP-84298 remove this conditional.
-        if !*SERVERLESS {
-            match file_ctx
-                .internal_client
-                .database("admin")
-                .run_command(doc! { "killAllSessions": [] })
-                .await
-            {
-                Ok(_) => {}
-                Err(err) => match err.sdam_code() {
-                    Some(11601) => {}
-                    _ => panic!("{}: killAllSessions failed", test.description),
-                },
-            }
+        match file_ctx
+            .internal_client
+            .database("admin")
+            .run_command(doc! { "killAllSessions": [] })
+            .await
+        {
+            Ok(_) => {}
+            Err(err) => match err.sdam_code() {
+                Some(11601) => {}
+                _ => panic!("{}: killAllSessions failed", test.description),
+            },
         }
 
         #[cfg(feature = "in-use-encryption")]
