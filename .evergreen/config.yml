@@ -267,17 +267,6 @@ buildvariants:
     tasks:
       - name: test-x509-auth
 
-  # - name: serverless
-  #   display_name: "Serverless"
-  #   run_on:
-  #     - rhel80-small
-  #   expansions:
-  #     LIBMONGOCRYPT_OS: rhel-80-64-bit
-  #     AUTH: auth
-  #     SSL: ssl
-  #   tasks:
-  #     - serverless-task-group
-
   - name: oidc-linux
     display_name: "OIDC Linux"
     patchable: true
@@ -407,43 +396,6 @@ buildvariants:
 # Task Groups #
 ###############
 task_groups:
-  - name: serverless-task-group
-    setup_group_can_fail_task: true
-    setup_group_timeout_secs: 1800 # 30 minutes
-    setup_group:
-      - func: "fetch source"
-      - func: "create expansions"
-      - func: "prepare resources"
-      - func: "windows fix"
-      - func: "fix absolute paths"
-      - func: "init test-results"
-      - func: "make files executable"
-      - func: "install rust"
-      - func: "install junit dependencies"
-      - command: shell.exec
-        params:
-          shell: "bash"
-          script: |
-            ${PREPARE_SHELL}
-            bash ${DRIVERS_TOOLS}/.evergreen/serverless/setup-secrets.sh
-            bash ${DRIVERS_TOOLS}/.evergreen/serverless/create-instance.sh
-      - command: expansions.update
-        params:
-          file: serverless-expansion.yml
-    teardown_group:
-      - command: shell.exec
-        params:
-          script: |
-            ${PREPARE_SHELL}
-            bash ${DRIVERS_TOOLS}/.evergreen/serverless/delete-instance.sh
-      - func: "upload test results"
-      - func: "upload-mo-artifacts"
-      - func: "cleanup"
-
-    tasks:
-      - "test-serverless"
-      - "test-in-use-encryption-serverless"
-
   - name: azure-kms-task-group
     setup_group_can_fail_task: true
     setup_group_timeout_secs: 1800 # 30 minutes
@@ -1012,10 +964,6 @@ tasks:
           TOPOLOGY: server
       - func: "run x509 tests"
 
-  - name: test-serverless
-    commands:
-      - func: "run serverless tests"
-
   - name: test-tokio-sync
     tags: [sync]
     commands:
@@ -1111,18 +1059,6 @@ tasks:
           TOPOLOGY: replica_set
       - func: "start csfle servers"
       - func: "run csfle tests"
-
-  - name: test-in-use-encryption-serverless
-    commands:
-      - command: expansions.update
-        params:
-          file: src/expansion.yml
-      - command: expansions.update
-        params:
-          file: serverless-expansion.yml
-      - func: "install libmongocrypt"
-      - func: "start csfle servers"
-      - func: "run csfle serverless tests"
 
   - name: test-load-balancer-5.0
     tags: [load-balancer]
@@ -1578,23 +1514,6 @@ functions:
           - PROJECT_DIRECTORY
           - MONGODB_URI
 
-  "run serverless tests":
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        shell: bash
-        include_expansions_in_env:
-          - SERVERLESS_ATLAS_USER
-          - SERVERLESS_ATLAS_PASSWORD
-        script: |
-          ${PREPARE_SHELL}
-
-          export SINGLE_MONGOS_LB_URI=${SERVERLESS_URI}
-          . .evergreen/generate-uri.sh
-
-          .evergreen/run-serverless-tests.sh
-
   "run atlas tests":
     - command: ec2.assume_role
       params:
@@ -1669,35 +1588,6 @@ functions:
           - CRYPT_SHARED_LIB_PATH
           - DISABLE_CRYPT_SHARED
           - AZURE_IMDS_MOCK_PORT
-
-  "run csfle serverless tests":
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        shell: bash
-        include_expansions_in_env:
-          - DRIVERS_TOOLS
-          - PROJECT_DIRECTORY
-          - MONGODB_URI
-          - MONGOCRYPT_LIB_DIR
-          - OPENSSL
-          - OS
-          - LD_LIBRARY_PATH
-          - AWS_ACCESS_KEY_ID
-          - AWS_SECRET_ACCESS_KEY
-          - CSFLE_LOCAL_KEY
-          - CRYPT_SHARED_LIB_PATH
-          - DISABLE_CRYPT_SHARED
-          - AZURE_IMDS_MOCK_PORT
-          - SERVERLESS_ATLAS_USER
-          - SERVERLESS_ATLAS_PASSWORD
-        script: |
-          export SINGLE_MONGOS_LB_URI=${SERVERLESS_URI}
-          . .evergreen/generate-uri.sh
-          export SERVERLESS=serverless
-
-          .evergreen/run-csfle-tests.sh
 
   "build and upload gcp kms test":
     - command: shell.exec
