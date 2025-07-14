@@ -34,6 +34,25 @@
         "database": "encryptedDB",
         "collectionName": "encrypted"
       }
+    },
+    {
+      "client": {
+        "id": "client1"
+      }
+    },
+    {
+      "database": {
+        "id": "unencryptedDB",
+        "client": "client1",
+        "databaseName": "poc-queryable-encryption"
+      }
+    },
+    {
+      "collection": {
+        "id": "unencryptedColl",
+        "database": "unencryptedDB",
+        "collectionName": "encrypted"
+      }
     }
   ],
   "initialData": [
@@ -139,21 +158,27 @@
               "encryptedInt": 22
             }
           ]
-        }
-      ],
-      "outcome": [
+        },
         {
-          "collectionName": "encrypted",
-          "databaseName": "poc-queryable-encryption",
-          "documents": [
+          "object": "unencryptedColl",
+          "name": "find",
+          "arguments": {
+            "filter": {}
+          },
+          "expectResult": [
             {
               "_id": 1,
               "encryptedInt": {
                 "$$type": "binData"
               },
-              "__safeContent__": {
-                "$$type": "array"
-              }
+              "__safeContent__": [
+                {
+                  "$binary": {
+                    "base64": "rhS16TJojgDDBtbluxBokvcotP1mQTGeYpNt8xd3MJQ=",
+                    "subType": "00"
+                  }
+                }
+              ]
             }
           ]
         }

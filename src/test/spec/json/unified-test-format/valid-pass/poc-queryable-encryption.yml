@@ -22,6 +22,16 @@ createEntities:
       id: &encryptedColl encryptedColl
       database: *encryptedDB
       collectionName: &encryptedCollName encrypted
+  - client:
+      id: &client1 client1
+  - database:
+      id: &unencryptedDB unencryptedDB
+      client: *client1
+      databaseName: *encryptedDBName
+  - collection:
+      id: &unencryptedColl unencryptedColl
+      database: *unencryptedDB
+      collectionName: *encryptedCollName
 
 initialData:
   - databaseName: keyvault
@@ -66,8 +76,9 @@ tests:
         expectResult:
           - _id: 1
             encryptedInt: 22
-    outcome:
-      - collectionName: *encryptedCollName
-        databaseName: *encryptedDBName
-        documents:
-          - { _id: 1, encryptedInt: { $$type: binData }, __safeContent__: { $$type: array} }
+      - object: *unencryptedColl
+        name: find
+        arguments:
+          filter: {}
+        expectResult:
+          - { _id: 1, encryptedInt: { $$type: binData }, __safeContent__: [ { "$binary" : { "base64" : "rhS16TJojgDDBtbluxBokvcotP1mQTGeYpNt8xd3MJQ=", "subType" : "00" } } ] }
