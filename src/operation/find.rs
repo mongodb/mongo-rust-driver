@@ -2,7 +2,7 @@ use crate::bson::RawDocumentBuf;
 
 use crate::{
     bson::{rawdoc, Document},
-    bson_compat::RawDocumentBufExt as _,
+    bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{Error, Result},
@@ -32,7 +32,7 @@ impl Find {
 
 impl OperationWithDefaults for Find {
     type O = CursorSpecification;
-    const NAME: &'static str = "find";
+    const NAME: &'static CStr = cstr!("find");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
@@ -42,7 +42,7 @@ impl OperationWithDefaults for Find {
         if let Some(ref mut options) = self.options {
             // negative limits should be interpreted as request for single batch as per crud spec.
             if options.limit.map(|limit| limit < 0) == Some(true) {
-                body.append_err("singleBatch", true)?;
+                body.append(cstr!("singleBatch"), true);
             }
 
             if let Some(ref mut batch_size) = options.batch_size {
@@ -60,11 +60,11 @@ impl OperationWithDefaults for Find {
 
             match options.cursor_type {
                 Some(CursorType::Tailable) => {
-                    body.append_err("tailable", true)?;
+                    body.append(cstr!("tailable"), true);
                 }
                 Some(CursorType::TailableAwait) => {
-                    body.append_err("tailable", true)?;
-                    body.append_err("awaitData", true)?;
+                    body.append(cstr!("tailable"), true);
+                    body.append(cstr!("awaitData"), true);
                 }
                 _ => {}
             };
@@ -73,11 +73,11 @@ impl OperationWithDefaults for Find {
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         let raw_filter: RawDocumentBuf = (&self.filter).try_into()?;
-        body.append_err("filter", raw_filter)?;
+        body.append(cstr!("filter"), raw_filter);
 
         Ok(Command::new_read(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
+            Self::NAME,
+            &self.ns.db,
             self.options.as_ref().and_then(|o| o.read_concern.clone()),
             body,
         ))

@@ -77,7 +77,7 @@ impl CountDocuments {
 impl OperationWithDefaults for CountDocuments {
     type O = u64;
 
-    const NAME: &'static str = Aggregate::NAME;
+    const NAME: &'static crate::bson_compat::CStr = Aggregate::NAME;
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.aggregate.build(description)
