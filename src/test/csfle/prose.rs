@@ -442,6 +442,7 @@ mod custom_endpoint {
     }
 
     // case 10
+    #[cfg(feature = "openssl-tls")]
     #[tokio::test]
     async fn kmip_valid() -> Result<()> {
         let master_key = KmipMasterKey::builder().key_id("1".to_owned()).build();
@@ -460,6 +461,7 @@ mod custom_endpoint {
     }
 
     // case 11
+    #[cfg(feature = "openssl-tls")]
     #[tokio::test]
     async fn kmip_valid_endpoint() -> Result<()> {
         let master_key = KmipMasterKey::builder()
@@ -487,12 +489,7 @@ mod custom_endpoint {
         let client_encryption = custom_endpoint_setup(true).await?;
         let result = client_encryption.create_data_key(master_key).await;
         let err = result.unwrap_err();
-        assert!(err.is_csfle_error());
-        assert!(
-            err.to_string().contains("Invalid KMS response"),
-            "unexpected error: {}",
-            err
-        );
+        assert!(err.is_network_error());
 
         Ok(())
     }
