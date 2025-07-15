@@ -62,31 +62,7 @@ impl Event {
     }
 }
 
-impl SdamEvent {
-    pub(crate) fn name(&self) -> &str {
-        match self {
-            Self::ServerDescriptionChanged(_) => "ServerDescriptionChangedEvent",
-            Self::ServerOpening(_) => "ServerOpeningEvent",
-            Self::ServerClosed(_) => "ServerClosedEvent",
-            Self::TopologyDescriptionChanged(_) => "TopologyDescriptionChanged",
-            Self::TopologyOpening(_) => "TopologyOpeningEvent",
-            Self::TopologyClosed(_) => "TopologyClosedEvent",
-            Self::ServerHeartbeatStarted(_) => "ServerHeartbeatStartedEvent",
-            Self::ServerHeartbeatSucceeded(_) => "ServerHeartbeatSucceededEvent",
-            Self::ServerHeartbeatFailed(_) => "ServerHeartbeatFailedEvent",
-        }
-    }
-}
-
 impl CommandEvent {
-    pub(crate) fn name(&self) -> &str {
-        match self {
-            Self::Started(_) => "CommandStartedEvent",
-            Self::Succeeded(_) => "CommandSucceededEvent",
-            Self::Failed(_) => "CommandFailedEvent",
-        }
-    }
-
     pub(crate) fn command_name(&self) -> &str {
         match self {
             CommandEvent::Started(event) => event.command_name.as_str(),
