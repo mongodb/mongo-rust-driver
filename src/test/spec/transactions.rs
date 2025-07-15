@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bson::{doc, Document},
     error::{Error, Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
+    options::{CollectionOptions, WriteConcern},
     test::{
         get_client_options,
         log_uncaptured,
@@ -247,4 +248,33 @@ async fn convenient_api_retry_timeout_commit_transient() {
 
     let err = result.unwrap_err();
     assert!(err.contains_label(TRANSIENT_TRANSACTION_ERROR));
+}
+
+#[tokio::test]
+async fn write_concern_not_inherited() {
+    if !transactions_supported().await {
+        log_uncaptured("Skipping write_concern_not_inherited: no transaction support.");
+        return;
+    }
+
+    let client = Client::for_test().await;
+    let db = client.database("write_concern_not_inherited");
+    let coll: Collection<Document> = db.collection_with_options(
+        "test",
+        CollectionOptions::builder()
+            .write_concern(WriteConcern::nodes(0))
+            .build(),
+    );
+    let _ = coll.drop().write_concern(WriteConcern::majority()).await;
+    db.create_collection(coll.name()).await.unwrap();
+
+    let mut session = client.start_session().await.unwrap();
+    session.start_transaction().await.unwrap();
+    coll.insert_one(doc! { "n": 1 })
+        .session(&mut session)
+        .await
+        .unwrap();
+    session.commit_transaction().await.unwrap();
+
+    assert!(coll.find_one(doc! { "n": 1 }).await.unwrap().is_some());
 }
