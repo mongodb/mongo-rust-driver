@@ -21,7 +21,7 @@ use crate::bson::UuidRepresentation;
 use derive_where::derive_where;
 use macro_magic::export_tokens;
 use once_cell::sync::Lazy;
-use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
+use serde::{de::Unexpected, Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use strsim::jaro_winkler;
 use typed_builder::TypedBuilder;
@@ -794,7 +794,7 @@ pub struct ConnectionString {
     /// Note that by default, the driver will autodiscover other nodes in the cluster. To connect
     /// directly to a single server (rather than autodiscovering the rest of the cluster), set the
     /// `direct_connection` field to `true`.
-    pub host_info: HostInfo,
+    pub host_info: HostInfo, // here 
 
     /// The application name that the Client will send to the server as part of the handshake. This
     /// can be used in combination with the server logs to determine which Client is connected to a
@@ -1450,7 +1450,9 @@ impl ConnectionString {
             }
         };
 
-        let (pre_options, options) = split_once_left(after_scheme, "?");
+        let (pre_options, options) = split_once_left(after_scheme, "?"); 
+        // here 
+        
         let (user_info, hosts_and_auth_db) = split_once_right(pre_options, "@");
 
         // if '@' is in the host section, it MUST be interpreted as a request for authentication
@@ -2217,6 +2219,92 @@ impl FromStr for ConnectionString {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
         ConnectionString::parse(s)
+    }
+}
+
+impl fmt::Display for ConnectionString {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        // let uri = self.to_string_uri();
+        // ConnectionString::fmt_uri(self, formatter);
+        // ConnectionStringParts::fmt_uri(self, formatter)
+        // let uri = ConnectionString {
+        //     original_uri: self.original_uri.clone(),
+        //     // ..Default::default()
+        // } = self -> {original_uri}
+        // let uri = &self.unwrap().original_uri;
+
+        // todo: check other paths too (feature flags) - think about error cases 
+
+        let scheme = if self.is_srv() {
+            "mongodb+srv"
+        } else {
+            "mongodb"
+        };
+
+        let mut uri = format!("{}://", scheme);
+
+        if let Some(cred) = &self.credential {
+            if let Some(username) = &cred.username {
+                uri += username;
+                // uri += &percent_encode(user);
+                if let Some(password) = &cred.password {
+                    uri += &format!(":{}", password);
+                    // uri += &format!(":{}", percent_encode(pass));
+                }
+                uri += "@";
+            }
+        }
+
+        // need to loop through this to handle multiple hosts
+        match &self.host_info {
+            HostInfo::HostIdentifiers(hosts) => {
+                for (i, host) in hosts.iter().enumerate() {
+                    if i > 0 {
+                        uri += ",";
+                    }
+                    match host {
+                        ServerAddress::Tcp { host, port } => {
+                            uri += host;
+                            // uri += &host.to_uri_string();
+                            if let Some(port) = port {
+                                uri += &format!(":{}", port);
+                            }
+                        }
+                        #[cfg(unix)]
+                        ServerAddress::Unix { path } => {
+                            uri += &path.to_string_lossy();
+                        }
+                    }
+                    // uri += &host.to_uri_string();
+                }
+            }
+            HostInfo::DnsRecord(host) => {
+                uri += host;
+            }
+        }
+        // uri += &self.host_info.to_uri_string();
+
+        if let Some(db) = &self.default_database {
+            uri += &format!("/{}", db);
+            // uri += &format!("/{}", percent_encode(db));
+        }
+
+        // if there are options, append `?key=value&...`
+        // (you can store them in ConnectionStringParts or reconstruct)
+
+        uri
+
+
+        write!(formatter, "{}", self.original_uri)
+    }
+}
+
+impl Serialize for ConnectionString {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
     }
 }
 
