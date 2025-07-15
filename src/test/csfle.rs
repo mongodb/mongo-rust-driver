@@ -240,7 +240,7 @@ async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
                         if valid {
                             "localhost:5698"
                         } else {
-                            "doesnotexist.local:5698"
+                            "doesnotexist.invalid:5698"
                         },
                     );
                 }
