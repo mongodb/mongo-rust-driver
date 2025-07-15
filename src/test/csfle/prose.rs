@@ -268,6 +268,8 @@ async fn views_prohibited() -> Result<()> {
 
 // Prose test 7. Custom Endpoint
 mod custom_endpoint {
+    use crate::client_encryption::KmipMasterKey;
+
     use super::*;
 
     async fn custom_endpoint_aws_ok(endpoint: Option<String>) -> Result<()> {
@@ -310,18 +312,14 @@ mod custom_endpoint {
 
     // case 4
     #[tokio::test]
-    async fn aws_invalid_port() -> Result<()> {
+    async fn kmip_invalid_port() -> Result<()> {
         let client_encryption = custom_endpoint_setup(true).await?;
 
         let result = client_encryption
             .create_data_key(
-                AwsMasterKey::builder()
-                    .region("us-east-1")
-                    .key(
-                        "arn:aws:kms:us-east-1:579766882180:key/\
-                         89fcc2c4-08b0-4bd9-9f25-e30687b580d0",
-                    )
-                    .endpoint(Some("kms.us-east-1.amazonaws.com:12345".to_string()))
+                KmipMasterKey::builder()
+                    .key_id("1".to_owned())
+                    .endpoint("localhost:12345".to_owned())
                     .build(),
             )
             .await;
@@ -428,6 +426,62 @@ mod custom_endpoint {
             .key_ring("key-ring-csfle")
             .key_name("key-name-csfle")
             .endpoint(Some("doesnotexist.invalid:443".to_string()))
+            .build();
+
+        let client_encryption = custom_endpoint_setup(true).await?;
+        let result = client_encryption.create_data_key(master_key).await;
+        let err = result.unwrap_err();
+        assert!(err.is_csfle_error());
+        assert!(
+            err.to_string().contains("Invalid KMS response"),
+            "unexpected error: {}",
+            err
+        );
+
+        Ok(())
+    }
+
+    // case 10
+    #[tokio::test]
+    async fn kmip_valid() -> Result<()> {
+        let master_key = KmipMasterKey::builder().key_id("1".to_owned()).build();
+
+        let client_encryption = custom_endpoint_setup(true).await?;
+        let key_id = client_encryption
+            .create_data_key(master_key.clone())
+            .await?;
+        validate_roundtrip(&client_encryption, key_id).await?;
+
+        let client_encryption_invalid = custom_endpoint_setup(false).await?;
+        let result = client_encryption_invalid.create_data_key(master_key).await;
+        assert!(result.unwrap_err().is_network_error());
+
+        Ok(())
+    }
+
+    // case 11
+    #[tokio::test]
+    async fn kmip_valid_endpoint() -> Result<()> {
+        let master_key = KmipMasterKey::builder()
+            .key_id("1".to_owned())
+            .endpoint("localhost:5698".to_owned())
+            .build();
+
+        let client_encryption = custom_endpoint_setup(true).await?;
+        let key_id = client_encryption
+            .create_data_key(master_key.clone())
+            .await?;
+        validate_roundtrip(&client_encryption, key_id).await?;
+
+        Ok(())
+    }
+
+    // case 12
+    #[tokio::test]
+    async fn kmip_invalid() -> Result<()> {
+        let master_key = KmipMasterKey::builder()
+            .key_id("1".to_owned())
+            .endpoint("doesnotexist.invalid:5698".to_owned())
             .build();
 
         let client_encryption = custom_endpoint_setup(true).await?;
