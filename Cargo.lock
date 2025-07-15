@@ -237,7 +237,7 @@ dependencies = [
 [[package]]
 name = "bson"
 version = "3.0.0"
-source = "git+https://github.com/mongodb/bson-rust?branch=main#194177a1593835bf897dd2408db31ce949e32e77"
+source = "git+https://github.com/mongodb/bson-rust?branch=main#174fe65a7a79a67742008c669bd672bd025d439a"
 dependencies = [
  "ahash",
  "base64 0.22.1",
