@@ -18,9 +18,7 @@ use crate::{
 
 use super::{
     sasl::{SaslContinue, SaslResponse, SaslStart},
-    AuthMechanism,
-    Credential,
-    MONGODB_OIDC_STR,
+    AuthMechanism, Credential, MONGODB_OIDC_STR,
 };
 
 pub(crate) const TOKEN_RESOURCE_PROP_STR: &str = "TOKEN_RESOURCE";
@@ -309,7 +307,9 @@ enum CallbackKind {
     Machine,
 }
 
+use crate::error::ErrorKind;
 use std::fmt::Debug;
+
 impl std::fmt::Debug for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(format!("Callback: {:?}", self.kind).as_str())
@@ -972,8 +972,7 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
         .is_some_and(|source| source != "$external")
     {
         return Err(Error::invalid_argument(format!(
-            "source must be $external for {} authentication, found: {:?}",
-            MONGODB_OIDC_STR, credential.source
+            "only $external may be specified as an auth source for {MONGODB_OIDC_STR}",
         )));
     }
     #[cfg(test)]
