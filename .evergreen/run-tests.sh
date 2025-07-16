@@ -6,7 +6,7 @@ set -o pipefail
 source .evergreen/env.sh
 source .evergreen/cargo-test.sh
 
-FEATURE_FLAGS+=("tracing-unstable" "cert-key-password" "gssapi-auth")
+FEATURE_FLAGS+=("tracing-unstable" "cert-key-password")
 
 if [ "$OPENSSL" = true ]; then
   FEATURE_FLAGS+=("openssl-tls")
