@@ -307,7 +307,6 @@ enum CallbackKind {
     Machine,
 }
 
-use crate::error::ErrorKind;
 use std::fmt::Debug;
 
 impl std::fmt::Debug for Function {

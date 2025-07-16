@@ -59,7 +59,7 @@ gcp-oidc = ["dep:reqwest"]
 gcp-kms = ["dep:reqwest"]
 
 # Enable support for GSSAPI (Kerberos) authentication.
-gssapi-auth = ["dep:cross-krb5", "dep:dns-lookup"]
+gssapi-auth = ["dep:cross-krb5", "dep:hickory-resolver"]
 
 zstd-compression = ["dep:zstd"]
 zlib-compression = ["dep:flate2"]
@@ -86,7 +86,6 @@ chrono = { version = "0.4.7", default-features = false, features = [
 cross-krb5 = { version = "0.4.2", optional = true, default-features = false }
 derive_more = "0.99.17"
 derive-where = "1.2.7"
-dns-lookup = { version = "2.0", optional = true }
 flate2 = { version = "1.0", optional = true }
 futures-io = "0.3.21"
 futures-core = "0.3.14"

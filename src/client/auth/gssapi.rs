@@ -1,5 +1,8 @@
 use cross_krb5::{ClientCtx, InitiateFlags, K5Ctx, PendingClientCtx, Step};
-use dns_lookup::{lookup_addr, lookup_host};
+use hickory_resolver::{
+    proto::rr::{RData, RecordType},
+    TokioAsyncResolver,
+};
 
 use crate::{
     bson::Bson,
@@ -44,7 +47,7 @@ pub(crate) async fn authenticate_stream(
 
     let conn_host = conn.address.host().to_string();
     let hostname = properties.service_host.as_ref().unwrap_or(&conn_host);
-    let hostname = canonicalize_hostname(hostname, &properties.canonicalize_host_name)?;
+    let hostname = canonicalize_hostname(hostname, &properties.canonicalize_host_name).await?;
 
     let user_principal = credential.username.clone();
     let (mut authenticator, initial_token) =
@@ -304,38 +307,72 @@ impl GssapiAuthenticator {
     }
 }
 
-fn canonicalize_hostname(hostname: &str, mode: &CanonicalizeHostName) -> Result<String> {
+async fn canonicalize_hostname(hostname: &str, mode: &CanonicalizeHostName) -> Result<String> {
     if mode == &CanonicalizeHostName::None {
         return Ok(hostname.to_string());
     }
 
-    // Forward lookup
-    let ip_addrs = lookup_host(hostname).map_err(|e| {
+    let resolver = TokioAsyncResolver::tokio_from_system_conf().map_err(|e| {
         Error::authentication_error(
             GSSAPI_STR,
-            &format!("Failed to look up hostname for canonicalization: {e:?}"),
+            &format!("Failed to initialize hostname Resolver for canonicalization: {e:?}"),
         )
     })?;
 
-    if let Some(ip_addr) = ip_addrs.first() {
-        match mode {
-            CanonicalizeHostName::Forward => {
-                // Return the original host, but lowercased to match FQDN convention
-                Ok(hostname.to_ascii_lowercase())
-            }
-            CanonicalizeHostName::ForwardAndReverse => {
-                // Reverse-lookup for FQDN, fallback to hostname
-                match lookup_addr(ip_addr) {
-                    Ok(fqdn) => Ok(fqdn.to_ascii_lowercase()),
-                    Err(_) => Ok(hostname.to_ascii_lowercase()),
+    match mode {
+        CanonicalizeHostName::Forward => {
+            let lookup_records =
+                resolver
+                    .lookup(hostname, RecordType::CNAME)
+                    .await
+                    .map_err(|e| {
+                        Error::authentication_error(
+                            GSSAPI_STR,
+                            &format!("Failed to look up hostname for canonicalization: {e:?}"),
+                        )
+                    })?;
+
+            if let Some(first_record) = lookup_records.records().first() {
+                if let Some(RData::CNAME(cname)) = first_record.data() {
+                    Ok(cname.to_lowercase().to_string())
+                } else {
+                    Ok(hostname.to_string())
                 }
+            } else {
+                Err(Error::authentication_error(
+                    GSSAPI_STR,
+                    &format!("No addresses found for hostname: {hostname}"),
+                ))
             }
-            CanonicalizeHostName::None => unreachable!(),
         }
-    } else {
-        Err(Error::authentication_error(
-            GSSAPI_STR,
-            &format!("No addresses found for hostname: {hostname}"),
-        ))
+        CanonicalizeHostName::ForwardAndReverse => {
+            // forward lookup
+            let ips = resolver.lookup_ip(hostname).await.map_err(|e| {
+                Error::authentication_error(
+                    GSSAPI_STR,
+                    &format!("Failed to look up hostname for canonicalization: {e:?}"),
+                )
+            })?;
+
+            if let Some(first_address) = ips.iter().next() {
+                // reverse lookup
+                match resolver.reverse_lookup(first_address).await {
+                    Ok(reverse_lookup) => {
+                        if let Some(name) = reverse_lookup.iter().next() {
+                            Ok(name.to_lowercase().to_string())
+                        } else {
+                            Ok(hostname.to_lowercase())
+                        }
+                    }
+                    Err(_) => Ok(hostname.to_lowercase()),
+                }
+            } else {
+                Err(Error::authentication_error(
+                    GSSAPI_STR,
+                    &format!("No addresses found for hostname: {hostname}"),
+                ))
+            }
+        }
+        CanonicalizeHostName::None => unreachable!(),
     }
 }
