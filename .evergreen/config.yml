@@ -199,8 +199,9 @@ buildvariants:
       # Configuring SSL: ssl causes errors in bootstrap mongo-orchestration.
     tasks:
       # The Stable API was introduced in MongoDB version 5.0. Drivers Evergreen Tools only supports
-      # setting REQUIRE_API_VERSION on standalones.
+      # setting REQUIRE_API_VERSION on standalones and sharded clusters.
       - .standalone !.4.0 !.4.2 !.4.4
+      - .sharded !.4.0 !.4.2 !.4.4
 
   - name: sync-api
     display_name: "Sync API"
