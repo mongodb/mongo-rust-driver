@@ -17,7 +17,7 @@ license = "Apache-2.0"
 readme = "README.md"
 name = "mongodb"
 version = "3.2.3"
-rust-version = "1.81"
+rust-version = "1.82"
 
 exclude = [
     "etc/**",
