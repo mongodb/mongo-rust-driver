@@ -9,7 +9,8 @@ use crate::{
     client::{
         auth::{
             sasl::{SaslContinue, SaslResponse, SaslStart},
-            Credential, GSSAPI_STR,
+            Credential,
+            GSSAPI_STR,
         },
         options::ServerApi,
     },

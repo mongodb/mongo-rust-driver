@@ -18,7 +18,9 @@ use crate::{
 
 use super::{
     sasl::{SaslContinue, SaslResponse, SaslStart},
-    AuthMechanism, Credential, MONGODB_OIDC_STR,
+    AuthMechanism,
+    Credential,
+    MONGODB_OIDC_STR,
 };
 
 pub(crate) const TOKEN_RESOURCE_PROP_STR: &str = "TOKEN_RESOURCE";
