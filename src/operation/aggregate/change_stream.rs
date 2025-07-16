@@ -109,7 +109,7 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         };
 
         let description = context.connection.stream_description()?;
-        if self.args.options.as_ref().map_or(true, has_no_time)
+        if self.args.options.as_ref().is_none_or(has_no_time)
             && description.max_wire_version.is_some_and(|v| v >= 7)
             && spec.initial_buffer.is_empty()
             && spec.post_batch_resume_token.is_none()
