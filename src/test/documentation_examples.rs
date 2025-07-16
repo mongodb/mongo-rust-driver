@@ -1684,15 +1684,8 @@ async fn convenient_transaction_examples() -> Result<()> {
         return Ok(());
     }
 
-    let uri = DEFAULT_URI.clone();
+    let client = Client::for_test().await;
     // Start Transactions withTxn API Example 1
-
-    // For a replica set, include the replica set name and a seedlist of the members in the URI
-    // string; e.g. let uri = "mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017/?
-    // replicaSet=myRepl"; For a sharded cluster, connect to the mongos instances; e.g.
-    // let uri = "mongodb://mongos0.example.com:27017,mongos1.example.com:27017/";
-
-    let client = Client::with_uri_str(uri).await?;
 
     // Prereq: Create collections. CRUD operations in transactions must be on existing collections.
 
