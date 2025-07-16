@@ -6,8 +6,7 @@ use crate::{
     client::{
         auth::{
             sasl::{SaslContinue, SaslResponse, SaslStart},
-            Credential,
-            GSSAPI_STR,
+            Credential, GSSAPI_STR,
         },
         options::ServerApi,
     },
@@ -155,9 +154,8 @@ impl GssapiProperties {
                             return Err(Error::authentication_error(
                                 GSSAPI_STR,
                                 format!(
-                                    "Invalid CANONICALIZE_HOST_NAME value: {}. Valid values are \
+                                    "Invalid CANONICALIZE_HOST_NAME value: {s}. Valid values are \
                                      'none', 'forward', 'forwardAndReverse'",
-                                    s
                                 )
                                 .as_str(),
                             ))
@@ -203,15 +201,15 @@ impl GssapiAuthenticator {
         hostname: &str,
     ) -> Result<(Self, Vec<u8>)> {
         let service_name: &str = properties.service_name.as_ref();
-        let mut service_principal = format!("{}/{}", service_name, hostname);
+        let mut service_principal = format!("{service_name}/{hostname}");
         if let Some(service_realm) = properties.service_realm.as_ref() {
-            service_principal = format!("{}@{}", service_principal, service_realm);
+            service_principal = format!("{service_principal}@{service_realm}");
         } else if let Some(user_principal) = user_principal.as_ref() {
             if let Some(idx) = user_principal.find('@') {
                 // If no SERVICE_REALM was specified, use realm specified in the
                 // username. Note that `realm` starts with '@'.
                 let (_, realm) = user_principal.split_at(idx);
-                service_principal = format!("{}{}", service_principal, realm);
+                service_principal = format!("{service_principal}{realm}");
             }
         }
 
@@ -224,7 +222,7 @@ impl GssapiAuthenticator {
         .map_err(|e| {
             Error::authentication_error(
                 GSSAPI_STR,
-                &format!("Failed to initialize GSSAPI context: {}", e),
+                &format!("Failed to initialize GSSAPI context: {e}"),
             )
         })?;
 
@@ -251,7 +249,7 @@ impl GssapiAuthenticator {
             ))
         } else if let Some(pending_ctx) = self.pending_ctx.take() {
             match pending_ctx.step(challenge).map_err(|e| {
-                Error::authentication_error(GSSAPI_STR, &format!("GSSAPI step failed: {}", e))
+                Error::authentication_error(GSSAPI_STR, &format!("GSSAPI step failed: {e}"))
             })? {
                 Step::Finished((ctx, token)) => {
                     self.is_complete = true;
@@ -277,14 +275,14 @@ impl GssapiAuthenticator {
     fn do_unwrap_wrap(&mut self, payload: &[u8]) -> Result<Vec<u8>> {
         if let Some(mut established_ctx) = self.established_ctx.take() {
             let _ = established_ctx.unwrap(payload).map_err(|e| {
-                Error::authentication_error(GSSAPI_STR, &format!("GSSAPI unwrap failed: {}", e))
+                Error::authentication_error(GSSAPI_STR, &format!("GSSAPI unwrap failed: {e}"))
             })?;
 
             if let Some(user_principal) = self.user_principal.take() {
                 let bytes: &[u8] = &[0x1, 0x0, 0x0, 0x0];
                 let bytes = [bytes, user_principal.as_bytes()].concat();
                 let output_token = established_ctx.wrap(false, bytes.as_slice()).map_err(|e| {
-                    Error::authentication_error(GSSAPI_STR, &format!("GSSAPI wrap failed: {}", e))
+                    Error::authentication_error(GSSAPI_STR, &format!("GSSAPI wrap failed: {e}"))
                 })?;
                 Ok(output_token.to_vec())
             } else {
@@ -315,7 +313,7 @@ fn canonicalize_hostname(hostname: &str, mode: &CanonicalizeHostName) -> Result<
     let ip_addrs = lookup_host(hostname).map_err(|e| {
         Error::authentication_error(
             GSSAPI_STR,
-            &format!("Failed to look up hostname for canonicalization: {:?}", e),
+            &format!("Failed to look up hostname for canonicalization: {e:?}"),
         )
     })?;
 
@@ -337,7 +335,7 @@ fn canonicalize_hostname(hostname: &str, mode: &CanonicalizeHostName) -> Result<
     } else {
         Err(Error::authentication_error(
             GSSAPI_STR,
-            &format!("No addresses found for hostname: {}", hostname),
+            &format!("No addresses found for hostname: {hostname}"),
         ))
     }
 }
