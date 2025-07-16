@@ -1,6 +1,7 @@
 use crate::bson::rawdoc;
 
 use crate::{
+    bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options_to_raw_document, OperationWithDefaults},
@@ -24,7 +25,7 @@ impl DropIndexes {
 
 impl OperationWithDefaults for DropIndexes {
     type O = ();
-    const NAME: &'static str = "dropIndexes";
+    const NAME: &'static CStr = cstr!("dropIndexes");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
@@ -34,11 +35,7 @@ impl OperationWithDefaults for DropIndexes {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
-            body,
-        ))
+        Ok(Command::new(Self::NAME, &self.ns.db, body))
     }
 
     fn handle_response<'a>(

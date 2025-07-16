@@ -16,7 +16,7 @@ mod x509;
 
 use std::{borrow::Cow, fmt::Debug, str::FromStr};
 
-use crate::{bson::RawDocumentBuf, bson_compat::RawDocumentBufExt as _};
+use crate::{bson::RawDocumentBuf, bson_compat::cstr};
 use derive_where::derive_where;
 use hmac::{digest::KeyInit, Mac};
 use rand::Rng;
@@ -477,17 +477,13 @@ impl Credential {
 
     /// If the mechanism is missing, append the appropriate mechanism negotiation key-value-pair to
     /// the provided hello or legacy hello command document.
-    pub(crate) fn append_needed_mechanism_negotiation(
-        &self,
-        command: &mut RawDocumentBuf,
-    ) -> Result<()> {
+    pub(crate) fn append_needed_mechanism_negotiation(&self, command: &mut RawDocumentBuf) {
         if let (Some(username), None) = (self.username.as_ref(), self.mechanism.as_ref()) {
-            command.append_err(
-                "saslSupportedMechs",
+            command.append(
+                cstr!("saslSupportedMechs"),
                 format!("{}.{}", self.resolved_source(), username),
-            )?;
+            );
         }
-        Ok(())
     }
 
     /// Attempts to authenticate a stream according to this credential, returning an error

@@ -33,6 +33,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bson::{self, Bson, Document},
+    bson_compat::CStr,
     bson_util::{self, extend_raw_document_buf},
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     cmap::{
@@ -108,7 +109,7 @@ pub(crate) trait Operation {
     type O;
 
     /// The name of the server side command associated with this operation.
-    const NAME: &'static str;
+    const NAME: &'static CStr;
 
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
@@ -156,7 +157,8 @@ pub(crate) trait Operation {
 
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle>;
 
-    fn name(&self) -> &str;
+    /// The name of the server side command associated with this operation.
+    fn name(&self) -> &CStr;
 }
 
 pub(crate) type OverrideCriteriaFn =
@@ -169,7 +171,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     type O;
 
     /// The name of the server side command associated with this operation.
-    const NAME: &'static str;
+    const NAME: &'static CStr;
 
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
@@ -254,7 +256,8 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         None
     }
 
-    fn name(&self) -> &str {
+    /// The name of the server side command associated with this operation.
+    fn name(&self) -> &CStr {
         Self::NAME
     }
 }
@@ -264,7 +267,7 @@ where
     T: Send + Sync,
 {
     type O = T::O;
-    const NAME: &'static str = T::NAME;
+    const NAME: &'static CStr = T::NAME;
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.build(description)
     }
@@ -308,7 +311,7 @@ where
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.pinned_connection()
     }
-    fn name(&self) -> &str {
+    fn name(&self) -> &CStr {
         self.name()
     }
 }

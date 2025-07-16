@@ -42,7 +42,7 @@ impl ChangeStreamAggregate {
 impl OperationWithDefaults for ChangeStreamAggregate {
     type O = (CursorSpecification, ChangeStreamData);
 
-    const NAME: &'static str = "aggregate";
+    const NAME: &'static crate::bson_compat::CStr = Aggregate::NAME;
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if let Some(data) = &mut self.resume_data {

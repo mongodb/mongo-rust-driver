@@ -180,13 +180,6 @@ pub(crate) enum TestFileEntity {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct StoreEventsAsEntity {
-    pub id: String,
-    pub events: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct Client {
     pub(crate) id: String,
     pub(crate) uri_options: Option<Document>,
@@ -199,8 +192,6 @@ pub(crate) struct Client {
     pub(crate) observe_sensitive_commands: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_server_api_test_format")]
     pub(crate) server_api: Option<ServerApi>,
-    #[serde(default, deserialize_with = "serde_util::deserialize_nonempty_vec")]
-    pub(crate) store_events_as_entities: Option<Vec<StoreEventsAsEntity>>,
     #[cfg(feature = "tracing-unstable")]
     #[serde(default, deserialize_with = "deserialize_tracing_level_map")]
     pub(crate) observe_log_messages: Option<HashMap<String, tracing::Level>>,

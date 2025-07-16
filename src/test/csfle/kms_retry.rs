@@ -7,7 +7,7 @@ use reqwest::{Certificate, Client as HttpClient};
 
 use crate::{
     client_encryption::{AwsMasterKey, AzureMasterKey, ClientEncryption, GcpMasterKey},
-    test::{get_client_options, log_uncaptured, SERVERLESS},
+    test::get_client_options,
     Client,
     Namespace,
 };
@@ -16,11 +16,6 @@ use super::{AWS_KMS, AZURE_KMS, CSFLE_TLS_CERT_DIR, GCP_KMS};
 
 #[tokio::test]
 async fn kms_retry() {
-    if *SERVERLESS {
-        log_uncaptured("skipping kms_retry on serverless");
-        return;
-    }
-
     let endpoint = "127.0.0.1:9003";
 
     let mut certificate_file_path = PathBuf::from(&*CSFLE_TLS_CERT_DIR);

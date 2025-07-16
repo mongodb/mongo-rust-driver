@@ -268,6 +268,8 @@ async fn views_prohibited() -> Result<()> {
 
 // Prose test 7. Custom Endpoint
 mod custom_endpoint {
+    use crate::client_encryption::KmipMasterKey;
+
     use super::*;
 
     async fn custom_endpoint_aws_ok(endpoint: Option<String>) -> Result<()> {
@@ -310,18 +312,14 @@ mod custom_endpoint {
 
     // case 4
     #[tokio::test]
-    async fn aws_invalid_port() -> Result<()> {
+    async fn kmip_invalid_port() -> Result<()> {
         let client_encryption = custom_endpoint_setup(true).await?;
 
         let result = client_encryption
             .create_data_key(
-                AwsMasterKey::builder()
-                    .region("us-east-1")
-                    .key(
-                        "arn:aws:kms:us-east-1:579766882180:key/\
-                         89fcc2c4-08b0-4bd9-9f25-e30687b580d0",
-                    )
-                    .endpoint(Some("kms.us-east-1.amazonaws.com:12345".to_string()))
+                KmipMasterKey::builder()
+                    .key_id("1".to_owned())
+                    .endpoint("localhost:12345".to_owned())
                     .build(),
             )
             .await;
@@ -439,6 +437,59 @@ mod custom_endpoint {
             "unexpected error: {}",
             err
         );
+
+        Ok(())
+    }
+
+    // case 10
+    #[cfg(feature = "openssl-tls")]
+    #[tokio::test]
+    async fn kmip_valid() -> Result<()> {
+        let master_key = KmipMasterKey::builder().key_id("1".to_owned()).build();
+
+        let client_encryption = custom_endpoint_setup(true).await?;
+        let key_id = client_encryption
+            .create_data_key(master_key.clone())
+            .await?;
+        validate_roundtrip(&client_encryption, key_id).await?;
+
+        let client_encryption_invalid = custom_endpoint_setup(false).await?;
+        let result = client_encryption_invalid.create_data_key(master_key).await;
+        assert!(result.unwrap_err().is_network_error());
+
+        Ok(())
+    }
+
+    // case 11
+    #[cfg(feature = "openssl-tls")]
+    #[tokio::test]
+    async fn kmip_valid_endpoint() -> Result<()> {
+        let master_key = KmipMasterKey::builder()
+            .key_id("1".to_owned())
+            .endpoint("localhost:5698".to_owned())
+            .build();
+
+        let client_encryption = custom_endpoint_setup(true).await?;
+        let key_id = client_encryption
+            .create_data_key(master_key.clone())
+            .await?;
+        validate_roundtrip(&client_encryption, key_id).await?;
+
+        Ok(())
+    }
+
+    // case 12
+    #[tokio::test]
+    async fn kmip_invalid() -> Result<()> {
+        let master_key = KmipMasterKey::builder()
+            .key_id("1".to_owned())
+            .endpoint("doesnotexist.invalid:5698".to_owned())
+            .build();
+
+        let client_encryption = custom_endpoint_setup(true).await?;
+        let result = client_encryption.create_data_key(master_key).await;
+        let err = result.unwrap_err();
+        assert!(err.is_network_error());
 
         Ok(())
     }
@@ -1757,10 +1808,11 @@ mod range_explicit_encryption {
         };
 
         // Case 2: Find encrypted range and return the maximum
+        let ckey: &crate::bson_compat::CStr = key.as_str().try_into()?;
         let query = rawdoc! {
             "$and": [
-                { &key: { "$gte": bson_numbers[&6].clone() } },
-                { &key: { "$lte": bson_numbers[&200].clone() } },
+                { ckey: { "$gte": bson_numbers[&6].clone() } },
+                { ckey: { "$lte": bson_numbers[&200].clone() } },
             ]
         };
         let find_payload = client_encryption
@@ -1780,8 +1832,8 @@ mod range_explicit_encryption {
         // Case 3: Find encrypted range and return the minimum
         let query = rawdoc! {
             "$and": [
-                { &key: { "$gte": bson_numbers[&0].clone() } },
-                { &key: { "$lte": bson_numbers[&6].clone() } },
+                { ckey: { "$gte": bson_numbers[&0].clone() } },
+                { ckey: { "$lte": bson_numbers[&6].clone() } },
             ]
         };
         let find_payload = client_encryption
@@ -1803,7 +1855,7 @@ mod range_explicit_encryption {
         // Case 4: Find encrypted range with an open range query
         let query = rawdoc! {
             "$and": [
-                { &key: { "$gt": bson_numbers[&30].clone() } },
+                { ckey: { "$gt": bson_numbers[&30].clone() } },
             ]
         };
         let find_payload = client_encryption
@@ -1855,9 +1907,9 @@ mod range_explicit_encryption {
         // Case 7: Encrypting a document of a different type errors
         if bson_type != "DoubleNoPrecision" && bson_type != "DecimalNoPrecision" {
             let value = if bson_type == "Int" {
-                rawdoc! { &key: { "$numberDouble": "6" } }
+                rawdoc! { ckey: { "$numberDouble": "6" } }
             } else {
-                rawdoc! { &key: { "$numberInt": "6" } }
+                rawdoc! { ckey: { "$numberInt": "6" } }
             };
             let error = client_encryption
                 .encrypt(value, key1_id.clone(), Algorithm::Range)

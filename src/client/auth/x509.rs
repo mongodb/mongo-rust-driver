@@ -2,7 +2,7 @@ use crate::bson::rawdoc;
 
 use crate::{
     bson::Document,
-    bson_compat::RawDocumentBufExt as _,
+    bson_compat::cstr,
     client::options::ServerApi,
     cmap::{Command, Connection, RawCommandResponse},
     error::{Error, Result},
@@ -25,7 +25,7 @@ pub(crate) fn build_client_first(
     };
 
     if let Some(ref username) = credential.username {
-        auth_command_doc.append_err("username", username.as_str())?;
+        auth_command_doc.append(cstr!("username"), username.as_str());
     }
 
     let mut command = Command::new("authenticate", "$external", auth_command_doc);

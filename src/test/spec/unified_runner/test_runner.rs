@@ -17,7 +17,6 @@ use crate::{
         log_uncaptured,
         server_version_lte,
         spec::unified_runner::{
-            entity::EventList,
             matcher::events_match,
             test_file::{ExpectedEventType, TestFile},
         },
@@ -28,7 +27,6 @@ use crate::{
         DEFAULT_URI,
         LOAD_BALANCED_MULTIPLE_URI,
         LOAD_BALANCED_SINGLE_URI,
-        SERVERLESS,
         SERVER_API,
     },
     Client,
@@ -87,16 +85,6 @@ impl TestRunner {
             internal_client: Client::for_test().await,
             entities: Default::default(),
             fail_point_guards: Default::default(),
-            cluster_time: Default::default(),
-        }
-    }
-
-    pub(crate) async fn new_with_connection_string(connection_string: &str) -> Self {
-        let options = ClientOptions::parse(connection_string).await.unwrap();
-        Self {
-            internal_client: Client::for_test().options(options).await,
-            entities: Arc::new(RwLock::new(EntityMap::new())),
-            fail_point_guards: Arc::new(RwLock::new(Vec::new())),
             cluster_time: Default::default(),
         }
     }
@@ -452,17 +440,6 @@ impl TestRunner {
         for entity in create_entities {
             let (id, entity) = match entity {
                 TestFileEntity::Client(client) => {
-                    if let Some(store_events_as_entities) = &client.store_events_as_entities {
-                        for store_events_as_entity in store_events_as_entities {
-                            let event_list = EventList {
-                                client_id: client.id.clone(),
-                                event_names: store_events_as_entity.events.clone(),
-                            };
-                            self.insert_entity(&store_events_as_entity.id, event_list)
-                                .await;
-                        }
-                    }
-
                     let id = client.id.clone();
                     let observe_events = client.observe_events.clone();
                     let ignore_command_names = client.ignore_command_monitoring_events.clone();
@@ -471,8 +448,7 @@ impl TestRunner {
                     let server_api = client.server_api.clone().or_else(|| SERVER_API.clone());
 
                     let given_uri = if get_client_options().await.load_balanced.unwrap_or(false) {
-                        // for serverless testing, ignore use_multiple_mongoses.
-                        if client.use_multiple_mongoses() && !*SERVERLESS {
+                        if client.use_multiple_mongoses() {
                             LOAD_BALANCED_MULTIPLE_URI.as_ref().expect(
                                 "Test requires URI for load balancer fronting multiple servers",
                             )

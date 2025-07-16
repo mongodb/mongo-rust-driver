@@ -1,6 +1,7 @@
 use crate::bson::rawdoc;
 
 use crate::{
+    bson_compat::{cstr, CStr},
     bson_util::to_raw_bson_array_ser,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
@@ -36,7 +37,7 @@ impl CreateIndexes {
 
 impl OperationWithDefaults for CreateIndexes {
     type O = CreateIndexesResult;
-    const NAME: &'static str = "createIndexes";
+    const NAME: &'static CStr = cstr!("createIndexes");
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         // commit quorum is not supported on < 4.4
@@ -63,11 +64,7 @@ impl OperationWithDefaults for CreateIndexes {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
-            body,
-        ))
+        Ok(Command::new(Self::NAME, &self.ns.db, body))
     }
 
     fn handle_response<'a>(
