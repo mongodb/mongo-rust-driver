@@ -6,10 +6,7 @@ use tokio::sync::{mpsc, RwLock};
 
 use crate::{
     bson::{doc, Document},
-    client::{
-        csfle::options::{AutoEncryptionOptions, KmsProviders},
-        options::ClientOptions,
-    },
+    client::options::ClientOptions,
     concern::WriteConcern,
     gridfs::GridFsBucket,
     options::{CollectionOptions, ReadConcern, ReadPreference, SelectionCriteria},
@@ -537,6 +534,8 @@ impl TestRunner {
 
                     #[cfg(feature = "in-use-encryption")]
                     if let Some(opts) = &client.auto_encrypt_opts {
+                        use crate::client::csfle::options::{AutoEncryptionOptions, KmsProviders};
+
                         let real_opts = AutoEncryptionOptions {
                             key_vault_client: None,
                             key_vault_namespace: opts.key_vault_namespace.clone(),
