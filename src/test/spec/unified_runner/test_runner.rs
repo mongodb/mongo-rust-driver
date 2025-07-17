@@ -70,7 +70,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
 ];
 
 static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
-static MAX_SPEC_VERSION: Version = Version::new(1, 22, 0);
+static MAX_SPEC_VERSION: Version = Version::new(1, 23, 0);
 
 pub(crate) type EntityMap = HashMap<String, Entity>;
 
@@ -408,28 +408,45 @@ impl TestRunner {
         session: &mut ClientSession,
     ) {
         let client = session.client();
+        let collection_options = CollectionOptions::builder()
+            .write_concern(WriteConcern::majority())
+            .build();
+        let db = client.database(&data.database_name);
+        let coll = db.collection_with_options(&data.collection_name, collection_options.clone());
+        coll.drop().session(&mut *session).await.unwrap();
+        db.collection_with_options::<Document>(
+            &format!("enxcol_.{}.esc", data.collection_name),
+            collection_options.clone(),
+        )
+        .drop()
+        .session(&mut *session)
+        .await
+        .unwrap();
+        db.collection_with_options::<Document>(
+            &format!("enxcol_.{}.ecoc", data.collection_name),
+            collection_options.clone(),
+        )
+        .drop()
+        .session(&mut *session)
+        .await
+        .unwrap();
+
+        let mut create_options = data
+            .create_options
+            .as_ref()
+            .map_or_else(Default::default, Clone::clone);
+        create_options.write_concern = Some(WriteConcern::majority());
+        client
+            .database(&data.database_name)
+            .create_collection(&data.collection_name)
+            .session(&mut *session)
+            .with_options(create_options)
+            .await
+            .unwrap();
+
         if !data.documents.is_empty() {
-            let collection_options = CollectionOptions::builder()
-                .write_concern(WriteConcern::majority())
-                .build();
-            let coll = client
-                .database(&data.database_name)
-                .collection_with_options(&data.collection_name, collection_options);
-            coll.drop().session(&mut *session).await.unwrap();
             coll.insert_many(data.documents.clone())
                 .session(session)
-                .await
-                .unwrap();
-        } else {
-            let coll = client
-                .database(&data.database_name)
-                .collection::<Document>(&data.collection_name);
-            coll.drop().session(&mut *session).await.unwrap();
-            client
-                .database(&data.database_name)
-                .create_collection(&data.collection_name)
-                .session(&mut *session)
-                .write_concern(WriteConcern::majority())
                 .await
                 .unwrap();
         }
@@ -519,13 +536,15 @@ impl TestRunner {
                     );
 
                     #[cfg(feature = "in-use-encryption")]
-                    if let Some(opts) = &client.auto_encryption_opts {
+                    if let Some(opts) = &client.auto_encrypt_opts {
                         let real_opts = AutoEncryptionOptions {
                             key_vault_client: None,
                             key_vault_namespace: opts.key_vault_namespace.clone(),
-                            kms_providers: KmsProviders::new(fill_kms_placeholders(
-                                opts.kms_providers.clone(),
-                            ))
+                            kms_providers: KmsProviders::new(
+                                crate::test::csfle::fill_kms_placeholders(
+                                    opts.kms_providers.clone(),
+                                ),
+                            )
                             .unwrap(),
                             schema_map: opts.schema_map.clone(),
                             bypass_auto_encryption: opts.bypass_auto_encryption,
@@ -620,7 +639,8 @@ impl TestRunner {
                         .client()
                         .unwrap()
                         .clone();
-                    let kms_providers = fill_kms_placeholders(opts.kms_providers.clone());
+                    let kms_providers =
+                        crate::test::csfle::fill_kms_placeholders(opts.kms_providers.clone());
                     let client_encryption = crate::client_encryption::ClientEncryption::builder(
                         kv_client,
                         opts.key_vault_namespace.clone(),
@@ -758,35 +778,4 @@ impl TestRunner {
             .await
             .insert(id.as_ref().into(), Entity::Cursor(cursor));
     }
-}
-
-#[cfg(feature = "in-use-encryption")]
-fn fill_kms_placeholders(
-    kms_provider_map: HashMap<mongocrypt::ctx::KmsProvider, Document>,
-) -> crate::test::csfle::KmsProviderList {
-    use crate::test::csfle::ALL_KMS_PROVIDERS;
-
-    let placeholder = doc! { "$$placeholder": 1 };
-    let all_kms_providers = ALL_KMS_PROVIDERS.clone();
-
-    let mut kms_providers = Vec::new();
-    for (provider, mut config) in kms_provider_map {
-        let test_kms_provider = all_kms_providers.iter().find(|(p, ..)| p == &provider);
-
-        for (key, value) in config.iter_mut() {
-            if value.as_document() == Some(&placeholder) {
-                let test_kms_provider = test_kms_provider
-                    .unwrap_or_else(|| panic!("missing config for {:?}", provider));
-                let placeholder_value = test_kms_provider.1.get(key).unwrap_or_else(|| {
-                    panic!("provider config {:?} missing key {:?}", provider, key)
-                });
-                *value = placeholder_value.clone();
-            }
-        }
-
-        let tls_options = test_kms_provider.and_then(|(_, _, tls_options)| tls_options.clone());
-        kms_providers.push((provider, config, tls_options));
-    }
-
-    kms_providers
 }

@@ -1585,6 +1585,7 @@ functions:
           - LD_LIBRARY_PATH
           - AWS_ACCESS_KEY_ID
           - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
           - CSFLE_LOCAL_KEY
           - CRYPT_SHARED_LIB_PATH
           - DISABLE_CRYPT_SHARED

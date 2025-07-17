@@ -28,6 +28,16 @@ createEntities:
       id: &encryptedColl encryptedColl
       database: *encryptedDB
       collectionName: &encryptedCollName default
+  - client:
+      id: &client1 client1
+  - database:
+      id: &unencryptedDB unencryptedDB
+      client: *client1
+      databaseName: *encryptedDBName
+  - collection:
+      id: &unencryptedColl unencryptedColl
+      database: *unencryptedDB
+      collectionName: *encryptedCollName
 
 initialData:
   - databaseName: &keyvaultDBName keyvault
@@ -61,6 +71,12 @@ tests:
         arguments:
           filter: { "_id": 1 }
         expectResult: [{"_id": 1, "encryptedIndexed": "123" }]
+      - object: *unencryptedColl
+        name: find
+        arguments:
+          filter: {}
+        expectResult:
+          - {"_id": 1, "encryptedIndexed": { "$$type": "binData" }, "__safeContent__": [{ "$binary" : { "base64" : "31eCYlbQoVboc5zwC8IoyJVSkag9PxREka8dkmbXJeY=", "subType" : "00" } }] }
     expectEvents:
       - client: *client0
         events:
@@ -112,8 +128,3 @@ tests:
               $db: *keyvaultDBName
               readConcern: { level: "majority" }
             commandName: find
-    outcome:
-      - collectionName: *encryptedCollName
-        databaseName: *encryptedDBName
-        documents:
-          - {"_id": 1, "encryptedIndexed": { "$$type": "binData" }, "__safeContent__": [{ "$binary" : { "base64" : "31eCYlbQoVboc5zwC8IoyJVSkag9PxREka8dkmbXJeY=", "subType" : "00" } }] }

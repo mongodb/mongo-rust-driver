@@ -20,6 +20,7 @@ use crate::{
         AuthMechanism,
         ClientOptions,
         CollectionOptions,
+        CreateCollectionOptions,
         DatabaseOptions,
         HedgedReadOptions,
         ReadConcern,
@@ -196,7 +197,7 @@ pub(crate) struct Client {
     #[serde(default, deserialize_with = "deserialize_tracing_level_map")]
     pub(crate) observe_log_messages: Option<HashMap<String, tracing::Level>>,
     #[cfg(feature = "in-use-encryption")]
-    pub(crate) auto_encryption_opts: Option<AutoEncryptionOpts>,
+    pub(crate) auto_encrypt_opts: Option<AutoEncryptionOpts>,
 }
 
 impl Client {
@@ -417,6 +418,7 @@ pub(crate) struct CollectionData {
     pub(crate) collection_name: String,
     pub(crate) database_name: String,
     pub(crate) documents: Vec<Document>,
+    pub(crate) create_options: Option<CreateCollectionOptions>,
 }
 
 #[derive(Debug, Deserialize)]
