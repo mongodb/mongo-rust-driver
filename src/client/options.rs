@@ -48,7 +48,7 @@ use crate::{
 };
 
 pub use bulk_write::*;
-#[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+#[cfg(feature = "dns-resolver")]
 pub use resolver_config::ResolverConfig;
 #[cfg(not(feature = "dns-resolver"))]
 pub(crate) use resolver_config::ResolverConfig;
@@ -318,7 +318,7 @@ impl ServerAddress {
         })
     }
 
-    #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+    #[cfg(feature = "dns-resolver")]
     pub(crate) fn host(&self) -> std::borrow::Cow<'_, str> {
         match self {
             Self::Tcp { host, .. } => std::borrow::Cow::Borrowed(host.as_str()),
@@ -632,7 +632,7 @@ pub struct ClientOptions {
     #[builder(setter(skip))]
     #[serde(skip)]
     #[derive_where(skip(Debug))]
-    #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+    #[cfg(feature = "dns-resolver")]
     pub(crate) resolver_config: Option<ResolverConfig>,
 
     /// Control test behavior of the client.
@@ -1323,7 +1323,7 @@ impl ClientOptions {
     }
 
     pub(crate) fn resolver_config(&self) -> Option<&ResolverConfig> {
-        #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+        #[cfg(feature = "dns-resolver")]
         {
             self.resolver_config.as_ref()
         }

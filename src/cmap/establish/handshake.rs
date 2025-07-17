@@ -16,7 +16,7 @@ use tokio::sync::broadcast;
     feature = "snappy-compression"
 ))]
 use crate::options::Compressor;
-#[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+#[cfg(feature = "dns-resolver")]
 use crate::options::ResolverConfig;
 use crate::{
     client::auth::ClientFirst,
@@ -345,7 +345,7 @@ pub(crate) struct Handshaker {
     #[cfg(feature = "aws-auth")]
     http_client: crate::runtime::HttpClient,
 
-    #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+    #[cfg(feature = "dns-resolver")]
     resolver_config: Option<ResolverConfig>,
 }
 
@@ -416,7 +416,7 @@ impl Handshaker {
             metadata,
             #[cfg(feature = "aws-auth")]
             http_client: crate::runtime::HttpClient::default(),
-            #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+            #[cfg(afeature = "dns-resolver")]
             resolver_config: options.resolver_config,
         })
     }
@@ -505,7 +505,7 @@ impl Handshaker {
                     first_round,
                     #[cfg(feature = "aws-auth")]
                     &self.http_client,
-                    #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+                    #[cfg(feature = "dns-resolver")]
                     self.resolver_config.as_ref(),
                 )
                 .await?
@@ -544,7 +544,7 @@ pub(crate) struct HandshakerOptions {
 
     /// Configuration of the DNS resolver used for SRV and TXT lookups, as well
     /// as hostname canonicalization for GSSAPI.
-    #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+    #[cfg(feature = "dns-resolver")]
     pub(crate) resolver_config: Option<ResolverConfig>,
 }
 

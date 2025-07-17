@@ -12,7 +12,7 @@ mod join_handle;
 mod pem;
 #[cfg(any(feature = "in-use-encryption", test))]
 pub(crate) mod process;
-#[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+#[cfg(feature = "dns-resolver")]
 mod resolver;
 pub(crate) mod stream;
 mod sync_read_ext;
@@ -25,7 +25,7 @@ mod worker_handle;
 
 use std::{future::Future, net::SocketAddr, time::Duration};
 
-#[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+#[cfg(feature = "dns-resolver")]
 pub(crate) use self::resolver::AsyncResolver;
 pub(crate) use self::{
     acknowledged_message::{AcknowledgedMessage, AcknowledgmentReceiver, AcknowledgmentSender},

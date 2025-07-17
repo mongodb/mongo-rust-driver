@@ -56,7 +56,7 @@ gcp-oidc = ["dep:reqwest"]
 gcp-kms = ["dep:reqwest"]
 
 # Enable support for GSSAPI (Kerberos) authentication.
-gssapi-auth = ["dep:cross-krb5", "dep:hickory-resolver"]
+gssapi-auth = ["dep:cross-krb5", "dns-resolver"]
 
 zstd-compression = ["dep:zstd"]
 zlib-compression = ["dep:flate2"]
