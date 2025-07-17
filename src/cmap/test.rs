@@ -9,18 +9,20 @@ use tokio::sync::{Mutex, RwLock};
 use self::file::{Operation, TestFile, ThreadedOperation};
 
 use crate::{
+    bson::{doc, Document},
     cmap::{
         establish::{ConnectionEstablisher, EstablisherOptions},
         ConnectionPool,
         ConnectionPoolOptions,
     },
-    error::{Error, ErrorKind, Result},
+    error::{Error, ErrorKind, Result, TRANSIENT_TRANSACTION_ERROR},
     event::cmap::{
         CmapEvent,
         ConnectionCheckoutFailedReason,
         ConnectionClosedReason,
         ConnectionPoolOptions as EventOptions,
     },
+    hello::LEGACY_HELLO_COMMAND_NAME,
     options::TlsOptions,
     runtime::{self, AsyncJoinHandle},
     sdam::{TopologyUpdater, UpdateMessage},
@@ -30,10 +32,15 @@ use crate::{
         get_client_options,
         log_uncaptured,
         run_spec_test,
-        util::event_buffer::EventBuffer,
+        topology_is_sharded,
+        util::{
+            event_buffer::EventBuffer,
+            fail_point::{FailPoint, FailPointMode},
+        },
         MatchErrExt,
         Matchable,
     },
+    Client,
 };
 
 use super::conn::pooled::PooledConnection;
@@ -487,4 +494,50 @@ async fn cmap_spec_tests() {
         run_cmap_spec_tests,
     )
     .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn pool_cleared_error_has_transient_transaction_error_label() {
+    let mut client_options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        client_options.hosts.drain(1..);
+    }
+    client_options.retry_reads = Some(false);
+    client_options.connect_timeout = Some(Duration::from_millis(500));
+    client_options.heartbeat_freq = Some(Duration::from_millis(500));
+    let client = Client::for_test()
+        .options(client_options)
+        .monitor_events()
+        .await;
+
+    let mut session = client.start_session().await.unwrap();
+    session.start_transaction().await.unwrap();
+
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
+        .error_code(8)
+        .block_connection(Duration::from_millis(5000));
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let find_client = client.clone();
+    let find_handle = tokio::spawn(async move {
+        find_client
+            .database("db")
+            .collection::<Document>("coll")
+            .find_one(doc! {})
+            .session(&mut session)
+            .await
+    });
+
+    let fail_point = FailPoint::fail_command(
+        &["hello", LEGACY_HELLO_COMMAND_NAME],
+        // One or more of these failpoints may be encountered by an RTT hello rather than a server
+        // monitor.
+        FailPointMode::Times(4),
+    )
+    .block_connection(Duration::from_millis(1500));
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let find_error = find_handle.await.unwrap().unwrap_err();
+    assert!(find_error.is_pool_cleared());
+    assert!(find_error.contains_label(TRANSIENT_TRANSACTION_ERROR));
 }
