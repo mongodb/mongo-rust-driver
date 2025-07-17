@@ -166,6 +166,7 @@ impl RunOnRequirement {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) enum TestFileEntity {

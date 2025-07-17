@@ -345,7 +345,7 @@ pub(crate) fn fill_kms_placeholders(
         {
             Some(&*AWS_TEMP_KMS)
         } else {
-            (&*ALL_KMS_PROVIDERS).iter().find(|(p, ..)| p == &provider)
+            (*ALL_KMS_PROVIDERS).iter().find(|(p, ..)| p == &provider)
         };
 
         for (key, value) in config.iter_mut() {

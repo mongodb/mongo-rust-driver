@@ -237,7 +237,7 @@ impl Client {
         if csfle_state.is_some() {
             return Err(Error::internal("double initialization of csfle state"));
         }
-        *csfle_state = Some(ClientState::new(&self, opts).await?);
+        *csfle_state = Some(ClientState::new(self, opts).await?);
 
         Ok(())
     }
