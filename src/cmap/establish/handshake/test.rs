@@ -18,6 +18,8 @@ async fn metadata_no_options() {
         driver_info: None,
         server_api: None,
         load_balanced: false,
+        #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+        resolver_config: None,
     })
     .unwrap();
 
@@ -66,6 +68,8 @@ async fn metadata_with_options() {
         compressors: None,
         server_api: None,
         load_balanced: false,
+        #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+        resolver_config: None,
     };
 
     let handshaker = Handshaker::new(options).unwrap();

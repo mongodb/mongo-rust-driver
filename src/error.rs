@@ -282,7 +282,7 @@ impl Error {
         self.labels.insert(label);
     }
 
-    #[cfg(feature = "dns-resolver")]
+    #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
     pub(crate) fn from_resolve_error(error: hickory_resolver::error::ResolveError) -> Self {
         ErrorKind::DnsResolve {
             message: error.to_string(),
@@ -290,7 +290,7 @@ impl Error {
         .into()
     }
 
-    #[cfg(feature = "dns-resolver")]
+    #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
     pub(crate) fn from_resolve_proto_error(error: hickory_proto::error::ProtoError) -> Self {
         ErrorKind::DnsResolve {
             message: error.to_string(),

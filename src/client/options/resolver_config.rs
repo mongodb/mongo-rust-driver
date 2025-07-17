@@ -1,4 +1,4 @@
-#[cfg(feature = "dns-resolver")]
+#[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
 use hickory_resolver::config::ResolverConfig as HickoryResolverConfig;
 
 /// Configuration for the upstream nameservers to use for resolution.
@@ -7,11 +7,11 @@ use hickory_resolver::config::ResolverConfig as HickoryResolverConfig;
 /// API stability.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResolverConfig {
-    #[cfg(feature = "dns-resolver")]
+    #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
     pub(crate) inner: HickoryResolverConfig,
 }
 
-#[cfg(feature = "dns-resolver")]
+#[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
 impl ResolverConfig {
     /// Creates a default configuration, using 1.1.1.1, 1.0.0.1 and 2606:4700:4700::1111,
     /// 2606:4700:4700::1001 (thank you, Cloudflare).

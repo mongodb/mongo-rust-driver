@@ -1,8 +1,5 @@
 use cross_krb5::{ClientCtx, InitiateFlags, K5Ctx, PendingClientCtx, Step};
-use hickory_resolver::{
-    proto::rr::{RData, RecordType},
-    TokioAsyncResolver,
-};
+use hickory_resolver::proto::rr::RData;
 
 use crate::{
     bson::Bson,
@@ -16,6 +13,7 @@ use crate::{
     },
     cmap::Connection,
     error::{Error, Result},
+    options::ResolverConfig,
 };
 
 const SERVICE_NAME: &str = "SERVICE_NAME";
@@ -43,12 +41,18 @@ pub(crate) async fn authenticate_stream(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
+    resolver_config: Option<&ResolverConfig>,
 ) -> Result<()> {
     let properties = GssapiProperties::from_credential(credential)?;
 
     let conn_host = conn.address.host().to_string();
     let hostname = properties.service_host.as_ref().unwrap_or(&conn_host);
-    let hostname = canonicalize_hostname(hostname, &properties.canonicalize_host_name).await?;
+    let hostname = canonicalize_hostname(
+        hostname,
+        &properties.canonicalize_host_name,
+        resolver_config,
+    )
+    .await?;
 
     let user_principal = credential.username.clone();
     let (mut authenticator, initial_token) =
@@ -308,30 +312,21 @@ impl GssapiAuthenticator {
     }
 }
 
-async fn canonicalize_hostname(hostname: &str, mode: &CanonicalizeHostName) -> Result<String> {
+async fn canonicalize_hostname(
+    hostname: &str,
+    mode: &CanonicalizeHostName,
+    resolver_config: Option<&ResolverConfig>,
+) -> Result<String> {
     if mode == &CanonicalizeHostName::None {
         return Ok(hostname.to_string());
     }
 
-    let resolver = TokioAsyncResolver::tokio_from_system_conf().map_err(|e| {
-        Error::authentication_error(
-            GSSAPI_STR,
-            &format!("Failed to initialize hostname Resolver for canonicalization: {e:?}"),
-        )
-    })?;
+    let resolver =
+        crate::runtime::AsyncResolver::new(resolver_config.map(|c| c.inner.clone())).await?;
 
     match mode {
         CanonicalizeHostName::Forward => {
-            let lookup_records =
-                resolver
-                    .lookup(hostname, RecordType::CNAME)
-                    .await
-                    .map_err(|e| {
-                        Error::authentication_error(
-                            GSSAPI_STR,
-                            &format!("Failed to look up hostname for canonicalization: {e:?}"),
-                        )
-                    })?;
+            let lookup_records = resolver.cname_lookup(hostname).await?;
 
             if let Some(first_record) = lookup_records.records().first() {
                 if let Some(RData::CNAME(cname)) = first_record.data() {
@@ -348,12 +343,7 @@ async fn canonicalize_hostname(hostname: &str, mode: &CanonicalizeHostName) -> R
         }
         CanonicalizeHostName::ForwardAndReverse => {
             // forward lookup
-            let ips = resolver.lookup_ip(hostname).await.map_err(|e| {
-                Error::authentication_error(
-                    GSSAPI_STR,
-                    &format!("Failed to look up hostname for canonicalization: {e:?}"),
-                )
-            })?;
+            let ips = resolver.ip_lookup(hostname).await?;
 
             if let Some(first_address) = ips.iter().next() {
                 // reverse lookup

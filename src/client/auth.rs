@@ -24,6 +24,8 @@ use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
 use self::scram::ScramVersion;
+#[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+use crate::options::ResolverConfig;
 use crate::{
     bson::Document,
     client::options::ServerApi,
@@ -287,6 +289,9 @@ impl AuthMechanism {
         credential: &Credential,
         server_api: Option<&ServerApi>,
         #[cfg(feature = "aws-auth")] http_client: &crate::runtime::HttpClient,
+        #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))] resolver_config: Option<
+            &ResolverConfig,
+        >,
     ) -> Result<()> {
         self.validate_credential(credential)?;
 
@@ -306,7 +311,7 @@ impl AuthMechanism {
             }
             #[cfg(feature = "gssapi-auth")]
             AuthMechanism::Gssapi => {
-                gssapi::authenticate_stream(stream, credential, server_api).await
+                gssapi::authenticate_stream(stream, credential, server_api, resolver_config).await
             }
             AuthMechanism::Plain => {
                 plain::authenticate_stream(stream, credential, server_api).await
@@ -495,6 +500,9 @@ impl Credential {
         server_api: Option<&ServerApi>,
         first_round: Option<FirstRound>,
         #[cfg(feature = "aws-auth")] http_client: &crate::runtime::HttpClient,
+        #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))] resolver_config: Option<
+            &ResolverConfig,
+        >,
     ) -> Result<()> {
         let stream_description = conn.stream_description()?;
 
@@ -533,6 +541,8 @@ impl Credential {
                 server_api,
                 #[cfg(feature = "aws-auth")]
                 http_client,
+                #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
+                resolver_config,
             )
             .await
     }

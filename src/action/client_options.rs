@@ -100,8 +100,9 @@ pub struct ParseConnectionString {
 #[export_tokens(parse_conn_str_setters)]
 impl ParseConnectionString {
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
-    /// provided `ResolverConfig` as part of this method.
-    #[cfg(feature = "dns-resolver")]
+    /// provided `ResolverConfig` as part of this method. In the case that "GSSAPI" auth is used,
+    /// hostname canonicalization will be done using the provided `ResolverConfig`.
+    #[cfg(any(feature = "dns-resolver", feature = "gssapi-auth"))]
     pub fn resolver_config(mut self, value: ResolverConfig) -> Self {
         self.resolver_config = Some(value);
         self
