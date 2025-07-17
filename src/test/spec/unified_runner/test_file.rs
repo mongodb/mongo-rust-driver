@@ -297,6 +297,7 @@ pub(crate) fn merge_uri_options(
     uri
 }
 
+#[cfg(feature = "in-use-encryption")]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct AutoEncryptionOpts {
