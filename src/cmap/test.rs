@@ -507,6 +507,10 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
         return;
     }
 
+    // The disableFailPoint commands may occasionally fail with ConnectionPoolCleared errors, so use
+    // an app name to ensure that other tests are not affected.
+    let app_name = "pool_cleared_error_has_transient_transaction_error_label";
+
     let mut client_options = get_client_options().await.clone();
     if topology_is_sharded().await {
         client_options.hosts.drain(1..);
@@ -514,6 +518,7 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
     client_options.retry_reads = Some(false);
     client_options.connect_timeout = Some(Duration::from_millis(500));
     client_options.heartbeat_freq = Some(Duration::from_millis(500));
+    client_options.app_name = Some(app_name.to_string());
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
@@ -523,8 +528,8 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
     session.start_transaction().await.unwrap();
 
     let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
-        .error_code(8)
-        .block_connection(Duration::from_secs(30));
+        .block_connection(Duration::from_secs(30))
+        .app_name(app_name);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let find_client = client.clone();
@@ -543,7 +548,8 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
         // monitor.
         FailPointMode::Times(4),
     )
-    .block_connection(Duration::from_millis(1500));
+    .block_connection(Duration::from_millis(1500))
+    .app_name(app_name);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let find_error = find_handle.await.unwrap().unwrap_err();
