@@ -524,7 +524,7 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
 
     let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
         .error_code(8)
-        .block_connection(Duration::from_millis(5000));
+        .block_connection(Duration::from_secs(30));
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let find_client = client.clone();
@@ -547,6 +547,6 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let find_error = find_handle.await.unwrap().unwrap_err();
-    assert!(find_error.is_pool_cleared());
+    assert!(find_error.is_pool_cleared(), "{:?}", find_error);
     assert!(find_error.contains_label(TRANSIENT_TRANSACTION_ERROR));
 }
