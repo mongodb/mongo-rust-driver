@@ -28,6 +28,7 @@ use crate::{
     sdam::{TopologyUpdater, UpdateMessage},
     test::{
         assert_matches,
+        block_connection_supported,
         eq_matches,
         get_client_options,
         log_uncaptured,
@@ -498,6 +499,14 @@ async fn cmap_spec_tests() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn pool_cleared_error_has_transient_transaction_error_label() {
+    if !block_connection_supported().await {
+        log_uncaptured(
+            "skipping pool_cleared_error_has_transient_transaction_error_label: block connection \
+             unsupported",
+        );
+        return;
+    }
+
     let mut client_options = get_client_options().await.clone();
     if topology_is_sharded().await {
         client_options.hosts.drain(1..);
