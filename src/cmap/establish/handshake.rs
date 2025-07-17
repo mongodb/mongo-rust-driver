@@ -16,7 +16,7 @@ use tokio::sync::broadcast;
     feature = "snappy-compression"
 ))]
 use crate::options::Compressor;
-#[cfg(feature = "dns-resolver")]
+#[cfg(feature = "gssapi-auth")]
 use crate::options::ResolverConfig;
 use crate::{
     client::auth::ClientFirst,
@@ -345,7 +345,7 @@ pub(crate) struct Handshaker {
     #[cfg(feature = "aws-auth")]
     http_client: crate::runtime::HttpClient,
 
-    #[cfg(feature = "dns-resolver")]
+    #[cfg(feature = "gssapi-auth")]
     resolver_config: Option<ResolverConfig>,
 }
 
@@ -416,7 +416,7 @@ impl Handshaker {
             metadata,
             #[cfg(feature = "aws-auth")]
             http_client: crate::runtime::HttpClient::default(),
-            #[cfg(afeature = "dns-resolver")]
+            #[cfg(feature = "gssapi-auth")]
             resolver_config: options.resolver_config,
         })
     }
@@ -505,7 +505,7 @@ impl Handshaker {
                     first_round,
                     #[cfg(feature = "aws-auth")]
                     &self.http_client,
-                    #[cfg(feature = "dns-resolver")]
+                    #[cfg(feature = "gssapi-auth")]
                     self.resolver_config.as_ref(),
                 )
                 .await?
@@ -542,9 +542,8 @@ pub(crate) struct HandshakerOptions {
     /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
     pub(crate) load_balanced: bool,
 
-    /// Configuration of the DNS resolver used for SRV and TXT lookups, as well
-    /// as hostname canonicalization for GSSAPI.
-    #[cfg(feature = "dns-resolver")]
+    /// Configuration of the DNS resolver used for hostname canonicalization for GSSAPI.
+    #[cfg(feature = "gssapi-auth")]
     pub(crate) resolver_config: Option<ResolverConfig>,
 }
 

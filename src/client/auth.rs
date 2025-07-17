@@ -24,7 +24,7 @@ use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
 use self::scram::ScramVersion;
-#[cfg(feature = "dns-resolver")]
+#[cfg(feature = "gssapi-auth")]
 use crate::options::ResolverConfig;
 use crate::{
     bson::Document,

@@ -2,11 +2,17 @@ use crate::error::{Error, Result};
 use hickory_resolver::{
     config::ResolverConfig,
     error::ResolveErrorKind,
-    lookup::{Lookup, ReverseLookup, SrvLookup, TxtLookup},
-    lookup_ip::LookupIp,
-    proto::rr::RecordType,
+    lookup::{SrvLookup, TxtLookup},
     Name,
 };
+
+#[cfg(feature = "gssapi-auth")]
+use hickory_resolver::{
+    lookup::{Lookup, ReverseLookup},
+    lookup_ip::LookupIp,
+    proto::rr::RecordType,
+};
+#[cfg(feature = "gssapi-auth")]
 use std::net::IpAddr;
 
 /// An async runtime agnostic DNS resolver.
@@ -27,6 +33,7 @@ impl AsyncResolver {
 }
 
 impl AsyncResolver {
+    #[cfg(feature = "gssapi-auth")]
     pub async fn cname_lookup(&self, query: &str) -> Result<Lookup> {
         let name = Name::from_str_relaxed(query).map_err(Error::from_resolve_proto_error)?;
         let lookup = self
@@ -37,6 +44,7 @@ impl AsyncResolver {
         Ok(lookup)
     }
 
+    #[cfg(feature = "gssapi-auth")]
     pub async fn ip_lookup(&self, query: &str) -> Result<LookupIp> {
         let name = Name::from_str_relaxed(query).map_err(Error::from_resolve_proto_error)?;
         let lookup = self
@@ -47,6 +55,7 @@ impl AsyncResolver {
         Ok(lookup)
     }
 
+    #[cfg(feature = "gssapi-auth")]
     pub async fn reverse_lookup(&self, ip_addr: IpAddr) -> Result<ReverseLookup> {
         let lookup = self
             .resolver

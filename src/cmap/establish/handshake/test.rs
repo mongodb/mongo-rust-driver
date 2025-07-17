@@ -18,7 +18,7 @@ async fn metadata_no_options() {
         driver_info: None,
         server_api: None,
         load_balanced: false,
-        #[cfg(feature = "dns-resolver")]
+        #[cfg(feature = "gssapi-auth")]
         resolver_config: None,
     })
     .unwrap();
@@ -68,7 +68,7 @@ async fn metadata_with_options() {
         compressors: None,
         server_api: None,
         load_balanced: false,
-        #[cfg(feature = "dns-resolver")]
+        #[cfg(feature = "gssapi-auth")]
         resolver_config: None,
     };
 
