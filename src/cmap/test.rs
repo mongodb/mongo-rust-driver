@@ -34,6 +34,7 @@ use crate::{
         log_uncaptured,
         run_spec_test,
         topology_is_sharded,
+        transactions_supported,
         util::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
@@ -502,6 +503,13 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
     if !block_connection_supported().await {
         log_uncaptured(
             "skipping pool_cleared_error_has_transient_transaction_error_label: block connection \
+             unsupported",
+        );
+        return;
+    }
+    if !transactions_supported().await {
+        log_uncaptured(
+            "skipping pool_cleared_error_has_transient_transaction_error_label: transactions \
              unsupported",
         );
         return;
