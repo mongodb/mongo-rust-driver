@@ -33,6 +33,7 @@ use crate::{
         get_client_options,
         log_uncaptured,
         run_spec_test,
+        topology_is_load_balanced,
         topology_is_sharded,
         transactions_supported,
         util::{
@@ -513,6 +514,12 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
              unsupported",
         );
         return;
+    }
+    if topology_is_load_balanced().await {
+        log_uncaptured(
+            "skipping pool_cleared_error_has_transient_transaction_error_label: load balanced \
+             topology",
+        );
     }
 
     // The disableFailPoint commands may occasionally fail with ConnectionPoolCleared errors, so use
