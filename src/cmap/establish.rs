@@ -62,6 +62,8 @@ impl EstablisherOptions {
                 driver_info: opts.driver_info.clone(),
                 server_api: opts.server_api.clone(),
                 load_balanced: opts.load_balanced.unwrap_or(false),
+                #[cfg(feature = "gssapi-auth")]
+                resolver_config: opts.resolver_config.clone(),
             },
             tls_options: opts.tls_options(),
             connect_timeout: opts.connect_timeout,

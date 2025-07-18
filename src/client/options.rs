@@ -1583,7 +1583,18 @@ impl ConnectionString {
                             let val = match &s.to_lowercase()[..] {
                                 "true" => Bson::Boolean(true),
                                 "false" => Bson::Boolean(false),
-                                _ => Bson::String(s),
+                                "none" | "forward" | "forwardandreverse" => Bson::String(s),
+                                _ => {
+                                    return Err(ErrorKind::InvalidArgument {
+                                        message: format!(
+                                            "Invalid CANONICALIZE_HOST_NAME value: {}. Valid \
+                                             values are 'none', 'forward', 'forwardAndReverse', \
+                                             'true', 'false'",
+                                            s
+                                        ),
+                                    }
+                                    .into());
+                                }
                             };
                             doc.insert("CANONICALIZE_HOST_NAME", val);
                         }
@@ -1591,6 +1602,22 @@ impl ConnectionString {
                             doc.insert("CANONICALIZE_HOST_NAME", val);
                         }
                         None => {}
+                    }
+
+                    credential.mechanism_properties = Some(doc);
+                }
+
+                #[cfg(feature = "gssapi-auth")]
+                if mechanism == &AuthMechanism::Gssapi {
+                    // Set mongodb as the default SERVICE_NAME if none is provided
+                    let mut doc = if let Some(doc) = credential.mechanism_properties.take() {
+                        doc
+                    } else {
+                        Document::new()
+                    };
+
+                    if !doc.contains_key("SERVICE_NAME") {
+                        doc.insert("SERVICE_NAME", "mongodb");
                     }
 
                     credential.mechanism_properties = Some(doc);

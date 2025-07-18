@@ -16,6 +16,8 @@ use tokio::sync::broadcast;
     feature = "snappy-compression"
 ))]
 use crate::options::Compressor;
+#[cfg(feature = "gssapi-auth")]
+use crate::options::ResolverConfig;
 use crate::{
     client::auth::ClientFirst,
     cmap::{Command, Connection, StreamDescription},
@@ -342,6 +344,9 @@ pub(crate) struct Handshaker {
 
     #[cfg(feature = "aws-auth")]
     http_client: crate::runtime::HttpClient,
+
+    #[cfg(feature = "gssapi-auth")]
+    resolver_config: Option<ResolverConfig>,
 }
 
 #[cfg(test)]
@@ -411,6 +416,8 @@ impl Handshaker {
             metadata,
             #[cfg(feature = "aws-auth")]
             http_client: crate::runtime::HttpClient::default(),
+            #[cfg(feature = "gssapi-auth")]
+            resolver_config: options.resolver_config,
         })
     }
 
@@ -498,6 +505,8 @@ impl Handshaker {
                     first_round,
                     #[cfg(feature = "aws-auth")]
                     &self.http_client,
+                    #[cfg(feature = "gssapi-auth")]
+                    self.resolver_config.as_ref(),
                 )
                 .await?
         }
@@ -532,9 +541,13 @@ pub(crate) struct HandshakerOptions {
 
     /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
     pub(crate) load_balanced: bool,
+
+    /// Configuration of the DNS resolver used for hostname canonicalization for GSSAPI.
+    #[cfg(feature = "gssapi-auth")]
+    pub(crate) resolver_config: Option<ResolverConfig>,
 }
 
-/// Updates the handshake command document with the speculative authenitication info.
+/// Updates the handshake command document with the speculative authentication info.
 async fn set_speculative_auth_info(
     command: &mut RawDocumentBuf,
     credential: Option<&Credential>,

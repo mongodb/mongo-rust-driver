@@ -257,6 +257,14 @@ buildvariants:
     # Limit the test to only schedule every 14 days to reduce external resource usage.
     batchtime: 20160
 
+  - name: gssapi-auth
+    display_name: "GSSAPI Authentication"
+    patchable: true
+    run_on:
+      - ubuntu2004-small
+    tasks:
+      - test-gssapi-auth
+
   - name: x509-auth
     display_name: "x509 Authentication"
     patchable: false
@@ -772,7 +780,7 @@ tasks:
       - func: "compile only"
         vars:
           # Our minimum supported Rust version. This should be updated whenever the MSRV is bumped.
-          RUST_VERSION: 1.81.0
+          RUST_VERSION: 1.82.0
 
   - name: check-cargo-deny
     commands:
@@ -923,6 +931,10 @@ tasks:
       - func: "run aws assume role with web identity test"
         vars:
           AWS_ROLE_SESSION_NAME: test
+
+  - name: test-gssapi-auth
+    commands:
+      - func: "run gssapi auth test"
 
   - name: test-atlas-connectivity
     commands:
@@ -1375,6 +1387,17 @@ functions:
           - PROJECT_DIRECTORY
         env:
           AWS_AUTH_TYPE: web-identity
+
+  "run gssapi auth test":
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        working_dir: ${PROJECT_DIRECTORY}
+        args:
+          - .evergreen/run-gssapi-tests.sh
+        include_expansions_in_env:
+          - PROJECT_DIRECTORY
 
   "run x509 tests":
     - command: shell.exec

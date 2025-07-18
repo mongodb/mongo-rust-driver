@@ -3,6 +3,8 @@
 
 #[cfg(feature = "aws-auth")]
 pub(crate) mod aws;
+#[cfg(feature = "gssapi-auth")]
+mod gssapi;
 /// Contains the functionality for [`OIDC`](https://openid.net/developers/how-connect-works/) authorization and authentication.
 pub mod oidc;
 mod plain;
@@ -22,6 +24,8 @@ use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
 use self::scram::ScramVersion;
+#[cfg(feature = "gssapi-auth")]
+use crate::options::ResolverConfig;
 use crate::{
     bson::Document,
     client::options::ServerApi,
@@ -67,8 +71,7 @@ pub enum AuthMechanism {
     /// Kerberos authentication mechanism as defined in [RFC 4752](http://tools.ietf.org/html/rfc4752).
     ///
     /// See the [MongoDB documentation](https://www.mongodb.com/docs/manual/core/kerberos/) for more information.
-    ///
-    /// Note: This mechanism is not currently supported by this driver but will be in the future.
+    #[cfg(feature = "gssapi-auth")]
     Gssapi,
 
     /// The SASL PLAIN mechanism, as defined in [RFC 4616](), is used in MongoDB to perform LDAP
@@ -148,6 +151,25 @@ impl AuthMechanism {
 
                 Ok(())
             }
+            #[cfg(feature = "gssapi-auth")]
+            AuthMechanism::Gssapi => {
+                if credential.username.is_none() {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: "No username provided for GSSAPI authentication".to_string(),
+                    }
+                    .into());
+                }
+
+                if credential.source.as_deref().unwrap_or("$external") != "$external" {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: "only $external may be specified as an auth source for GSSAPI"
+                            .to_string(),
+                    }
+                    .into());
+                }
+
+                Ok(())
+            }
             AuthMechanism::Plain => {
                 if credential.username.is_none() {
                     return Err(ErrorKind::InvalidArgument {
@@ -197,6 +219,7 @@ impl AuthMechanism {
             AuthMechanism::ScramSha256 => SCRAM_SHA_256_STR,
             AuthMechanism::MongoDbCr => MONGODB_CR_STR,
             AuthMechanism::MongoDbX509 => MONGODB_X509_STR,
+            #[cfg(feature = "gssapi-auth")]
             AuthMechanism::Gssapi => GSSAPI_STR,
             AuthMechanism::Plain => PLAIN_STR,
             #[cfg(feature = "aws-auth")]
@@ -217,7 +240,8 @@ impl AuthMechanism {
             AuthMechanism::MongoDbOidc => "$external",
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => "$external",
-            AuthMechanism::Gssapi => "",
+            #[cfg(feature = "gssapi-auth")]
+            AuthMechanism::Gssapi => "$external",
         }
     }
 
@@ -242,6 +266,8 @@ impl AuthMechanism {
             Self::MongoDbX509 => Ok(Some(ClientFirst::X509(Box::new(
                 x509::build_speculative_client_first(credential)?,
             )))),
+            #[cfg(feature = "gssapi-auth")]
+            AuthMechanism::Gssapi => Ok(None),
             Self::Plain => Ok(None),
             Self::MongoDbOidc => Ok(oidc::build_speculative_client_first(credential)
                 .await
@@ -254,10 +280,6 @@ impl AuthMechanism {
                     .into(),
             }
             .into()),
-            _ => Err(ErrorKind::Authentication {
-                message: format!("Authentication mechanism {:?} not yet implemented.", self),
-            }
-            .into()),
         }
     }
 
@@ -267,6 +289,7 @@ impl AuthMechanism {
         credential: &Credential,
         server_api: Option<&ServerApi>,
         #[cfg(feature = "aws-auth")] http_client: &crate::runtime::HttpClient,
+        #[cfg(feature = "gssapi-auth")] resolver_config: Option<&ResolverConfig>,
     ) -> Result<()> {
         self.validate_credential(credential)?;
 
@@ -284,6 +307,10 @@ impl AuthMechanism {
             AuthMechanism::MongoDbX509 => {
                 x509::authenticate_stream(stream, credential, server_api, None).await
             }
+            #[cfg(feature = "gssapi-auth")]
+            AuthMechanism::Gssapi => {
+                gssapi::authenticate_stream(stream, credential, server_api, resolver_config).await
+            }
             AuthMechanism::Plain => {
                 plain::authenticate_stream(stream, credential, server_api).await
             }
@@ -300,10 +327,6 @@ impl AuthMechanism {
             AuthMechanism::MongoDbOidc => {
                 oidc::authenticate_stream(stream, credential, server_api, None).await
             }
-            _ => Err(ErrorKind::Authentication {
-                message: format!("Authentication mechanism {:?} not yet implemented.", self),
-            }
-            .into()),
         }
     }
 
@@ -327,6 +350,14 @@ impl AuthMechanism {
                 ),
             }
             .into()),
+            #[cfg(feature = "gssapi-auth")]
+            AuthMechanism::Gssapi => Err(ErrorKind::Authentication {
+                message: format!(
+                    "Reauthentication for authentication mechanism {:?} is not supported.",
+                    self
+                ),
+            }
+            .into()),
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => Err(ErrorKind::Authentication {
                 message: format!(
@@ -338,10 +369,6 @@ impl AuthMechanism {
             AuthMechanism::MongoDbOidc => {
                 oidc::reauthenticate_stream(stream, credential, server_api).await
             }
-            _ => Err(ErrorKind::Authentication {
-                message: format!("Authentication mechanism {:?} not yet implemented.", self),
-            }
-            .into()),
         }
     }
 }
@@ -355,7 +382,13 @@ impl FromStr for AuthMechanism {
             SCRAM_SHA_256_STR => Ok(AuthMechanism::ScramSha256),
             MONGODB_CR_STR => Ok(AuthMechanism::MongoDbCr),
             MONGODB_X509_STR => Ok(AuthMechanism::MongoDbX509),
+            #[cfg(feature = "gssapi-auth")]
             GSSAPI_STR => Ok(AuthMechanism::Gssapi),
+            #[cfg(not(feature = "gssapi-auth"))]
+            GSSAPI_STR => Err(ErrorKind::InvalidArgument {
+                message: "GSSAPI auth is only supported with the gssapi-auth feature flag".into(),
+            }
+            .into()),
             PLAIN_STR => Ok(AuthMechanism::Plain),
             MONGODB_OIDC_STR => Ok(AuthMechanism::MongoDbOidc),
             #[cfg(feature = "aws-auth")]
@@ -465,6 +498,7 @@ impl Credential {
         server_api: Option<&ServerApi>,
         first_round: Option<FirstRound>,
         #[cfg(feature = "aws-auth")] http_client: &crate::runtime::HttpClient,
+        #[cfg(feature = "gssapi-auth")] resolver_config: Option<&ResolverConfig>,
     ) -> Result<()> {
         let stream_description = conn.stream_description()?;
 
@@ -495,7 +529,6 @@ impl Credential {
             None => Cow::Owned(AuthMechanism::from_stream_description(stream_description)),
             Some(ref m) => Cow::Borrowed(m),
         };
-
         // Authenticate according to the chosen mechanism.
         mechanism
             .authenticate_stream(
@@ -504,6 +537,8 @@ impl Credential {
                 server_api,
                 #[cfg(feature = "aws-auth")]
                 http_client,
+                #[cfg(feature = "gssapi-auth")]
+                resolver_config,
             )
             .await
     }
