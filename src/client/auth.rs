@@ -16,7 +16,7 @@ mod x509;
 
 use std::{borrow::Cow, fmt::Debug, str::FromStr};
 
-use crate::{bson::RawDocumentBuf, bson_compat::cstr};
+use crate::{bson::RawDocumentBuf, bson_compat::cstr, options::ClientOptions};
 use derive_where::derive_where;
 use hmac::{digest::KeyInit, Mac};
 use rand::Rng;
@@ -287,12 +287,11 @@ impl AuthMechanism {
         &self,
         stream: &mut Connection,
         credential: &Credential,
-        server_api: Option<&ServerApi>,
-        #[cfg(feature = "aws-auth")] http_client: &crate::runtime::HttpClient,
-        #[cfg(feature = "gssapi-auth")] resolver_config: Option<&ResolverConfig>,
+        opts: &AuthOptions,
     ) -> Result<()> {
         self.validate_credential(credential)?;
 
+        let server_api = opts.server_api.as_ref();
         match self {
             AuthMechanism::ScramSha1 => {
                 ScramVersion::Sha1
@@ -309,14 +308,20 @@ impl AuthMechanism {
             }
             #[cfg(feature = "gssapi-auth")]
             AuthMechanism::Gssapi => {
-                gssapi::authenticate_stream(stream, credential, server_api, resolver_config).await
+                gssapi::authenticate_stream(
+                    stream,
+                    credential,
+                    server_api,
+                    opts.resolver_config.as_ref(),
+                )
+                .await
             }
             AuthMechanism::Plain => {
                 plain::authenticate_stream(stream, credential, server_api).await
             }
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => {
-                aws::authenticate_stream(stream, credential, server_api, http_client).await
+                aws::authenticate_stream(stream, credential, server_api, &opts.http_client).await
             }
             AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
                 message: "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM \
@@ -409,6 +414,28 @@ impl FromStr for AuthMechanism {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+// Auxiliary information needed by authentication mechanisms.
+pub(crate) struct AuthOptions {
+    server_api: Option<ServerApi>,
+    #[cfg(feature = "aws-auth")]
+    http_client: crate::runtime::HttpClient,
+    #[cfg(feature = "gssapi-auth")]
+    resolver_config: Option<ResolverConfig>,
+}
+
+impl From<&ClientOptions> for AuthOptions {
+    fn from(opts: &ClientOptions) -> Self {
+        Self {
+            server_api: opts.server_api.clone(),
+            #[cfg(feature = "aws-auth")]
+            http_client: crate::runtime::HttpClient::default(),
+            #[cfg(feature = "gssapi-auth")]
+            resolver_config: opts.resolver_config.clone(),
+        }
+    }
+}
+
 /// A struct containing authentication information.
 ///
 /// Some fields (mechanism and source) may be omitted and will either be negotiated or assigned a
@@ -495,10 +522,8 @@ impl Credential {
     pub(crate) async fn authenticate_stream(
         &self,
         conn: &mut Connection,
-        server_api: Option<&ServerApi>,
         first_round: Option<FirstRound>,
-        #[cfg(feature = "aws-auth")] http_client: &crate::runtime::HttpClient,
-        #[cfg(feature = "gssapi-auth")] resolver_config: Option<&ResolverConfig>,
+        opts: &AuthOptions,
     ) -> Result<()> {
         let stream_description = conn.stream_description()?;
 
@@ -513,14 +538,16 @@ impl Credential {
             return match first_round {
                 FirstRound::Scram(version, first_round) => {
                     version
-                        .authenticate_stream(conn, self, server_api, first_round)
+                        .authenticate_stream(conn, self, opts.server_api.as_ref(), first_round)
                         .await
                 }
                 FirstRound::X509(server_first) => {
-                    x509::authenticate_stream(conn, self, server_api, server_first).await
+                    x509::authenticate_stream(conn, self, opts.server_api.as_ref(), server_first)
+                        .await
                 }
                 FirstRound::Oidc(server_first) => {
-                    oidc::authenticate_stream(conn, self, server_api, server_first).await
+                    oidc::authenticate_stream(conn, self, opts.server_api.as_ref(), server_first)
+                        .await
                 }
             };
         }
@@ -530,17 +557,7 @@ impl Credential {
             Some(ref m) => Cow::Borrowed(m),
         };
         // Authenticate according to the chosen mechanism.
-        mechanism
-            .authenticate_stream(
-                conn,
-                self,
-                server_api,
-                #[cfg(feature = "aws-auth")]
-                http_client,
-                #[cfg(feature = "gssapi-auth")]
-                resolver_config,
-            )
-            .await
+        mechanism.authenticate_stream(conn, self, opts).await
     }
 
     #[cfg(test)]
