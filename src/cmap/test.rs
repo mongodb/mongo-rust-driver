@@ -4,7 +4,6 @@ mod integration;
 
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
-use rand::distributions::{Alphanumeric, DistString};
 use tokio::sync::{Mutex, RwLock};
 
 use self::file::{Operation, TestFile, ThreadedOperation};
@@ -523,10 +522,7 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
         );
     }
 
-    // Configuring FailPointMode::AlwaysOn for the "hello" failpoint makes it impossible to disable
-    // the failpoints set in this test. Using a random app name means that other tests, including
-    // subsequent runs of this one, will not be affected.
-    let app_name = Alphanumeric.sample_string(&mut rand::thread_rng(), 20);
+    let app_name = "pool_cleared_error_has_transient_transaction_error_label";
 
     let mut client_options = get_client_options().await.clone();
     if topology_is_sharded().await {
@@ -534,7 +530,7 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
     }
     client_options.connect_timeout = Some(Duration::from_millis(500));
     client_options.heartbeat_freq = Some(Duration::from_millis(500));
-    client_options.app_name = Some(app_name.clone());
+    client_options.app_name = Some(app_name.to_string());
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
@@ -545,13 +541,12 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
 
     let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
         .block_connection(Duration::from_secs(15))
-        .app_name(&app_name)
-        .skip_disabling();
+        .app_name(app_name);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-    let find_client = client.clone();
-    let find_handle = tokio::spawn(async move {
-        find_client
+    let insert_client = client.clone();
+    let insert_handle = tokio::spawn(async move {
+        insert_client
             .database("db")
             .collection("coll")
             .insert_one(doc! { "x": 1 })
@@ -566,11 +561,17 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
         FailPointMode::AlwaysOn,
     )
     .block_connection(Duration::from_millis(1500))
-    .app_name(&app_name)
-    .skip_disabling();
+    .app_name(app_name);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-    let find_error = find_handle.await.unwrap().unwrap_err();
-    assert!(find_error.is_pool_cleared(), "{:?}", find_error);
-    assert!(find_error.contains_label(TRANSIENT_TRANSACTION_ERROR));
+    let insert_error = insert_handle.await.unwrap().unwrap_err();
+    assert!(insert_error.is_pool_cleared(), "{:?}", insert_error);
+    assert!(insert_error.contains_label(TRANSIENT_TRANSACTION_ERROR));
+
+    let events = client.events.filter_map(|e| match e {
+        crate::test::Event::Command(ce) if ce.command_name() == "insert" => Some(e.clone()),
+        crate::test::Event::Cmap(_) => Some(e.clone()),
+        _ => None,
+    });
+    dbg!(events);
 }

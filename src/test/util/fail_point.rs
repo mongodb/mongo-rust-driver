@@ -6,7 +6,7 @@ use crate::{
     bson::{doc, Document},
     error::Result,
     selection_criteria::{ReadPreference, SelectionCriteria},
-    test::log_uncaptured,
+    test::{get_client_options, log_uncaptured},
     Client,
 };
 
@@ -26,7 +26,6 @@ impl Client {
             client: self.clone(),
             failure_type: fail_point.failure_type,
             selection_criteria: fail_point.selection_criteria,
-            skip_disabling: fail_point.skip_disabling,
         })
     }
 }
@@ -49,10 +48,6 @@ pub(crate) struct FailPoint {
     /// The selection criteria to use when configuring this fail point.
     #[serde(skip, default = "primary_selection_criteria")]
     selection_criteria: SelectionCriteria,
-
-    /// Whether to skip disabling this failpoint. Defaults to false.
-    #[serde(skip)]
-    skip_disabling: bool,
 }
 
 fn primary_selection_criteria() -> SelectionCriteria {
@@ -69,7 +64,6 @@ impl FailPoint {
             mode,
             data,
             selection_criteria: ReadPreference::Primary.into(),
-            skip_disabling: false,
         }
     }
 
@@ -124,11 +118,6 @@ impl FailPoint {
         self.selection_criteria = selection_criteria;
         self
     }
-
-    pub(crate) fn skip_disabling(mut self) -> Self {
-        self.skip_disabling = true;
-        self
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -147,15 +136,10 @@ pub(crate) struct FailPointGuard {
     client: Client,
     failure_type: String,
     selection_criteria: SelectionCriteria,
-    skip_disabling: bool,
 }
 
 impl Drop for FailPointGuard {
     fn drop(&mut self) {
-        if self.skip_disabling {
-            return;
-        }
-
         let client = self.client.clone();
 
         // This forces the Tokio runtime to not finish shutdown until this future has completed.
@@ -163,6 +147,16 @@ impl Drop for FailPointGuard {
         // multi-threaded runtime.
         let result = tokio::task::block_in_place(|| {
             futures::executor::block_on(async move {
+                let client = if client.options().app_name.is_some() {
+                    // Create a fresh client with no app name to avoid issues when disabling a
+                    // failpoint configured on the "hello" command.
+                    let mut options = client.options().clone();
+                    options.app_name = None;
+                    Client::for_test().options(options).await.into_client()
+                } else {
+                    client
+                };
+
                 client
                     .database("admin")
                     .run_command(
@@ -177,4 +171,28 @@ impl Drop for FailPointGuard {
             log_uncaptured(format!("failed disabling failpoint: {:?}", error));
         }
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_name_fail_point_is_disabled() {
+    let mut options = get_client_options().await.clone();
+    options.app_name = Some("abc".to_string());
+    let client = Client::for_test().options(options).await;
+
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn)
+        .app_name("abc")
+        .error_code(8);
+    let guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let collection = client
+        .database("db")
+        .collection::<crate::bson::Document>("coll");
+
+    collection.find(doc! {}).await.unwrap_err();
+    collection.find(doc! {}).await.unwrap_err();
+
+    drop(guard);
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    collection.find(doc! {}).await.unwrap();
 }
