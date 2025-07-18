@@ -4,12 +4,13 @@ mod integration;
 
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
+use rand::distributions::{Alphanumeric, DistString};
 use tokio::sync::{Mutex, RwLock};
 
 use self::file::{Operation, TestFile, ThreadedOperation};
 
 use crate::{
-    bson::{doc, Document},
+    bson::doc,
     cmap::{
         establish::{ConnectionEstablisher, EstablisherOptions},
         ConnectionPool,
@@ -522,18 +523,18 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
         );
     }
 
-    // The disableFailPoint commands may occasionally fail with ConnectionPoolCleared errors, so use
-    // an app name to ensure that other tests are not affected.
-    let app_name = "pool_cleared_error_has_transient_transaction_error_label";
+    // Configuring FailPointMode::AlwaysOn for the "hello" failpoint makes it impossible to disable
+    // the failpoints set in this test. Using a random app name means that other tests, including
+    // subsequent runs of this one, will not be affected.
+    let app_name = Alphanumeric.sample_string(&mut rand::thread_rng(), 20);
 
     let mut client_options = get_client_options().await.clone();
     if topology_is_sharded().await {
         client_options.hosts.drain(1..);
     }
-    client_options.retry_reads = Some(false);
     client_options.connect_timeout = Some(Duration::from_millis(500));
     client_options.heartbeat_freq = Some(Duration::from_millis(500));
-    client_options.app_name = Some(app_name.to_string());
+    client_options.app_name = Some(app_name.clone());
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
@@ -542,29 +543,31 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
     let mut session = client.start_session().await.unwrap();
     session.start_transaction().await.unwrap();
 
-    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
-        .block_connection(Duration::from_secs(30))
-        .app_name(app_name);
+    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
+        .block_connection(Duration::from_secs(15))
+        .app_name(&app_name)
+        .skip_disabling();
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let find_client = client.clone();
     let find_handle = tokio::spawn(async move {
         find_client
             .database("db")
-            .collection::<Document>("coll")
-            .find_one(doc! {})
+            .collection("coll")
+            .insert_one(doc! { "x": 1 })
             .session(&mut session)
             .await
     });
 
     let fail_point = FailPoint::fail_command(
         &["hello", LEGACY_HELLO_COMMAND_NAME],
-        // One or more of these failpoints may be encountered by an RTT hello rather than a server
-        // monitor.
-        FailPointMode::Times(4),
+        // The RTT hellos may encounter this failpoint, so use FailPointMode::AlwaysOn to ensure
+        // that the server monitors hit it as well.
+        FailPointMode::AlwaysOn,
     )
     .block_connection(Duration::from_millis(1500))
-    .app_name(app_name);
+    .app_name(&app_name)
+    .skip_disabling();
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let find_error = find_handle.await.unwrap().unwrap_err();

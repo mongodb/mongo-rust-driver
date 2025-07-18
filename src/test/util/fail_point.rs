@@ -26,6 +26,7 @@ impl Client {
             client: self.clone(),
             failure_type: fail_point.failure_type,
             selection_criteria: fail_point.selection_criteria,
+            skip_disabling: fail_point.skip_disabling,
         })
     }
 }
@@ -48,6 +49,10 @@ pub(crate) struct FailPoint {
     /// The selection criteria to use when configuring this fail point.
     #[serde(skip, default = "primary_selection_criteria")]
     selection_criteria: SelectionCriteria,
+
+    /// Whether to skip disabling this failpoint. Defaults to false.
+    #[serde(skip)]
+    skip_disabling: bool,
 }
 
 fn primary_selection_criteria() -> SelectionCriteria {
@@ -64,6 +69,7 @@ impl FailPoint {
             mode,
             data,
             selection_criteria: ReadPreference::Primary.into(),
+            skip_disabling: false,
         }
     }
 
@@ -118,6 +124,11 @@ impl FailPoint {
         self.selection_criteria = selection_criteria;
         self
     }
+
+    pub(crate) fn skip_disabling(mut self) -> Self {
+        self.skip_disabling = true;
+        self
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -136,10 +147,15 @@ pub(crate) struct FailPointGuard {
     client: Client,
     failure_type: String,
     selection_criteria: SelectionCriteria,
+    skip_disabling: bool,
 }
 
 impl Drop for FailPointGuard {
     fn drop(&mut self) {
+        if self.skip_disabling {
+            return;
+        }
+
         let client = self.client.clone();
 
         // This forces the Tokio runtime to not finish shutdown until this future has completed.
