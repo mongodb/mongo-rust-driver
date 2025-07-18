@@ -6,7 +6,7 @@ use crate::{
     bson::{doc, Document},
     error::Result,
     selection_criteria::{ReadPreference, SelectionCriteria},
-    test::log_uncaptured,
+    test::{fail_command_supported, get_client_options, log_uncaptured, topology_is_sharded},
     Client,
 };
 
@@ -147,6 +147,16 @@ impl Drop for FailPointGuard {
         // multi-threaded runtime.
         let result = tokio::task::block_in_place(|| {
             futures::executor::block_on(async move {
+                let client = if client.options().app_name.is_some() {
+                    // Create a fresh client with no app name to avoid issues when disabling a
+                    // failpoint configured on the "hello" command.
+                    let mut options = client.options().clone();
+                    options.app_name = None;
+                    Client::for_test().options(options).await.into_client()
+                } else {
+                    client
+                };
+
                 client
                     .database("admin")
                     .run_command(
@@ -161,4 +171,35 @@ impl Drop for FailPointGuard {
             log_uncaptured(format!("failed disabling failpoint: {:?}", error));
         }
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_name_fail_point_is_disabled() {
+    if !fail_command_supported().await {
+        return;
+    }
+
+    let mut options = get_client_options().await.clone();
+    options.app_name = Some("abc".to_string());
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
+    let client = Client::for_test().options(options).await;
+
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn)
+        .app_name("abc")
+        .error_code(8);
+    let guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let collection = client
+        .database("db")
+        .collection::<crate::bson::Document>("coll");
+
+    collection.find(doc! {}).await.unwrap_err();
+    collection.find(doc! {}).await.unwrap_err();
+
+    drop(guard);
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    collection.find(doc! {}).await.unwrap();
 }
