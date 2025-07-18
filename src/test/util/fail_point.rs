@@ -6,7 +6,7 @@ use crate::{
     bson::{doc, Document},
     error::Result,
     selection_criteria::{ReadPreference, SelectionCriteria},
-    test::{get_client_options, log_uncaptured},
+    test::{fail_command_supported, get_client_options, log_uncaptured},
     Client,
 };
 
@@ -175,6 +175,10 @@ impl Drop for FailPointGuard {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_name_fail_point_is_disabled() {
+    if !fail_command_supported().await {
+        return;
+    }
+
     let mut options = get_client_options().await.clone();
     options.app_name = Some("abc".to_string());
     let client = Client::for_test().options(options).await;
