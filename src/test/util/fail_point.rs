@@ -6,7 +6,7 @@ use crate::{
     bson::{doc, Document},
     error::Result,
     selection_criteria::{ReadPreference, SelectionCriteria},
-    test::{fail_command_supported, get_client_options, log_uncaptured},
+    test::{fail_command_supported, get_client_options, log_uncaptured, topology_is_sharded},
     Client,
 };
 
@@ -181,6 +181,9 @@ async fn app_name_fail_point_is_disabled() {
 
     let mut options = get_client_options().await.clone();
     options.app_name = Some("abc".to_string());
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
     let client = Client::for_test().options(options).await;
 
     let fail_point = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn)
