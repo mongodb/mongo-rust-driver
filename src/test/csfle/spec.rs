@@ -16,8 +16,16 @@ async fn run_unified() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn run_legacy() {
-    // TODO RUST-528: unskip this file
-    let mut skipped_files = vec!["timeoutMS.json"];
+    let mut skipped_files = vec![
+        // TODO RUST-528: unskip this file
+        "timeoutMS.json",
+        // These files have been migrated to unified tests.
+        // TODO DRIVERS-3178 remove these once the files are gone.
+        "fle2v2-BypassQueryAnalysis.json",
+        "fle2v2-EncryptedFields-vs-EncryptedFieldsMap.json",
+        "localSchema.json",
+        "maxWireVersion.json",
+    ];
     if cfg!(not(feature = "openssl-tls")) {
         skipped_files.push("kmipKMS.json");
     }

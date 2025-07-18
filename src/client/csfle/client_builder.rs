@@ -112,8 +112,7 @@ impl EncryptedClientBuilder {
     /// mongocryptd as part of `Client` initialization.
     pub async fn build(self) -> Result<Client> {
         let client = Client::with_options(self.client_options)?;
-        *client.inner.csfle.write().await =
-            Some(super::ClientState::new(&client, self.enc_opts).await?);
+        client.init_csfle(self.enc_opts).await?;
         Ok(client)
     }
 }

@@ -251,7 +251,6 @@ Then for each element in `tests`:
                 This MAY be configured system-wide.
             - `tlsCertificateKeyFile` (or equivalent) set to
                 [drivers-evergreen-tools/.evergreen/x509gen/client.pem](https://github.com/mongodb-labs/drivers-evergreen-tools/blob/master/.evergreen/x509gen/client.pem).
-                
 
             The method of passing TLS options for KMIP TLS connections is driver dependent.
     2. If `autoEncryptOpts` does not include `keyVaultNamespace`, default it to `keyvault.datakeys`.
@@ -317,7 +316,7 @@ mongocryptd is released alongside the server. mongocryptd is available in versio
 Drivers MUST run all tests with mongocryptd on at least one platform for all tested server versions.
 
 Drivers MUST run all tests with [crypt_shared](../client-side-encryption.md#crypt_shared) on at least one platform for
-all tested server versions. For server versions \< 6.0, drivers MUST test with the latest major release of
+all tested server versions. For server versions < 6.0, drivers MUST test with the latest major release of
 [crypt_shared](../client-side-encryption.md#crypt_shared). Using the latest major release of
 [crypt_shared](../client-side-encryption.md#crypt_shared) is supported with older server versions.
 
@@ -427,7 +426,6 @@ First, perform the setup.
         This MAY be configured system-wide.
     - `tlsCertificateKeyFile` (or equivalent) set to
         [drivers-evergreen-tools/.evergreen/x509gen/client.pem](https://github.com/mongodb-labs/drivers-evergreen-tools/blob/master/.evergreen/x509gen/client.pem).
-        
 
     The method of passing TLS options for KMIP TLS connections is driver dependent.
 
@@ -684,7 +682,6 @@ binary subtype 4 (or standard UUID), which MUST be decoded and encoded as subtyp
         This MAY be configured system-wide.
     - `tlsCertificateKeyFile` (or equivalent) set to
         [drivers-evergreen-tools/.evergreen/x509gen/client.pem](https://github.com/mongodb-labs/drivers-evergreen-tools/blob/master/.evergreen/x509gen/client.pem).
-        
 
     The method of passing TLS options for KMIP TLS connections is driver dependent.
 
@@ -811,7 +808,7 @@ Configure with KMS providers as follows:
          "endpoint": "doesnotexist.invalid:443"
       },
       "kmip": {
-         "endpoint": "doesnotexist.local:5698"
+         "endpoint": "doesnotexist.invalid:5698"
       }
 }
 ```
@@ -866,13 +863,12 @@ The method of passing TLS options for KMIP TLS connections is driver dependent.
     Expect this to succeed. Use the returned UUID of the key to explicitly encrypt and decrypt the string "test" to
     validate it works.
 
-4. Call `client_encryption.createDataKey()` with "aws" as the provider and the following masterKey:
+4. Call `client_encryption.createDataKey()` with "kmip" as the provider and the following masterKey:
 
     ```javascript
     {
-      region: "us-east-1",
-      key: "arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0",
-      endpoint: "kms.us-east-1.amazonaws.com:12345"
+      "keyId": "1",
+      "endpoint": "localhost:12345"
     }
     ```
 
@@ -961,7 +957,7 @@ The method of passing TLS options for KMIP TLS connections is driver dependent.
     validate it works.
 
     Call `client_encryption_invalid.createDataKey()` with the same masterKey. Expect this to fail with a network
-    exception indicating failure to resolve "doesnotexist.local".
+    exception indicating failure to resolve "doesnotexist.invalid".
 
 11. Call `client_encryption.createDataKey()` with "kmip" as the provider and the following masterKey:
 
@@ -980,11 +976,11 @@ The method of passing TLS options for KMIP TLS connections is driver dependent.
     ```javascript
     {
       "keyId": "1",
-      "endpoint": "doesnotexist.local:5698"
+      "endpoint": "doesnotexist.invalid:5698"
     }
     ```
 
-    Expect this to fail with a network exception indicating failure to resolve "doesnotexist.local".
+    Expect this to fail with a network exception indicating failure to resolve "doesnotexist.invalid".
 
 ### 8. Bypass Spawning mongocryptd
 
@@ -1448,7 +1444,6 @@ Four mock KMS server processes must be running:
 
 1. The mock
     [KMS HTTP server](https://github.com/mongodb-labs/drivers-evergreen-tools/blob/master/.evergreen/csfle/kms_http_server.py).
-    
 
     Run on port 9000 with
     [ca.pem](https://github.com/mongodb-labs/drivers-evergreen-tools/blob/master/.evergreen/x509gen/ca.pem) as a CA
@@ -1464,7 +1459,6 @@ Four mock KMS server processes must be running:
 
 2. The mock
     [KMS HTTP server](https://github.com/mongodb-labs/drivers-evergreen-tools/blob/master/.evergreen/csfle/kms_http_server.py).
-    
 
     Run on port 9001 with
     [ca.pem](https://github.com/mongodb-labs/drivers-evergreen-tools/blob/master/.evergreen/x509gen/ca.pem) as a CA
@@ -1480,7 +1474,6 @@ Four mock KMS server processes must be running:
 
 3. The mock
     [KMS HTTP server](https://github.com/mongodb-labs/drivers-evergreen-tools/blob/master/.evergreen/csfle/kms_http_server.py).
-    
 
     Run on port 9002 with
     [ca.pem](https://github.com/mongodb-labs/drivers-evergreen-tools/blob/master/.evergreen/x509gen/ca.pem) as a CA
@@ -1746,7 +1739,7 @@ Expect an error indicating TLS handshake failed due to an invalid hostname.
 Call `client_encryption_no_client_cert.createDataKey()` with "azure" as the provider and the following masterKey:
 
 ```javascript
-{ 'keyVaultEndpoint': 'doesnotexist.local', 'keyName': 'foo' }
+{ 'keyVaultEndpoint': 'doesnotexist.invalid', 'keyName': 'foo' }
 ```
 
 Expect an error indicating TLS handshake failed.
@@ -1858,7 +1851,7 @@ Call `client_encryption_with_names.createDataKey()` with "azure:no_client_cert" 
 masterKey:
 
 ```javascript
-{ 'keyVaultEndpoint': 'doesnotexist.local', 'keyName': 'foo' }
+{ 'keyVaultEndpoint': 'doesnotexist.invalid', 'keyName': 'foo' }
 ```
 
 Expect an error indicating TLS handshake failed.
@@ -3413,3 +3406,361 @@ Repeat this test with the `azure` and `gcp` masterKeys.
 2. Call `client_encryption.createDataKey()` with "aws" as the provider. Expect this to fail.
 
 Repeat this test with the `azure` and `gcp` masterKeys.
+
+### 25. Test $lookup
+
+All tests require libmongocrypt 1.13.0, server 7.0+, and must be skipped on standalone. Tests define more constraints.
+
+The syntax `<filename.json>` is used to refer to the content of the corresponding file in `../etc/data/lookup`.
+
+#### Setup
+
+Create an encrypted MongoClient named `encryptedClient` configured with:
+
+```python
+AutoEncryptionOpts(
+    keyVaultNamespace="db.keyvault",
+    kmsProviders={"local": { "key": "<base64 decoding of LOCAL_MASTERKEY>" }}
+)
+```
+
+Use `encryptedClient` to drop `db.keyvault`. Insert `<key-doc.json>` into `db.keyvault` with majority write concern.
+
+Use `encryptedClient` to drop and create the following collections:
+
+- `db.csfle` with options: `{ "validator": { "$jsonSchema": "<schema-csfle.json>"}}`.
+- `db.csfle2` with options: `{ "validator": { "$jsonSchema": "<schema-csfle2.json>"}}`.
+- `db.qe` with options: `{ "encryptedFields": "<schema-qe.json>"}`.
+- `db.qe2` with options: `{ "encryptedFields": "<schema-qe2.json>"}`.
+- `db.no_schema` with no options.
+- `db.no_schema2` with no options.
+
+Create an unencrypted MongoClient named `unencryptedClient`.
+
+Insert documents with `encryptedClient`:
+
+- `{"csfle": "csfle"}` into `db.csfle`
+    - Use `unencryptedClient` to retrieve it. Assert the `csfle` field is BSON binary.
+- `{"csfle2": "csfle2"}` into `db.csfle2`
+    - Use `unencryptedClient` to retrieve it. Assert the `csfle2` field is BSON binary.
+- `{"qe": "qe"}` into `db.qe`
+    - Use `unencryptedClient` to retrieve it. Assert the `qe` field is BSON binary.
+- `{"qe2": "qe2"}` into `db.qe2`
+    - Use `unencryptedClient` to retrieve it. Assert the `qe2` field is BSON binary.
+- `{"no_schema": "no_schema"}` into `db.no_schema`
+- `{"no_schema2": "no_schema2"}` into `db.no_schema2`
+
+#### Case 1: `db.csfle` joins `db.no_schema`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.csfle` with the following pipeline:
+
+```json
+[
+    {"$match" : {"csfle" : "csfle"}},
+    {
+        "$lookup" : {
+            "from" : "no_schema",
+            "as" : "matched",
+            "pipeline" : [ {"$match" : {"no_schema" : "no_schema"}}, {"$project" : {"_id" : 0}} ]
+        }
+    },
+    {"$project" : {"_id" : 0}}
+]
+```
+
+Expect one document to be returned matching: `{"csfle" : "csfle", "matched" : [ {"no_schema" : "no_schema"} ]}`.
+
+#### Case 2: `db.qe` joins `db.no_schema`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.qe` with the following pipeline:
+
+```json
+[
+    {"$match" : {"qe" : "qe"}},
+    {
+       "$lookup" : {
+          "from" : "no_schema",
+          "as" : "matched",
+          "pipeline" :
+             [ {"$match" : {"no_schema" : "no_schema"}}, {"$project" : {"_id" : 0, "__safeContent__" : 0}} ]
+       }
+    },
+    {"$project" : {"_id" : 0, "__safeContent__" : 0}}
+]
+```
+
+Expect one document to be returned matching: `{"qe" : "qe", "matched" : [ {"no_schema" : "no_schema"} ]}`.
+
+#### Case 3: `db.no_schema` joins `db.csfle`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.no_schema` with the following pipeline:
+
+```json
+[
+    {"$match" : {"no_schema" : "no_schema"}},
+    {
+        "$lookup" : {
+            "from" : "csfle",
+            "as" : "matched",
+            "pipeline" : [ {"$match" : {"csfle" : "csfle"}}, {"$project" : {"_id" : 0}} ]
+        }
+    },
+    {"$project" : {"_id" : 0}}
+]
+```
+
+Expect one document to be returned matching: `{"no_schema" : "no_schema", "matched" : [ {"csfle" : "csfle"} ]}`.
+
+#### Case 4: `db.no_schema` joins `db.qe`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.no_schema` with the following pipeline:
+
+```json
+[
+   {"$match" : {"no_schema" : "no_schema"}},
+   {
+      "$lookup" : {
+         "from" : "qe",
+         "as" : "matched",
+         "pipeline" : [ {"$match" : {"qe" : "qe"}}, {"$project" : {"_id" : 0, "__safeContent__" : 0}} ]
+      }
+   },
+   {"$project" : {"_id" : 0}}
+]
+```
+
+Expect one document to be returned matching: `{"no_schema" : "no_schema", "matched" : [ {"qe" : "qe"} ]}`.
+
+#### Case 5: `db.csfle` joins `db.csfle2`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.csfle` with the following pipeline:
+
+```json
+[
+   {"$match" : {"csfle" : "csfle"}},
+   {
+      "$lookup" : {
+         "from" : "csfle2",
+         "as" : "matched",
+         "pipeline" : [ {"$match" : {"csfle2" : "csfle2"}}, {"$project" : {"_id" : 0}} ]
+      }
+   },
+   {"$project" : {"_id" : 0}}
+]
+```
+
+Expect one document to be returned matching: `{"csfle" : "csfle", "matched" : [ {"csfle2" : "csfle2"} ]}`.
+
+#### Case 6: `db.qe` joins `db.qe2`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.qe` with the following pipeline:
+
+```json
+[
+   {"$match" : {"qe" : "qe"}},
+   {
+      "$lookup" : {
+         "from" : "qe2",
+         "as" : "matched",
+         "pipeline" : [ {"$match" : {"qe2" : "qe2"}}, {"$project" : {"_id" : 0, "__safeContent__" : 0}} ]
+      }
+   },
+   {"$project" : {"_id" : 0, "__safeContent__" : 0}}
+]
+```
+
+Expect one document to be returned matching: `{"qe" : "qe", "matched" : [ {"qe2" : "qe2"} ]}`.
+
+#### Case 7: `db.no_schema` joins `db.no_schema2`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.no_schema` with the following pipeline:
+
+```json
+[
+    {"$match" : {"no_schema" : "no_schema"}},
+    {
+        "$lookup" : {
+            "from" : "no_schema2",
+            "as" : "matched",
+            "pipeline" : [ {"$match" : {"no_schema2" : "no_schema2"}}, {"$project" : {"_id" : 0}} ]
+        }
+    },
+    {"$project" : {"_id" : 0}}
+]
+```
+
+Expect one document to be returned matching:
+`{"no_schema" : "no_schema", "matched" : [ {"no_schema2" : "no_schema2"} ]}`.
+
+#### Case 8: `db.csfle` joins `db.qe`
+
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.csfle` with the following pipeline:
+
+```json
+[
+    {"$match" : {"csfle" : "qe"}},
+    {
+        "$lookup" : {
+            "from" : "qe",
+            "as" : "matched",
+            "pipeline" : [ {"$match" : {"qe" : "qe"}}, {"$project" : {"_id" : 0}} ]
+        }
+    },
+    {"$project" : {"_id" : 0}}
+]
+```
+
+Expect an exception to be thrown with a message containing the substring `not supported`.
+
+#### Case 9: test error with \<8.1
+
+This case requires mongocryptd/crypt_shared \<8.1.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.csfle` with the following pipeline:
+
+```json
+[
+    {"$match" : {"csfle" : "csfle"}},
+    {
+        "$lookup" : {
+            "from" : "no_schema",
+            "as" : "matched",
+            "pipeline" : [ {"$match" : {"no_schema" : "no_schema"}}, {"$project" : {"_id" : 0}} ]
+        }
+    },
+    {"$project" : {"_id" : 0}}
+]
+```
+
+Expect an exception to be thrown with a message containing the substring `Upgrade`.
+
+### 26. Custom AWS Credentials
+
+These tests require valid AWS credentials for the remote KMS provider via the secrets manager (FLE_AWS_KEY and
+FLE_AWS_SECRET). These tests MUST NOT run inside an AWS environment that has the same credentials set in order to
+properly ensure the tests would fail using on-demand credentials.
+
+#### Case 1: ClientEncryption with `credentialProviders` and incorrect `kmsProviders`
+
+Create a MongoClient named `setupClient`.
+
+Create a [ClientEncryption](../client-side-encryption.md#clientencryption) object with the following options:
+
+```typescript
+class ClientEncryptionOpts {
+  keyVaultClient: <setupClient>,
+  keyVaultNamespace: "keyvault.datakeys",
+  kmsProviders: { "aws": { "accessKeyId": <set from secrets manager>, "secretAccessKey": <set from secrets manager> } },
+  credentialProviders: { "aws": <default provider from AWS SDK> }
+}
+```
+
+Assert that an error is thrown.
+
+#### Case 2: ClientEncryption with `credentialProviders` works
+
+Create a MongoClient named `setupClient`.
+
+Create a [ClientEncryption](../client-side-encryption.md#clientencryption) object with the following options:
+
+```typescript
+class ClientEncryptionOpts {
+  keyVaultClient: <setupClient>,
+  keyVaultNamespace: "keyvault.datakeys",
+  kmsProviders: { "aws": {} },
+  credentialProviders: { "aws": <object/function that returns valid credentials from the secrets manager> }
+}
+```
+
+Use the client encryption to create a datakey using the "aws" KMS provider. This should successfully load and use the
+AWS credentials that were provided by the secrets manager for the remote provider. Assert the datakey was created and
+that the custom credential provider was called at least once.
+
+An example of this in Node.js:
+
+```typescript
+import { ClientEncryption, MongoClient } from 'mongodb';
+
+let calledCount = 0;
+const masterKey = {
+  region: '<aws region>',
+  key: '<key for arn>'
+};
+const keyVaultClient = new MongoClient(process.env.MONGODB_URI);
+const options = {
+  keyVaultNamespace: 'keyvault.datakeys',
+  kmsProviders: { aws: {} },
+  credentialProviders: {
+    aws: async () => {
+      calledCount++;
+      return {
+        accessKeyId: process.env.FLE_AWS_KEY,
+        secretAccessKey: process.env.FLE_AWS_SECRET
+      };
+    }
+  }
+};
+const clientEncryption = new ClientEncryption(keyVaultClient, options);
+const dk = await clientEncryption.createDataKey('aws', { masterKey });
+expect(dk).to.be.a(Binary);
+expect(calledCount).to.be.greaterThan(0);
+```
+
+#### Case 3: `AutoEncryptionOpts` with `credentialProviders` and incorrect `kmsProviders`
+
+Create a `MongoClient` object with the following options:
+
+```typescript
+class AutoEncryptionOpts {
+  autoEncryption: {
+    keyVaultNamespace: "keyvault.datakeys",
+    kmsProviders: { "aws": { "accessKeyId": <set from secrets manager>, "secretAccessKey": <set from secrets manager> } },
+    credentialProviders: { "aws": <default provider from AWS SDK> }
+  }
+}
+```
+
+Assert that an error is thrown.
