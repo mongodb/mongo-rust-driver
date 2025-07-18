@@ -535,19 +535,18 @@ impl Credential {
         // If speculative authentication returned a response, then short-circuit the authentication
         // logic and use the first round from the handshake.
         if let Some(first_round) = first_round {
+            let server_api = opts.server_api.as_ref();
             return match first_round {
                 FirstRound::Scram(version, first_round) => {
                     version
-                        .authenticate_stream(conn, self, opts.server_api.as_ref(), first_round)
+                        .authenticate_stream(conn, self, server_api, first_round)
                         .await
                 }
                 FirstRound::X509(server_first) => {
-                    x509::authenticate_stream(conn, self, opts.server_api.as_ref(), server_first)
-                        .await
+                    x509::authenticate_stream(conn, self, server_api, server_first).await
                 }
                 FirstRound::Oidc(server_first) => {
-                    oidc::authenticate_stream(conn, self, opts.server_api.as_ref(), server_first)
-                        .await
+                    oidc::authenticate_stream(conn, self, server_api, server_first).await
                 }
             };
         }
