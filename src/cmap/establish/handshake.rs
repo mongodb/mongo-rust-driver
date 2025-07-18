@@ -6,6 +6,7 @@ use std::env;
 use crate::{
     bson::{rawdoc, RawBson, RawDocumentBuf},
     bson_compat::cstr,
+    options::ClientOptions,
 };
 use once_cell::sync::Lazy;
 use tokio::sync::broadcast;
@@ -545,6 +546,25 @@ pub(crate) struct HandshakerOptions {
     /// Configuration of the DNS resolver used for hostname canonicalization for GSSAPI.
     #[cfg(feature = "gssapi-auth")]
     pub(crate) resolver_config: Option<ResolverConfig>,
+}
+
+impl From<&ClientOptions> for HandshakerOptions {
+    fn from(opts: &ClientOptions) -> Self {
+        Self {
+            app_name: opts.app_name.clone(),
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
+            compressors: opts.compressors.clone(),
+            driver_info: opts.driver_info.clone(),
+            server_api: opts.server_api.clone(),
+            load_balanced: opts.load_balanced.unwrap_or(false),
+            #[cfg(feature = "gssapi-auth")]
+            resolver_config: opts.resolver_config.clone(),
+        }
+    }
 }
 
 /// Updates the handshake command document with the speculative authentication info.
