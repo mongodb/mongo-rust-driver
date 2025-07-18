@@ -567,11 +567,4 @@ async fn pool_cleared_error_has_transient_transaction_error_label() {
     let insert_error = insert_handle.await.unwrap().unwrap_err();
     assert!(insert_error.is_pool_cleared(), "{:?}", insert_error);
     assert!(insert_error.contains_label(TRANSIENT_TRANSACTION_ERROR));
-
-    let events = client.events.filter_map(|e| match e {
-        crate::test::Event::Command(ce) if ce.command_name() == "insert" => Some(e.clone()),
-        crate::test::Event::Cmap(_) => Some(e.clone()),
-        _ => None,
-    });
-    dbg!(events);
 }
