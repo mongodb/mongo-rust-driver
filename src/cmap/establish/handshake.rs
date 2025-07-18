@@ -6,6 +6,7 @@ use std::env;
 use crate::{
     bson::{rawdoc, RawBson, RawDocumentBuf},
     bson_compat::cstr,
+    options::{AuthOptions, ClientOptions},
 };
 use once_cell::sync::Lazy;
 use tokio::sync::broadcast;
@@ -16,8 +17,6 @@ use tokio::sync::broadcast;
     feature = "snappy-compression"
 ))]
 use crate::options::Compressor;
-#[cfg(feature = "gssapi-auth")]
-use crate::options::ResolverConfig;
 use crate::{
     client::auth::ClientFirst,
     cmap::{Command, Connection, StreamDescription},
@@ -338,15 +337,9 @@ pub(crate) struct Handshaker {
     ))]
     compressors: Option<Vec<Compressor>>,
 
-    server_api: Option<ServerApi>,
-
     metadata: ClientMetadata,
 
-    #[cfg(feature = "aws-auth")]
-    http_client: crate::runtime::HttpClient,
-
-    #[cfg(feature = "gssapi-auth")]
-    resolver_config: Option<ResolverConfig>,
+    auth_options: AuthOptions,
 }
 
 #[cfg(test)]
@@ -412,12 +405,8 @@ impl Handshaker {
                 feature = "snappy-compression"
             ))]
             compressors: options.compressors,
-            server_api: options.server_api,
             metadata,
-            #[cfg(feature = "aws-auth")]
-            http_client: crate::runtime::HttpClient::default(),
-            #[cfg(feature = "gssapi-auth")]
-            resolver_config: options.resolver_config,
+            auth_options: options.auth_options,
         })
     }
 
@@ -499,15 +488,7 @@ impl Handshaker {
 
         if let Some(credential) = credential {
             credential
-                .authenticate_stream(
-                    conn,
-                    self.server_api.as_ref(),
-                    first_round,
-                    #[cfg(feature = "aws-auth")]
-                    &self.http_client,
-                    #[cfg(feature = "gssapi-auth")]
-                    self.resolver_config.as_ref(),
-                )
+                .authenticate_stream(conn, first_round, &self.auth_options)
                 .await?
         }
 
@@ -542,9 +523,26 @@ pub(crate) struct HandshakerOptions {
     /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
     pub(crate) load_balanced: bool,
 
-    /// Configuration of the DNS resolver used for hostname canonicalization for GSSAPI.
-    #[cfg(feature = "gssapi-auth")]
-    pub(crate) resolver_config: Option<ResolverConfig>,
+    /// Auxiliary data for authentication mechanisms.
+    pub(crate) auth_options: AuthOptions,
+}
+
+impl From<&ClientOptions> for HandshakerOptions {
+    fn from(opts: &ClientOptions) -> Self {
+        Self {
+            app_name: opts.app_name.clone(),
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
+            compressors: opts.compressors.clone(),
+            driver_info: opts.driver_info.clone(),
+            server_api: opts.server_api.clone(),
+            load_balanced: opts.load_balanced.unwrap_or(false),
+            auth_options: AuthOptions::from(opts),
+        }
+    }
 }
 
 /// Updates the handshake command document with the speculative authentication info.
