@@ -1389,6 +1389,9 @@ functions:
           AWS_AUTH_TYPE: web-identity
 
   "run gssapi auth test":
+    - command: ec2.assume_role
+      params:
+        role_arn: ${aws_test_secrets_role}
     - command: subprocess.exec
       type: test
       params:
@@ -1397,6 +1400,10 @@ functions:
         args:
           - .evergreen/run-gssapi-tests.sh
         include_expansions_in_env:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - DRIVERS_TOOLS
           - PROJECT_DIRECTORY
 
   "run x509 tests":

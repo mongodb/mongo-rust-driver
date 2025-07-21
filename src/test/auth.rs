@@ -1,5 +1,7 @@
 #[cfg(feature = "aws-auth")]
 mod aws;
+#[cfg(feature = "gssapi-auth")]
+mod gssapi;
 
 use serde::Deserialize;
 
