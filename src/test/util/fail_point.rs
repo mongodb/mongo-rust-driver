@@ -147,6 +147,16 @@ impl Drop for FailPointGuard {
         // multi-threaded runtime.
         let result = tokio::task::block_in_place(|| {
             futures::executor::block_on(async move {
+                let client = if client.options().app_name.is_some() {
+                    // Create a fresh client with no app name to avoid issues when disabling a
+                    // failpoint configured on the "hello" command.
+                    let mut options = client.options().clone();
+                    options.app_name = None;
+                    Client::for_test().options(options).await.into_client()
+                } else {
+                    client
+                };
+
                 client
                     .database("admin")
                     .run_command(

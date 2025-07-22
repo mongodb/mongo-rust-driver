@@ -486,3 +486,74 @@ async fn cmap_spec_tests() {
     )
     .await;
 }
+
+// TODO RUST-2074: investigate why this test is flaky
+// #[tokio::test(flavor = "multi_thread")]
+// async fn pool_cleared_error_has_transient_transaction_error_label() {
+//     if !block_connection_supported().await {
+//         log_uncaptured(
+//             "skipping pool_cleared_error_has_transient_transaction_error_label: block connection
+// \              unsupported",
+//         );
+//         return;
+//     }
+//     if !transactions_supported().await {
+//         log_uncaptured(
+//             "skipping pool_cleared_error_has_transient_transaction_error_label: transactions \
+//              unsupported",
+//         );
+//         return;
+//     }
+//     if topology_is_load_balanced().await {
+//         log_uncaptured(
+//             "skipping pool_cleared_error_has_transient_transaction_error_label: load balanced \
+//              topology",
+//         );
+//     }
+
+//     let app_name = "pool_cleared_error_has_transient_transaction_error_label";
+
+//     let mut client_options = get_client_options().await.clone();
+//     if topology_is_sharded().await {
+//         client_options.hosts.drain(1..);
+//     }
+//     client_options.connect_timeout = Some(Duration::from_millis(500));
+//     client_options.heartbeat_freq = Some(Duration::from_millis(500));
+//     client_options.app_name = Some(app_name.to_string());
+//     let client = Client::for_test()
+//         .options(client_options)
+//         .monitor_events()
+//         .await;
+
+//     let mut session = client.start_session().await.unwrap();
+//     session.start_transaction().await.unwrap();
+
+//     let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
+//         .block_connection(Duration::from_secs(15))
+//         .app_name(app_name);
+//     let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+//     let insert_client = client.clone();
+//     let insert_handle = tokio::spawn(async move {
+//         insert_client
+//             .database("db")
+//             .collection("coll")
+//             .insert_one(doc! { "x": 1 })
+//             .session(&mut session)
+//             .await
+//     });
+
+//     let fail_point = FailPoint::fail_command(
+//         &["hello", LEGACY_HELLO_COMMAND_NAME],
+//         // The RTT hellos may encounter this failpoint, so use FailPointMode::AlwaysOn to ensure
+//         // that the server monitors hit it as well.
+//         FailPointMode::AlwaysOn,
+//     )
+//     .block_connection(Duration::from_millis(1500))
+//     .app_name(app_name);
+//     let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+//     let insert_error = insert_handle.await.unwrap().unwrap_err();
+//     assert!(insert_error.is_pool_cleared(), "{:?}", insert_error);
+//     assert!(insert_error.contains_label(TRANSIENT_TRANSACTION_ERROR));
+// }
