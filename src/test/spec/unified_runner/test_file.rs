@@ -20,6 +20,7 @@ use crate::{
         AuthMechanism,
         ClientOptions,
         CollectionOptions,
+        CreateCollectionOptions,
         DatabaseOptions,
         HedgedReadOptions,
         ReadConcern,
@@ -165,6 +166,7 @@ impl RunOnRequirement {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) enum TestFileEntity {
@@ -195,6 +197,8 @@ pub(crate) struct Client {
     #[cfg(feature = "tracing-unstable")]
     #[serde(default, deserialize_with = "deserialize_tracing_level_map")]
     pub(crate) observe_log_messages: Option<HashMap<String, tracing::Level>>,
+    #[cfg(feature = "in-use-encryption")]
+    pub(crate) auto_encrypt_opts: Option<AutoEncryptionOpts>,
 }
 
 impl Client {
@@ -292,6 +296,25 @@ pub(crate) fn merge_uri_options(
     }
 
     uri
+}
+
+#[cfg(feature = "in-use-encryption")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct AutoEncryptionOpts {
+    pub(crate) kms_providers: HashMap<mongocrypt::ctx::KmsProvider, Document>,
+    pub(crate) key_vault_namespace: crate::Namespace,
+    pub(crate) bypass_auto_encryption: Option<bool>,
+    pub(crate) schema_map: Option<HashMap<String, Document>>,
+    pub(crate) encrypted_fields_map: Option<HashMap<String, Document>>,
+    pub(crate) extra_options: Option<Document>,
+    pub(crate) bypass_query_analysis: Option<bool>,
+    #[serde(
+        default,
+        rename = "keyExpirationMS",
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis"
+    )]
+    pub(crate) key_cache_expiration: Option<Duration>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -397,6 +420,7 @@ pub(crate) struct CollectionData {
     pub(crate) collection_name: String,
     pub(crate) database_name: String,
     pub(crate) documents: Vec<Document>,
+    pub(crate) create_options: Option<CreateCollectionOptions>,
 }
 
 #[derive(Debug, Deserialize)]
