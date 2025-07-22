@@ -162,10 +162,8 @@ impl Executor {
 
         let pool = ConnectionPool::new(
             get_client_options().await.hosts[0].clone(),
-            ConnectionEstablisher::new(EstablisherOptions::from_client_options(
-                get_client_options().await,
-            ))
-            .unwrap(),
+            ConnectionEstablisher::new(EstablisherOptions::from(get_client_options().await))
+                .unwrap(),
             updater,
             crate::bson::oid::ObjectId::new(),
             Some(self.pool_options),
