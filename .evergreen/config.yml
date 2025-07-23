@@ -258,10 +258,18 @@ buildvariants:
     batchtime: 20160
 
   - name: gssapi-auth
-    display_name: "GSSAPI Authentication"
+    display_name: "GSSAPI Authentication - Linux"
     patchable: true
     run_on:
-      - ubuntu2004-small
+      - ubuntu2204-small
+    tasks:
+      - test-gssapi-auth
+
+  - name: gssapi-auth
+    display_name: "GSSAPI Authentication - macOS"
+    patchable: true
+    run_on:
+      - macos-14
     tasks:
       - test-gssapi-auth
 
