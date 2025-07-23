@@ -1,9 +1,9 @@
 use std::{fs::File, io::Read, time::Duration};
 
 // Note: Uncomment the following lines for AWS SDK for authentication
-// use aws_config::BehaviorVersion;
-// use aws_credential_types::provider::ProvideCredentials;
-// use aws_types::sdk_config::SharedCredentialsProvider;
+use aws_config::BehaviorVersion;
+use aws_credential_types::provider::ProvideCredentials;
+use aws_types::sdk_config::SharedCredentialsProvider;
 use chrono::{offset::Utc, DateTime};
 use hmac::Hmac;
 use once_cell::sync::Lazy;
@@ -111,29 +111,21 @@ async fn authenticate_stream_inner(
         )
     } else {
         // If credentials are not provided in the URI, use the AWS SDK to load
-        // Note: Untested but compiles
-        // let creds = aws_config::load_defaults(BehaviorVersion::latest())
-        //     .await
-        //     .credentials_provider()
-        //     .expect("no credential provider configured")
-        //     .provide_credentials()
-        //     .await
-        //     .map_err(|e| {
-        //         Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
-        //     })?;
-        // AwsCredential::from_sdk_creds(
-        //     creds.access_key_id().to_string(),
-        //     creds.secret_access_key().to_string(),
-        //     creds.session_token().map(|s| s.to_string()),
-        //     None,
-        // )
-
-        // For now, throw an error
-        return Err(Error::authentication_error(
-            MECH_NAME,
-            "Credentials must be provided in the MongoDB URI - methods supported by the AWS SDK \
-             are not yet tested",
-        ));
+        let creds = aws_config::load_defaults(BehaviorVersion::latest())
+            .await
+            .credentials_provider()
+            .expect("no credential provider configured")
+            .provide_credentials()
+            .await
+            .map_err(|e| {
+                Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
+            })?;
+        AwsCredential::from_sdk_creds(
+            creds.access_key_id().to_string(),
+            creds.secret_access_key().to_string(),
+            creds.session_token().map(|s| s.to_string()),
+            None,
+        )
     };
     #[cfg(not(feature = "aws-sdk-auth"))]
     let aws_credential = {
