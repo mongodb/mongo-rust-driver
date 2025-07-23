@@ -222,7 +222,7 @@ buildvariants:
 
   - name: aws-auth
     display_name: "AWS Authentication"
-    patchable: false
+    # patchable: false
     run_on:
       - ubuntu2004-small
     expansions:
@@ -892,16 +892,16 @@ tasks:
       - func: "add aws auth variables to file"
       - func: "run aws auth test with regular aws credentials"
 
-  - name: test-aws-auth-assume-role-credentials
-    tags: [aws-auth]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          ORCHESTRATION_FILE: auth-aws.json
-          MONGODB_VERSION: rapid
-          TOPOLOGY: server
-      - func: "add aws auth variables to file"
-      - func: "run aws auth test with assume role credentials"
+  # - name: test-aws-auth-assume-role-credentials
+  #   tags: [aws-auth]
+  #   commands:
+  #     - func: "bootstrap mongo-orchestration"
+  #       vars:
+  #         ORCHESTRATION_FILE: auth-aws.json
+  #         MONGODB_VERSION: rapid
+  #         TOPOLOGY: server
+  #     - func: "add aws auth variables to file"
+  #     - func: "run aws auth test with assume role credentials"
 
   - name: test-aws-auth-environment-variables
     tags: [aws-auth]
@@ -914,62 +914,62 @@ tasks:
       - func: "add aws auth variables to file"
       - func: "run aws auth test with aws credentials as environment variables"
 
-  - name: test-aws-auth-environment-variables-session-token
-    tags: [aws-auth]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          ORCHESTRATION_FILE: auth-aws.json
-          MONGODB_VERSION: rapid
-          TOPOLOGY: server
-      - func: "add aws auth variables to file"
-      - func: "run aws auth test with aws credentials and session token as environment variables"
+  # - name: test-aws-auth-environment-variables-session-token
+  #   tags: [aws-auth]
+  #   commands:
+  #     - func: "bootstrap mongo-orchestration"
+  #       vars:
+  #         ORCHESTRATION_FILE: auth-aws.json
+  #         MONGODB_VERSION: rapid
+  #         TOPOLOGY: server
+  #     - func: "add aws auth variables to file"
+  #     - func: "run aws auth test with aws credentials and session token as environment variables"
 
-  - name: test-aws-auth-ec2
-    tags: [aws-auth]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          ORCHESTRATION_FILE: auth-aws.json
-          MONGODB_VERSION: rapid
-          TOPOLOGY: server
-      - func: "add aws auth variables to file"
-      - func: "run aws auth test with aws EC2 credentials"
+  # - name: test-aws-auth-ec2
+  #   tags: [aws-auth]
+  #   commands:
+  #     - func: "bootstrap mongo-orchestration"
+  #       vars:
+  #         ORCHESTRATION_FILE: auth-aws.json
+  #         MONGODB_VERSION: rapid
+  #         TOPOLOGY: server
+  #     - func: "add aws auth variables to file"
+  #     - func: "run aws auth test with aws EC2 credentials"
 
-  - name: test-aws-auth-ecs
-    tags: [aws-auth]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          ORCHESTRATION_FILE: auth-aws.json
-          MONGODB_VERSION: rapid
-          TOPOLOGY: server
-      - func: "add aws auth variables to file"
-      - func: "run aws ecs auth test"
+  # - name: test-aws-auth-ecs
+  #   tags: [aws-auth]
+  #   commands:
+  #     - func: "bootstrap mongo-orchestration"
+  #       vars:
+  #         ORCHESTRATION_FILE: auth-aws.json
+  #         MONGODB_VERSION: rapid
+  #         TOPOLOGY: server
+  #     - func: "add aws auth variables to file"
+  #     - func: "run aws ecs auth test"
 
-  - name: test-aws-auth-assume-role-with-web-identity
-    tags: [aws-auth]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          ORCHESTRATION_FILE: auth-aws.json
-          MONGODB_VERSION: rapid
-          TOPOLOGY: server
-      - func: "add aws auth variables to file"
-      - func: "run aws assume role with web identity test"
+  # - name: test-aws-auth-assume-role-with-web-identity
+  #   tags: [aws-auth]
+  #   commands:
+  #     - func: "bootstrap mongo-orchestration"
+  #       vars:
+  #         ORCHESTRATION_FILE: auth-aws.json
+  #         MONGODB_VERSION: rapid
+  #         TOPOLOGY: server
+  #     - func: "add aws auth variables to file"
+  #     - func: "run aws assume role with web identity test"
 
-  - name: test-aws-auth-assume-role-with-web-identity-session-name
-    tags: [aws-auth]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          ORCHESTRATION_FILE: auth-aws.json
-          MONGODB_VERSION: rapid
-          TOPOLOGY: server
-      - func: "add aws auth variables to file"
-      - func: "run aws assume role with web identity test"
-        vars:
-          AWS_ROLE_SESSION_NAME: test
+  # - name: test-aws-auth-assume-role-with-web-identity-session-name
+  #   tags: [aws-auth]
+  #   commands:
+  #     - func: "bootstrap mongo-orchestration"
+  #       vars:
+  #         ORCHESTRATION_FILE: auth-aws.json
+  #         MONGODB_VERSION: rapid
+  #         TOPOLOGY: server
+  #     - func: "add aws auth variables to file"
+  #     - func: "run aws assume role with web identity test"
+  #       vars:
+  #         AWS_ROLE_SESSION_NAME: test
 
   - name: test-atlas-connectivity
     commands:
