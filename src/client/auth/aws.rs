@@ -1,15 +1,17 @@
-use std::{fs::File, io::Read, time::Duration};
-
-// Note: Uncomment the following lines for AWS SDK for authentication
+#[cfg(feature = "aws-sdk-auth")]
 use aws_config::BehaviorVersion;
+#[cfg(feature = "aws-sdk-auth")]
 use aws_credential_types::provider::ProvideCredentials;
+#[cfg(feature = "aws-sdk-auth")]
 use aws_types::sdk_config::SharedCredentialsProvider;
+
 use chrono::{offset::Utc, DateTime};
 use hmac::Hmac;
 use once_cell::sync::Lazy;
 use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use std::{fs::File, io::Read, time::Duration};
 use tokio::sync::Mutex;
 
 use crate::{
