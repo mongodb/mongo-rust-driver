@@ -44,6 +44,10 @@ cert-key-password = ["dep:pem", "dep:pkcs8"]
 # This can only be used with the tokio-runtime feature flag.
 aws-auth = ["dep:reqwest"]
 
+# Enable support AWS SDK for authentication.
+# This can only be used with the tokio-runtime and aws-auth feature flags.
+aws-sdk-auth = ["dep:reqwest"]
+
 # Enable support for on-demand Azure KMS credentials.
 # This can only be used with the tokio-runtime feature flag.
 azure-kms = ["dep:reqwest"]
@@ -120,6 +124,9 @@ webpki-roots = "0.26"
 zstd = { version = "0.11.2", optional = true }
 macro_magic = "0.5.1"
 rustversion = "1.0.20"
+aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }
+aws-credential-types = "1.2.4"
+aws-types = "1.3.7"
 
 [dependencies.bson2]
 git = "https://github.com/mongodb/bson-rust"

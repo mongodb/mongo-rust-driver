@@ -1,5 +1,9 @@
 use std::{fs::File, io::Read, time::Duration};
 
+// Note: Uncomment the following lines for AWS SDK for authentication
+// use aws_config::BehaviorVersion;
+// use aws_credential_types::provider::ProvideCredentials;
+// use aws_types::sdk_config::SharedCredentialsProvider;
 use chrono::{offset::Utc, DateTime};
 use hmac::Hmac;
 use once_cell::sync::Lazy;
@@ -90,6 +94,48 @@ async fn authenticate_stream_inner(
     let server_first = ServerFirst::parse(server_first_response.auth_response_body(MECH_NAME)?)?;
     server_first.validate(&nonce)?;
 
+    #[cfg(feature = "aws-sdk-auth")]
+    let aws_credential = if let (Some(access_key), Some(secret_key)) =
+        (&credential.username, &credential.password)
+    {
+        // Look for credentials in the MongoDB URI
+        AwsCredential::from_sdk_creds(
+            access_key.clone(),
+            secret_key.clone(),
+            credential
+                .mechanism_properties
+                .as_ref()
+                .and_then(|mp| mp.get_str("AWS_SESSION_TOKEN").ok())
+                .map(str::to_owned),
+            None,
+        )
+    } else {
+        // If credentials are not provided in the URI, use the AWS SDK to load
+        // Note: Untested but compiles
+        // let creds = aws_config::load_defaults(BehaviorVersion::latest())
+        //     .await
+        //     .credentials_provider()
+        //     .expect("no credential provider configured")
+        //     .provide_credentials()
+        //     .await
+        //     .map_err(|e| {
+        //         Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
+        //     })?;
+        // AwsCredential::from_sdk_creds(
+        //     creds.access_key_id().to_string(),
+        //     creds.secret_access_key().to_string(),
+        //     creds.session_token().map(|s| s.to_string()),
+        //     None,
+        // )
+
+        // For now, throw an error
+        return Err(Error::authentication_error(
+            MECH_NAME,
+            "Credentials must be provided in the MongoDB URI - methods supported by the AWS SDK \
+             are not yet tested",
+        ));
+    };
+    #[cfg(not(feature = "aws-sdk-auth"))]
     let aws_credential = {
         // Limit scope of this variable to avoid holding onto the lock for the duration of
         // authenticate_stream.
@@ -243,6 +289,20 @@ impl AwsCredential {
             Self::get_from_ecs(relative_uri, http_client).await
         } else {
             Self::get_from_ec2(http_client).await
+        }
+    }
+
+    fn from_sdk_creds(
+        access_key_id: String,
+        secret_access_key: String,
+        session_token: Option<String>,
+        expiration: Option<crate::bson::DateTime>,
+    ) -> Self {
+        Self {
+            access_key_id,
+            secret_access_key,
+            session_token,
+            expiration,
         }
     }
 
