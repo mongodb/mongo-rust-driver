@@ -73,9 +73,11 @@ test_gssapi_auth!(
 
 test_gssapi_auth!(
     with_service_realm_and_host_options,
-    user_principal = "PRINCIPAL_CROSS",
+    user_principal = "PRINCIPAL_CROSS", // Use the cross-realm USER principal
     auth_mechanism_properties = {
-        let service_realm = std::env::var("SASL_REALM_CROSS").expect("SASL_REALM_CROSS not set");
+        // However, the SERVICE principal is not cross-realm, hence the use of
+        // SASL_REALM instead of SASL_REALM_CROSS.
+        let service_realm = std::env::var("SASL_REALM").expect("SASL_REALM not set");
         let service_host = std::env::var("SASL_HOST").expect("SASL_HOST not set");
         format!("SERVICE_REALM:{service_realm},SERVICE_HOST:{service_host}").as_str()
     },
