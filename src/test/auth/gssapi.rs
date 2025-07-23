@@ -36,7 +36,7 @@ macro_rules! test_gssapi_auth {
             match doc {
                 Ok(Some(doc)) => {
                     assert!(
-                        doc.get_bool(gssapi_db).unwrap(),
+                        doc.get_bool(&gssapi_db).unwrap(),
                         "expected '{gssapi_db}' field to exist and be 'true'"
                     );
                     assert_eq!(
