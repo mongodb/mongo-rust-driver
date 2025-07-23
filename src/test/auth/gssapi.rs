@@ -8,7 +8,7 @@ use crate::{
 ///   - user_principal is the name of the environment variable that stores the user principal
 ///   - auth_mechanism_properties is an optional set of authMechanismProperties to append to the uri
 macro_rules! test_gssapi_auth {
-    ($test_name:ident, user_principal = $user_principal:expr, $(auth_mechanism_properties = $auth_mechanism_properties:expr,)?) => {
+    ($test_name:ident, user_principal = $user_principal:expr, gssapi_db = $gssapi_db:expr, $(auth_mechanism_properties = $auth_mechanism_properties:expr,)?) => {
         #[tokio::test]
         async fn $test_name() {
             // Get env variables
@@ -16,7 +16,8 @@ macro_rules! test_gssapi_auth {
             let user_principal = std::env::var($user_principal)
                 .expect(format!("{} not set", $user_principal).as_str())
                 .replace("@", "%40");
-            let gssapi_db = std::env::var("GSSAPI_DB").expect("GSSAPI_DB not set");
+            let gssapi_db = std::env::var($gssapi_db)
+                .expect(format!("{} not set", $gssapi_db).as_str());
 
             // Optionally create authMechanismProperties
             #[allow(unused_mut, unused_assignments)]
@@ -51,29 +52,39 @@ macro_rules! test_gssapi_auth {
     };
 }
 
-test_gssapi_auth!(no_options, user_principal = "PRINCIPAL",);
+test_gssapi_auth!(
+    no_options,
+    user_principal = "PRINCIPAL",
+    gssapi_db = "GSSAPI_DB",
+);
 
 test_gssapi_auth!(
     explicit_canonicalize_host_name_false,
     user_principal = "PRINCIPAL",
+    gssapi_db = "GSSAPI_DB",
     auth_mechanism_properties = "CANONICALIZE_HOST_NAME:false",
 );
 
 test_gssapi_auth!(
     canonicalize_host_name_forward,
     user_principal = "PRINCIPAL",
+    gssapi_db = "GSSAPI_DB",
     auth_mechanism_properties = "CANONICALIZE_HOST_NAME:forward",
 );
 
 test_gssapi_auth!(
     canonicalize_host_name_forward_and_reverse,
     user_principal = "PRINCIPAL",
+    gssapi_db = "GSSAPI_DB",
     auth_mechanism_properties = "CANONICALIZE_HOST_NAME:forwardAndReverse",
 );
 
 test_gssapi_auth!(
     with_service_realm_and_host_options,
-    user_principal = "PRINCIPAL_CROSS", // Use the cross-realm USER principal
+    // Use the cross-realm USER principal
+    user_principal = "PRINCIPAL_CROSS",
+    // The cross-realm user is only authorized on the cross-realm db
+    gssapi_db = "GSSAPI_DB_CROSS",
     auth_mechanism_properties = {
         // However, the SERVICE principal is not cross-realm, hence the use of
         // SASL_REALM instead of SASL_REALM_CROSS.
