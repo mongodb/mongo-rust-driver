@@ -257,7 +257,7 @@ buildvariants:
     # Limit the test to only schedule every 14 days to reduce external resource usage.
     batchtime: 20160
 
-  - name: gssapi-auth
+  - name: gssapi-auth-linux
     display_name: "GSSAPI Authentication - Linux"
     patchable: true
     run_on:
@@ -265,7 +265,7 @@ buildvariants:
     tasks:
       - test-gssapi-auth
 
-  - name: gssapi-auth
+  - name: gssapi-auth-macos
     display_name: "GSSAPI Authentication - macOS"
     patchable: true
     run_on:
