@@ -1,13 +1,40 @@
-use crate::bson::RawBson;
+#[cfg(feature = "bson-3")]
+pub(crate) type CStr = crate::bson::raw::CStr;
+#[cfg(feature = "bson-3")]
+pub(crate) type CString = crate::bson::raw::CString;
+#[cfg(feature = "bson-3")]
+pub(crate) use crate::bson::raw::cstr;
+
+#[cfg(not(feature = "bson-3"))]
+pub(crate) type CStr = str;
+#[cfg(not(feature = "bson-3"))]
+pub(crate) type CString = String;
+#[cfg(not(feature = "bson-3"))]
+macro_rules! cstr {
+    ($text:literal) => {
+        $text
+    };
+}
+#[cfg(not(feature = "bson-3"))]
+pub(crate) use cstr;
+
+pub(crate) fn cstr_to_str(cs: &CStr) -> &str {
+    #[cfg(feature = "bson-3")]
+    {
+        cs.as_str()
+    }
+    #[cfg(not(feature = "bson-3"))]
+    {
+        cs
+    }
+}
 
 pub(crate) trait RawDocumentBufExt: Sized {
-    fn append_err(&mut self, key: impl AsRef<str>, value: impl Into<RawBson>) -> RawResult<()>;
-
-    fn append_ref_err<'a>(
+    fn append_ref_compat<'a>(
         &mut self,
-        key: impl AsRef<str>,
-        value: impl Into<crate::bson::raw::RawBsonRef<'a>>,
-    ) -> RawResult<()>;
+        key: impl AsRef<CStr>,
+        value: impl Into<crate::bson::raw::RawBsonRef<'a>> + 'a,
+    );
 
     #[cfg(not(feature = "bson-3"))]
     fn decode_from_bytes(data: Vec<u8>) -> RawResult<Self>;
@@ -15,67 +42,27 @@ pub(crate) trait RawDocumentBufExt: Sized {
 
 #[cfg(feature = "bson-3")]
 impl RawDocumentBufExt for crate::bson::RawDocumentBuf {
-    fn append_err(&mut self, key: impl AsRef<str>, value: impl Into<RawBson>) -> RawResult<()> {
-        self.append(key, value.into())
-    }
-
-    fn append_ref_err<'a>(
+    fn append_ref_compat<'a>(
         &mut self,
-        key: impl AsRef<str>,
-        value: impl Into<crate::bson::raw::RawBsonRef<'a>>,
-    ) -> RawResult<()> {
-        self.append(key, value)
+        key: impl AsRef<CStr>,
+        value: impl Into<crate::bson::raw::RawBsonRef<'a>> + 'a,
+    ) {
+        self.append(key, value);
     }
 }
 
 #[cfg(not(feature = "bson-3"))]
 impl RawDocumentBufExt for crate::bson::RawDocumentBuf {
-    fn append_err(&mut self, key: impl AsRef<str>, value: impl Into<RawBson>) -> RawResult<()> {
-        self.append(key, value);
-        Ok(())
-    }
-
-    fn append_ref_err<'a>(
+    fn append_ref_compat<'a>(
         &mut self,
-        key: impl AsRef<str>,
+        key: impl AsRef<CStr>,
         value: impl Into<crate::bson::raw::RawBsonRef<'a>>,
-    ) -> RawResult<()> {
-        self.append_ref(key, value);
-        Ok(())
+    ) {
+        self.append_ref(key, value)
     }
 
     fn decode_from_bytes(data: Vec<u8>) -> RawResult<Self> {
         Self::from_bytes(data)
-    }
-}
-
-pub(crate) trait RawArrayBufExt: Sized {
-    #[allow(dead_code)]
-    fn from_iter_err<V: Into<RawBson>, I: IntoIterator<Item = V>>(iter: I) -> RawResult<Self>;
-
-    fn push_err(&mut self, value: impl Into<RawBson>) -> RawResult<()>;
-}
-
-#[cfg(feature = "bson-3")]
-impl RawArrayBufExt for crate::bson::RawArrayBuf {
-    fn from_iter_err<V: Into<RawBson>, I: IntoIterator<Item = V>>(iter: I) -> RawResult<Self> {
-        Self::from_iter(iter.into_iter().map(|v| v.into()))
-    }
-
-    fn push_err(&mut self, value: impl Into<RawBson>) -> RawResult<()> {
-        self.push(value.into())
-    }
-}
-
-#[cfg(not(feature = "bson-3"))]
-impl RawArrayBufExt for crate::bson::RawArrayBuf {
-    fn from_iter_err<V: Into<RawBson>, I: IntoIterator<Item = V>>(iter: I) -> RawResult<Self> {
-        Ok(Self::from_iter(iter))
-    }
-
-    fn push_err(&mut self, value: impl Into<RawBson>) -> RawResult<()> {
-        self.push(value);
-        Ok(())
     }
 }
 
@@ -110,6 +97,7 @@ macro_rules! use_either {
     ($($name:ident => $path3:path | $path2:path);+;) => {
         $(
             #[cfg(feature = "bson-3")]
+            #[allow(unused_imports)]
             pub(crate) use crate::bson::{$path3 as $name};
 
             #[cfg(not(feature = "bson-3"))]
@@ -123,6 +111,8 @@ macro_rules! use_either {
 use_either! {
     RawResult                       => error::Result                    | raw::Result;
     RawError                        => error::Error                     | raw::Error;
+    DeError                         => error::Error                     | de::Error;
+    SerError                        => error::Error                     | ser::Error;
     serialize_to_raw_document_buf   => serialize_to_raw_document_buf    | to_raw_document_buf;
     serialize_to_document           => serialize_to_document            | to_document;
     serialize_to_bson               => serialize_to_bson                | to_bson;

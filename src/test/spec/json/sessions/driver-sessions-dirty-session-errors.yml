@@ -164,7 +164,7 @@ tests:
                 findAndModify: *collection0Name
                 query: { _id: 1 }
                 update: { $inc: { x: 1 } }
-                new: false
+                new: { $$unsetOrMatches: false }
                 lsid: { $$sessionLsid: *session0 }
                 txnNumber: 1
                 readConcern: { $$exists: false }
@@ -255,7 +255,7 @@ tests:
                 findAndModify: *collection0Name
                 query: { _id: 1 }
                 update: { $inc: { x: 1 } }
-                new: false
+                new: { $$unsetOrMatches: false }
                 lsid: { $$type: object }
                 txnNumber: 1
                 readConcern: { $$exists: false }

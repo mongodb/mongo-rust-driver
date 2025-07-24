@@ -19,7 +19,7 @@ use tokio::sync::RwLock;
 
 use crate::{
     bson::{Bson, Document},
-    bson_compat::RawDocumentBufExt as _,
+    bson_compat::cstr,
     client::{
         auth::{
             self,
@@ -461,7 +461,7 @@ impl ClientFirst {
         let mut cmd = sasl_start.into_command()?;
 
         if self.include_db {
-            cmd.body.append_err("db", self.source.clone())?;
+            cmd.body.append(cstr!("db"), self.source.clone());
         }
 
         Ok(cmd)

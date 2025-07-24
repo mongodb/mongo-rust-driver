@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, rawdoc, Document, RawArrayBuf, RawBson, RawDocumentBuf},
-    bson_compat::{RawArrayBufExt as _, RawDocumentBufExt as _},
+    bson_compat::{cstr, CStr, RawDocumentBufExt as _},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{convert_insert_many_error, Result},
@@ -21,21 +21,21 @@ pub(crate) enum UpdateOrReplace {
 }
 
 impl UpdateOrReplace {
-    pub(crate) fn append_to_rawdoc(&self, doc: &mut RawDocumentBuf, key: &str) -> Result<()> {
+    pub(crate) fn append_to_rawdoc(&self, doc: &mut RawDocumentBuf, key: &CStr) -> Result<()> {
         match self {
             Self::UpdateModifications(update_modifications) => match update_modifications {
                 UpdateModifications::Document(document) => {
                     let raw = RawDocumentBuf::from_document(document)?;
-                    doc.append_err(key, raw)?;
+                    doc.append(key, raw);
                 }
                 UpdateModifications::Pipeline(pipeline) => {
                     let raw = bson_util::to_raw_bson_array(pipeline)?;
-                    doc.append_err(key, raw)?;
+                    doc.append(key, raw);
                 }
             },
             Self::Replacement(replacement_doc) => {
                 bson_util::replacement_raw_document_check(replacement_doc)?;
-                doc.append_ref_err(key, replacement_doc)?;
+                doc.append_ref_compat(key, replacement_doc);
             }
         }
 
@@ -95,7 +95,7 @@ impl Update {
 impl OperationWithDefaults for Update {
     type O = UpdateResult;
 
-    const NAME: &'static str = "update";
+    const NAME: &'static CStr = cstr!("update");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
@@ -105,71 +105,70 @@ impl OperationWithDefaults for Update {
         let mut update = rawdoc! {
             "q": RawDocumentBuf::from_document(&self.filter)?,
         };
-        self.update.append_to_rawdoc(&mut update, "u")?;
+        self.update.append_to_rawdoc(&mut update, cstr!("u"))?;
 
         if let Some(ref options) = self.options {
             if let Some(upsert) = options.upsert {
-                update.append_err("upsert", upsert)?;
+                update.append(cstr!("upsert"), upsert);
             }
 
             if let Some(ref array_filters) = options.array_filters {
-                update.append_err("arrayFilters", bson_util::to_raw_bson_array(array_filters)?)?;
+                update.append(
+                    cstr!("arrayFilters"),
+                    bson_util::to_raw_bson_array(array_filters)?,
+                );
             }
 
             if let Some(ref hint) = options.hint {
-                update.append_err("hint", hint.to_raw_bson()?)?;
+                update.append(cstr!("hint"), hint.to_raw_bson()?);
             }
 
             if let Some(ref collation) = options.collation {
-                update.append_err(
-                    "collation",
+                update.append(
+                    cstr!("collation"),
                     crate::bson_compat::serialize_to_raw_document_buf(&collation)?,
-                )?;
+                );
             }
 
             if let Some(bypass_doc_validation) = options.bypass_document_validation {
-                body.append_err("bypassDocumentValidation", bypass_doc_validation)?;
+                body.append(cstr!("bypassDocumentValidation"), bypass_doc_validation);
             }
 
             if let Some(ref write_concern) = options.write_concern {
                 if !write_concern.is_empty() {
-                    body.append_err(
-                        "writeConcern",
+                    body.append(
+                        cstr!("writeConcern"),
                         crate::bson_compat::serialize_to_raw_document_buf(write_concern)?,
-                    )?;
+                    );
                 }
             }
 
             if let Some(ref let_vars) = options.let_vars {
-                body.append_err(
-                    "let",
+                body.append(
+                    cstr!("let"),
                     crate::bson_compat::serialize_to_raw_document_buf(&let_vars)?,
-                )?;
+                );
             }
 
             if let Some(ref comment) = options.comment {
-                body.append_err("comment", RawBson::try_from(comment.clone())?)?;
+                body.append(cstr!("comment"), RawBson::try_from(comment.clone())?);
             }
 
             if let Some(ref sort) = options.sort {
-                update.append_err("sort", RawDocumentBuf::from_document(sort)?)?;
+                update.append(cstr!("sort"), RawDocumentBuf::from_document(sort)?);
             }
         };
 
         if let Some(multi) = self.multi {
-            update.append_err("multi", multi)?;
+            update.append(cstr!("multi"), multi);
         }
 
         let mut updates = RawArrayBuf::new();
-        updates.push_err(update)?;
-        body.append_err("updates", updates)?;
-        body.append_err("ordered", true)?; // command monitoring tests expect this (SPEC-1130)
+        updates.push(update);
+        body.append(cstr!("updates"), updates);
+        body.append(cstr!("ordered"), true); // command monitoring tests expect this (SPEC-1130)
 
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
-            body,
-        ))
+        Ok(Command::new(Self::NAME, &self.ns.db, body))
     }
 
     fn handle_response<'a>(

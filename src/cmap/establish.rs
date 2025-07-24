@@ -48,21 +48,10 @@ pub(crate) struct EstablisherOptions {
     pub(crate) test_patch_reply: Option<fn(&mut Result<HelloReply>)>,
 }
 
-impl EstablisherOptions {
-    pub(crate) fn from_client_options(opts: &ClientOptions) -> Self {
+impl From<&ClientOptions> for EstablisherOptions {
+    fn from(opts: &ClientOptions) -> Self {
         Self {
-            handshake_options: HandshakerOptions {
-                app_name: opts.app_name.clone(),
-                #[cfg(any(
-                    feature = "zstd-compression",
-                    feature = "zlib-compression",
-                    feature = "snappy-compression"
-                ))]
-                compressors: opts.compressors.clone(),
-                driver_info: opts.driver_info.clone(),
-                server_api: opts.server_api.clone(),
-                load_balanced: opts.load_balanced.unwrap_or(false),
-            },
+            handshake_options: HandshakerOptions::from(opts),
             tls_options: opts.tls_options(),
             connect_timeout: opts.connect_timeout,
             #[cfg(test)]

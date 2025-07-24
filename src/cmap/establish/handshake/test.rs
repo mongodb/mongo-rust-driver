@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, options::AuthOptions};
 
 use super::Handshaker;
 use crate::{cmap::establish::handshake::HandshakerOptions, options::DriverInfo};
@@ -18,6 +18,7 @@ async fn metadata_no_options() {
         driver_info: None,
         server_api: None,
         load_balanced: false,
+        auth_options: AuthOptions::default(),
     })
     .unwrap();
 
@@ -66,6 +67,7 @@ async fn metadata_with_options() {
         compressors: None,
         server_api: None,
         load_balanced: false,
+        auth_options: AuthOptions::default(),
     };
 
     let handshaker = Handshaker::new(options).unwrap();

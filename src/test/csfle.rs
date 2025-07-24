@@ -44,6 +44,11 @@ pub(crate) type KmsProviderList = Vec<KmsInfo>;
 static CSFLE_LOCAL_KEY: Lazy<String> = Lazy::new(|| get_env_var("CSFLE_LOCAL_KEY"));
 static FLE_AWS_KEY: Lazy<String> = Lazy::new(|| get_env_var("FLE_AWS_KEY"));
 static FLE_AWS_SECRET: Lazy<String> = Lazy::new(|| get_env_var("FLE_AWS_SECRET"));
+static FLE_AWS_TEMP_KEY: Lazy<String> = Lazy::new(|| get_env_var("CSFLE_AWS_TEMP_ACCESS_KEY_ID"));
+static FLE_AWS_TEMP_SECRET: Lazy<String> =
+    Lazy::new(|| get_env_var("CSFLE_AWS_TEMP_SECRET_ACCESS_KEY"));
+static FLE_AWS_TEMP_SESSION_TOKEN: Lazy<String> =
+    Lazy::new(|| get_env_var("CSFLE_AWS_TEMP_SESSION_TOKEN"));
 static FLE_AZURE_TENANTID: Lazy<String> = Lazy::new(|| get_env_var("FLE_AZURE_TENANTID"));
 static FLE_AZURE_CLIENTID: Lazy<String> = Lazy::new(|| get_env_var("FLE_AZURE_CLIENTID"));
 static FLE_AZURE_CLIENTSECRET: Lazy<String> = Lazy::new(|| get_env_var("FLE_AZURE_CLIENTSECRET"));
@@ -61,13 +66,16 @@ static CSFLE_TLS_CERT_DIR: Lazy<String> = Lazy::new(|| get_env_var("CSFLE_TLS_CE
 static CRYPT_SHARED_LIB_PATH: Lazy<String> = Lazy::new(|| get_env_var("CRYPT_SHARED_LIB_PATH"));
 
 fn get_env_var(name: &str) -> String {
-    std::env::var(name).unwrap_or_else(|_| {
-        panic!(
-            "Missing environment variable for {}. See src/test/csfle.rs for the list of required \
-             variables and instructions for retrieving them.",
-            name
-        )
-    })
+    match std::env::var(name) {
+        Ok(v) if !v.is_empty() => v,
+        _ => {
+            panic!(
+                "Missing environment variable for {}. See src/test/csfle.rs for the list of \
+                 required variables and instructions for retrieving them.",
+                name
+            )
+        }
+    }
 }
 
 pub(crate) static AWS_KMS: Lazy<KmsInfo> = Lazy::new(|| {
@@ -76,6 +84,17 @@ pub(crate) static AWS_KMS: Lazy<KmsInfo> = Lazy::new(|| {
         doc! {
             "accessKeyId": &*FLE_AWS_KEY,
             "secretAccessKey": &*FLE_AWS_SECRET
+        },
+        None,
+    )
+});
+static AWS_TEMP_KMS: Lazy<KmsInfo> = Lazy::new(|| {
+    (
+        KmsProvider::aws(),
+        doc! {
+            "accessKeyId": &*FLE_AWS_TEMP_KEY,
+            "secretAccessKey": &*FLE_AWS_TEMP_SECRET,
+            "sessionToken": &*FLE_AWS_TEMP_SESSION_TOKEN,
         },
         None,
     )
@@ -240,7 +259,7 @@ async fn custom_endpoint_setup(valid: bool) -> Result<ClientEncryption> {
                         if valid {
                             "localhost:5698"
                         } else {
-                            "doesnotexist.local:5698"
+                            "doesnotexist.invalid:5698"
                         },
                     );
                 }
@@ -309,4 +328,40 @@ async fn fle2v2_ok(name: &str) -> bool {
         return false;
     }
     true
+}
+
+pub(crate) fn fill_kms_placeholders(
+    kms_provider_map: std::collections::HashMap<mongocrypt::ctx::KmsProvider, Document>,
+) -> KmsProviderList {
+    use mongocrypt::ctx::KmsProviderType;
+
+    let placeholder = doc! { "$$placeholder": 1 };
+
+    let mut kms_providers = Vec::new();
+    for (provider, mut config) in kms_provider_map {
+        // AWS uses temp creds if the "sessionToken" key is present in the config
+        let test_kms_provider = if *provider.provider_type() == KmsProviderType::Aws
+            && config.contains_key("sessionToken")
+        {
+            Some(&*AWS_TEMP_KMS)
+        } else {
+            (*ALL_KMS_PROVIDERS).iter().find(|(p, ..)| p == &provider)
+        };
+
+        for (key, value) in config.iter_mut() {
+            if value.as_document() == Some(&placeholder) {
+                let test_kms_provider = test_kms_provider
+                    .unwrap_or_else(|| panic!("missing config for {:?}", provider));
+                let placeholder_value = test_kms_provider.1.get(key).unwrap_or_else(|| {
+                    panic!("provider config {:?} missing key {:?}", provider, key)
+                });
+                *value = placeholder_value.clone();
+            }
+        }
+
+        let tls_options = test_kms_provider.and_then(|(_, _, tls_options)| tls_options.clone());
+        kms_providers.push((provider, config, tls_options));
+    }
+
+    kms_providers
 }

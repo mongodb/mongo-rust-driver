@@ -543,6 +543,8 @@ impl Error {
             | ErrorKind::GridFs(_) => {}
             #[cfg(feature = "in-use-encryption")]
             ErrorKind::Encryption(_) => {}
+            #[cfg(feature = "bson-3")]
+            ErrorKind::Bson(_) => {}
         }
     }
 }
@@ -556,23 +558,33 @@ where
     }
 }
 
+#[cfg(not(feature = "bson-3"))]
 impl From<crate::bson::de::Error> for ErrorKind {
     fn from(err: crate::bson::de::Error) -> Self {
         Self::BsonDeserialization(err)
     }
 }
 
+#[cfg(not(feature = "bson-3"))]
 impl From<crate::bson::ser::Error> for ErrorKind {
     fn from(err: crate::bson::ser::Error) -> Self {
         Self::BsonSerialization(err)
     }
 }
 
+#[cfg(not(feature = "bson-3"))]
 impl From<crate::bson_compat::RawError> for ErrorKind {
     fn from(err: crate::bson_compat::RawError) -> Self {
         Self::InvalidResponse {
             message: err.to_string(),
         }
+    }
+}
+
+#[cfg(feature = "bson-3")]
+impl From<crate::bson::error::Error> for ErrorKind {
+    fn from(err: crate::bson::error::Error) -> Self {
+        Self::Bson(err)
     }
 }
 
@@ -617,13 +629,18 @@ pub enum ErrorKind {
     #[non_exhaustive]
     Authentication { message: String },
 
-    /// Wrapper around `bson::de::Error`.
+    /// Wrapper around `bson::de::Error`.  Unused if the `bson-3` feature is enabled.
     #[error("{0}")]
-    BsonDeserialization(crate::bson::de::Error),
+    BsonDeserialization(crate::bson_compat::DeError),
 
-    /// Wrapper around `bson::ser::Error`.
+    /// Wrapper around `bson::ser::Error`.  Unused if the `bson-3` feature is enabled.
     #[error("{0}")]
-    BsonSerialization(crate::bson::ser::Error),
+    BsonSerialization(crate::bson_compat::SerError),
+
+    /// Wrapper around `bson::error::Error`.
+    #[cfg(feature = "bson-3")]
+    #[error("{0}")]
+    Bson(crate::bson::error::Error),
 
     /// An error occurred when trying to execute an [`insert_many`](crate::Collection::insert_many)
     /// operation.

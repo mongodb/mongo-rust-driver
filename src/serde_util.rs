@@ -164,7 +164,7 @@ where
 pub(crate) fn write_concern_is_empty(write_concern: &Option<WriteConcern>) -> bool {
     write_concern
         .as_ref()
-        .map_or(true, |write_concern| write_concern.is_empty())
+        .is_none_or(|write_concern| write_concern.is_empty())
 }
 
 #[cfg(test)]

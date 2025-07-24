@@ -17,7 +17,7 @@ cargo $TOOLCHAIN build
 
 # Test with all features.
 if [ "$RUST_VERSION" != "" ]; then
-  cargo $TOOLCHAIN build --features openssl-tls,sync,aws-auth,zlib-compression,zstd-compression,snappy-compression,in-use-encryption,tracing-unstable
+  cargo $TOOLCHAIN build --features openssl-tls,sync,aws-auth,gssapi-auth,zlib-compression,zstd-compression,snappy-compression,in-use-encryption,tracing-unstable
 else
   cargo $TOOLCHAIN build --all-features
 fi

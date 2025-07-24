@@ -1,6 +1,7 @@
 use crate::bson::rawdoc;
 
 use crate::{
+    bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::DropDatabaseOptions,
     error::Result,
@@ -25,7 +26,7 @@ impl DropDatabase {
 impl OperationWithDefaults for DropDatabase {
     type O = ();
 
-    const NAME: &'static str = "dropDatabase";
+    const NAME: &'static CStr = cstr!("dropDatabase");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
@@ -34,11 +35,7 @@ impl OperationWithDefaults for DropDatabase {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            self.target_db.clone(),
-            body,
-        ))
+        Ok(Command::new(Self::NAME, &self.target_db, body))
     }
 
     fn handle_response<'a>(

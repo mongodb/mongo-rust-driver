@@ -9,7 +9,7 @@ use crate::{
     bson::doc,
     event::{
         cmap::CmapEvent,
-        command::{CommandEvent, CommandSucceededEvent},
+        command::{CommandEvent, CommandFailedEvent, CommandSucceededEvent},
         sdam::SdamEvent,
     },
     test::get_client_options,
@@ -62,31 +62,7 @@ impl Event {
     }
 }
 
-impl SdamEvent {
-    pub(crate) fn name(&self) -> &str {
-        match self {
-            Self::ServerDescriptionChanged(_) => "ServerDescriptionChangedEvent",
-            Self::ServerOpening(_) => "ServerOpeningEvent",
-            Self::ServerClosed(_) => "ServerClosedEvent",
-            Self::TopologyDescriptionChanged(_) => "TopologyDescriptionChanged",
-            Self::TopologyOpening(_) => "TopologyOpeningEvent",
-            Self::TopologyClosed(_) => "TopologyClosedEvent",
-            Self::ServerHeartbeatStarted(_) => "ServerHeartbeatStartedEvent",
-            Self::ServerHeartbeatSucceeded(_) => "ServerHeartbeatSucceededEvent",
-            Self::ServerHeartbeatFailed(_) => "ServerHeartbeatFailedEvent",
-        }
-    }
-}
-
 impl CommandEvent {
-    pub(crate) fn name(&self) -> &str {
-        match self {
-            Self::Started(_) => "CommandStartedEvent",
-            Self::Succeeded(_) => "CommandSucceededEvent",
-            Self::Failed(_) => "CommandFailedEvent",
-        }
-    }
-
     pub(crate) fn command_name(&self) -> &str {
         match self {
             CommandEvent::Started(event) => event.command_name.as_str(),
@@ -98,6 +74,13 @@ impl CommandEvent {
     pub(crate) fn as_command_succeeded(&self) -> Option<&CommandSucceededEvent> {
         match self {
             CommandEvent::Succeeded(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn as_command_failed(&self) -> Option<&CommandFailedEvent> {
+        match self {
+            CommandEvent::Failed(e) => Some(e),
             _ => None,
         }
     }

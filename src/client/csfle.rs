@@ -230,3 +230,15 @@ pub(crate) fn aux_collections(
     }
     Ok(out)
 }
+
+impl Client {
+    pub(crate) async fn init_csfle(&self, opts: AutoEncryptionOptions) -> Result<()> {
+        let mut csfle_state = self.inner.csfle.write().await;
+        if csfle_state.is_some() {
+            return Err(Error::internal("double initialization of csfle state"));
+        }
+        *csfle_state = Some(ClientState::new(self, opts).await?);
+
+        Ok(())
+    }
+}

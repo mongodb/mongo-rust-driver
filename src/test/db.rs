@@ -1,6 +1,6 @@
 use std::cmp::Ord;
 
-use crate::{bson::RawDocumentBuf, bson_compat::RawDocumentBufExt as _};
+use crate::{bson::RawDocumentBuf, bson_compat::cstr};
 use futures::{stream::TryStreamExt, StreamExt};
 use serde::Deserialize;
 
@@ -431,7 +431,7 @@ async fn test_run_command() {
     // Test run_raw_command
     {
         let mut cmd = RawDocumentBuf::new();
-        cmd.append_err("ping", 1).unwrap();
+        cmd.append(cstr!("ping"), 1);
         let got = database.run_raw_command(cmd).await.unwrap();
         assert_eq!(crate::bson_util::get_int(got.get("ok").unwrap()), Some(1));
     }
@@ -459,8 +459,8 @@ async fn test_run_command() {
     // Test run_raw_cursor_command
     {
         let mut cmd = RawDocumentBuf::new();
-        cmd.append_err("find", "coll").unwrap();
-        cmd.append_err("filter", RawDocumentBuf::new()).unwrap();
+        cmd.append(cstr!("find"), "coll");
+        cmd.append(cstr!("filter"), RawDocumentBuf::new());
 
         let cursor = database.run_raw_cursor_command(cmd).await.unwrap();
         let v: Vec<Result<Document>> = cursor.collect().await;

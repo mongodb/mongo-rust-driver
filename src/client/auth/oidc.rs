@@ -9,7 +9,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, rawdoc, spec::BinarySubtype, Binary, Document},
-    bson_compat::RawDocumentBufExt as _,
+    bson_compat::cstr,
     client::options::{ServerAddress, ServerApi},
     cmap::{Command, Connection},
     error::{Error, Result},
@@ -310,6 +310,7 @@ enum CallbackKind {
 }
 
 use std::fmt::Debug;
+
 impl std::fmt::Debug for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(format!("Callback: {:?}", self.kind).as_str())
@@ -620,9 +621,9 @@ async fn send_sasl_start_command(
 ) -> Result<SaslResponse> {
     let mut start_doc = rawdoc! {};
     if let Some(access_token) = access_token {
-        start_doc.append_err("jwt", access_token)?;
+        start_doc.append(cstr!("jwt"), access_token);
     } else if let Some(username) = credential.username.as_deref() {
-        start_doc.append_err("n", username)?;
+        start_doc.append(cstr!("n"), username);
     }
     let sasl_start = SaslStart::new(
         source.to_string(),
@@ -972,8 +973,7 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
         .is_some_and(|source| source != "$external")
     {
         return Err(Error::invalid_argument(format!(
-            "source must be $external for {} authentication, found: {:?}",
-            MONGODB_OIDC_STR, credential.source
+            "only $external may be specified as an auth source for {MONGODB_OIDC_STR}",
         )));
     }
     #[cfg(test)]

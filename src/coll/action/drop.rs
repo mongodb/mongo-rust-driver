@@ -52,7 +52,7 @@ where
         }
         // * from a `list_collections` call:
         let found;
-        if enc_fields.is_none() && client_enc_fields.is_some() {
+        if enc_fields.is_none() && enc_opts.is_some() {
             let filter = doc! { "name": self.name() };
             let mut specs: Vec<_> = match session.as_deref_mut() {
                 Some(s) => {
