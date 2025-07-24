@@ -1,8 +1,5 @@
-#[cfg(feature = "aws-sdk-auth")]
 use aws_config::BehaviorVersion;
-#[cfg(feature = "aws-sdk-auth")]
 use aws_credential_types::provider::ProvideCredentials;
-#[cfg(feature = "aws-sdk-auth")]
 use aws_types::sdk_config::SharedCredentialsProvider;
 
 use chrono::{offset::Utc, DateTime};
@@ -96,7 +93,6 @@ async fn authenticate_stream_inner(
     let server_first = ServerFirst::parse(server_first_response.auth_response_body(MECH_NAME)?)?;
     server_first.validate(&nonce)?;
 
-    #[cfg(feature = "aws-sdk-auth")]
     let aws_credential = if let (Some(access_key), Some(secret_key)) =
         (&credential.username, &credential.password)
     {
@@ -128,24 +124,6 @@ async fn authenticate_stream_inner(
             creds.session_token().map(|s| s.to_string()),
             None,
         )
-    };
-    #[cfg(not(feature = "aws-sdk-auth"))]
-    let aws_credential = {
-        // Limit scope of this variable to avoid holding onto the lock for the duration of
-        // authenticate_stream.
-        let cached_credential = CACHED_CREDENTIAL.lock().await;
-        match *cached_credential {
-            Some(ref aws_credential) if !aws_credential.is_expired() => aws_credential.clone(),
-            _ => {
-                // From the spec: the driver MUST not place a lock on making a request.
-                drop(cached_credential);
-                let aws_credential = AwsCredential::get(credential, http_client).await?;
-                if aws_credential.expiration.is_some() {
-                    *CACHED_CREDENTIAL.lock().await = Some(aws_credential.clone());
-                }
-                aws_credential
-            }
-        }
     };
 
     let date = Utc::now();
