@@ -17,7 +17,7 @@ license = "Apache-2.0"
 readme = "README.md"
 name = "mongodb"
 version = "3.2.3"
-rust-version = "1.81"
+rust-version = "1.82"
 
 exclude = [
     "etc/**",
@@ -41,7 +41,6 @@ dns-resolver = ["dep:hickory-resolver", "dep:hickory-proto"]
 cert-key-password = ["dep:pem", "dep:pkcs8"]
 
 # Enable support for MONGODB-AWS authentication.
-# This can only be used with the tokio-runtime feature flag.
 aws-auth = ["dep:reqwest"]
 
 # Enable support AWS SDK for authentication.
@@ -49,7 +48,6 @@ aws-auth = ["dep:reqwest"]
 aws-sdk-auth = ["dep:reqwest", "aws-config"]
 
 # Enable support for on-demand Azure KMS credentials.
-# This can only be used with the tokio-runtime feature flag.
 azure-kms = ["dep:reqwest"]
 
 # Enable support for azure OIDC authentication.
@@ -59,8 +57,10 @@ azure-oidc = ["dep:reqwest"]
 gcp-oidc = ["dep:reqwest"]
 
 # Enable support for on-demand GCP KMS credentials.
-# This can only be used with the tokio-runtime feature flag.
 gcp-kms = ["dep:reqwest"]
+
+# Enable support for GSSAPI (Kerberos) authentication.
+gssapi-auth = ["dep:cross-krb5", "dns-resolver"]
 
 zstd-compression = ["dep:zstd"]
 zlib-compression = ["dep:flate2"]
@@ -74,7 +74,7 @@ in-use-encryption-unstable = ["in-use-encryption"]
 # Enables support for emitting tracing events.
 # The tracing API is unstable and may have backwards-incompatible changes in minor version updates.
 # TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.
-tracing-unstable = ["dep:tracing", "dep:log"]
+tracing-unstable = ["dep:tracing", "dep:log", "bson3?/serde_json-1"]
 
 [dependencies]
 async-trait = "0.1.42"
@@ -84,6 +84,7 @@ chrono = { version = "0.4.7", default-features = false, features = [
     "clock",
     "std",
 ] }
+cross-krb5 = { version = "0.4.2", optional = true, default-features = false }
 derive_more = "0.99.17"
 derive-where = "1.2.7"
 flate2 = { version = "1.0", optional = true }
@@ -238,6 +239,13 @@ regex = "1.6.0"
 reqwest = { version = "0.12.2", features = ["rustls-tls"] }
 serde-hex = "0.1.0"
 serde_path_to_error = "0.1"
+
+[dev-dependencies.bson3]
+git = "https://github.com/mongodb/bson-rust"
+branch = "main"
+package = "bson"
+version = "3.0.0"
+features = ["serde", "serde_json-1"]
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]

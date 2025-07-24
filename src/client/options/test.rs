@@ -22,6 +22,14 @@ static SKIPPED_TESTS: Lazy<Vec<&'static str>> = Lazy::new(|| {
         "maxPoolSize=0 does not error",
         #[cfg(not(feature = "cert-key-password"))]
         "Valid tlsCertificateKeyFilePassword is parsed correctly",
+        // The driver does not support OCSP (see RUST-361)
+        "tlsDisableCertificateRevocationCheck can be set to true",
+        "tlsDisableCertificateRevocationCheck can be set to false",
+        "tlsDisableOCSPEndpointCheck can be set to true",
+        "tlsDisableOCSPEndpointCheck can be set to false",
+        // TODO RUST-582: unskip these tests
+        "Valid connection and timeout options are parsed correctly",
+        "timeoutMS=0",
     ];
 
     // TODO RUST-1896: unskip this test when openssl-tls is enabled
@@ -209,13 +217,23 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
 
 #[tokio::test]
 async fn run_uri_options_spec_tests() {
-    let skipped_files = vec!["single-threaded-options.json"];
+    let mut skipped_files = vec![
+        "single-threaded-options.json",
+        // TODO RUST-1054 unskip this file
+        "proxy-options.json",
+    ];
+    if cfg!(not(feature = "gssapi-auth")) {
+        skipped_files.push("auth-options.json");
+    }
     run_tests(&["uri-options"], &skipped_files).await;
 }
 
 #[tokio::test]
 async fn run_connection_string_spec_tests() {
     let mut skipped_files = Vec::new();
+    if cfg!(not(feature = "gssapi-auth")) {
+        skipped_files.push("valid-auth.json");
+    }
     if cfg!(not(unix)) {
         skipped_files.push("valid-unix_socket-absolute.json");
         skipped_files.push("valid-unix_socket-relative.json");

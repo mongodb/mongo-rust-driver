@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::{
     bson::{rawdoc, RawDocumentBuf},
-    bson_compat::RawDocumentBufExt,
+    bson_compat::cstr,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
@@ -23,6 +23,7 @@ use crate::{
 /// To limit usages of the legacy name in the codebase, this constant should be used
 /// wherever possible.
 pub(crate) const LEGACY_HELLO_COMMAND_NAME: &str = "isMaster";
+pub(crate) const LEGACY_HELLO_COMMAND_NAME_CSTR: &crate::bson_compat::CStr = cstr!("isMaster");
 pub(crate) const LEGACY_HELLO_COMMAND_NAME_LOWERCASE: &str = "ismaster";
 
 #[derive(Debug, Clone, Copy)]
@@ -49,26 +50,22 @@ pub(crate) fn hello_command(
     {
         (rawdoc! { "hello": 1 }, "hello")
     } else {
-        let mut body = rawdoc! { LEGACY_HELLO_COMMAND_NAME: 1 };
+        let mut body = rawdoc! { LEGACY_HELLO_COMMAND_NAME_CSTR: 1 };
         if hello_ok.is_none() {
-            // Unwrap safety: key and value are static known-good values.
-            body.append_err("helloOk", true).unwrap();
+            body.append(cstr!("helloOk"), true);
         }
         (body, LEGACY_HELLO_COMMAND_NAME)
     };
 
     if let Some(opts) = awaitable_options {
-        // Unwrap safety: keys are static and values are types without cstrings.
-        body.append_err("topologyVersion", opts.topology_version)
-            .unwrap();
-        body.append_err(
-            "maxAwaitTimeMS",
+        body.append(cstr!("topologyVersion"), opts.topology_version);
+        body.append(
+            cstr!("maxAwaitTimeMS"),
             opts.max_await_time
                 .as_millis()
                 .try_into()
                 .unwrap_or(i64::MAX),
-        )
-        .unwrap();
+        );
     }
 
     let mut command = Command::new(command_name, "admin", body);

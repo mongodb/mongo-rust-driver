@@ -168,11 +168,9 @@ async fn invalid() {
         // deserialization implementations.
         Some(&[
             "runOnRequirement-minProperties.json",
-            "storeEventsAsEntity-events-enum.json",
             "tests-minItems.json",
             "expectedError-isError-const.json",
             "expectedError-minProperties.json",
-            "storeEventsAsEntity-events-minItems.json",
             "expectedLogMessage-component-enum.json",
             "entity-client-observeLogMessages-minProperties.json",
             "test-expectLogMessages-minItems.json",

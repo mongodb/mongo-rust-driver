@@ -311,7 +311,7 @@ impl<'de> Deserialize<'de> for Operation {
 
 fn deserialize_op<'de, 'a, Op: TestOperation + Deserialize<'de> + 'a>(
     arguments: Document,
-) -> std::result::Result<Box<dyn TestOperation + 'a>, crate::bson::de::Error> {
+) -> std::result::Result<Box<dyn TestOperation + 'a>, crate::bson_compat::DeError> {
     Ok(Box::new(Op::deserialize(BsonDeserializer::new(
         Bson::Document(arguments),
     ))?))

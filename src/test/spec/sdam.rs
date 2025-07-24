@@ -41,6 +41,9 @@ async fn run_unified() {
             // The driver does not support socketTimeoutMS.
             "Reset server and pool after network timeout error during authentication",
             "Ignore network timeout error on find",
+            // TODO RUST-2068: unskip these tests
+            "Pool is cleared on handshake error during minPoolSize population",
+            "Pool is cleared on authentication error during minPoolSize population",
         ])
         .await;
 }

@@ -349,7 +349,7 @@ impl<T> SessionCursor<T> {
 
 impl<T> SessionCursor<T> {
     pub(crate) fn is_exhausted(&self) -> bool {
-        self.state.as_ref().map_or(true, |state| state.exhausted)
+        self.state.as_ref().is_none_or(|state| state.exhausted)
     }
 
     #[cfg(test)]

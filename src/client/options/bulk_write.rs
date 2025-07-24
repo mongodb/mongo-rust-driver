@@ -7,7 +7,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{rawdoc, Array, Bson, Document, RawDocumentBuf},
-    bson_compat::RawDocumentBufExt as _,
+    bson_compat::cstr,
     bson_util::{get_or_prepend_id_field, replacement_document_check, update_document_check},
     error::Result,
     options::{UpdateModifications, WriteConcern},
@@ -362,11 +362,12 @@ impl WriteModel {
         }
     }
 
-    pub(crate) fn operation_name(&self) -> &'static str {
+    pub(crate) fn operation_name(&self) -> &'static crate::bson_compat::CStr {
+        use crate::bson_compat::cstr;
         match self.operation_type() {
-            OperationType::Insert => "insert",
-            OperationType::Update => "update",
-            OperationType::Delete => "delete",
+            OperationType::Insert => cstr!("insert"),
+            OperationType::Update => cstr!("update"),
+            OperationType::Delete => cstr!("delete"),
         }
     }
 
@@ -396,7 +397,7 @@ impl WriteModel {
         };
 
         if let Some(multi) = self.multi() {
-            model_document.append_err("multi", multi)?;
+            model_document.append(cstr!("multi"), multi);
         }
 
         Ok((model_document, inserted_id))

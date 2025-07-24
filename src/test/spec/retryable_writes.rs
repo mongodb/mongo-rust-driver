@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use crate::bson::Bson;
+use crate::{bson::Bson, options::SelectionCriteria};
 use tokio::sync::Mutex;
 
 use crate::{
@@ -317,27 +317,44 @@ async fn retry_write_different_mongos() {
         );
         return;
     }
+
+    // NOTE: This test uses a single client to set failpoints on each mongos and run the insert
+    // operation. This avoids flakiness caused by a race between server discovery and server
+    // selection.
+
+    // When a client is first created, it initializes its view of the topology with all configured
+    // mongos addresses, but marks each as Unknown until it completes the server discovery process
+    // by sending and receiving "hello" messages Unknown servers are not eligible for server
+    // selection.
+
+    // Previously, we created a new client for each call to `enable_fail_point` and for the insert
+    // operation. Each new client restarted the discovery process, and sometimes had not yet marked
+    // both mongos servers as usable, leading to test failures when the retry logic couldn't insert
+    // a second eligible server.
+
+    // By reusing a single client, each `enable_fail_point` call forces discovery to complete for
+    // the corresponding mongos. As a result, when the insert operation runs, the client has a
+    // fully discovered topology and can reliably select between both servers.
     client_options.hosts.drain(2..);
     client_options.retry_writes = Some(true);
-
-    let mut guards = vec![];
-    for ix in [0, 1] {
-        let mut opts = client_options.clone();
-        opts.hosts.remove(ix);
-        opts.direct_connection = Some(true);
-        let client = Client::for_test().options(opts).await;
-
-        let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
-            .error_code(6)
-            .error_labels(vec![RETRYABLE_WRITE_ERROR])
-            .close_connection(true);
-        guards.push(client.enable_fail_point(fail_point).await.unwrap());
-    }
-
+    let hosts = client_options.hosts.clone();
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
         .await;
+
+    let mut guards = Vec::new();
+    for address in hosts {
+        let address = address.clone();
+        let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
+            .error_code(6)
+            .error_labels([RETRYABLE_WRITE_ERROR])
+            .selection_criteria(SelectionCriteria::Predicate(Arc::new(move |info| {
+                info.description.address == address
+            })));
+        guards.push(client.enable_fail_point(fail_point).await.unwrap());
+    }
+
     let result = client
         .database("test")
         .collection::<crate::bson::Document>("retry_write_different_mongos")
@@ -357,6 +374,14 @@ async fn retry_write_different_mongos() {
         ),
         "unexpected events: {:#?}",
         events,
+    );
+    let first_failed = events[1].as_command_failed().unwrap();
+    let first_address = &first_failed.connection.address;
+    let second_failed = events[3].as_command_failed().unwrap();
+    let second_address = &second_failed.connection.address;
+    assert_ne!(
+        first_address, second_address,
+        "Failed commands did not occur on two different mongos instances"
     );
 
     drop(guards); // enforce lifetime
@@ -384,11 +409,11 @@ async fn retry_write_same_mongos() {
 
         let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
             .error_code(6)
-            .error_labels(vec![RETRYABLE_WRITE_ERROR])
-            .close_connection(true);
+            .error_labels(vec![RETRYABLE_WRITE_ERROR]);
         client.enable_fail_point(fail_point).await.unwrap()
     };
 
+    client_options.direct_connection = Some(false);
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
@@ -412,6 +437,14 @@ async fn retry_write_same_mongos() {
         ),
         "unexpected events: {:#?}",
         events,
+    );
+    let first_failed = events[1].as_command_failed().unwrap();
+    let first_address = &first_failed.connection.address;
+    let second_failed = events[3].as_command_succeeded().unwrap();
+    let second_address = &second_failed.connection.address;
+    assert_eq!(
+        first_address, second_address,
+        "Failed commands did not occur on the same mongos instance",
     );
 
     drop(fp_guard); // enforce lifetime

@@ -2,6 +2,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, rawdoc, Bson, Document, RawBsonRef, RawDocumentBuf},
+    bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::DistinctOptions, Namespace},
     error::Result,
@@ -37,7 +38,7 @@ impl Distinct {
 impl OperationWithDefaults for Distinct {
     type O = Vec<Bson>;
 
-    const NAME: &'static str = "distinct";
+    const NAME: &'static CStr = cstr!("distinct");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
@@ -49,8 +50,8 @@ impl OperationWithDefaults for Distinct {
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new_read(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
+            Self::NAME,
+            &self.ns.db,
             self.options.as_ref().and_then(|o| o.read_concern.clone()),
             body,
         ))

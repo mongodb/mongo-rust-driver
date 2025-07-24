@@ -4,8 +4,6 @@
 #[cfg(feature = "dns-resolver")]
 #[path = "test/atlas_connectivity.rs"]
 mod atlas_connectivity_skip_ci; // requires Atlas URI environment variables set
-#[path = "test/atlas_planned_maintenance_testing.rs"]
-mod atlas_planned_maintenance_testing_skip_ci; // run from the drivers-atlas-testing project
 mod auth;
 mod bulk_write;
 mod change_stream;
@@ -279,18 +277,12 @@ pub(crate) static SERVER_API: Lazy<Option<ServerApi>> =
         }),
         _ => None,
     });
-pub(crate) static SERVERLESS: Lazy<bool> =
-    Lazy::new(|| matches!(std::env::var("SERVERLESS"), Ok(s) if s == "serverless"));
 pub(crate) static LOAD_BALANCED_SINGLE_URI: Lazy<Option<String>> =
     Lazy::new(|| std::env::var("SINGLE_MONGOS_LB_URI").ok());
 pub(crate) static LOAD_BALANCED_MULTIPLE_URI: Lazy<Option<String>> =
     Lazy::new(|| std::env::var("MULTI_MONGOS_LB_URI").ok());
 pub(crate) static OIDC_URI: Lazy<Option<String>> =
     Lazy::new(|| std::env::var("MONGODB_URI_SINGLE").ok());
-pub(crate) static SERVERLESS_ATLAS_USER: Lazy<Option<String>> =
-    Lazy::new(|| std::env::var("SERVERLESS_ATLAS_USER").ok());
-pub(crate) static SERVERLESS_ATLAS_PASSWORD: Lazy<Option<String>> =
-    Lazy::new(|| std::env::var("SERVERLESS_ATLAS_PASSWORD").ok());
 
 // conditional definitions do not work within the lazy_static! macro, so this
 // needs to be defined separately.
@@ -321,15 +313,6 @@ pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
         feature = "snappy-compression"
     ))]
     set_compressor(options);
-
-    if options.credential.is_none() && SERVERLESS_ATLAS_USER.is_some() {
-        options.credential = Some(
-            Credential::builder()
-                .username(SERVERLESS_ATLAS_USER.clone())
-                .password(SERVERLESS_ATLAS_PASSWORD.clone())
-                .build(),
-        );
-    }
 
     if let Some(ref mut credential) = options.credential {
         if credential.mechanism == Some(AuthMechanism::MongoDbOidc)

@@ -7,20 +7,12 @@ use crate::{
     bson::doc,
     options::{CreateCollectionOptions, CursorType, FindOptions},
     runtime,
-    test::{log_uncaptured, SERVERLESS},
     Client,
 };
 
 #[tokio::test]
 #[function_name::named]
 async fn tailable_cursor() {
-    if *SERVERLESS {
-        log_uncaptured(
-            "skipping cursor::tailable_cursor; serverless does not support capped collections",
-        );
-        return;
-    }
-
     let client = Client::for_test().await;
     let coll = client
         .create_fresh_collection(
