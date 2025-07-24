@@ -6,7 +6,7 @@ use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::{doc, serde_helpers, Bson, Document, RawBson, RawDocumentBuf},
+    bson::{doc, Bson, Document, RawBson, RawDocumentBuf},
     concern::{ReadConcern, WriteConcern},
     error::Result,
     options::Collation,
@@ -1186,7 +1186,7 @@ impl Serialize for CommitQuorum {
         S: Serializer,
     {
         match self {
-            CommitQuorum::Nodes(n) => serde_helpers::serialize_u32_as_i32(n, serializer),
+            CommitQuorum::Nodes(n) => serde_util::serialize_u32_as_i32(n, serializer),
             CommitQuorum::VotingMembers => serializer.serialize_str("votingMembers"),
             CommitQuorum::Majority => serializer.serialize_str("majority"),
             CommitQuorum::Custom(s) => serializer.serialize_str(s),
