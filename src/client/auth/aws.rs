@@ -1,6 +1,15 @@
+#[cfg(feature = "aws-auth")]
 use aws_config::BehaviorVersion;
+
+#[cfg(feature = "aws-auth")]
 use aws_credential_types::provider::ProvideCredentials;
+
+#[allow(unused_imports)]
+#[cfg(feature = "aws-auth")]
 use aws_types::sdk_config::SharedCredentialsProvider;
+
+#[allow(unused_imports)]
+use std::{fs::File, io::Read, time::Duration};
 
 use chrono::{offset::Utc, DateTime};
 use hmac::Hmac;
@@ -8,7 +17,6 @@ use once_cell::sync::Lazy;
 use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use std::{fs::File, io::Read, time::Duration};
 use tokio::sync::Mutex;
 
 use crate::{
@@ -58,7 +66,7 @@ async fn authenticate_stream_inner(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
-    http_client: &HttpClient,
+    _http_client: &HttpClient,
 ) -> Result<()> {
     let source = match credential.source.as_deref() {
         Some("$external") | None => "$external",
@@ -93,6 +101,7 @@ async fn authenticate_stream_inner(
     let server_first = ServerFirst::parse(server_first_response.auth_response_body(MECH_NAME)?)?;
     server_first.validate(&nonce)?;
 
+    // Find credentials using MongoDB URI or AWS SDK
     let aws_credential = if let (Some(access_key), Some(secret_key)) =
         (&credential.username, &credential.password)
     {
@@ -125,6 +134,25 @@ async fn authenticate_stream_inner(
             None,
         )
     };
+
+    // Find credentials using original implementation without AWS SDK
+    // let aws_credential = {
+    //     // Limit scope of this variable to avoid holding onto the lock for the duration of
+    //     // authenticate_stream.
+    //     let cached_credential = CACHED_CREDENTIAL.lock().await;
+    //     match *cached_credential {
+    //         Some(ref aws_credential) if !aws_credential.is_expired() => aws_credential.clone(),
+    //         _ => {
+    //             // From the spec: the driver MUST not place a lock on making a request.
+    //             drop(cached_credential);
+    //             let aws_credential = AwsCredential::get(credential, http_client).await?;
+    //             if aws_credential.expiration.is_some() {
+    //                 *CACHED_CREDENTIAL.lock().await = Some(aws_credential.clone());
+    //             }
+    //             aws_credential
+    //         }
+    //     }
+    // };
 
     let date = Utc::now();
 
@@ -172,6 +200,7 @@ async fn authenticate_stream_inner(
 }
 
 /// Contains the credentials for MONGODB-AWS authentication.
+#[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub(crate) struct AwsCredential {
@@ -504,15 +533,15 @@ impl AwsCredential {
         self.session_token.as_deref()
     }
 
-    fn is_expired(&self) -> bool {
-        match self.expiration {
-            Some(expiration) => {
-                expiration.saturating_duration_since(crate::bson::DateTime::now())
-                    < Duration::from_secs(5 * 60)
-            }
-            None => true,
-        }
-    }
+    // fn is_expired(&self) -> bool {
+    //     match self.expiration {
+    //         Some(expiration) => {
+    //             expiration.saturating_duration_since(crate::bson::DateTime::now())
+    //                 < Duration::from_secs(5 * 60)
+    //         }
+    //         None => true,
+    //     }
+    // }
 }
 
 /// The response from the server to the `saslStart` command in a MONGODB-AWS authentication attempt.

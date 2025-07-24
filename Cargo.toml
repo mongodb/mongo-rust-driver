@@ -42,7 +42,7 @@ cert-key-password = ["dep:pem", "dep:pkcs8"]
 
 # Enable support for MONGODB-AWS authentication.
 # This can only be used with the tokio-runtime feature flag.
-aws-auth = ["dep:reqwest"]
+aws-auth = ["dep:reqwest", "aws-config", "aws-sdk-sso", "aws-sdk-sts", "aws-sdk-ssooidc"]
 
 # Enable support AWS SDK for authentication.
 # This can only be used with the tokio-runtime and aws-auth feature flags.
