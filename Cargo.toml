@@ -42,11 +42,7 @@ cert-key-password = ["dep:pem", "dep:pkcs8"]
 
 # Enable support for MONGODB-AWS authentication.
 # This can only be used with the tokio-runtime feature flag.
-aws-auth = ["dep:reqwest", "aws-config", "aws-sdk-sso", "aws-sdk-sts", "aws-sdk-ssooidc"]
-
-# Enable support AWS SDK for authentication.
-# This can only be used with the tokio-runtime and aws-auth feature flags.
-aws-sdk-auth = ["dep:reqwest", "aws-config"]
+aws-auth = ["dep:reqwest", "aws-config"]
 
 # Enable support for on-demand Azure KMS credentials.
 # This can only be used with the tokio-runtime feature flag.
@@ -137,21 +133,6 @@ features = [
     "default-https-client",
     "rt-tokio"
 ]
-
-[dependencies.aws-sdk-sso]
-version = "=1.74.0"
-optional = true
-default-features = false
-
-[dependencies.aws-sdk-ssooidc]
-version = "=1.75.0"
-optional = true
-default-features = false
-
-[dependencies.aws-sdk-sts]
-version = "=1.76.0"
-optional = true
-default-features = false
 
 [dependencies.bson2]
 git = "https://github.com/mongodb/bson-rust"

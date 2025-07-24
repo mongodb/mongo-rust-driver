@@ -66,6 +66,8 @@ async fn authenticate_stream_inner(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
+    // Note from RUST-1529: http_client is used in the original non-AWS SDK implementation for
+    // credentials
     _http_client: &HttpClient,
 ) -> Result<()> {
     let source = match credential.source.as_deref() {
@@ -200,6 +202,7 @@ async fn authenticate_stream_inner(
 }
 
 /// Contains the credentials for MONGODB-AWS authentication.
+// RUST-1529 note: dead_code tag was added to avoid unused warnings for expiration field
 #[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
