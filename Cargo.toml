@@ -125,7 +125,7 @@ aws-credential-types = "1.2.4"
 aws-types = "1.3.7"
 
 [dependencies.aws-config]
-version = "1.8.1"
+version = "1.8.2"
 optional = true
 default-features = false
 features = [
@@ -136,17 +136,17 @@ features = [
 ]
 
 [dependencies.aws-sdk-sso]
-version = "=1.74.0"
-optional = true
-default-features = false
-
-[dependencies.aws-sdk-ssooidc]
 version = "=1.75.0"
 optional = true
 default-features = false
 
-[dependencies.aws-sdk-sts]
+[dependencies.aws-sdk-ssooidc]
 version = "=1.76.0"
+optional = true
+default-features = false
+
+[dependencies.aws-sdk-sts]
+version = "=1.77.0"
 optional = true
 default-features = false
 
