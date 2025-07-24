@@ -8,8 +8,9 @@ use aws_credential_types::provider::ProvideCredentials;
 #[cfg(feature = "aws-auth")]
 use aws_types::sdk_config::SharedCredentialsProvider;
 
-#[allow(unused_imports)]
-use std::{fs::File, io::Read, time::Duration};
+use std::{fs::File, io::Read};
+// Note from RUST-1529: commented Duration import since original implementation is commented out
+// use std::time::Duration;
 
 use chrono::{offset::Utc, DateTime};
 use hmac::Hmac;
