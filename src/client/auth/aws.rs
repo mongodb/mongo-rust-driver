@@ -249,6 +249,7 @@ fn non_empty(s: Option<String>) -> Option<String> {
     }
 }
 
+#[allow(dead_code)]
 impl AwsCredential {
     /// Derives the credentials for an authentication attempt given the set of credentials the user
     /// passed in.
