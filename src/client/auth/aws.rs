@@ -224,6 +224,8 @@ async fn authenticate_stream_inner(
 }
 
 /// Contains the credentials for MONGODB-AWS authentication.
+// RUST-1529 note: dead_code tag was added to avoid unused warnings for expiration field
+#[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub(crate) struct AwsCredential {
@@ -249,7 +251,6 @@ fn non_empty(s: Option<String>) -> Option<String> {
     }
 }
 
-#[allow(dead_code)]
 impl AwsCredential {
     /// Derives the credentials for an authentication attempt given the set of credentials the user
     /// passed in.
