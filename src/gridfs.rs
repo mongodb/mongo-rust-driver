@@ -14,6 +14,7 @@ use crate::{
     checked::Checked,
     error::Error,
     options::{CollectionOptions, ReadConcern, SelectionCriteria, WriteConcern},
+    serde_util,
     Collection,
     Database,
 };
@@ -31,7 +32,7 @@ pub(crate) struct Chunk<'a> {
     #[serde(rename = "_id")]
     id: ObjectId,
     files_id: Bson,
-    #[serde(serialize_with = "crate::bson::serde_helpers::serialize_u32_as_i32")]
+    #[serde(serialize_with = "serde_util::serialize_u32_as_i32")]
     n: u32,
     #[serde(borrow)]
     data: RawBinaryRef<'a>,
@@ -54,7 +55,7 @@ pub struct FilesCollectionDocument {
     /// The size of the file's chunks in bytes.
     #[serde(
         rename = "chunkSize",
-        serialize_with = "crate::bson::serde_helpers::serialize_u32_as_i32"
+        serialize_with = "serde_util::serialize_u32_as_i32"
     )]
     pub chunk_size_bytes: u32,
 

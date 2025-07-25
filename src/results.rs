@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::{
-    bson::{serde_helpers, Binary, Bson, Document, RawDocumentBuf},
+    bson::{Binary, Bson, Document, RawDocumentBuf},
     change_stream::event::ResumeToken,
     db::options::CreateCollectionOptions,
     serde_util,
@@ -53,11 +53,11 @@ pub struct InsertManyResult {
 #[non_exhaustive]
 pub struct UpdateResult {
     /// The number of documents that matched the filter.
-    #[serde(serialize_with = "crate::bson::serde_helpers::serialize_u64_as_i64")]
+    #[serde(serialize_with = "serde_util::serialize_u64_as_i64")]
     pub matched_count: u64,
 
     /// The number of documents that were modified by the operation.
-    #[serde(serialize_with = "crate::bson::serde_helpers::serialize_u64_as_i64")]
+    #[serde(serialize_with = "serde_util::serialize_u64_as_i64")]
     pub modified_count: u64,
 
     /// The `_id` field of the upserted document.
@@ -71,7 +71,7 @@ pub struct UpdateResult {
 #[non_exhaustive]
 pub struct DeleteResult {
     /// The number of documents deleted by the operation.
-    #[serde(serialize_with = "crate::bson::serde_helpers::serialize_u64_as_i64")]
+    #[serde(serialize_with = "serde_util::serialize_u64_as_i64")]
     pub deleted_count: u64,
 }
 
@@ -182,7 +182,7 @@ pub struct DatabaseSpecification {
     /// The amount of disk space in bytes that is consumed by the database.
     #[serde(
         deserialize_with = "serde_util::deserialize_u64_from_bson_number",
-        serialize_with = "serde_helpers::serialize_u64_as_i64"
+        serialize_with = "serde_util::serialize_u64_as_i64"
     )]
     pub size_on_disk: u64,
 
