@@ -1,10 +1,6 @@
 use std::time::Duration;
 
-use crate::{
-    bson::{serde_helpers, Document},
-    collation::Collation,
-    serde_util,
-};
+use crate::{bson::Document, collation::Collation, serde_util};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use typed_builder::TypedBuilder;
@@ -157,7 +153,7 @@ impl Serialize for IndexVersion {
             IndexVersion::V0 => serializer.serialize_i32(0),
             IndexVersion::V1 => serializer.serialize_i32(1),
             IndexVersion::V2 => serializer.serialize_i32(2),
-            IndexVersion::Custom(i) => serde_helpers::serialize_u32_as_i32(i, serializer),
+            IndexVersion::Custom(i) => serde_util::serialize_u32_as_i32(i, serializer),
         }
     }
 }
@@ -203,7 +199,7 @@ impl Serialize for TextIndexVersion {
             TextIndexVersion::V1 => serializer.serialize_i32(1),
             TextIndexVersion::V2 => serializer.serialize_i32(2),
             TextIndexVersion::V3 => serializer.serialize_i32(3),
-            TextIndexVersion::Custom(i) => serde_helpers::serialize_u32_as_i32(i, serializer),
+            TextIndexVersion::Custom(i) => serde_util::serialize_u32_as_i32(i, serializer),
         }
     }
 }
@@ -244,7 +240,7 @@ impl Serialize for Sphere2DIndexVersion {
         match self {
             Sphere2DIndexVersion::V2 => serializer.serialize_i32(2),
             Sphere2DIndexVersion::V3 => serializer.serialize_i32(3),
-            Sphere2DIndexVersion::Custom(i) => serde_helpers::serialize_u32_as_i32(i, serializer),
+            Sphere2DIndexVersion::Custom(i) => serde_util::serialize_u32_as_i32(i, serializer),
         }
     }
 }

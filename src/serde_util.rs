@@ -7,6 +7,7 @@ use crate::{
     bson_util::get_u64,
     error::{Error, Result},
     options::WriteConcern,
+    serde_util,
 };
 
 pub(crate) mod duration_option_as_int_seconds {
@@ -73,7 +74,7 @@ pub(crate) fn serialize_u32_option_as_i32<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(ref val) => crate::bson::serde_helpers::serialize_u32_as_i32(val, serializer),
+        Some(ref val) => serde_util::serialize_u32_as_i32(val, serializer),
         None => serializer.serialize_none(),
     }
 }
@@ -101,7 +102,7 @@ pub(crate) fn serialize_u64_option_as_i64<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(ref v) => crate::bson::serde_helpers::serialize_u64_as_i64(v, serializer),
+        Some(ref v) => serde_util::serialize_u64_as_i64(v, serializer),
         None => serializer.serialize_none(),
     }
 }
@@ -224,4 +225,30 @@ pub(crate) fn serialize_bool_or_true<S: Serializer>(
 ) -> std::result::Result<S::Ok, S::Error> {
     let val = val.unwrap_or(true);
     serializer.serialize_bool(val)
+}
+
+pub(crate) fn serialize_u32_as_i32<S: Serializer>(
+    n: &u32,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    match i32::try_from(*n) {
+        Ok(n) => n.serialize(serializer),
+        Err(_) => Err(serde::ser::Error::custom(format!(
+            "cannot serialize u32 {} as i32",
+            n
+        ))),
+    }
+}
+
+pub(crate) fn serialize_u64_as_i64<S: Serializer>(
+    n: &u64,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    match i64::try_from(*n) {
+        Ok(n) => n.serialize(serializer),
+        Err(_) => Err(serde::ser::Error::custom(format!(
+            "cannot serialize u64 {} as i64",
+            n
+        ))),
+    }
 }
