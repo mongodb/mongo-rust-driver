@@ -67,8 +67,7 @@ async fn authenticate_stream_inner(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
-    // Note from RUST-1529: http_client is used in the original non-AWS SDK implementation for
-    // credentials
+    // RUST-1529 note: http_client is used in the non-AWS SDK implementation to get credentials
     _http_client: &HttpClient,
 ) -> Result<()> {
     let source = match credential.source.as_deref() {
@@ -121,42 +120,22 @@ async fn authenticate_stream_inner(
         )
     } else {
         // If credentials are not provided in the URI, use the AWS SDK to load
-        // let creds = aws_config::load_defaults(BehaviorVersion::latest())
-        //     .await
-        //     .credentials_provider()
-        //     .expect("no credential provider configured")
-        //     .provide_credentials()
-        //     .await
-        //     .map_err(|e| {
-        //         Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
-        //     })?;
-
-        // AwsCredential::from_sdk_creds(
-        //     creds.access_key_id().to_string(),
-        //     creds.secret_access_key().to_string(),
-        //     creds.session_token().map(|s| s.to_string()),
-        //     None,
-        // )
-        let provider = aws_config::load_defaults(BehaviorVersion::latest())
+        let creds = aws_config::load_defaults(BehaviorVersion::latest())
             .await
             .credentials_provider()
-            .expect("no credential provider configured");
+            .expect("no credential provider configured")
+            .provide_credentials()
+            .await
+            .map_err(|e| {
+                Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
+            })?;
 
-        match provider.provide_credentials().await {
-            Ok(creds) => AwsCredential::from_sdk_creds(
-                creds.access_key_id().to_string(),
-                creds.secret_access_key().to_string(),
-                creds.session_token().map(|s| s.to_string()),
-                None,
-            ),
-            Err(e) => {
-                eprintln!("AWS credential error: {:#?}", e);
-                return Err(Error::authentication_error(
-                    MECH_NAME,
-                    &format!("failed to get creds: {e}"),
-                ));
-            }
-        }
+        AwsCredential::from_sdk_creds(
+            creds.access_key_id().to_string(),
+            creds.secret_access_key().to_string(),
+            creds.session_token().map(|s| s.to_string()),
+            None,
+        )
     };
 
     // Find credentials using original implementation without AWS SDK
@@ -224,7 +203,7 @@ async fn authenticate_stream_inner(
 }
 
 /// Contains the credentials for MONGODB-AWS authentication.
-// RUST-1529 note: dead_code tag was added to avoid unused warnings for expiration field
+// RUST-1529 note: dead_code tag added to avoid unused warnings on expiration field
 #[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -558,6 +537,8 @@ impl AwsCredential {
         self.session_token.as_deref()
     }
 
+    // RUST-1529 note: commented out is_expired method since it is not used in the current
+    // implementation
     // fn is_expired(&self) -> bool {
     //     match self.expiration {
     //         Some(expiration) => {
