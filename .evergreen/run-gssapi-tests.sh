@@ -16,9 +16,6 @@ FEATURE_FLAGS+=("gssapi-auth")
 
 set +o errexit
 
-# Update hosts with relevant data
-echo "`host $SASL_HOST | awk '/has address/ { print $4 ; exit }'` $SASL_HOST" | sudo tee -a /etc/hosts
-
 # Create a krb5 config file with relevant
 touch krb5.conf
 echo "[realms]
@@ -46,7 +43,7 @@ klist
 
 # Run end-to-end auth tests for "$PRINCIPAL" user
 TEST_OPTIONS+=("--skip with_service_realm_and_host_options")
-cargo_test test::auth::gssapi
+cargo_test test::auth::gssapi_skip_local
 
 # Unauthenticate
 echo "Unauthenticating $PRINCIPAL"
@@ -58,7 +55,7 @@ echo "$SASL_PASS_CROSS" | kinit -p $PRINCIPAL_CROSS
 klist
 
 TEST_OPTIONS=()
-cargo_test test::auth::gssapi::with_service_realm_and_host_options
+cargo_test test::auth::gssapi_skip_local::with_service_realm_and_host_options
 
 # Unauthenticate
 echo "Unuthenticating $PRINCIPAL_CROSS"
