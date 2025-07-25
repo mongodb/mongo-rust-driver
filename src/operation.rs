@@ -52,7 +52,7 @@ use crate::{
         WriteConcernError,
         WriteFailure,
     },
-    options::WriteConcern,
+    options::{ClientOptions, WriteConcern},
     selection_criteria::SelectionCriteria,
     BoxFuture,
     ClientSession,
@@ -98,6 +98,26 @@ pub(crate) enum Retryability {
     Write,
     Read,
     None,
+}
+
+impl Retryability {
+    /// Returns this level of retryability in tandem with the client options.
+    pub(crate) fn with_options(&self, options: &ClientOptions) -> Self {
+        match self {
+            Self::Write if options.retry_writes != Some(false) => Self::Write,
+            Self::Read if options.retry_reads != Some(false) => Self::Read,
+            _ => Self::None,
+        }
+    }
+
+    /// Whether this level of retryability can retry the given error.
+    pub(crate) fn can_retry_error(&self, error: &Error) -> bool {
+        match self {
+            Self::Write => error.is_write_retryable(),
+            Self::Read => error.is_read_retryable(),
+            Self::None => false,
+        }
+    }
 }
 
 /// A trait modeling the behavior of a server side operation.
