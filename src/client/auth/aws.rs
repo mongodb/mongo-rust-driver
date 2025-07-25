@@ -1,9 +1,15 @@
-#[cfg(feature = "aws-sdk-auth")]
+#[cfg(feature = "aws-auth")]
 use aws_config::BehaviorVersion;
-#[cfg(feature = "aws-sdk-auth")]
+
+#[cfg(feature = "aws-auth")]
 use aws_credential_types::provider::ProvideCredentials;
-#[cfg(feature = "aws-sdk-auth")]
+
+#[allow(unused_imports)]
+#[cfg(feature = "aws-auth")]
 use aws_types::sdk_config::SharedCredentialsProvider;
+
+// Note from RUST-1529: commented Duration import since original implementation is commented out
+// use std::time::Duration;
 
 use chrono::{offset::Utc, DateTime};
 use hmac::Hmac;
@@ -11,7 +17,7 @@ use once_cell::sync::Lazy;
 use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use std::{fs::File, io::Read, time::Duration};
+use std::{fs::File, io::Read};
 use tokio::sync::Mutex;
 
 use crate::{
@@ -61,7 +67,9 @@ async fn authenticate_stream_inner(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
-    http_client: &HttpClient,
+    // Note from RUST-1529: http_client is used in the original non-AWS SDK implementation for
+    // credentials
+    _http_client: &HttpClient,
 ) -> Result<()> {
     let source = match credential.source.as_deref() {
         Some("$external") | None => "$external",
@@ -96,7 +104,7 @@ async fn authenticate_stream_inner(
     let server_first = ServerFirst::parse(server_first_response.auth_response_body(MECH_NAME)?)?;
     server_first.validate(&nonce)?;
 
-    #[cfg(feature = "aws-sdk-auth")]
+    // Find credentials using MongoDB URI or AWS SDK
     let aws_credential = if let (Some(access_key), Some(secret_key)) =
         (&credential.username, &credential.password)
     {
@@ -113,40 +121,62 @@ async fn authenticate_stream_inner(
         )
     } else {
         // If credentials are not provided in the URI, use the AWS SDK to load
-        let creds = aws_config::load_defaults(BehaviorVersion::latest())
+        // let creds = aws_config::load_defaults(BehaviorVersion::latest())
+        //     .await
+        //     .credentials_provider()
+        //     .expect("no credential provider configured")
+        //     .provide_credentials()
+        //     .await
+        //     .map_err(|e| {
+        //         Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
+        //     })?;
+
+        // AwsCredential::from_sdk_creds(
+        //     creds.access_key_id().to_string(),
+        //     creds.secret_access_key().to_string(),
+        //     creds.session_token().map(|s| s.to_string()),
+        //     None,
+        // )
+        let provider = aws_config::load_defaults(BehaviorVersion::latest())
             .await
             .credentials_provider()
-            .expect("no credential provider configured")
-            .provide_credentials()
-            .await
-            .map_err(|e| {
-                Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
-            })?;
-        AwsCredential::from_sdk_creds(
-            creds.access_key_id().to_string(),
-            creds.secret_access_key().to_string(),
-            creds.session_token().map(|s| s.to_string()),
-            None,
-        )
-    };
-    #[cfg(not(feature = "aws-sdk-auth"))]
-    let aws_credential = {
-        // Limit scope of this variable to avoid holding onto the lock for the duration of
-        // authenticate_stream.
-        let cached_credential = CACHED_CREDENTIAL.lock().await;
-        match *cached_credential {
-            Some(ref aws_credential) if !aws_credential.is_expired() => aws_credential.clone(),
-            _ => {
-                // From the spec: the driver MUST not place a lock on making a request.
-                drop(cached_credential);
-                let aws_credential = AwsCredential::get(credential, http_client).await?;
-                if aws_credential.expiration.is_some() {
-                    *CACHED_CREDENTIAL.lock().await = Some(aws_credential.clone());
-                }
-                aws_credential
+            .expect("no credential provider configured");
+
+        match provider.provide_credentials().await {
+            Ok(creds) => AwsCredential::from_sdk_creds(
+                creds.access_key_id().to_string(),
+                creds.secret_access_key().to_string(),
+                creds.session_token().map(|s| s.to_string()),
+                None,
+            ),
+            Err(e) => {
+                eprintln!("AWS credential error: {:#?}", e);
+                return Err(Error::authentication_error(
+                    MECH_NAME,
+                    &format!("failed to get creds: {e}"),
+                ));
             }
         }
     };
+
+    // Find credentials using original implementation without AWS SDK
+    // let aws_credential = {
+    //     // Limit scope of this variable to avoid holding onto the lock for the duration of
+    //     // authenticate_stream.
+    //     let cached_credential = CACHED_CREDENTIAL.lock().await;
+    //     match *cached_credential {
+    //         Some(ref aws_credential) if !aws_credential.is_expired() => aws_credential.clone(),
+    //         _ => {
+    //             // From the spec: the driver MUST not place a lock on making a request.
+    //             drop(cached_credential);
+    //             let aws_credential = AwsCredential::get(credential, http_client).await?;
+    //             if aws_credential.expiration.is_some() {
+    //                 *CACHED_CREDENTIAL.lock().await = Some(aws_credential.clone());
+    //             }
+    //             aws_credential
+    //         }
+    //     }
+    // };
 
     let date = Utc::now();
 
@@ -526,15 +556,15 @@ impl AwsCredential {
         self.session_token.as_deref()
     }
 
-    fn is_expired(&self) -> bool {
-        match self.expiration {
-            Some(expiration) => {
-                expiration.saturating_duration_since(crate::bson::DateTime::now())
-                    < Duration::from_secs(5 * 60)
-            }
-            None => true,
-        }
-    }
+    // fn is_expired(&self) -> bool {
+    //     match self.expiration {
+    //         Some(expiration) => {
+    //             expiration.saturating_duration_since(crate::bson::DateTime::now())
+    //                 < Duration::from_secs(5 * 60)
+    //         }
+    //         None => true,
+    //     }
+    // }
 }
 
 /// The response from the server to the `saslStart` command in a MONGODB-AWS authentication attempt.

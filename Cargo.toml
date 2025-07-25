@@ -41,11 +41,7 @@ dns-resolver = ["dep:hickory-resolver", "dep:hickory-proto"]
 cert-key-password = ["dep:pem", "dep:pkcs8"]
 
 # Enable support for MONGODB-AWS authentication.
-aws-auth = ["dep:reqwest"]
-
-# Enable support AWS SDK for authentication.
-# This can only be used with the tokio-runtime and aws-auth feature flags.
-aws-sdk-auth = ["dep:reqwest", "aws-config"]
+aws-auth = ["dep:reqwest", "aws-config"]
 
 # Enable support for on-demand Azure KMS credentials.
 azure-kms = ["dep:reqwest"]
