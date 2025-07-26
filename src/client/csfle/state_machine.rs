@@ -18,7 +18,12 @@ use tokio::{
 };
 
 use crate::{
-    client::{csfle::options::KmsProvidersTlsOptions, options::ServerAddress, WeakClient},
+    client::{
+        auth::aws::get_aws_credentials,
+        csfle::options::KmsProvidersTlsOptions,
+        options::ServerAddress,
+        WeakClient,
+    },
     error::{Error, Result},
     operation::{run_command::RunCommand, RawOutput},
     options::ReadConcern,
@@ -250,10 +255,7 @@ impl CryptExecutor {
                             KmsProviderType::Aws => {
                                 #[cfg(feature = "aws-auth")]
                                 {
-                                    use crate::{
-                                        client::auth::{aws::AwsCredential, Credential},
-                                        runtime::HttpClient,
-                                    };
+                                    use crate::client::auth::Credential;
 
                                     // Original implementation using the AWS SDK
                                     let aws_creds =
