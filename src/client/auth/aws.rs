@@ -2,7 +2,7 @@
 use aws_config::BehaviorVersion;
 
 #[cfg(feature = "aws-auth")]
-use aws_credential_types::provider::ProvideCredentials;
+use aws_credential_types::{provider::ProvideCredentials, Credentials};
 
 // Note from RUST-1529: commented Duration import since original implementation is commented out
 // use std::time::Duration;
@@ -99,7 +99,13 @@ async fn authenticate_stream_inner(
     let server_first = ServerFirst::parse(server_first_response.auth_response_body(MECH_NAME)?)?;
     server_first.validate(&nonce)?;
 
-    let aws_credential = get_aws_credentials(credential).await?;
+    let creds = get_aws_credentials(credential).await?;
+    let aws_credential = AwsCredential::from_sdk_creds(
+        creds.access_key_id().to_string(),
+        creds.secret_access_key().to_string(),
+        creds.session_token().map(|s| s.to_string()),
+        None,
+    );
 
     // Find credentials using original implementation without AWS SDK
     // let aws_credential = {
@@ -166,10 +172,10 @@ async fn authenticate_stream_inner(
 }
 
 // Find credentials using MongoDB URI or AWS SDK
-pub async fn get_aws_credentials(credential: &Credential) -> Result<AwsCredential> {
+pub async fn get_aws_credentials(credential: &Credential) -> Result<Credentials> {
     if let (Some(access_key), Some(secret_key)) = (&credential.username, &credential.password) {
         // Look for credentials in the MongoDB URI
-        Ok(AwsCredential::from_sdk_creds(
+        Ok(Credentials::new(
             access_key.clone(),
             secret_key.clone(),
             credential
@@ -178,6 +184,7 @@ pub async fn get_aws_credentials(credential: &Credential) -> Result<AwsCredentia
                 .and_then(|mp| mp.get_str("AWS_SESSION_TOKEN").ok())
                 .map(str::to_owned),
             None,
+            "MongoDB URI",
         ))
     } else {
         // If credentials are not provided in the URI, use the AWS SDK to load
@@ -195,13 +202,7 @@ pub async fn get_aws_credentials(credential: &Credential) -> Result<AwsCredentia
             .map_err(|e| {
                 Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
             })?;
-
-        Ok(AwsCredential::from_sdk_creds(
-            creds.access_key_id().to_string(),
-            creds.secret_access_key().to_string(),
-            creds.session_token().map(|s| s.to_string()),
-            None,
-        ))
+        Ok(creds)
     }
 }
 
