@@ -4,10 +4,6 @@ use aws_config::BehaviorVersion;
 #[cfg(feature = "aws-auth")]
 use aws_credential_types::provider::ProvideCredentials;
 
-#[allow(unused_imports)]
-#[cfg(feature = "aws-auth")]
-use aws_types::sdk_config::SharedCredentialsProvider;
-
 // Note from RUST-1529: commented Duration import since original implementation is commented out
 // use std::time::Duration;
 
@@ -123,7 +119,12 @@ async fn authenticate_stream_inner(
         let creds = aws_config::load_defaults(BehaviorVersion::latest())
             .await
             .credentials_provider()
-            .expect("no credential provider configured")
+            .ok_or_else(|| {
+                Error::authentication_error(
+                    MECH_NAME,
+                    &format!("no credential provider configured"),
+                )
+            })?
             .provide_credentials()
             .await
             .map_err(|e| {
