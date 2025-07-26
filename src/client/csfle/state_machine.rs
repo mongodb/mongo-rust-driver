@@ -255,11 +255,10 @@ impl CryptExecutor {
                                         runtime::HttpClient,
                                     };
 
-                                    let aws_creds = AwsCredential::get(
-                                        &Credential::default(),
-                                        &HttpClient::default(),
-                                    )
-                                    .await?;
+                                    // Original implementation using the AWS SDK
+                                    let aws_creds =
+                                        get_aws_credentials(&Credential::default()).await?;
+
                                     let mut creds = rawdoc! {
                                         "accessKeyId": aws_creds.access_key(),
                                         "secretAccessKey": aws_creds.secret_key(),
