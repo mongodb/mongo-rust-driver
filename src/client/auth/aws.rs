@@ -1,15 +1,24 @@
-use std::{fs::File, io::Read, time::Duration};
+#[cfg(feature = "aws-auth")]
+use aws_config::BehaviorVersion;
+
+#[cfg(feature = "aws-auth")]
+use aws_credential_types::{provider::ProvideCredentials, Credentials};
+
+// Note from RUST-1529: commented Duration import since original implementation is commented out
+// use std::time::Duration;
+// use rand::distributions::{Alphanumeric, DistString};
+// use std::{fs::File, io::Read};
+// use crate::bson::rawdoc;
 
 use chrono::{offset::Utc, DateTime};
 use hmac::Hmac;
 use once_cell::sync::Lazy;
-use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 
 use crate::{
-    bson::{doc, rawdoc, spec::BinarySubtype, Binary, Bson, Document},
+    bson::{doc, spec::BinarySubtype, Binary, Bson, Document},
     client::{
         auth::{
             self,
@@ -28,8 +37,8 @@ use crate::{
 #[cfg(not(feature = "bson-3"))]
 use crate::bson_compat::DocumentExt as _;
 
-const AWS_ECS_IP: &str = "169.254.170.2";
-const AWS_EC2_IP: &str = "169.254.169.254";
+// const AWS_ECS_IP: &str = "169.254.170.2";
+// const AWS_EC2_IP: &str = "169.254.169.254";
 const AWS_LONG_DATE_FMT: &str = "%Y%m%dT%H%M%SZ";
 const MECH_NAME: &str = "MONGODB-AWS";
 
@@ -55,7 +64,8 @@ async fn authenticate_stream_inner(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
-    http_client: &HttpClient,
+    // RUST-1529 note: http_client is used in the non-AWS SDK implementation to get credentials
+    _http_client: &HttpClient,
 ) -> Result<()> {
     let source = match credential.source.as_deref() {
         Some("$external") | None => "$external",
@@ -90,23 +100,32 @@ async fn authenticate_stream_inner(
     let server_first = ServerFirst::parse(server_first_response.auth_response_body(MECH_NAME)?)?;
     server_first.validate(&nonce)?;
 
-    let aws_credential = {
-        // Limit scope of this variable to avoid holding onto the lock for the duration of
-        // authenticate_stream.
-        let cached_credential = CACHED_CREDENTIAL.lock().await;
-        match *cached_credential {
-            Some(ref aws_credential) if !aws_credential.is_expired() => aws_credential.clone(),
-            _ => {
-                // From the spec: the driver MUST not place a lock on making a request.
-                drop(cached_credential);
-                let aws_credential = AwsCredential::get(credential, http_client).await?;
-                if aws_credential.expiration.is_some() {
-                    *CACHED_CREDENTIAL.lock().await = Some(aws_credential.clone());
-                }
-                aws_credential
-            }
-        }
-    };
+    let creds = get_aws_credentials(credential).await?;
+    let aws_credential = AwsCredential::from_sdk_creds(
+        creds.access_key_id().to_string(),
+        creds.secret_access_key().to_string(),
+        creds.session_token().map(|s| s.to_string()),
+        None,
+    );
+
+    // Find credentials using original implementation without AWS SDK
+    // let aws_credential = {
+    //     // Limit scope of this variable to avoid holding onto the lock for the duration of
+    //     // authenticate_stream.
+    //     let cached_credential = CACHED_CREDENTIAL.lock().await;
+    //     match *cached_credential {
+    //         Some(ref aws_credential) if !aws_credential.is_expired() => aws_credential.clone(),
+    //         _ => {
+    //             // From the spec: the driver MUST not place a lock on making a request.
+    //             drop(cached_credential);
+    //             let aws_credential = AwsCredential::get(credential, http_client).await?;
+    //             if aws_credential.expiration.is_some() {
+    //                 *CACHED_CREDENTIAL.lock().await = Some(aws_credential.clone());
+    //             }
+    //             aws_credential
+    //         }
+    //     }
+    // };
 
     let date = Utc::now();
 
@@ -153,7 +172,41 @@ async fn authenticate_stream_inner(
     Ok(())
 }
 
+// Find credentials using MongoDB URI or AWS SDK
+pub async fn get_aws_credentials(credential: &Credential) -> Result<Credentials> {
+    if let (Some(access_key), Some(secret_key)) = (&credential.username, &credential.password) {
+        // Look for credentials in the MongoDB URI
+        Ok(Credentials::new(
+            access_key.clone(),
+            secret_key.clone(),
+            credential
+                .mechanism_properties
+                .as_ref()
+                .and_then(|mp| mp.get_str("AWS_SESSION_TOKEN").ok())
+                .map(str::to_owned),
+            None,
+            "MongoDB URI",
+        ))
+    } else {
+        // If credentials are not provided in the URI, use the AWS SDK to load
+        let creds = aws_config::load_defaults(BehaviorVersion::latest())
+            .await
+            .credentials_provider()
+            .ok_or_else(|| {
+                Error::authentication_error(MECH_NAME, "no credential provider configured")
+            })?
+            .provide_credentials()
+            .await
+            .map_err(|e| {
+                Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
+            })?;
+        Ok(creds)
+    }
+}
+
 /// Contains the credentials for MONGODB-AWS authentication.
+// RUST-1529 note: dead_code tag added to avoid unused warnings on expiration field
+#[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub(crate) struct AwsCredential {
@@ -171,168 +224,183 @@ pub(crate) struct AwsCredential {
     expiration: Option<crate::bson::DateTime>,
 }
 
-fn non_empty(s: Option<String>) -> Option<String> {
-    match s {
-        None => None,
-        Some(s) if s.is_empty() => None,
-        Some(s) => Some(s),
-    }
-}
+// fn non_empty(s: Option<String>) -> Option<String> {
+//     match s {
+//         None => None,
+//         Some(s) if s.is_empty() => None,
+//         Some(s) => Some(s),
+//     }
+// }
 
 impl AwsCredential {
-    /// Derives the credentials for an authentication attempt given the set of credentials the user
-    /// passed in.
-    pub(crate) async fn get(credential: &Credential, http_client: &HttpClient) -> Result<Self> {
-        let access_key = credential
-            .username
-            .clone()
-            .or_else(|| non_empty(std::env::var("AWS_ACCESS_KEY_ID").ok()));
-        let secret_key = credential
-            .password
-            .clone()
-            .or_else(|| non_empty(std::env::var("AWS_SECRET_ACCESS_KEY").ok()));
-        let session_token = credential
-            .mechanism_properties
-            .as_ref()
-            .and_then(|d| d.get_str("AWS_SESSION_TOKEN").ok())
-            .map(|s| s.to_string())
-            .or_else(|| non_empty(std::env::var("AWS_SESSION_TOKEN").ok()));
+    // /// Derives the credentials for an authentication attempt given the set of credentials the
+    // user /// passed in.
+    // pub(crate) async fn get(credential: &Credential, http_client: &HttpClient) -> Result<Self> {
+    //     let access_key = credential
+    //         .username
+    //         .clone()
+    //         .or_else(|| non_empty(std::env::var("AWS_ACCESS_KEY_ID").ok()));
+    //     let secret_key = credential
+    //         .password
+    //         .clone()
+    //         .or_else(|| non_empty(std::env::var("AWS_SECRET_ACCESS_KEY").ok()));
+    //     let session_token = credential
+    //         .mechanism_properties
+    //         .as_ref()
+    //         .and_then(|d| d.get_str("AWS_SESSION_TOKEN").ok())
+    //         .map(|s| s.to_string())
+    //         .or_else(|| non_empty(std::env::var("AWS_SESSION_TOKEN").ok()));
 
-        let found_access_key = access_key.is_some();
-        let found_secret_key = secret_key.is_some();
+    //     let found_access_key = access_key.is_some();
+    //     let found_secret_key = secret_key.is_some();
 
-        // If we have an access key and secret key, we can continue with the credentials we've
-        // found.
-        if let (Some(access_key), Some(secret_key)) = (access_key, secret_key) {
-            return Ok(Self {
-                access_key_id: access_key,
-                secret_access_key: secret_key,
-                session_token,
-                expiration: None,
-            });
-        }
+    //     // If we have an access key and secret key, we can continue with the credentials we've
+    //     // found.
+    //     if let (Some(access_key), Some(secret_key)) = (access_key, secret_key) {
+    //         return Ok(Self {
+    //             access_key_id: access_key,
+    //             secret_access_key: secret_key,
+    //             session_token,
+    //             expiration: None,
+    //         });
+    //     }
 
-        if found_access_key || found_secret_key {
-            return Err(Error::authentication_error(
-                MECH_NAME,
-                "cannot specify only one of access key and secret key; either both or neither \
-                 must be provided",
-            ));
-        }
+    //     if found_access_key || found_secret_key {
+    //         return Err(Error::authentication_error(
+    //             MECH_NAME,
+    //             "cannot specify only one of access key and secret key; either both or neither \
+    //              must be provided",
+    //         ));
+    //     }
 
-        if session_token.is_some() {
-            return Err(Error::authentication_error(
-                MECH_NAME,
-                "cannot specify session token without both access key and secret key",
-            ));
-        }
+    //     if session_token.is_some() {
+    //         return Err(Error::authentication_error(
+    //             MECH_NAME,
+    //             "cannot specify session token without both access key and secret key",
+    //         ));
+    //     }
 
-        if let (Ok(token_file), Ok(role_arn)) = (
-            std::env::var("AWS_WEB_IDENTITY_TOKEN_FILE"),
-            std::env::var("AWS_ROLE_ARN"),
-        ) {
-            return Self::get_from_assume_role_with_web_identity_request(
-                token_file,
-                role_arn,
-                http_client,
-            )
-            .await;
-        }
+    //     if let (Ok(token_file), Ok(role_arn)) = (
+    //         std::env::var("AWS_WEB_IDENTITY_TOKEN_FILE"),
+    //         std::env::var("AWS_ROLE_ARN"),
+    //     ) {
+    //         return Self::get_from_assume_role_with_web_identity_request(
+    //             token_file,
+    //             role_arn,
+    //             http_client,
+    //         )
+    //         .await;
+    //     }
 
-        if let Ok(relative_uri) = std::env::var("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") {
-            Self::get_from_ecs(relative_uri, http_client).await
-        } else {
-            Self::get_from_ec2(http_client).await
+    //     if let Ok(relative_uri) = std::env::var("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") {
+    //         Self::get_from_ecs(relative_uri, http_client).await
+    //     } else {
+    //         Self::get_from_ec2(http_client).await
+    //     }
+    // }
+
+    // Creates AwsCredential from keys.
+    fn from_sdk_creds(
+        access_key_id: String,
+        secret_access_key: String,
+        session_token: Option<String>,
+        expiration: Option<crate::bson::DateTime>,
+    ) -> Self {
+        Self {
+            access_key_id,
+            secret_access_key,
+            session_token,
+            expiration,
         }
     }
 
-    async fn get_from_assume_role_with_web_identity_request(
-        token_file: String,
-        role_arn: String,
-        http_client: &HttpClient,
-    ) -> Result<Self> {
-        let mut file = File::open(&token_file).map_err(|_| {
-            Error::authentication_error(MECH_NAME, "could not open identity token file")
-        })?;
-        let mut buffer = Vec::<u8>::new();
-        file.read_to_end(&mut buffer).map_err(|_| {
-            Error::authentication_error(MECH_NAME, "could not read identity token file")
-        })?;
-        let token = std::str::from_utf8(&buffer).map_err(|_| {
-            Error::authentication_error(MECH_NAME, "could not read identity token file")
-        })?;
+    // async fn get_from_assume_role_with_web_identity_request(
+    //     token_file: String,
+    //     role_arn: String,
+    //     http_client: &HttpClient,
+    // ) -> Result<Self> {
+    //     let mut file = File::open(&token_file).map_err(|_| {
+    //         Error::authentication_error(MECH_NAME, "could not open identity token file")
+    //     })?;
+    //     let mut buffer = Vec::<u8>::new();
+    //     file.read_to_end(&mut buffer).map_err(|_| {
+    //         Error::authentication_error(MECH_NAME, "could not read identity token file")
+    //     })?;
+    //     let token = std::str::from_utf8(&buffer).map_err(|_| {
+    //         Error::authentication_error(MECH_NAME, "could not read identity token file")
+    //     })?;
 
-        let session_name = std::env::var("AWS_ROLE_SESSION_NAME")
-            .unwrap_or_else(|_| Alphanumeric.sample_string(&mut rand::thread_rng(), 10));
+    //     let session_name = std::env::var("AWS_ROLE_SESSION_NAME")
+    //         .unwrap_or_else(|_| Alphanumeric.sample_string(&mut rand::thread_rng(), 10));
 
-        let query = rawdoc! {
-            "Action": "AssumeRoleWithWebIdentity",
-            "RoleSessionName": session_name,
-            "RoleArn": role_arn,
-            "WebIdentityToken": token,
-            "Version": "2011-06-15",
-        };
+    //     let query = rawdoc! {
+    //         "Action": "AssumeRoleWithWebIdentity",
+    //         "RoleSessionName": session_name,
+    //         "RoleArn": role_arn,
+    //         "WebIdentityToken": token,
+    //         "Version": "2011-06-15",
+    //     };
 
-        let response = http_client
-            .get("https://sts.amazonaws.com/")
-            .headers(&[("Accept", "application/json")])
-            .query(query)
-            .send::<Document>()
-            .await
-            .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?;
+    //     let response = http_client
+    //         .get("https://sts.amazonaws.com/")
+    //         .headers(&[("Accept", "application/json")])
+    //         .query(query)
+    //         .send::<Document>()
+    //         .await
+    //         .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?;
 
-        let credential = response
-            .get_document("AssumeRoleWithWebIdentityResponse")
-            .and_then(|d| d.get_document("AssumeRoleWithWebIdentityResult"))
-            .and_then(|d| d.get_document("Credentials"))
-            .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?
-            .to_owned();
+    //     let credential = response
+    //         .get_document("AssumeRoleWithWebIdentityResponse")
+    //         .and_then(|d| d.get_document("AssumeRoleWithWebIdentityResult"))
+    //         .and_then(|d| d.get_document("Credentials"))
+    //         .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?
+    //         .to_owned();
 
-        Ok(crate::bson_compat::deserialize_from_document(credential)?)
-    }
+    //     Ok(crate::bson_compat::deserialize_from_document(credential)?)
+    // }
 
-    /// Obtains credentials from the ECS endpoint.
-    async fn get_from_ecs(relative_uri: String, http_client: &HttpClient) -> Result<Self> {
-        // Use the local IP address that AWS uses for ECS agents.
-        let uri = format!("http://{}/{}", AWS_ECS_IP, relative_uri);
+    // /// Obtains credentials from the ECS endpoint.
+    // async fn get_from_ecs(relative_uri: String, http_client: &HttpClient) -> Result<Self> {
+    //     // Use the local IP address that AWS uses for ECS agents.
+    //     let uri = format!("http://{}/{}", AWS_ECS_IP, relative_uri);
 
-        http_client
-            .get(&uri)
-            .send()
-            .await
-            .map_err(|_| Error::unknown_authentication_error(MECH_NAME))
-    }
+    //     http_client
+    //         .get(&uri)
+    //         .send()
+    //         .await
+    //         .map_err(|_| Error::unknown_authentication_error(MECH_NAME))
+    // }
 
-    /// Obtains temporary credentials for an EC2 instance to use for authentication.
-    async fn get_from_ec2(http_client: &HttpClient) -> Result<Self> {
-        let temporary_token = http_client
-            .put(format!("http://{}/latest/api/token", AWS_EC2_IP))
-            .headers(&[("X-aws-ec2-metadata-token-ttl-seconds", "30")])
-            .send_and_get_string()
-            .await
-            .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?;
+    // /// Obtains temporary credentials for an EC2 instance to use for authentication.
+    // async fn get_from_ec2(http_client: &HttpClient) -> Result<Self> {
+    //     let temporary_token = http_client
+    //         .put(format!("http://{}/latest/api/token", AWS_EC2_IP))
+    //         .headers(&[("X-aws-ec2-metadata-token-ttl-seconds", "30")])
+    //         .send_and_get_string()
+    //         .await
+    //         .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?;
 
-        let role_name_uri = format!(
-            "http://{}/latest/meta-data/iam/security-credentials/",
-            AWS_EC2_IP
-        );
+    //     let role_name_uri = format!(
+    //         "http://{}/latest/meta-data/iam/security-credentials/",
+    //         AWS_EC2_IP
+    //     );
 
-        let role_name = http_client
-            .get(&role_name_uri)
-            .headers(&[("X-aws-ec2-metadata-token", &temporary_token[..])])
-            .send_and_get_string()
-            .await
-            .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?;
+    //     let role_name = http_client
+    //         .get(&role_name_uri)
+    //         .headers(&[("X-aws-ec2-metadata-token", &temporary_token[..])])
+    //         .send_and_get_string()
+    //         .await
+    //         .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?;
 
-        let credential_uri = format!("{}/{}", role_name_uri, role_name);
+    //     let credential_uri = format!("{}/{}", role_name_uri, role_name);
 
-        http_client
-            .get(&credential_uri)
-            .headers(&[("X-aws-ec2-metadata-token", &temporary_token[..])])
-            .send()
-            .await
-            .map_err(|_| Error::unknown_authentication_error(MECH_NAME))
-    }
+    //     http_client
+    //         .get(&credential_uri)
+    //         .headers(&[("X-aws-ec2-metadata-token", &temporary_token[..])])
+    //         .send()
+    //         .await
+    //         .map_err(|_| Error::unknown_authentication_error(MECH_NAME))
+    // }
 
     /// Computes the signed authorization header for the credentials to send to the server in a sasl
     /// payload.
@@ -457,30 +525,32 @@ impl AwsCredential {
         Ok(auth_header)
     }
 
-    #[cfg(feature = "in-use-encryption")]
-    pub(crate) fn access_key(&self) -> &str {
-        &self.access_key_id
-    }
+    // #[cfg(feature = "in-use-encryption")]
+    // pub(crate) fn access_key(&self) -> &str {
+    //     &self.access_key_id
+    // }
 
-    #[cfg(feature = "in-use-encryption")]
-    pub(crate) fn secret_key(&self) -> &str {
-        &self.secret_access_key
-    }
+    // #[cfg(feature = "in-use-encryption")]
+    // pub(crate) fn secret_key(&self) -> &str {
+    //     &self.secret_access_key
+    // }
 
-    #[cfg(feature = "in-use-encryption")]
-    pub(crate) fn session_token(&self) -> Option<&str> {
-        self.session_token.as_deref()
-    }
+    // #[cfg(feature = "in-use-encryption")]
+    // pub(crate) fn session_token(&self) -> Option<&str> {
+    //     self.session_token.as_deref()
+    // }
 
-    fn is_expired(&self) -> bool {
-        match self.expiration {
-            Some(expiration) => {
-                expiration.saturating_duration_since(crate::bson::DateTime::now())
-                    < Duration::from_secs(5 * 60)
-            }
-            None => true,
-        }
-    }
+    // RUST-1529 note: commented out is_expired method since it is not used in the current
+    // implementation
+    // fn is_expired(&self) -> bool {
+    //     match self.expiration {
+    //         Some(expiration) => {
+    //             expiration.saturating_duration_since(crate::bson::DateTime::now())
+    //                 < Duration::from_secs(5 * 60)
+    //         }
+    //         None => true,
+    //     }
+    // }
 }
 
 /// The response from the server to the `saslStart` command in a MONGODB-AWS authentication attempt.
