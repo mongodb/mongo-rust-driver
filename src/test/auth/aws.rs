@@ -11,6 +11,7 @@ use crate::{
 async fn auth_aws() {
     let client = Client::for_test().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
+    let _ = tracing_subscriber::fmt::try_init();
 
     coll.find_one(doc! {}).await.unwrap();
 }

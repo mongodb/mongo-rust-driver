@@ -29,9 +29,13 @@ async fn try_create_data_key() -> Result<()> {
 
 #[tokio::test]
 async fn success() {
+    dbg!("Running on-demand AWS credentials test");
     assert!(std::env::var("AWS_ACCESS_KEY_ID").is_ok());
+    dbg!("AWS_ACCESS_KEY_ID is set");
     assert!(std::env::var("AWS_SECRET_ACCESS_KEY").is_ok());
+    dbg!("AWS_SECRET_ACCESS_KEY is set");
     try_create_data_key().await.unwrap();
+    dbg!("try_create_data_key succeeded");
 }
 
 #[tokio::test]
