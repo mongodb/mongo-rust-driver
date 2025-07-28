@@ -191,8 +191,8 @@ pub async fn get_aws_credentials(credential: &Credential) -> Result<Credentials>
         ))
     } else {
         // If credentials are not provided in the URI, use the AWS SDK to load
-        let creds = aws_config::load_defaults(BehaviorVersion::latest())
-            .await
+        let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
+        let creds = config
             .credentials_provider()
             .ok_or_else(|| {
                 Error::authentication_error(MECH_NAME, "no credential provider configured")

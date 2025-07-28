@@ -136,6 +136,7 @@ default-features = false
 version = "1"
 optional = true
 default-features = false
+features = ["default-https-client", "rt-tokio"]
 
 [dependencies.aws-sdk-sts]
 version = "=1.73"
