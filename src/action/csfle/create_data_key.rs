@@ -13,6 +13,7 @@ impl ClientEncryption {
     #[deeplink]
     #[options_doc(create_data_keys)]
     pub fn create_data_key(&self, master_key: impl Into<MasterKey>) -> CreateDataKey {
+        dbg!("create_data_key inside src/action/csfle/create_data_key.rs");
         CreateDataKey {
             client_enc: self,
             master_key: master_key.into(),

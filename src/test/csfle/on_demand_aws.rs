@@ -17,6 +17,7 @@ async fn try_create_data_key() -> Result<()> {
         KV_NAMESPACE.clone(),
         [(KmsProvider::aws(), doc! {}, None)],
     )?;
+    dbg!("ClientEncryption::new worked");
     ce.create_data_key(
         AwsMasterKey::builder()
             .region("us-east-1")
