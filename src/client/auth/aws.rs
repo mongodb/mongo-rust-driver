@@ -631,44 +631,44 @@ impl ServerFirst {
     }
 }
 
-#[cfg(test)]
-pub(crate) mod test_utils {
-    use super::{AwsCredential, CACHED_CREDENTIAL};
+// #[cfg(test)]
+// pub(crate) mod test_utils {
+//     use super::{AwsCredential, CACHED_CREDENTIAL};
 
-    pub(crate) async fn cached_credential() -> Option<AwsCredential> {
-        CACHED_CREDENTIAL.lock().await.clone()
-    }
+//     pub(crate) async fn cached_credential() -> Option<AwsCredential> {
+//         CACHED_CREDENTIAL.lock().await.clone()
+//     }
 
-    pub(crate) async fn clear_cached_credential() {
-        *CACHED_CREDENTIAL.lock().await = None;
-    }
+//     pub(crate) async fn clear_cached_credential() {
+//         *CACHED_CREDENTIAL.lock().await = None;
+//     }
 
-    pub(crate) async fn poison_cached_credential() {
-        CACHED_CREDENTIAL
-            .lock()
-            .await
-            .as_mut()
-            .unwrap()
-            .access_key_id = "bad".into();
-    }
+//     pub(crate) async fn poison_cached_credential() {
+//         CACHED_CREDENTIAL
+//             .lock()
+//             .await
+//             .as_mut()
+//             .unwrap()
+//             .access_key_id = "bad".into();
+//     }
 
-    pub(crate) async fn cached_access_key_id() -> String {
-        cached_credential().await.unwrap().access_key_id
-    }
+//     pub(crate) async fn cached_access_key_id() -> String {
+//         cached_credential().await.unwrap().access_key_id
+//     }
 
-    pub(crate) async fn cached_secret_access_key() -> String {
-        cached_credential().await.unwrap().secret_access_key
-    }
+//     pub(crate) async fn cached_secret_access_key() -> String {
+//         cached_credential().await.unwrap().secret_access_key
+//     }
 
-    pub(crate) async fn cached_session_token() -> Option<String> {
-        cached_credential().await.unwrap().session_token
-    }
+//     pub(crate) async fn cached_session_token() -> Option<String> {
+//         cached_credential().await.unwrap().session_token
+//     }
 
-    pub(crate) async fn cached_expiration() -> crate::bson::DateTime {
-        cached_credential().await.unwrap().expiration.unwrap()
-    }
+//     pub(crate) async fn cached_expiration() -> crate::bson::DateTime {
+//         cached_credential().await.unwrap().expiration.unwrap()
+//     }
 
-    pub(crate) async fn set_cached_expiration(expiration: crate::bson::DateTime) {
-        CACHED_CREDENTIAL.lock().await.as_mut().unwrap().expiration = Some(expiration);
-    }
-}
+//     pub(crate) async fn set_cached_expiration(expiration: crate::bson::DateTime) {
+//         CACHED_CREDENTIAL.lock().await.as_mut().unwrap().expiration = Some(expiration);
+//     }
+// }
