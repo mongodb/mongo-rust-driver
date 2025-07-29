@@ -58,7 +58,7 @@ TEST_OPTIONS=()
 cargo_test test::auth::gssapi_skip_local::with_service_realm_and_host_options
 
 # Unauthenticate
-echo "Unuthenticating $PRINCIPAL_CROSS"
+echo "Unauthenticating $PRINCIPAL_CROSS"
 kdestroy
 
 # Run remaining tests
