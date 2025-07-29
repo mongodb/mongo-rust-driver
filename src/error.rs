@@ -50,8 +50,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// [`ErrorKind`](enum.ErrorKind.html) is wrapped in an `Box` to allow the errors to be
 /// cloned.
 #[derive(Clone, Debug, Error)]
-#[cfg_attr(test, error("Kind: {kind}, labels: {labels:?}, backtrace: {bt}"))]
-#[cfg_attr(not(test), error("Kind: {kind}, labels: {labels:?}"))]
+#[cfg_attr(
+    test,
+    error("Kind: {kind}, labels: {labels:?}, source: {source:?}, backtrace: {bt}")
+)]
+#[cfg_attr(
+    not(test),
+    error("Kind: {kind}, labels: {labels:?}, source: {source:?}")
+)]
 #[non_exhaustive]
 pub struct Error {
     /// The type of error that occurred.

@@ -6,14 +6,19 @@ use futures_core::TryStream;
 use futures_util::{FutureExt, TryStreamExt};
 
 use crate::{
-    bson::{rawdoc, Bson, RawDocumentBuf},
+    bson::{rawdoc, Bson, RawArrayBuf, RawDocumentBuf},
     bson_compat::{cstr, CStr},
-    bson_util::{self, extend_raw_document_buf},
+    bson_util::{self, RawDocumentCollection},
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{BulkWriteError, Error, ErrorKind, Result},
-    operation::{run_command::RunCommand, GetMore, OperationWithDefaults},
+    operation::{
+        run_command::RunCommand,
+        GetMore,
+        OperationWithDefaults,
+        MAX_ENCRYPTED_WRITE_SIZE,
+    },
     options::{BulkWriteOptions, OperationType, WriteModel},
     results::{BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult},
     BoxFuture,
@@ -33,11 +38,15 @@ use super::{
 
 use server_responses::*;
 
+const NS_INFO: &CStr = cstr!("nsInfo");
+const OPS: &CStr = cstr!("ops");
+
 pub(crate) struct BulkWrite<'a, R>
 where
     R: BulkWriteResult,
 {
     client: Client,
+    encrypted: bool,
     models: &'a [WriteModel],
     offset: usize,
     options: Option<&'a BulkWriteOptions>,
@@ -52,14 +61,16 @@ impl<'a, R> BulkWrite<'a, R>
 where
     R: BulkWriteResult,
 {
-    pub(crate) fn new(
+    pub(crate) async fn new(
         client: Client,
         models: &'a [WriteModel],
         offset: usize,
         options: Option<&'a BulkWriteOptions>,
     ) -> BulkWrite<'a, R> {
+        let encrypted = client.should_auto_encrypt().await;
         Self {
             client,
+            encrypted,
             models,
             offset,
             options,
@@ -222,37 +233,102 @@ where
             .and_then(|options| options.ordered)
             .unwrap_or(true)
     }
+
+    fn batch_split_models<T: RawDocumentCollection>(
+        &mut self,
+        command_body: RawDocumentBuf,
+        max_size: usize,
+        max_operations: usize,
+        max_bson_object_size: usize,
+    ) -> Result<Command> {
+        // For single-batch writes, ignore the lower maximum size defined by
+        // MAX_ENCRYPTED_WRITE_SIZE.
+        let first_write_max_encrypted_size = max_bson_object_size - command_body.as_bytes().len();
+
+        let mut namespace_info: NamespaceInfo<T> = NamespaceInfo::new();
+        let mut ops = T::default();
+        let mut current_size = Checked::new(0);
+
+        for (i, model) in self.models.iter().take(max_operations).enumerate() {
+            let (namespace_index, namespace_size) =
+                namespace_info.get_index_and_size(model.namespace())?;
+            let (model_document, inserted_id) = model.get_ops_document(namespace_index)?;
+
+            let operation_size = T::bytes_added(i, &model_document)?;
+            current_size += namespace_size + operation_size;
+            let current_size = current_size.get()?;
+
+            if current_size < max_size
+                || self.encrypted && i == 0 && current_size < first_write_max_encrypted_size
+            {
+                self.n_attempted += 1;
+                if let Some(inserted_id) = inserted_id {
+                    self.inserted_ids.insert(self.offset + i, inserted_id);
+                }
+                namespace_info.add_pending();
+                ops.push(model_document);
+            } else {
+                break;
+            }
+        }
+
+        if self.n_attempted == 0 {
+            return Err(Error::invalid_argument(format!(
+                "operation at index {} exceeds the maximum size",
+                self.offset
+            )));
+        }
+
+        let mut command = Command::new(Self::NAME, "admin", command_body);
+        namespace_info
+            .namespaces
+            .add_to_command(NS_INFO, &mut command);
+        ops.add_to_command(OPS, &mut command);
+        Ok(command)
+    }
 }
 
 /// A helper struct for tracking namespace information.
-struct NamespaceInfo<'a> {
-    namespaces: Vec<RawDocumentBuf>,
+struct NamespaceInfo<'a, T: RawDocumentCollection> {
+    namespaces: T,
+    pending_namespace: Option<RawDocumentBuf>,
     // Cache the namespaces and their indexes to avoid traversing the namespaces array each time a
     // namespace is looked up or added.
     cache: HashMap<&'a Namespace, usize>,
 }
 
-impl<'a> NamespaceInfo<'a> {
+impl<'a, T> NamespaceInfo<'a, T>
+where
+    T: RawDocumentCollection,
+{
     fn new() -> Self {
         Self {
-            namespaces: Vec::new(),
+            namespaces: Default::default(),
+            pending_namespace: None,
             cache: HashMap::new(),
         }
     }
 
-    /// Gets the index for the given namespace in the nsInfo list, adding it to the list if it is
-    /// not already present.
-    fn get_index(&mut self, namespace: &'a Namespace) -> (usize, usize) {
+    /// Gets the index for the given namespace in the nsInfo list and the number of bytes it would
+    /// add to the nsInfo list. Stores the namespace as a pending entry.
+    fn get_index_and_size(&mut self, namespace: &'a Namespace) -> Result<(usize, usize)> {
         match self.cache.get(namespace) {
-            Some(index) => (*index, 0),
+            Some(index) => Ok((*index, 0)),
             None => {
                 let namespace_doc = rawdoc! { "ns": namespace.to_string() };
-                let length_added = namespace_doc.as_bytes().len();
-                self.namespaces.push(namespace_doc);
-                let next_index = self.cache.len();
-                self.cache.insert(namespace, next_index);
-                (next_index, length_added)
+                let index = self.cache.len();
+                let bytes_added = T::bytes_added(index, &namespace_doc)?;
+                self.pending_namespace = Some(namespace_doc);
+                self.cache.insert(namespace, index);
+                Ok((index, bytes_added))
             }
+        }
+    }
+
+    /// Adds the pending namespace to the list, if any.
+    fn add_pending(&mut self) {
+        if let Some(pending) = self.pending_namespace.take() {
+            self.namespaces.push(pending);
         }
     }
 }
@@ -273,9 +349,9 @@ where
             .into());
         }
 
-        let max_message_size: usize =
-            Checked::new(description.max_message_size_bytes).try_into()?;
         let max_operations: usize = Checked::new(description.max_write_batch_size).try_into()?;
+        let max_bson_object_size: usize =
+            Checked::new(description.max_bson_object_size).try_into()?;
 
         let mut command_body = rawdoc! { Self::NAME: 1 };
         let mut options = match self.options {
@@ -285,56 +361,30 @@ where
         options.append(cstr!("errorsOnly"), R::errors_only());
         bson_util::extend_raw_document_buf(&mut command_body, options)?;
 
-        let max_document_sequences_size: usize = (Checked::new(max_message_size)
-            - OP_MSG_OVERHEAD_BYTES
-            - command_body.as_bytes().len())
-        .try_into()?;
-
-        let mut namespace_info = NamespaceInfo::new();
-        let mut ops = Vec::new();
-        let mut current_size = Checked::new(0);
-        for (i, model) in self.models.iter().take(max_operations).enumerate() {
-            let (namespace_index, namespace_size) = namespace_info.get_index(model.namespace());
-
-            let operation_namespace_index: i32 = Checked::new(namespace_index).try_into()?;
-            let mut operation = rawdoc! { model.operation_name(): operation_namespace_index };
-            let (model_doc, inserted_id) = model.get_ops_document_contents()?;
-            extend_raw_document_buf(&mut operation, model_doc)?;
-
-            let operation_size = operation.as_bytes().len();
-
-            current_size += namespace_size + operation_size;
-            if current_size.get()? > max_document_sequences_size {
-                // Remove the namespace doc from the list if one was added for this operation.
-                if namespace_size > 0 {
-                    let last_index = namespace_info.namespaces.len() - 1;
-                    namespace_info.namespaces.remove(last_index);
-                }
-                break;
-            }
-
-            if let Some(inserted_id) = inserted_id {
-                self.inserted_ids.insert(i, inserted_id);
-            }
-            ops.push(operation);
+        // Auto-encryption does not support document sequences.
+        if self.encrypted {
+            let max_size =
+                (Checked::new(MAX_ENCRYPTED_WRITE_SIZE) - command_body.as_bytes().len()).get()?;
+            self.batch_split_models::<RawArrayBuf>(
+                command_body,
+                max_size,
+                max_operations,
+                max_bson_object_size,
+            )
+        } else {
+            let max_message_size: usize =
+                Checked::new(description.max_message_size_bytes).try_into()?;
+            let max_size = (Checked::new(max_message_size)
+                - OP_MSG_OVERHEAD_BYTES
+                - command_body.as_bytes().len())
+            .get()?;
+            self.batch_split_models::<Vec<RawDocumentBuf>>(
+                command_body,
+                max_size,
+                max_operations,
+                max_bson_object_size,
+            )
         }
-
-        if ops.is_empty() {
-            return Err(ErrorKind::InvalidArgument {
-                message: format!(
-                    "operation at index {} exceeds the maximum message size ({} bytes)",
-                    self.offset, max_message_size
-                ),
-            }
-            .into());
-        }
-
-        self.n_attempted = ops.len();
-
-        let mut command = Command::new(Self::NAME, "admin", command_body);
-        command.add_document_sequence("nsInfo", namespace_info.namespaces);
-        command.add_document_sequence("ops", ops);
-        Ok(command)
     }
 
     fn handle_response_async<'b>(

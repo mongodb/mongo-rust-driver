@@ -19,7 +19,9 @@ use crate::{
         RawBsonRef,
         RawDocumentBuf,
     },
+    bson_compat::CStr,
     checked::Checked,
+    cmap::Command,
     error::{Error, ErrorKind, Result},
     runtime::SyncLittleEndianRead,
 };
@@ -243,6 +245,49 @@ pub(crate) fn get_or_prepend_id_field(doc: &mut RawDocumentBuf) -> Result<Bson> 
 
             Ok(id.into())
         }
+    }
+}
+
+/// A helper trait for working with collections of raw documents. This is useful for unifying
+/// command-building implementations that conditionally construct both document sequences and a
+/// single command document.
+pub(crate) trait RawDocumentCollection: Default {
+    /// Calculates the total number of bytes that would be added to a collection of this type by the
+    /// given document.
+    fn bytes_added(index: usize, doc: &RawDocumentBuf) -> Result<usize>;
+
+    /// Adds the given document to the collection.
+    fn push(&mut self, doc: RawDocumentBuf);
+
+    /// Adds the collection of raw documents to the provided command.
+    fn add_to_command(self, identifier: &'static CStr, command: &mut Command);
+}
+
+impl RawDocumentCollection for Vec<RawDocumentBuf> {
+    fn bytes_added(_index: usize, doc: &RawDocumentBuf) -> Result<usize> {
+        Ok(doc.as_bytes().len())
+    }
+
+    fn push(&mut self, doc: RawDocumentBuf) {
+        self.push(doc);
+    }
+
+    fn add_to_command(self, identifier: &'static CStr, command: &mut Command) {
+        command.add_document_sequence(identifier, self);
+    }
+}
+
+impl RawDocumentCollection for RawArrayBuf {
+    fn bytes_added(index: usize, doc: &RawDocumentBuf) -> Result<usize> {
+        array_entry_size_bytes(index, doc.as_bytes().len())
+    }
+
+    fn push(&mut self, doc: RawDocumentBuf) {
+        self.push(doc);
+    }
+
+    fn add_to_command(self, identifier: &'static CStr, command: &mut Command) {
+        command.body.append(identifier, self);
     }
 }
 
