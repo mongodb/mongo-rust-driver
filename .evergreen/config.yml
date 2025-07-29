@@ -257,11 +257,20 @@ buildvariants:
     # Limit the test to only schedule every 14 days to reduce external resource usage.
     batchtime: 20160
 
-  - name: gssapi-auth
-    display_name: "GSSAPI Authentication"
+  - name: gssapi-auth-linux
+    display_name: "GSSAPI Authentication - Linux"
     patchable: true
     run_on:
-      - ubuntu2004-small
+      - ubuntu2204-small
+    tasks:
+      - test-gssapi-auth
+
+  - name: gssapi-auth-macos
+    display_name: "GSSAPI Authentication - macOS"
+    patchable: true
+    disable: true
+    run_on:
+      - macos-14
     tasks:
       - test-gssapi-auth
 
@@ -1389,6 +1398,9 @@ functions:
           AWS_AUTH_TYPE: web-identity
 
   "run gssapi auth test":
+    - command: ec2.assume_role
+      params:
+        role_arn: ${aws_test_secrets_role}
     - command: subprocess.exec
       type: test
       params:
@@ -1397,6 +1409,10 @@ functions:
         args:
           - .evergreen/run-gssapi-tests.sh
         include_expansions_in_env:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - DRIVERS_TOOLS
           - PROJECT_DIRECTORY
 
   "run x509 tests":

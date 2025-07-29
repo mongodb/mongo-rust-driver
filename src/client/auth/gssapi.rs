@@ -1,5 +1,4 @@
 use cross_krb5::{ClientCtx, InitiateFlags, K5Ctx, PendingClientCtx, Step};
-use hickory_resolver::proto::rr::RData;
 
 use crate::{
     bson::Bson,
@@ -324,21 +323,24 @@ async fn canonicalize_hostname(
     let resolver =
         crate::runtime::AsyncResolver::new(resolver_config.map(|c| c.inner.clone())).await?;
 
-    match mode {
+    let hostname = match mode {
         CanonicalizeHostName::Forward => {
             let lookup_records = resolver.cname_lookup(hostname).await?;
 
-            if let Some(first_record) = lookup_records.records().first() {
-                if let Some(RData::CNAME(cname)) = first_record.data() {
-                    Ok(cname.to_lowercase().to_string())
-                } else {
-                    Ok(hostname.to_string())
-                }
+            if !lookup_records.records().is_empty() {
+                // As long as there is a record, we can return the original hostname.
+                // Although the spec says to return the canonical name, this is not
+                // done by any drivers in practice since the majority of them use
+                // libraries that do not follow CNAME chains. Also, we do not want to
+                // use the canonical name since it will likely differ from the input
+                // name, and the use of the input name is required for the service
+                // principal to be accepted by the GSSAPI auth flow.
+                hostname.to_lowercase().to_string()
             } else {
-                Err(Error::authentication_error(
+                return Err(Error::authentication_error(
                     GSSAPI_STR,
                     &format!("No addresses found for hostname: {hostname}"),
-                ))
+                ));
             }
         }
         CanonicalizeHostName::ForwardAndReverse => {
@@ -350,20 +352,27 @@ async fn canonicalize_hostname(
                 match resolver.reverse_lookup(first_address).await {
                     Ok(reverse_lookup) => {
                         if let Some(name) = reverse_lookup.iter().next() {
-                            Ok(name.to_lowercase().to_string())
+                            name.to_lowercase().to_string()
                         } else {
-                            Ok(hostname.to_lowercase())
+                            hostname.to_lowercase()
                         }
                     }
-                    Err(_) => Ok(hostname.to_lowercase()),
+                    Err(_) => hostname.to_lowercase(),
                 }
             } else {
-                Err(Error::authentication_error(
+                return Err(Error::authentication_error(
                     GSSAPI_STR,
                     &format!("No addresses found for hostname: {hostname}"),
-                ))
+                ));
             }
         }
         CanonicalizeHostName::None => unreachable!(),
-    }
+    };
+
+    // Sometimes reverse lookup results in a trailing "." since that is the correct
+    // way to present a FQDN. However, GSSAPI rejects the trailing "." so we remove
+    // it here manually.
+    let hostname = hostname.trim_end_matches(".");
+
+    Ok(hostname.to_string())
 }
