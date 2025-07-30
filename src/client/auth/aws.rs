@@ -128,12 +128,6 @@ async fn authenticate_stream_inner(
     let creds = get_aws_credentials(credential).await.map_err(|e| {
         Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
     })?;
-    let aws_credential = AwsCredential::from_sdk_creds(
-        creds.access_key_id().to_string(),
-        creds.secret_access_key().to_string(),
-        creds.session_token().map(|s| s.to_string()),
-        None,
-    );
 
     let date = Utc::now();
 
@@ -284,8 +278,8 @@ pub async fn compute_aws_sigv4_headers(
     let signing_settings = SigningSettings::default();
     let signing_params = SigningParams::builder()
         .identity(&identity)
-        .region(&region)
-        .name(&service)
+        .region(region)
+        .name(service)
         .time(date.into())
         .settings(signing_settings)
         .build()
@@ -436,21 +430,6 @@ impl AwsCredential {
             Self::get_from_ecs(relative_uri, http_client).await
         } else {
             Self::get_from_ec2(http_client).await
-        }
-    }
-
-    // Creates AwsCredential from keys.
-    fn from_sdk_creds(
-        access_key_id: String,
-        secret_access_key: String,
-        session_token: Option<String>,
-        expiration: Option<crate::bson::DateTime>,
-    ) -> Self {
-        Self {
-            access_key_id,
-            secret_access_key,
-            session_token,
-            expiration,
         }
     }
 
