@@ -106,16 +106,6 @@ async fn authenticate_stream_inner(
     let server_first = ServerFirst::parse(server_first_response.auth_response_body(MECH_NAME)?)?;
     server_first.validate(&nonce)?;
 
-    let creds = get_aws_credentials(credential).await.map_err(|e| {
-        Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
-    })?;
-    // let aws_credential = AwsCredential::from_sdk_creds(
-    //     creds.access_key_id().to_string(),
-    //     creds.secret_access_key().to_string(),
-    //     creds.session_token().map(|s| s.to_string()),
-    //     None,
-    // );
-
     // Find credentials using original implementation without AWS SDK
     // let aws_credential = {
     //     // Limit scope of this variable to avoid holding onto the lock for the duration of
@@ -134,6 +124,16 @@ async fn authenticate_stream_inner(
     //         }
     //     }
     // };
+
+    let creds = get_aws_credentials(credential).await.map_err(|e| {
+        Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
+    })?;
+    let aws_credential = AwsCredential::from_sdk_creds(
+        creds.access_key_id().to_string(),
+        creds.secret_access_key().to_string(),
+        creds.session_token().map(|s| s.to_string()),
+        None,
+    );
 
     let date = Utc::now();
     // Generate authorization header using original implementation without AWS SDK
