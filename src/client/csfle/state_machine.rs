@@ -255,7 +255,6 @@ impl CryptExecutor {
                                         Credential,
                                     };
 
-                                    // Original implementation using the AWS SDK
                                     let aws_creds =
                                         get_aws_credentials(&Credential::default()).await?;
 
