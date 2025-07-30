@@ -138,8 +138,6 @@ async fn authenticate_stream_inner(
     //     &server_first.server_nonce,
     // )?;
 
-    // dbg!("authorization header: {}", &authorization_header);
-
     // let mut client_second_payload = doc! {
     //     "a": authorization_header,
     //     "d": date.format(AWS_LONG_DATE_FMT).to_string(),
@@ -149,22 +147,13 @@ async fn authenticate_stream_inner(
     //     client_second_payload.insert("t", security_token);
     // }
 
-    let sigv4_headers = compute_aws_sigv4_headers(
+    let client_second_payload = compute_aws_sigv4_payload(
         creds,
         date,
         &server_first.sts_host,
         &server_first.server_nonce,
     )
     .await?;
-
-    let mut client_second_payload = doc! {
-        "a": sigv4_headers.authorization,
-        "d": sigv4_headers.date,
-    };
-
-    if let Some(token) = sigv4_headers.token {
-        client_second_payload.insert("t", token);
-    }
 
     let client_second_payload_bytes = client_second_payload.encode_to_vec()?;
 
@@ -226,18 +215,12 @@ pub(crate) async fn get_aws_credentials(credential: &Credential) -> Result<Crede
     }
 }
 
-pub struct AwsSigV4Headers {
-    pub authorization: String,
-    pub date: String,
-    pub token: Option<String>,
-}
-
-pub async fn compute_aws_sigv4_headers(
+pub async fn compute_aws_sigv4_payload(
     creds: Credentials,
     date: DateTime<Utc>,
     host: &str,
     server_nonce: &[u8],
-) -> Result<AwsSigV4Headers> {
+) -> Result<Document> {
     let date_str = date.format("%Y%m%dT%H%M%SZ").to_string();
 
     let region = if host == "sts.amazonaws.com" {
@@ -260,9 +243,9 @@ pub async fn compute_aws_sigv4_headers(
         .header("host", host)
         .header("content-type", "application/x-www-form-urlencoded")
         .header("content-length", body_bytes.len())
-        .header("x-amz-date", date_str.clone())
+        .header("x-amz-date", &date_str)
         .header("x-mongodb-gs2-cb-flag", "n")
-        .header("x-mongodb-server-nonce", nonce_b64.clone());
+        .header("x-mongodb-server-nonce", &nonce_b64);
 
     if let Some(token) = creds.session_token() {
         builder = builder.header("x-amz-security-token", token);
@@ -307,19 +290,17 @@ pub async fn compute_aws_sigv4_headers(
         .into_parts();
 
     signing_instructions.apply_to_request_http1x(&mut request);
-    dbg!("ending computation part of compute_aws_sigv4_headers");
 
     // Extract the Authorization header
     let headers = request.headers();
-    let authorization = headers
+    let authorization_header = headers
         .get("authorization")
         .ok_or_else(|| Error::authentication_error(MECH_NAME, "Missing authorization header"))?
         .to_str()
         .map_err(|e| Error::authentication_error(MECH_NAME, &format!("Invalid header value: {e}")))?
         .to_string();
-    dbg!("authorization header: {}", &authorization);
 
-    let token = headers
+    let token_header = headers
         .get("x-amz-security-token")
         .map(|v| {
             v.to_str().map(|s| s.to_string()).map_err(|e| {
@@ -327,13 +308,17 @@ pub async fn compute_aws_sigv4_headers(
             })
         })
         .transpose()?;
-    dbg!("token header: {}", &token);
 
-    Ok(AwsSigV4Headers {
-        authorization,
-        date: date_str,
-        token,
-    })
+    let mut payload = doc! {
+        "a": authorization_header,
+        "d": date_str,
+    };
+
+    if let Some(token) = token_header {
+        payload.insert("t", token);
+    }
+
+    Ok(payload)
 }
 
 /// Contains the credentials for MONGODB-AWS authentication.
