@@ -1,9 +1,11 @@
 use std::{fs::File, io::Read, time::Duration};
 
 use chrono::{offset::Utc, DateTime};
+use hmac::Hmac;
 use once_cell::sync::Lazy;
 use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 
 use crate::{
@@ -141,24 +143,6 @@ async fn authenticate_stream_inner(
     //     &server_first.sts_host,
     //     &server_first.server_nonce,
     // )?;
-
-    // let mut client_second_payload = doc! {
-    //     "a": authorization_header,
-    //     "d": date.format(AWS_LONG_DATE_FMT).to_string(),
-    // };
-
-    // if let Some(security_token) = aws_credential.session_token {
-    //     client_second_payload.insert("t", security_token);
-    // }
-
-    // attempt 1
-    // let mut client_second_payload = doc! {
-    //     "a": authorization_header,
-    //     "d": date_header,
-    // };
-    // if let Some(token) = token_header {
-    //     client_second_payload.insert("t", token);
-    // }
 
     let sigv4_headers = compute_aws_sigv4_headers(
         creds,
@@ -547,129 +531,128 @@ impl AwsCredential {
             .map_err(|_| Error::unknown_authentication_error(MECH_NAME))
     }
 
-    // Computes the signed authorization header for the credentials to send to the server in a sasl
-    // payload.
-    // fn compute_authorization_header(
-    //     &self,
-    //     date: DateTime<Utc>,
-    //     host: &str,
-    //     server_nonce: &[u8],
-    // ) -> Result<String> {
-    //     let date_str = date.format(AWS_LONG_DATE_FMT).to_string();
+    /// Computes the signed authorization header for the credentials to send to the server in a sasl
+    /// payload.
+    fn compute_authorization_header(
+        &self,
+        date: DateTime<Utc>,
+        host: &str,
+        server_nonce: &[u8],
+    ) -> Result<String> {
+        let date_str = date.format(AWS_LONG_DATE_FMT).to_string();
 
-    //     // We need to include the security token header if the user provided a token. If not, we
-    //     // just use the empty string.
-    //     let token = self
-    //         .session_token
-    //         .as_ref()
-    //         .map(|s| format!("x-amz-security-token:{}\n", s))
-    //         .unwrap_or_default();
+        // We need to include the security token header if the user provided a token. If not, we
+        // just use the empty string.
+        let token = self
+            .session_token
+            .as_ref()
+            .map(|s| format!("x-amz-security-token:{}\n", s))
+            .unwrap_or_default();
 
-    //     // Similarly, we need to put "x-amz-security-token" into the list of signed headers if
-    // the     // // user provided a token. If not, we just use the empty string.
-    //     let token_signed_header = if self.session_token.is_some() {
-    //         "x-amz-security-token;"
-    //     } else {
-    //         ""
-    //     };
+        // Similarly, we need to put "x-amz-security-token" into the list of signed headers if the
+        // user provided a token. If not, we just use the empty string.
+        let token_signed_header = if self.session_token.is_some() {
+            "x-amz-security-token;"
+        } else {
+            ""
+        };
 
-    //     // Generate the list of signed headers (either with or without the security token
-    // header).     #[rustfmt::skip]
-    //     let signed_headers = format!(
-    //         "\
-    //           content-length;\
-    //           content-type;\
-    //           host;\
-    //           x-amz-date;\
-    //           {token_signed_header}\
-    //           x-mongodb-gs2-cb-flag;\
-    //           x-mongodb-server-nonce\
-    //         ",
-    //         token_signed_header = token_signed_header,
-    //     );
+        // Generate the list of signed headers (either with or without the security token header).
+        #[rustfmt::skip]
+        let signed_headers = format!(
+            "\
+              content-length;\
+              content-type;\
+              host;\
+              x-amz-date;\
+              {token_signed_header}\
+              x-mongodb-gs2-cb-flag;\
+              x-mongodb-server-nonce\
+            ",
+            token_signed_header = token_signed_header,
+        );
 
-    //     let body = "Action=GetCallerIdentity&Version=2011-06-15";
-    //     let hashed_body = hex::encode(Sha256::digest(body.as_bytes()));
+        let body = "Action=GetCallerIdentity&Version=2011-06-15";
+        let hashed_body = hex::encode(Sha256::digest(body.as_bytes()));
 
-    //     let nonce = base64::encode(server_nonce);
+        let nonce = base64::encode(server_nonce);
 
-    //     #[rustfmt::skip]
-    //     let request = format!(
-    //         "\
-    //          POST\n\
-    //          /\n\n\
-    //          content-length:43\n\
-    //          content-type:application/x-www-form-urlencoded\n\
-    //          host:{host}\n\
-    //          x-amz-date:{date}\n\
-    //          {token}\
-    //          x-mongodb-gs2-cb-flag:n\n\
-    //          x-mongodb-server-nonce:{nonce}\n\n\
-    //          {signed_headers}\n\
-    //          {hashed_body}\
-    //          ",
-    //         host = host,
-    //         date = date_str,
-    //         token = token,
-    //         nonce = nonce,
-    //         signed_headers = signed_headers,
-    //         hashed_body = hashed_body,
-    //     );
+        #[rustfmt::skip]
+        let request = format!(
+            "\
+             POST\n\
+             /\n\n\
+             content-length:43\n\
+             content-type:application/x-www-form-urlencoded\n\
+             host:{host}\n\
+             x-amz-date:{date}\n\
+             {token}\
+             x-mongodb-gs2-cb-flag:n\n\
+             x-mongodb-server-nonce:{nonce}\n\n\
+             {signed_headers}\n\
+             {hashed_body}\
+             ",
+            host = host,
+            date = date_str,
+            token = token,
+            nonce = nonce,
+            signed_headers = signed_headers,
+            hashed_body = hashed_body,
+        );
 
-    //     let hashed_request = hex::encode(Sha256::digest(request.as_bytes()));
+        let hashed_request = hex::encode(Sha256::digest(request.as_bytes()));
 
-    //     let small_date = date.format("%Y%m%d").to_string();
+        let small_date = date.format("%Y%m%d").to_string();
 
-    //     let region = if host == "sts.amazonaws.com" {
-    //         "us-east-1"
-    //     } else {
-    //         let parts: Vec<_> = host.split('.').collect();
-    //         parts.get(1).copied().unwrap_or("us-east-1")
-    //     };
+        let region = if host == "sts.amazonaws.com" {
+            "us-east-1"
+        } else {
+            let parts: Vec<_> = host.split('.').collect();
+            parts.get(1).copied().unwrap_or("us-east-1")
+        };
 
-    //     #[rustfmt::skip]
-    //     let string_to_sign = format!(
-    //         "\
-    //          AWS4-HMAC-SHA256\n\
-    //          {full_date}\n\
-    //          {small_date}/{region}/sts/aws4_request\n\
-    //          {hashed_request}\
-    //         ",
-    //         full_date = date_str,
-    //         small_date = small_date,
-    //         region = region,
-    //         hashed_request = hashed_request,
-    //     );
+        #[rustfmt::skip]
+        let string_to_sign = format!(
+            "\
+             AWS4-HMAC-SHA256\n\
+             {full_date}\n\
+             {small_date}/{region}/sts/aws4_request\n\
+             {hashed_request}\
+            ",
+            full_date = date_str,
+            small_date = small_date,
+            region = region,
+            hashed_request = hashed_request,
+        );
 
-    //     let first_hmac_key = format!("AWS4{}", self.secret_access_key);
-    //     let k_date =
-    //         auth::mac::<Hmac<Sha256>>(first_hmac_key.as_ref(), small_date.as_ref(), MECH_NAME)?;
-    //     let k_region = auth::mac::<Hmac<Sha256>>(k_date.as_ref(), region.as_ref(), MECH_NAME)?;
-    //     let k_service = auth::mac::<Hmac<Sha256>>(k_region.as_ref(), b"sts", MECH_NAME)?;
-    //     let k_signing = auth::mac::<Hmac<Sha256>>(k_service.as_ref(), b"aws4_request",
-    // MECH_NAME)?;
+        let first_hmac_key = format!("AWS4{}", self.secret_access_key);
+        let k_date =
+            auth::mac::<Hmac<Sha256>>(first_hmac_key.as_ref(), small_date.as_ref(), MECH_NAME)?;
+        let k_region = auth::mac::<Hmac<Sha256>>(k_date.as_ref(), region.as_ref(), MECH_NAME)?;
+        let k_service = auth::mac::<Hmac<Sha256>>(k_region.as_ref(), b"sts", MECH_NAME)?;
+        let k_signing = auth::mac::<Hmac<Sha256>>(k_service.as_ref(), b"aws4_request", MECH_NAME)?;
 
-    //     let signature_bytes =
-    //         auth::mac::<Hmac<Sha256>>(k_signing.as_ref(), string_to_sign.as_ref(), MECH_NAME)?;
-    //     let signature = hex::encode(signature_bytes);
+        let signature_bytes =
+            auth::mac::<Hmac<Sha256>>(k_signing.as_ref(), string_to_sign.as_ref(), MECH_NAME)?;
+        let signature = hex::encode(signature_bytes);
 
-    //     #[rustfmt::skip]
-    //     let auth_header = format!(
-    //         "\
-    //          AWS4-HMAC-SHA256 \
-    //          Credential={access_key}/{small_date}/{region}/sts/aws4_request, \
-    //          SignedHeaders={signed_headers}, \
-    //          Signature={signature}\
-    //         ",
-    //         access_key = self.access_key_id,
-    //         small_date = small_date,
-    //         region = region,
-    //         signed_headers = signed_headers,
-    //         signature = signature
-    //     );
+        #[rustfmt::skip]
+        let auth_header = format!(
+            "\
+             AWS4-HMAC-SHA256 \
+             Credential={access_key}/{small_date}/{region}/sts/aws4_request, \
+             SignedHeaders={signed_headers}, \
+             Signature={signature}\
+            ",
+            access_key = self.access_key_id,
+            small_date = small_date,
+            region = region,
+            signed_headers = signed_headers,
+            signature = signature
+        );
 
-    //     Ok(auth_header)
-    // }
+        Ok(auth_header)
+    }
 
     #[cfg(feature = "in-use-encryption")]
     pub(crate) fn access_key(&self) -> &str {
