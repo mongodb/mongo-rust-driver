@@ -1,8 +1,10 @@
 use serde::Deserialize;
 
+#[cfg(feature = "bson-3")]
+use crate::bson_compat::RawDocumentBufExt as _;
 use crate::{
     bson::{doc, rawdoc, Document, RawArrayBuf, RawBson, RawDocumentBuf},
-    bson_compat::{cstr, CStr, RawDocumentBufExt as _},
+    bson_compat::{cstr, CStr},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{convert_insert_many_error, Result},
@@ -35,7 +37,7 @@ impl UpdateOrReplace {
             },
             Self::Replacement(replacement_doc) => {
                 bson_util::replacement_raw_document_check(replacement_doc)?;
-                doc.append_ref_compat(key, replacement_doc);
+                doc.append_ref(key, replacement_doc);
             }
         }
 
