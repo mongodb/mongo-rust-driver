@@ -125,7 +125,7 @@ impl CryptExecutor {
                 }
                 State::NeedMongoMarkings => {
                     let ctx = result_mut(&mut ctx)?;
-                    let command = ctx.mongo_op()?.to_raw_document_buf();
+                    let command = ctx.mongo_op()?.to_owned();
                     let db = db.as_ref().ok_or_else(|| {
                         Error::internal("db required for NeedMongoMarkings state")
                     })?;

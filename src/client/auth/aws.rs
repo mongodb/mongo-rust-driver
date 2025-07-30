@@ -75,7 +75,7 @@ async fn authenticate_stream_inner(
         // channel binding is not supported.
         "p": 110i32,
     };
-    let client_first_payload_bytes = client_first_payload.encode_to_vec()?;
+    let client_first_payload_bytes = client_first_payload.to_vec()?;
 
     let sasl_start = SaslStart::new(
         source.into(),
@@ -125,7 +125,7 @@ async fn authenticate_stream_inner(
         client_second_payload.insert("t", security_token);
     }
 
-    let client_second_payload_bytes = client_second_payload.encode_to_vec()?;
+    let client_second_payload_bytes = client_second_payload.to_vec()?;
 
     let sasl_continue = SaslContinue::new(
         source.into(),

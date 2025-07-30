@@ -54,9 +54,7 @@ impl<'a> Action for Encrypt<'a, Expression> {
         let doc_ref = result
             .get_document("v")
             .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
-        let doc = doc_ref
-            .to_owned()
-            .to_document()
+        let doc = Document::try_from(doc_ref.to_owned())
             .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
         Ok(doc)
     }

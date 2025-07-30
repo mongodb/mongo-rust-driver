@@ -469,15 +469,15 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for WriteResponseBody<T> {
     where
         D: serde::Deserializer<'de>,
     {
-        use bson::serde_helpers::Utf8LossyDeserialization;
+        use crate::bson_compat::Utf8Lossy;
         #[derive(Deserialize)]
         struct Helper<T> {
             #[serde(flatten)]
             body: T,
             #[serde(rename = "writeErrors")]
-            write_errors: Option<Utf8LossyDeserialization<Vec<IndexedWriteError>>>,
+            write_errors: Option<Utf8Lossy<Vec<IndexedWriteError>>>,
             #[serde(rename = "writeConcernError")]
-            write_concern_error: Option<Utf8LossyDeserialization<WriteConcernError>>,
+            write_concern_error: Option<Utf8Lossy<WriteConcernError>>,
             #[serde(rename = "errorLabels")]
             labels: Option<Vec<String>>,
         }

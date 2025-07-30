@@ -6,6 +6,8 @@ use std::{
 
 use serde::Serialize;
 
+#[cfg(feature = "bson-3")]
+use crate::bson_compat::RawBsonRefExt as _;
 use crate::{
     bson::{
         oid::ObjectId,
@@ -78,7 +80,7 @@ pub(crate) fn to_bson_array(docs: &[Document]) -> Bson {
 pub(crate) fn to_raw_bson_array(docs: &[Document]) -> Result<RawBson> {
     let mut array = RawArrayBuf::new();
     for doc in docs {
-        array.push(RawDocumentBuf::from_document(doc)?);
+        array.push(RawDocumentBuf::try_from(doc)?);
     }
     Ok(RawBson::Array(array))
 }
@@ -241,7 +243,7 @@ pub(crate) fn get_or_prepend_id_field(doc: &mut RawDocumentBuf) -> Result<Bson> 
             let new_length: i32 = Checked::new(new_bytes.len()).try_into()?;
             new_bytes[0..4].copy_from_slice(&new_length.to_le_bytes());
 
-            *doc = RawDocumentBuf::decode_from_bytes(new_bytes)?;
+            *doc = RawDocumentBuf::from_bytes(new_bytes)?;
 
             Ok(id.into())
         }

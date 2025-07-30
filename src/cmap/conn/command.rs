@@ -188,10 +188,10 @@ impl RawCommandResponse {
         #[cfg(not(feature = "bson-3"))]
         use crate::bson_compat::{DocumentExt as _, RawDocumentBufExt as _};
 
-        let raw = doc.encode_to_vec()?;
+        let raw = doc.to_vec()?;
         Ok(Self {
             source,
-            raw: RawDocumentBuf::decode_from_bytes(raw)?,
+            raw: RawDocumentBuf::from_bytes(raw)?,
         })
     }
 

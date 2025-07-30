@@ -25,7 +25,7 @@ impl UpdateOrReplace {
         match self {
             Self::UpdateModifications(update_modifications) => match update_modifications {
                 UpdateModifications::Document(document) => {
-                    let raw = RawDocumentBuf::from_document(document)?;
+                    let raw = RawDocumentBuf::try_from(document)?;
                     doc.append(key, raw);
                 }
                 UpdateModifications::Pipeline(pipeline) => {
@@ -103,7 +103,7 @@ impl OperationWithDefaults for Update {
         };
 
         let mut update = rawdoc! {
-            "q": RawDocumentBuf::from_document(&self.filter)?,
+            "q": RawDocumentBuf::try_from(&self.filter)?,
         };
         self.update.append_to_rawdoc(&mut update, cstr!("u"))?;
 
@@ -144,10 +144,7 @@ impl OperationWithDefaults for Update {
             }
 
             if let Some(ref let_vars) = options.let_vars {
-                body.append(
-                    cstr!("let"),
-                    crate::bson_compat::serialize_to_raw_document_buf(&let_vars)?,
-                );
+                body.append(cstr!("let"), RawDocumentBuf::try_from(let_vars)?);
             }
 
             if let Some(ref comment) = options.comment {
@@ -155,7 +152,7 @@ impl OperationWithDefaults for Update {
             }
 
             if let Some(ref sort) = options.sort {
-                update.append(cstr!("sort"), RawDocumentBuf::from_document(sort)?);
+                update.append(cstr!("sort"), RawDocumentBuf::try_from(sort)?);
             }
         };
 

@@ -35,9 +35,6 @@ pub(crate) trait RawDocumentBufExt: Sized {
         key: impl AsRef<CStr>,
         value: impl Into<crate::bson::raw::RawBsonRef<'a>> + 'a,
     );
-
-    #[cfg(not(feature = "bson-3"))]
-    fn decode_from_bytes(data: Vec<u8>) -> RawResult<Self>;
 }
 
 #[cfg(feature = "bson-3")]
@@ -60,36 +57,17 @@ impl RawDocumentBufExt for crate::bson::RawDocumentBuf {
     ) {
         self.append_ref(key, value)
     }
-
-    fn decode_from_bytes(data: Vec<u8>) -> RawResult<Self> {
-        Self::from_bytes(data)
-    }
 }
 
-#[cfg(not(feature = "bson-3"))]
-pub(crate) trait RawDocumentExt {
-    fn decode_from_bytes<D: AsRef<[u8]> + ?Sized>(data: &D) -> RawResult<&Self>;
+#[cfg(feature = "bson-3")]
+pub(crate) trait RawBsonRefExt {
+    fn to_raw_bson(&self) -> crate::bson::RawBson;
 }
 
-#[cfg(not(feature = "bson-3"))]
-impl RawDocumentExt for crate::bson::RawDocument {
-    fn decode_from_bytes<D: AsRef<[u8]> + ?Sized>(data: &D) -> RawResult<&Self> {
-        Self::from_bytes(data)
-    }
-}
-
-#[cfg(not(feature = "bson-3"))]
-#[allow(dead_code)]
-pub(crate) trait DocumentExt {
-    fn encode_to_vec(&self) -> crate::bson::ser::Result<Vec<u8>>;
-}
-
-#[cfg(not(feature = "bson-3"))]
-impl DocumentExt for crate::bson::Document {
-    fn encode_to_vec(&self) -> crate::bson::ser::Result<Vec<u8>> {
-        let mut out = vec![];
-        self.to_writer(&mut out)?;
-        Ok(out)
+#[cfg(feature = "bson-3")]
+impl RawBsonRefExt for crate::bson::RawBsonRef<'_> {
+    fn to_raw_bson(&self) -> crate::bson::RawBson {
+        (*self).into()
     }
 }
 
@@ -113,6 +91,7 @@ use_either! {
     RawError                        => error::Error                     | raw::Error;
     DeError                         => error::Error                     | de::Error;
     SerError                        => error::Error                     | ser::Error;
+    Utf8Lossy                       => Utf8Lossy                        | serde_helpers::Utf8LossyDeserialization;
     serialize_to_raw_document_buf   => serialize_to_raw_document_buf    | to_raw_document_buf;
     serialize_to_document           => serialize_to_document            | to_document;
     serialize_to_bson               => serialize_to_bson                | to_bson;
