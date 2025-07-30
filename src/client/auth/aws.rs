@@ -1,20 +1,28 @@
-#[cfg(feature = "aws-auth")]
 use aws_config::BehaviorVersion;
-
-#[cfg(feature = "aws-auth")]
 use aws_credential_types::{provider::ProvideCredentials, Credentials};
+use aws_sigv4::{
+    http_request::{sign, SignableBody, SignableRequest, SigningSettings},
+    sign::v4::SigningParams,
+};
+use http::Request;
 
-// Note from RUST-1529: commented Duration import since original implementation is commented out
-// use std::time::Duration;
+// #[cfg(feature = "aws-auth")]
+// use aws_types::credentials::{Credentials, ProvideCredentials, SharedCredentialsProvider};
+
+// use http::{HeaderMap, Method, Request, Uri};
+// use http::header::{HeaderName, AUTHORIZATION};
+
+// Note from RUST-1529: commented Duration import since original implementation is commented
+// out use std::time::Duration;
 // use rand::distributions::{Alphanumeric, DistString};
 // use std::{fs::File, io::Read};
 // use crate::bson::rawdoc;
+// use hmac::Hmac;
+// use sha2::{Digest, Sha256};
 
 use chrono::{offset::Utc, DateTime};
-use hmac::Hmac;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 
 use crate::{
@@ -103,12 +111,12 @@ async fn authenticate_stream_inner(
     let creds = get_aws_credentials(credential).await.map_err(|e| {
         Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
     })?;
-    let aws_credential = AwsCredential::from_sdk_creds(
-        creds.access_key_id().to_string(),
-        creds.secret_access_key().to_string(),
-        creds.session_token().map(|s| s.to_string()),
-        None,
-    );
+    // let aws_credential = AwsCredential::from_sdk_creds(
+    //     creds.access_key_id().to_string(),
+    //     creds.secret_access_key().to_string(),
+    //     creds.session_token().map(|s| s.to_string()),
+    //     None,
+    // );
 
     // Find credentials using original implementation without AWS SDK
     // let aws_credential = {
@@ -130,20 +138,47 @@ async fn authenticate_stream_inner(
     // };
 
     let date = Utc::now();
+    // Generate authorization header using original implementation without AWS SDK
 
-    let authorization_header = aws_credential.compute_authorization_header(
+    // let authorization_header = aws_credential.compute_authorization_header(
+    //     date,
+    //     &server_first.sts_host,
+    //     &server_first.server_nonce,
+    // )?;
+
+    // let mut client_second_payload = doc! {
+    //     "a": authorization_header,
+    //     "d": date.format(AWS_LONG_DATE_FMT).to_string(),
+    // };
+
+    // if let Some(security_token) = aws_credential.session_token {
+    //     client_second_payload.insert("t", security_token);
+    // }
+
+    // attempt 1
+    // let mut client_second_payload = doc! {
+    //     "a": authorization_header,
+    //     "d": date_header,
+    // };
+    // if let Some(token) = token_header {
+    //     client_second_payload.insert("t", token);
+    // }
+
+    let sigv4_headers = compute_aws_sigv4_headers(
+        creds,
         date,
         &server_first.sts_host,
         &server_first.server_nonce,
-    )?;
+    )
+    .await?;
 
     let mut client_second_payload = doc! {
-        "a": authorization_header,
-        "d": date.format(AWS_LONG_DATE_FMT).to_string(),
+        "a": sigv4_headers.authorization,
+        "d": sigv4_headers.date,
     };
 
-    if let Some(security_token) = aws_credential.session_token {
-        client_second_payload.insert("t", security_token);
+    if let Some(token) = sigv4_headers.token {
+        client_second_payload.insert("t", token);
     }
 
     let client_second_payload_bytes = client_second_payload.encode_to_vec()?;
@@ -204,6 +239,116 @@ pub async fn get_aws_credentials(credential: &Credential) -> Result<Credentials>
             })?;
         Ok(creds)
     }
+}
+
+pub struct AwsSigV4Headers {
+    pub authorization: String,
+    pub date: String,
+    pub token: Option<String>,
+}
+
+pub async fn compute_aws_sigv4_headers(
+    creds: Credentials,
+    date: DateTime<Utc>,
+    host: &str,
+    server_nonce: &[u8],
+) -> Result<AwsSigV4Headers> {
+    let date_str = date.format("%Y%m%dT%H%M%SZ").to_string();
+
+    let region = if host == "sts.amazonaws.com" {
+        "us-east-1"
+    } else {
+        let parts: Vec<_> = host.split('.').collect();
+        parts.get(1).copied().unwrap_or("us-east-1")
+    };
+
+    let url = format!("https://{}", host);
+    let service = "execute-api";
+    let body_str = "Action=GetCallerIdentity&Version=2011-06-15";
+    // let body_bytes = body_str.as_bytes();
+    let nonce_b64 = base64::encode(server_nonce);
+
+    // Create the HTTP request
+    let mut builder = Request::builder()
+        .method("POST")
+        .uri(&url)
+        .header("host", host)
+        .header("content-type", "application/x-www-form-urlencoded")
+        // .header("content-length", body_bytes.len())
+        .header("x-amz-date", date_str.clone())
+        .header("x-mongodb-gs2-cb-flag", "n")
+        .header("x-mongodb-server-nonce", nonce_b64.clone());
+
+    if let Some(token) = creds.session_token() {
+        builder = builder.header("x-amz-security-token", token);
+    }
+
+    let mut request = builder.body(body_str.to_string()).map_err(|e| {
+        Error::authentication_error(MECH_NAME, &format!("Failed to build request: {e}"))
+    })?;
+
+    let identity = creds.into();
+
+    // Set up signing parameters
+    let signing_settings = SigningSettings::default();
+    let signing_params = SigningParams::builder()
+        .identity(&identity)
+        .region(&region)
+        .name(&service)
+        .time(date.into())
+        .settings(signing_settings)
+        .build()
+        .map_err(|e| {
+            Error::authentication_error(MECH_NAME, &format!("Failed to build signing params: {e}"))
+        })?
+        .into();
+
+    let signable_request = SignableRequest::new(
+        request.method().as_str(),
+        request.uri().to_string(),
+        request
+            .headers()
+            .iter()
+            .map(|(k, v)| (k.as_str(), std::str::from_utf8(v.as_bytes()).unwrap())),
+        SignableBody::Bytes(request.body().as_bytes()),
+    )
+    .map_err(|e| {
+        Error::authentication_error(MECH_NAME, &format!("Failed to create SignableRequest: {e}"))
+    })?;
+
+    // Sign the request
+    let (signing_instructions, _signature) = sign(signable_request, &signing_params)
+        .map_err(|e| Error::authentication_error(MECH_NAME, &format!("Signing failed: {e}")))?
+        .into_parts();
+
+    signing_instructions.apply_to_request_http1x(&mut request);
+    dbg!("ending computation part of compute_aws_sigv4_headers");
+
+    // Extract the Authorization header
+    let headers = request.headers();
+    let authorization = headers
+        .get("authorization")
+        .ok_or_else(|| Error::authentication_error(MECH_NAME, "Missing authorization header"))?
+        .to_str()
+        .map_err(|e| Error::authentication_error(MECH_NAME, &format!("Invalid header value: {e}")))?
+        .to_string();
+    dbg!("authorization header: {}", &authorization);
+
+    let token = headers
+        .get("x-amz-security-token")
+        .map(|v| {
+            v.to_str().map(|s| s.to_string()).map_err(|e| {
+                Error::authentication_error(MECH_NAME, &format!("Invalid token header: {e}"))
+            })
+        })
+        .transpose()?;
+    dbg!("token header: {}", &token);
+
+    Ok(AwsSigV4Headers {
+        authorization,
+        date: date_str,
+        token,
+    })
 }
 
 /// Contains the credentials for MONGODB-AWS authentication.
@@ -404,128 +549,129 @@ impl AwsCredential {
     //         .map_err(|_| Error::unknown_authentication_error(MECH_NAME))
     // }
 
-    /// Computes the signed authorization header for the credentials to send to the server in a sasl
-    /// payload.
-    fn compute_authorization_header(
-        &self,
-        date: DateTime<Utc>,
-        host: &str,
-        server_nonce: &[u8],
-    ) -> Result<String> {
-        let date_str = date.format(AWS_LONG_DATE_FMT).to_string();
+    // Computes the signed authorization header for the credentials to send to the server in a sasl
+    // payload.
+    // fn compute_authorization_header(
+    //     &self,
+    //     date: DateTime<Utc>,
+    //     host: &str,
+    //     server_nonce: &[u8],
+    // ) -> Result<String> {
+    //     let date_str = date.format(AWS_LONG_DATE_FMT).to_string();
 
-        // We need to include the security token header if the user provided a token. If not, we
-        // just use the empty string.
-        let token = self
-            .session_token
-            .as_ref()
-            .map(|s| format!("x-amz-security-token:{}\n", s))
-            .unwrap_or_default();
+    //     // We need to include the security token header if the user provided a token. If not, we
+    //     // just use the empty string.
+    //     let token = self
+    //         .session_token
+    //         .as_ref()
+    //         .map(|s| format!("x-amz-security-token:{}\n", s))
+    //         .unwrap_or_default();
 
-        // Similarly, we need to put "x-amz-security-token" into the list of signed headers if the
-        // user provided a token. If not, we just use the empty string.
-        let token_signed_header = if self.session_token.is_some() {
-            "x-amz-security-token;"
-        } else {
-            ""
-        };
+    //     // Similarly, we need to put "x-amz-security-token" into the list of signed headers if
+    // the     // // user provided a token. If not, we just use the empty string.
+    //     let token_signed_header = if self.session_token.is_some() {
+    //         "x-amz-security-token;"
+    //     } else {
+    //         ""
+    //     };
 
-        // Generate the list of signed headers (either with or without the security token header).
-        #[rustfmt::skip]
-        let signed_headers = format!(
-            "\
-              content-length;\
-              content-type;\
-              host;\
-              x-amz-date;\
-              {token_signed_header}\
-              x-mongodb-gs2-cb-flag;\
-              x-mongodb-server-nonce\
-            ",
-            token_signed_header = token_signed_header,
-        );
+    //     // Generate the list of signed headers (either with or without the security token
+    // header).     #[rustfmt::skip]
+    //     let signed_headers = format!(
+    //         "\
+    //           content-length;\
+    //           content-type;\
+    //           host;\
+    //           x-amz-date;\
+    //           {token_signed_header}\
+    //           x-mongodb-gs2-cb-flag;\
+    //           x-mongodb-server-nonce\
+    //         ",
+    //         token_signed_header = token_signed_header,
+    //     );
 
-        let body = "Action=GetCallerIdentity&Version=2011-06-15";
-        let hashed_body = hex::encode(Sha256::digest(body.as_bytes()));
+    //     let body = "Action=GetCallerIdentity&Version=2011-06-15";
+    //     let hashed_body = hex::encode(Sha256::digest(body.as_bytes()));
 
-        let nonce = base64::encode(server_nonce);
+    //     let nonce = base64::encode(server_nonce);
 
-        #[rustfmt::skip]
-        let request = format!(
-            "\
-             POST\n\
-             /\n\n\
-             content-length:43\n\
-             content-type:application/x-www-form-urlencoded\n\
-             host:{host}\n\
-             x-amz-date:{date}\n\
-             {token}\
-             x-mongodb-gs2-cb-flag:n\n\
-             x-mongodb-server-nonce:{nonce}\n\n\
-             {signed_headers}\n\
-             {hashed_body}\
-             ",
-            host = host,
-            date = date_str,
-            token = token,
-            nonce = nonce,
-            signed_headers = signed_headers,
-            hashed_body = hashed_body,
-        );
+    //     #[rustfmt::skip]
+    //     let request = format!(
+    //         "\
+    //          POST\n\
+    //          /\n\n\
+    //          content-length:43\n\
+    //          content-type:application/x-www-form-urlencoded\n\
+    //          host:{host}\n\
+    //          x-amz-date:{date}\n\
+    //          {token}\
+    //          x-mongodb-gs2-cb-flag:n\n\
+    //          x-mongodb-server-nonce:{nonce}\n\n\
+    //          {signed_headers}\n\
+    //          {hashed_body}\
+    //          ",
+    //         host = host,
+    //         date = date_str,
+    //         token = token,
+    //         nonce = nonce,
+    //         signed_headers = signed_headers,
+    //         hashed_body = hashed_body,
+    //     );
 
-        let hashed_request = hex::encode(Sha256::digest(request.as_bytes()));
+    //     let hashed_request = hex::encode(Sha256::digest(request.as_bytes()));
 
-        let small_date = date.format("%Y%m%d").to_string();
+    //     let small_date = date.format("%Y%m%d").to_string();
 
-        let region = if host == "sts.amazonaws.com" {
-            "us-east-1"
-        } else {
-            let parts: Vec<_> = host.split('.').collect();
-            parts.get(1).copied().unwrap_or("us-east-1")
-        };
+    //     let region = if host == "sts.amazonaws.com" {
+    //         "us-east-1"
+    //     } else {
+    //         let parts: Vec<_> = host.split('.').collect();
+    //         parts.get(1).copied().unwrap_or("us-east-1")
+    //     };
 
-        #[rustfmt::skip]
-        let string_to_sign = format!(
-            "\
-             AWS4-HMAC-SHA256\n\
-             {full_date}\n\
-             {small_date}/{region}/sts/aws4_request\n\
-             {hashed_request}\
-            ",
-            full_date = date_str,
-            small_date = small_date,
-            region = region,
-            hashed_request = hashed_request,
-        );
+    //     #[rustfmt::skip]
+    //     let string_to_sign = format!(
+    //         "\
+    //          AWS4-HMAC-SHA256\n\
+    //          {full_date}\n\
+    //          {small_date}/{region}/sts/aws4_request\n\
+    //          {hashed_request}\
+    //         ",
+    //         full_date = date_str,
+    //         small_date = small_date,
+    //         region = region,
+    //         hashed_request = hashed_request,
+    //     );
 
-        let first_hmac_key = format!("AWS4{}", self.secret_access_key);
-        let k_date =
-            auth::mac::<Hmac<Sha256>>(first_hmac_key.as_ref(), small_date.as_ref(), MECH_NAME)?;
-        let k_region = auth::mac::<Hmac<Sha256>>(k_date.as_ref(), region.as_ref(), MECH_NAME)?;
-        let k_service = auth::mac::<Hmac<Sha256>>(k_region.as_ref(), b"sts", MECH_NAME)?;
-        let k_signing = auth::mac::<Hmac<Sha256>>(k_service.as_ref(), b"aws4_request", MECH_NAME)?;
+    //     let first_hmac_key = format!("AWS4{}", self.secret_access_key);
+    //     let k_date =
+    //         auth::mac::<Hmac<Sha256>>(first_hmac_key.as_ref(), small_date.as_ref(), MECH_NAME)?;
+    //     let k_region = auth::mac::<Hmac<Sha256>>(k_date.as_ref(), region.as_ref(), MECH_NAME)?;
+    //     let k_service = auth::mac::<Hmac<Sha256>>(k_region.as_ref(), b"sts", MECH_NAME)?;
+    //     let k_signing = auth::mac::<Hmac<Sha256>>(k_service.as_ref(), b"aws4_request",
+    // MECH_NAME)?;
 
-        let signature_bytes =
-            auth::mac::<Hmac<Sha256>>(k_signing.as_ref(), string_to_sign.as_ref(), MECH_NAME)?;
-        let signature = hex::encode(signature_bytes);
+    //     let signature_bytes =
+    //         auth::mac::<Hmac<Sha256>>(k_signing.as_ref(), string_to_sign.as_ref(), MECH_NAME)?;
+    //     let signature = hex::encode(signature_bytes);
 
-        #[rustfmt::skip]
-        let auth_header = format!(
-            "\
-             AWS4-HMAC-SHA256 \
-             Credential={access_key}/{small_date}/{region}/sts/aws4_request, \
-             SignedHeaders={signed_headers}, \
-             Signature={signature}\
-            ",
-            access_key = self.access_key_id,
-            small_date = small_date,
-            region = region,
-            signed_headers = signed_headers,
-            signature = signature
-        );
+    //     #[rustfmt::skip]
+    //     let auth_header = format!(
+    //         "\
+    //          AWS4-HMAC-SHA256 \
+    //          Credential={access_key}/{small_date}/{region}/sts/aws4_request, \
+    //          SignedHeaders={signed_headers}, \
+    //          Signature={signature}\
+    //         ",
+    //         access_key = self.access_key_id,
+    //         small_date = small_date,
+    //         region = region,
+    //         signed_headers = signed_headers,
+    //         signature = signature
+    //     );
 
-        Ok(auth_header)
-    }
+    //     Ok(auth_header)
+    // }
 
     // #[cfg(feature = "in-use-encryption")]
     // pub(crate) fn access_key(&self) -> &str {
