@@ -2059,7 +2059,6 @@ dependencies = [
  "async-trait",
  "aws-config",
  "aws-credential-types",
- "aws-sdk-sts",
  "aws-types",
  "backtrace",
  "base64 0.13.1",
