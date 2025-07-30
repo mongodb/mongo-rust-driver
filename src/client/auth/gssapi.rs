@@ -58,8 +58,9 @@ pub(crate) async fn authenticate_stream(
     .await?;
 
     let user_principal = credential.username.clone();
+    let service_principal = properties.service_principal_name(&hostname, user_principal.as_ref());
     let (mut authenticator, initial_token) =
-        GssapiAuthenticator::init(user_principal, properties.clone(), &hostname).await?;
+        GssapiAuthenticator::init(user_principal, service_principal).await?;
 
     let source = credential.source.as_deref().unwrap_or("$external");
 
@@ -194,6 +195,24 @@ impl GssapiProperties {
 
         Ok(properties)
     }
+
+    fn service_principal_name(self, hostname: &String, user_principal: Option<&String>) -> String {
+        // Set the service principal name in addition to the user provided properties
+        let service_name: &str = self.service_name.as_ref();
+        let mut service_principal = format!("{service_name}/{hostname}");
+        if let Some(service_realm) = self.service_realm.as_ref() {
+            service_principal = format!("{service_principal}@{service_realm}");
+        } else if let Some(user_principal) = user_principal {
+            if let Some(idx) = user_principal.find('@') {
+                // If no SERVICE_REALM was specified, use realm specified in the
+                // username. Note that `realm` starts with '@'.
+                let (_, realm) = user_principal.split_at(idx);
+                service_principal = format!("{service_principal}{realm}");
+            }
+        }
+
+        service_principal
+    }
 }
 
 struct GssapiAuthenticator {
@@ -208,22 +227,8 @@ impl GssapiAuthenticator {
     // getting an initial token to send to the server.
     async fn init(
         user_principal: Option<String>,
-        properties: GssapiProperties,
-        hostname: &str,
+        service_principal: String,
     ) -> Result<(Self, Vec<u8>)> {
-        let service_name: &str = properties.service_name.as_ref();
-        let mut service_principal = format!("{service_name}/{hostname}");
-        if let Some(service_realm) = properties.service_realm.as_ref() {
-            service_principal = format!("{service_principal}@{service_realm}");
-        } else if let Some(user_principal) = user_principal.as_ref() {
-            if let Some(idx) = user_principal.find('@') {
-                // If no SERVICE_REALM was specified, use realm specified in the
-                // username. Note that `realm` starts with '@'.
-                let (_, realm) = user_principal.split_at(idx);
-                service_principal = format!("{service_principal}{realm}");
-            }
-        }
-
         let (pending_ctx, initial_token) = ClientCtx::new(
             InitiateFlags::empty(),
             user_principal.as_deref(),
@@ -398,6 +403,9 @@ async fn windows_sspi(
     )
     .await?;
 
+    let service_principal =
+        properties.service_principal_name(&hostname, credential.username.as_ref());
+
     // Configuration
     let kerberos_config = KerberosConfig::new("", "".to_string());
     let mut kerberos = Kerberos::new_client_from_config(kerberos_config).map_err(|e| {
@@ -419,9 +427,7 @@ async fn windows_sspi(
             &mut kerberos,
             &mut acq_creds_handle_result.credentials_handle,
             input_token.as_slice(),
-            credential.username.clone(),
-            properties.clone(),
-            &hostname,
+            service_principal.clone(),
         )?;
         if status == SecurityStatus::ContinueNeeded || status == SecurityStatus::Ok {
             let command = if conversation_id.is_none() {
@@ -450,7 +456,7 @@ async fn windows_sspi(
             input_token = sasl_response.payload;
 
             if sasl_response.done {
-                return Ok(())
+                return Ok(());
             }
         } else {
             return Err(Error::authentication_error(
@@ -459,8 +465,6 @@ async fn windows_sspi(
             ));
         }
     }
-
-    Ok(())
 }
 
 pub(crate) fn get_cred_handle(
@@ -471,7 +475,8 @@ pub(crate) fn get_cred_handle(
         .acquire_credentials_handle()
         .with_credential_use(sspi::CredentialUse::Outbound);
 
-    if let Some(pwd) = credential.password.as_ref() {
+    let mut auth_data: Option<sspi::Credentials> = None;
+    if let Some(pwd) = credential.password.clone() {
         if let Some(username) = credential.username.as_ref() {
             let identity = sspi::AuthIdentity {
                 username: Username::parse(username).map_err(|e| {
@@ -483,13 +488,17 @@ pub(crate) fn get_cred_handle(
                 password: pwd.into(),
             };
 
-            acq_creds_handle_result = acq_creds_handle_result.with_auth_data(&identity.into());
+            auth_data = Some(identity.into());
         } else {
             return Err(Error::authentication_error(
                 GSSAPI_STR,
                 "Username required but not specified",
             ));
         }
+    }
+
+    if let Some(auth_data) = auth_data.as_ref() {
+        acq_creds_handle_result = acq_creds_handle_result.with_auth_data(auth_data);
     }
 
     acq_creds_handle_result.execute(kerberos).map_err(|e| {
@@ -505,24 +514,8 @@ fn step_helper(
     cred_handle: &mut <Kerberos as SspiImpl>::CredentialsHandle,
     input_buffer: &mut [SecurityBuffer],
     output_buffer: &mut [SecurityBuffer],
-    user_principal: Option<String>,
-    properties: GssapiProperties,
-    hostname: &str,
+    service_principal: String,
 ) -> Result<InitializeSecurityContextResult> {
-    // todo: consider not only refactoring this duplicated code into a helper function,
-    //       but possibly updating GssapiProperties::from-credential to create the service principal for me
-    let service_name: &str = properties.service_name.as_ref();
-    let mut service_principal = format!("{service_name}/{hostname}");
-    if let Some(service_realm) = properties.service_realm.as_ref() {
-        service_principal = format!("{service_principal}@{service_realm}");
-    } else if let Some(user_principal) = user_principal.as_ref() {
-        if let Some(idx) = user_principal.find('@') {
-            // If no SERVICE_REALM was specified, use realm specified in the
-            // username. Note that `realm` starts with '@'.
-            let (_, realm) = user_principal.split_at(idx);
-            service_principal = format!("{service_principal}{realm}");
-        }
-    }
     let mut builder = kerberos
         .initialize_security_context()
         .with_credentials_handle(cred_handle)
@@ -532,7 +525,7 @@ fn step_helper(
         .with_input(input_buffer)
         .with_output(output_buffer);
 
-    kerberos
+    let result = kerberos
         .initialize_security_context_impl(&mut builder)
         .map_err(|e| {
             Error::authentication_error(
@@ -543,16 +536,16 @@ fn step_helper(
         .resolve_to_result()
         .map_err(|e| {
             Error::authentication_error(GSSAPI_STR, &format!("Failed to resolve to result: {e}"))
-        })
+        });
+
+    result
 }
 
 pub fn step(
     kerberos: &mut Kerberos,
     cred_handle: &mut <Kerberos as SspiImpl>::CredentialsHandle,
     input_token: &[u8],
-    user_principal: Option<String>,
-    properties: GssapiProperties,
-    hostname: &str,
+    service_principal: String,
 ) -> Result<(Vec<u8>, SecurityStatus)> {
     let mut secure_input_buffer =
         vec![SecurityBuffer::new(input_token.to_vec(), BufferType::Token)];
@@ -562,9 +555,7 @@ pub fn step(
         cred_handle,
         &mut secure_input_buffer,
         &mut secure_output_buffer,
-        user_principal,
-        properties,
-        hostname,
+        service_principal,
     ) {
         Ok(result) => {
             let output_buffer = secure_output_buffer[0].to_owned();
