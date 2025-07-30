@@ -136,13 +136,24 @@ async fn authenticate_stream_inner(
     );
 
     let date = Utc::now();
-    // Generate authorization header using original implementation without AWS SDK
 
+    // Generate authorization header using original implementation without AWS SDK
     // let authorization_header = aws_credential.compute_authorization_header(
     //     date,
     //     &server_first.sts_host,
     //     &server_first.server_nonce,
     // )?;
+
+    // dbg!("authorization header: {}", &authorization_header);
+
+    // let mut client_second_payload = doc! {
+    //     "a": authorization_header,
+    //     "d": date.format(AWS_LONG_DATE_FMT).to_string(),
+    // };
+
+    // if let Some(security_token) = aws_credential.session_token {
+    //     client_second_payload.insert("t", security_token);
+    // }
 
     let sigv4_headers = compute_aws_sigv4_headers(
         creds,
@@ -243,9 +254,9 @@ pub async fn compute_aws_sigv4_headers(
     };
 
     let url = format!("https://{}", host);
-    let service = "execute-api";
+    let service = "sts";
     let body_str = "Action=GetCallerIdentity&Version=2011-06-15";
-    // let body_bytes = body_str.as_bytes();
+    let body_bytes = body_str.as_bytes();
     let nonce_b64 = base64::encode(server_nonce);
 
     // Create the HTTP request
@@ -254,7 +265,7 @@ pub async fn compute_aws_sigv4_headers(
         .uri(&url)
         .header("host", host)
         .header("content-type", "application/x-www-form-urlencoded")
-        // .header("content-length", body_bytes.len())
+        .header("content-length", body_bytes.len())
         .header("x-amz-date", date_str.clone())
         .header("x-mongodb-gs2-cb-flag", "n")
         .header("x-mongodb-server-nonce", nonce_b64.clone());
