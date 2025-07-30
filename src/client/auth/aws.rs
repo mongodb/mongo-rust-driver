@@ -221,8 +221,6 @@ pub async fn compute_aws_sigv4_payload(
     host: &str,
     server_nonce: &[u8],
 ) -> Result<Document> {
-    let date_str = date.format("%Y%m%dT%H%M%SZ").to_string();
-
     let region = if host == "sts.amazonaws.com" {
         "us-east-1"
     } else {
@@ -231,7 +229,7 @@ pub async fn compute_aws_sigv4_payload(
     };
 
     let url = format!("https://{}", host);
-    let service = "sts";
+    let date_str = date.format("%Y%m%dT%H%M%SZ").to_string();
     let body_str = "Action=GetCallerIdentity&Version=2011-06-15";
     let body_bytes = body_str.as_bytes();
     let nonce_b64 = base64::encode(server_nonce);
@@ -255,6 +253,7 @@ pub async fn compute_aws_sigv4_payload(
         Error::authentication_error(MECH_NAME, &format!("Failed to build request: {e}"))
     })?;
 
+    let service = "sts";
     let identity = creds.into();
 
     // Set up signing parameters
@@ -274,24 +273,24 @@ pub async fn compute_aws_sigv4_payload(
     let signable_request = SignableRequest::new(
         request.method().as_str(),
         request.uri().to_string(),
-        request
-            .headers()
-            .iter()
-            .map(|(k, v)| (k.as_str(), std::str::from_utf8(v.as_bytes()).unwrap())),
+        request.headers().iter().map(|(k, v)| {
+            (
+                k.as_str(),
+                std::str::from_utf8(v.as_bytes()).expect("Header value should be valid UTF-8"),
+            )
+        }),
         SignableBody::Bytes(request.body().as_bytes()),
     )
     .map_err(|e| {
         Error::authentication_error(MECH_NAME, &format!("Failed to create SignableRequest: {e}"))
     })?;
 
-    // Sign the request
     let (signing_instructions, _signature) = sign(signable_request, &signing_params)
         .map_err(|e| Error::authentication_error(MECH_NAME, &format!("Signing failed: {e}")))?
         .into_parts();
 
     signing_instructions.apply_to_request_http1x(&mut request);
 
-    // Extract the Authorization header
     let headers = request.headers();
     let authorization_header = headers
         .get("authorization")
