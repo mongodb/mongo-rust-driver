@@ -1,9 +1,9 @@
-// use std::env::{remove_var, set_var, var};
+use std::env::{remove_var, set_var, var};
 
 use crate::{
     bson::{doc, Document},
-    // client::auth::aws::test_utils::*,
-    // test::DEFAULT_URI,
+    client::auth::aws::test_utils::*,
+    test::DEFAULT_URI,
     Client,
 };
 
@@ -11,120 +11,125 @@ use crate::{
 async fn auth_aws() {
     let client = Client::for_test().await;
     let coll = client.database("aws").collection::<Document>("somecoll");
-    let _ = tracing_subscriber::fmt::try_init();
 
     coll.find_one(doc! {}).await.unwrap();
 }
 
 // The TestClient performs operations upon creation that trigger authentication, so the credential
 // caching tests use a regular client instead to avoid that noise.
-// async fn get_client() -> Client {
-//     Client::with_uri_str(DEFAULT_URI.clone()).await.unwrap()
-// }
+async fn get_client() -> Client {
+    Client::with_uri_str(DEFAULT_URI.clone()).await.unwrap()
+}
 
-// #[tokio::test]
-// async fn credential_caching() {
-//     // This test should only be run when authenticating using AWS endpoints.
-//     if var("SKIP_CREDENTIAL_CACHING_TESTS").is_ok() {
-//         return;
-//     }
+// Ignored because the AWS SDK handles caching internally, making this manual caching test
+// unnecessary. This test will be removed in a future PR as part of RUST-1529,
+// depending on whether we fully switch to the SDK-based implementation,
+// or gate it behind a feature flag and retain the original approach by default.
+#[ignore]
+#[tokio::test]
+async fn credential_caching() {
+    // This test should only be run when authenticating using AWS endpoints.
+    if var("SKIP_CREDENTIAL_CACHING_TESTS").is_ok() {
+        return;
+    }
 
-//     clear_cached_credential().await;
+    clear_cached_credential().await;
 
-//     let client = get_client().await;
-//     let coll = client.database("aws").collection::<Document>("somecoll");
-//     coll.find_one(doc! {}).await.unwrap();
-//     assert!(cached_credential().await.is_some());
+    let client = get_client().await;
+    let coll = client.database("aws").collection::<Document>("somecoll");
+    coll.find_one(doc! {}).await.unwrap();
+    assert!(cached_credential().await.is_some());
 
-//     let now = crate::bson::DateTime::now();
-//     set_cached_expiration(now).await;
+    let now = crate::bson::DateTime::now();
+    set_cached_expiration(now).await;
 
-//     let client = get_client().await;
-//     let coll = client.database("aws").collection::<Document>("somecoll");
-//     coll.find_one(doc! {}).await.unwrap();
-//     assert!(cached_credential().await.is_some());
-//     assert!(cached_expiration().await > now);
+    let client = get_client().await;
+    let coll = client.database("aws").collection::<Document>("somecoll");
+    coll.find_one(doc! {}).await.unwrap();
+    assert!(cached_credential().await.is_some());
+    assert!(cached_expiration().await > now);
 
-//     poison_cached_credential().await;
+    poison_cached_credential().await;
 
-//     let client = get_client().await;
-//     let coll = client.database("aws").collection::<Document>("somecoll");
-//     match coll.find_one(doc! {}).await {
-//         Ok(_) => panic!(
-//             "find one should have failed with authentication error due to poisoned cached \
-//              credential"
-//         ),
-//         Err(error) => assert!(error.is_auth_error()),
-//     }
-//     assert!(cached_credential().await.is_none());
+    let client = get_client().await;
+    let coll = client.database("aws").collection::<Document>("somecoll");
+    match coll.find_one(doc! {}).await {
+        Ok(_) => panic!(
+            "find one should have failed with authentication error due to poisoned cached \
+             credential"
+        ),
+        Err(error) => assert!(error.is_auth_error()),
+    }
+    assert!(cached_credential().await.is_none());
 
-//     coll.find_one(doc! {}).await.unwrap();
-//     assert!(cached_credential().await.is_some());
-// }
+    coll.find_one(doc! {}).await.unwrap();
+    assert!(cached_credential().await.is_some());
+}
 
-// todo: tests for aws sdk caching
-// TODO: find documentation for rust aws sdk credential caching
-// can delete caching logic if the aws sdk handles it properly for our needs
+// Ignored because the AWS SDK handles caching internally, making this manual caching test
+// unnecessary. This test will be removed in a future PR as part of RUST-1529,
+// depending on whether we fully switch to the SDK-based implementation,
+// or gate it behind a feature flag and retain the original approach by default.
+#[ignore]
+#[tokio::test]
+async fn credential_caching_environment_vars() {
+    // This test should only be run when authenticating using AWS endpoints.
+    if var("SKIP_CREDENTIAL_CACHING_TESTS").is_ok() {
+        return;
+    }
 
-// #[tokio::test]
-// async fn credential_caching_environment_vars() {
-//     // This test should only be run when authenticating using AWS endpoints.
-//     if var("SKIP_CREDENTIAL_CACHING_TESTS").is_ok() {
-//         return;
-//     }
+    clear_cached_credential().await;
 
-//     clear_cached_credential().await;
+    let client = get_client().await;
+    let coll = client.database("aws").collection::<Document>("somecoll");
+    coll.find_one(doc! {}).await.unwrap();
+    assert!(cached_credential().await.is_some());
 
-//     let client = get_client().await;
-//     let coll = client.database("aws").collection::<Document>("somecoll");
-//     coll.find_one(doc! {}).await.unwrap();
-//     assert!(cached_credential().await.is_some());
+    set_var("AWS_ACCESS_KEY_ID", cached_access_key_id().await);
+    set_var("AWS_SECRET_ACCESS_KEY", cached_secret_access_key().await);
+    if let Some(session_token) = cached_session_token().await {
+        set_var("AWS_SESSION_TOKEN", session_token);
+    }
+    clear_cached_credential().await;
 
-//     set_var("AWS_ACCESS_KEY_ID", cached_access_key_id().await);
-//     set_var("AWS_SECRET_ACCESS_KEY", cached_secret_access_key().await);
-//     if let Some(session_token) = cached_session_token().await {
-//         set_var("AWS_SESSION_TOKEN", session_token);
-//     }
-//     clear_cached_credential().await;
+    let client = get_client().await;
+    let coll = client.database("aws").collection::<Document>("somecoll");
+    coll.find_one(doc! {}).await.unwrap();
+    assert!(cached_credential().await.is_none());
 
-//     let client = get_client().await;
-//     let coll = client.database("aws").collection::<Document>("somecoll");
-//     coll.find_one(doc! {}).await.unwrap();
-//     assert!(cached_credential().await.is_none());
+    set_var("AWS_ACCESS_KEY_ID", "bad");
+    set_var("AWS_SECRET_ACCESS_KEY", "bad");
+    set_var("AWS_SESSION_TOKEN", "bad");
 
-//     set_var("AWS_ACCESS_KEY_ID", "bad");
-//     set_var("AWS_SECRET_ACCESS_KEY", "bad");
-//     set_var("AWS_SESSION_TOKEN", "bad");
+    let client = get_client().await;
+    let coll = client.database("aws").collection::<Document>("somecoll");
+    match coll.find_one(doc! {}).await {
+        Ok(_) => panic!(
+            "find one should have failed with authentication error due to poisoned environment \
+             variables"
+        ),
+        Err(error) => assert!(error.is_auth_error()),
+    }
 
-//     let client = get_client().await;
-//     let coll = client.database("aws").collection::<Document>("somecoll");
-//     match coll.find_one(doc! {}).await {
-//         Ok(_) => panic!(
-//             "find one should have failed with authentication error due to poisoned environment \
-//              variables"
-//         ),
-//         Err(error) => assert!(error.is_auth_error()),
-//     }
+    remove_var("AWS_ACCESS_KEY_ID");
+    remove_var("AWS_SECRET_ACCESS_KEY");
+    remove_var("AWS_SESSION_TOKEN");
+    clear_cached_credential().await;
 
-//     remove_var("AWS_ACCESS_KEY_ID");
-//     remove_var("AWS_SECRET_ACCESS_KEY");
-//     remove_var("AWS_SESSION_TOKEN");
-//     clear_cached_credential().await;
+    let client = get_client().await;
+    let coll = client.database("aws").collection::<Document>("somecoll");
+    coll.find_one(doc! {}).await.unwrap();
+    assert!(cached_credential().await.is_some());
 
-//     let client = get_client().await;
-//     let coll = client.database("aws").collection::<Document>("somecoll");
-//     coll.find_one(doc! {}).await.unwrap();
-//     assert!(cached_credential().await.is_some());
+    set_var("AWS_ACCESS_KEY_ID", "bad");
+    set_var("AWS_SECRET_ACCESS_KEY", "bad");
+    set_var("AWS_SESSION_TOKEN", "bad");
 
-//     set_var("AWS_ACCESS_KEY_ID", "bad");
-//     set_var("AWS_SECRET_ACCESS_KEY", "bad");
-//     set_var("AWS_SESSION_TOKEN", "bad");
+    let client = get_client().await;
+    let coll = client.database("aws").collection::<Document>("somecoll");
+    coll.find_one(doc! {}).await.unwrap();
 
-//     let client = get_client().await;
-//     let coll = client.database("aws").collection::<Document>("somecoll");
-//     coll.find_one(doc! {}).await.unwrap();
-
-//     remove_var("AWS_ACCESS_KEY_ID");
-//     remove_var("AWS_SECRET_ACCESS_KEY");
-//     remove_var("AWS_SESSION_TOKEN");
-// }
+    remove_var("AWS_ACCESS_KEY_ID");
+    remove_var("AWS_SECRET_ACCESS_KEY");
+    remove_var("AWS_SESSION_TOKEN");
+}
