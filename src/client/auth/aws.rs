@@ -119,12 +119,7 @@ async fn authenticate_stream_inner(
     let creds = get_aws_credentials(credential).await.map_err(|e| {
         Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
     })?;
-    let aws_credential = AwsCredential::from_sdk_creds(
-        creds.access_key_id().to_string(),
-        creds.secret_access_key().to_string(),
-        creds.session_token().map(|s| s.to_string()),
-        None,
-    );
+    let aws_credential = AwsCredential::from_sdk_creds(creds);
 
     let date = Utc::now();
 
@@ -301,17 +296,12 @@ impl AwsCredential {
     }
 
     // Creates AwsCredential from keys.
-    fn from_sdk_creds(
-        access_key_id: String,
-        secret_access_key: String,
-        session_token: Option<String>,
-        expiration: Option<crate::bson::DateTime>,
-    ) -> Self {
+    fn from_sdk_creds(creds: Credentials) -> Self {
         Self {
-            access_key_id,
-            secret_access_key,
-            session_token,
-            expiration,
+            access_key_id: creds.access_key_id().to_string(),
+            secret_access_key: creds.secret_access_key().to_string(),
+            session_token: creds.session_token().map(|s| s.to_string()),
+            expiration: None,
         }
     }
 
