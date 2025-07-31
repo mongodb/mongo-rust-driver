@@ -41,7 +41,7 @@ impl Database {
     pub fn run_command(&self, command: Document) -> RunCommand {
         RunCommand {
             db: self,
-            command: RawDocumentBuf::from_document(&command),
+            command: RawDocumentBuf::try_from(&command),
             options: None,
             session: None,
         }
@@ -76,7 +76,7 @@ impl Database {
     pub fn run_cursor_command(&self, command: Document) -> RunCursorCommand {
         RunCursorCommand {
             db: self,
-            command: RawDocumentBuf::from_document(&command),
+            command: RawDocumentBuf::try_from(&command),
             options: None,
             session: ImplicitSession,
         }

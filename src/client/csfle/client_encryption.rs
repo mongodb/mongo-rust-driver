@@ -9,6 +9,8 @@ use mongocrypt::{ctx::KmsProvider, Crypt};
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
+#[cfg(feature = "bson-3")]
+use crate::bson_compat::RawBsonRefExt as _;
 use crate::{
     bson::{doc, spec::BinarySubtype, Binary, RawBinaryRef, RawDocumentBuf},
     client::options::TlsOptions,

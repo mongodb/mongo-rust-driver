@@ -44,7 +44,7 @@ impl OperationWithDefaults for Distinct {
         let mut body = rawdoc! {
             Self::NAME: self.ns.coll.clone(),
             "key": self.field_name.clone(),
-            "query": RawDocumentBuf::from_document(&self.query)?,
+            "query": RawDocumentBuf::try_from(&self.query)?,
         };
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
