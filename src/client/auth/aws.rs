@@ -25,9 +25,6 @@ use crate::{
     serde_util,
 };
 
-#[cfg(not(feature = "bson-3"))]
-use crate::bson_compat::DocumentExt as _;
-
 const AWS_ECS_IP: &str = "169.254.170.2";
 const AWS_EC2_IP: &str = "169.254.169.254";
 const AWS_LONG_DATE_FMT: &str = "%Y%m%dT%H%M%SZ";
@@ -75,7 +72,8 @@ async fn authenticate_stream_inner(
         // channel binding is not supported.
         "p": 110i32,
     };
-    let client_first_payload_bytes = client_first_payload.encode_to_vec()?;
+    let mut client_first_payload_bytes = vec![];
+    client_first_payload.to_writer(&mut client_first_payload_bytes)?;
 
     let sasl_start = SaslStart::new(
         source.into(),
@@ -125,7 +123,8 @@ async fn authenticate_stream_inner(
         client_second_payload.insert("t", security_token);
     }
 
-    let client_second_payload_bytes = client_second_payload.encode_to_vec()?;
+    let mut client_second_payload_bytes = vec![];
+    client_second_payload.to_writer(&mut client_second_payload_bytes)?;
 
     let sasl_continue = SaslContinue::new(
         source.into(),

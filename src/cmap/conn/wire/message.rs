@@ -96,7 +96,7 @@ impl Message {
     /// Gets this message's command as a Document. If serialization fails, returns a document
     /// containing the error.
     pub(crate) fn get_command_document(&self) -> Document {
-        let mut command = match self.document_payload.to_document() {
+        let mut command = match Document::try_from(self.document_payload.as_ref()) {
             Ok(document) => document,
             Err(error) => return doc! { "serialization error": error.to_string() },
         };
@@ -104,7 +104,7 @@ impl Message {
         for document_sequence in &self.document_sequences {
             let mut documents = Array::new();
             for document in &document_sequence.documents {
-                match document.to_document() {
+                match Document::try_from(document.as_ref()) {
                     Ok(document) => documents.push(document.into()),
                     Err(error) => return doc! { "serialization error": error.to_string() },
                 }
@@ -424,14 +424,11 @@ enum MessageSection {
 impl MessageSection {
     /// Reads bytes from `reader` and deserializes them into a MessageSection.
     fn read<R: Read>(reader: &mut R) -> Result<Self> {
-        #[cfg(not(feature = "bson-3"))]
-        use crate::bson_compat::RawDocumentBufExt as _;
-
         let payload_type = reader.read_u8_sync()?;
 
         if payload_type == 0 {
             let bytes = bson_util::read_document_bytes(reader)?;
-            let document = RawDocumentBuf::decode_from_bytes(bytes)?;
+            let document = RawDocumentBuf::from_bytes(bytes)?;
             return Ok(MessageSection::Document(document));
         }
 
@@ -446,7 +443,7 @@ impl MessageSection {
 
         while length_remaining.get()? > count_reader.bytes_read() {
             let bytes = bson_util::read_document_bytes(&mut count_reader)?;
-            let document = RawDocumentBuf::decode_from_bytes(bytes)?;
+            let document = RawDocumentBuf::from_bytes(bytes)?;
             documents.push(document);
         }
 

@@ -1,8 +1,6 @@
 #[cfg(feature = "in-use-encryption")]
 use crate::bson::RawDocumentBuf;
 use crate::bson::{doc, RawBsonRef, RawDocument, Timestamp};
-#[cfg(not(feature = "bson-3"))]
-use crate::bson_compat::RawDocumentExt as _;
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
 use once_cell::sync::Lazy;
@@ -823,7 +821,7 @@ impl Client {
         is_sharded: bool,
         response: RawCommandResponse,
     ) -> Result<RawCommandResponse> {
-        let raw_doc = RawDocument::decode_from_bytes(response.as_bytes())?;
+        let raw_doc = RawDocument::from_bytes(response.as_bytes())?;
 
         let ok = match raw_doc.get("ok")? {
             Some(b) => {

@@ -386,7 +386,7 @@ impl WriteModel {
 
         let (mut model_document, inserted_id) = match self {
             Self::InsertOne(model) => {
-                let mut insert_document = RawDocumentBuf::from_document(&model.document)?;
+                let mut insert_document = RawDocumentBuf::try_from(&model.document)?;
                 let inserted_id = get_or_prepend_id_field(&mut insert_document)?;
                 (rawdoc! { "document": insert_document }, Some(inserted_id))
             }
