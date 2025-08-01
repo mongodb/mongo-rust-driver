@@ -250,19 +250,17 @@ impl CryptExecutor {
                             KmsProviderType::Aws => {
                                 #[cfg(feature = "aws-auth")]
                                 {
-                                    use crate::{
-                                        client::auth::{aws::AwsCredential, Credential},
-                                        runtime::HttpClient,
+                                    use crate::client::auth::{
+                                        aws::get_aws_credentials,
+                                        Credential,
                                     };
 
-                                    let aws_creds = AwsCredential::get(
-                                        &Credential::default(),
-                                        &HttpClient::default(),
-                                    )
-                                    .await?;
+                                    let aws_creds =
+                                        get_aws_credentials(&Credential::default()).await?;
+
                                     let mut creds = rawdoc! {
-                                        "accessKeyId": aws_creds.access_key(),
-                                        "secretAccessKey": aws_creds.secret_key(),
+                                        "accessKeyId": aws_creds.access_key_id().to_string(),
+                                        "secretAccessKey": aws_creds.secret_access_key().to_string(),
                                     };
                                     if let Some(token) = aws_creds.session_token() {
                                         creds.append(cstr!("sessionToken"), token);

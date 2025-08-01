@@ -25,6 +25,12 @@ use crate::{
     serde_util,
 };
 
+#[cfg(feature = "aws-auth")]
+use aws_config::BehaviorVersion;
+
+#[cfg(feature = "aws-auth")]
+use aws_credential_types::{provider::ProvideCredentials, Credentials};
+
 const AWS_ECS_IP: &str = "169.254.170.2";
 const AWS_EC2_IP: &str = "169.254.169.254";
 const AWS_LONG_DATE_FMT: &str = "%Y%m%dT%H%M%SZ";
@@ -52,7 +58,8 @@ async fn authenticate_stream_inner(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
-    http_client: &HttpClient,
+    // RUST-1529 note: http_client is used in the non-AWS SDK implementation to get credentials
+    _http_client: &HttpClient,
 ) -> Result<()> {
     let source = match credential.source.as_deref() {
         Some("$external") | None => "$external",
@@ -88,23 +95,29 @@ async fn authenticate_stream_inner(
     let server_first = ServerFirst::parse(server_first_response.auth_response_body(MECH_NAME)?)?;
     server_first.validate(&nonce)?;
 
-    let aws_credential = {
-        // Limit scope of this variable to avoid holding onto the lock for the duration of
-        // authenticate_stream.
-        let cached_credential = CACHED_CREDENTIAL.lock().await;
-        match *cached_credential {
-            Some(ref aws_credential) if !aws_credential.is_expired() => aws_credential.clone(),
-            _ => {
-                // From the spec: the driver MUST not place a lock on making a request.
-                drop(cached_credential);
-                let aws_credential = AwsCredential::get(credential, http_client).await?;
-                if aws_credential.expiration.is_some() {
-                    *CACHED_CREDENTIAL.lock().await = Some(aws_credential.clone());
-                }
-                aws_credential
-            }
-        }
-    };
+    // Find credentials using original implementation without AWS SDK
+    // let aws_credential = {
+    //     // Limit scope of this variable to avoid holding onto the lock for the duration of
+    //     // authenticate_stream.
+    //     let cached_credential = CACHED_CREDENTIAL.lock().await;
+    //     match *cached_credential {
+    //         Some(ref aws_credential) if !aws_credential.is_expired() => aws_credential.clone(),
+    //         _ => {
+    //             // From the spec: the driver MUST not place a lock on making a request.
+    //             drop(cached_credential);
+    //             let aws_credential = AwsCredential::get(credential, http_client).await?;
+    //             if aws_credential.expiration.is_some() {
+    //                 *CACHED_CREDENTIAL.lock().await = Some(aws_credential.clone());
+    //             }
+    //             aws_credential
+    //         }
+    //     }
+    // };
+
+    let creds = get_aws_credentials(credential).await.map_err(|e| {
+        Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
+    })?;
+    let aws_credential = AwsCredential::from_sdk_creds(creds);
 
     let date = Utc::now();
 
@@ -152,7 +165,41 @@ async fn authenticate_stream_inner(
     Ok(())
 }
 
+// Find credentials using MongoDB URI or AWS SDK
+pub(crate) async fn get_aws_credentials(credential: &Credential) -> Result<Credentials> {
+    if let (Some(access_key), Some(secret_key)) = (&credential.username, &credential.password) {
+        // Look for credentials in the MongoDB URI
+        Ok(Credentials::new(
+            access_key.clone(),
+            secret_key.clone(),
+            credential
+                .mechanism_properties
+                .as_ref()
+                .and_then(|mp| mp.get_str("AWS_SESSION_TOKEN").ok())
+                .map(str::to_owned),
+            None,
+            "MongoDB URI",
+        ))
+    } else {
+        // If credentials are not provided in the URI, use the AWS SDK to load
+        let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
+        let creds = config
+            .credentials_provider()
+            .ok_or_else(|| {
+                Error::authentication_error(MECH_NAME, "no credential provider configured")
+            })?
+            .provide_credentials()
+            .await
+            .map_err(|e| {
+                Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
+            })?;
+        Ok(creds)
+    }
+}
+
 /// Contains the credentials for MONGODB-AWS authentication.
+// RUST-1529 note: dead_code tag added to avoid unused warnings on expiration field
+#[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub(crate) struct AwsCredential {
@@ -170,6 +217,7 @@ pub(crate) struct AwsCredential {
     expiration: Option<crate::bson::DateTime>,
 }
 
+#[allow(dead_code)]
 fn non_empty(s: Option<String>) -> Option<String> {
     match s {
         None => None,
@@ -178,6 +226,7 @@ fn non_empty(s: Option<String>) -> Option<String> {
     }
 }
 
+#[allow(dead_code)]
 impl AwsCredential {
     /// Derives the credentials for an authentication attempt given the set of credentials the user
     /// passed in.
@@ -242,6 +291,16 @@ impl AwsCredential {
             Self::get_from_ecs(relative_uri, http_client).await
         } else {
             Self::get_from_ec2(http_client).await
+        }
+    }
+
+    // Creates AwsCredential from keys.
+    fn from_sdk_creds(creds: Credentials) -> Self {
+        Self {
+            access_key_id: creds.access_key_id().to_string(),
+            secret_access_key: creds.secret_access_key().to_string(),
+            session_token: creds.session_token().map(|s| s.to_string()),
+            expiration: None,
         }
     }
 
