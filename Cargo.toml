@@ -41,7 +41,7 @@ dns-resolver = ["dep:hickory-resolver", "dep:hickory-proto"]
 cert-key-password = ["dep:pem", "dep:pkcs8"]
 
 # Enable support for MONGODB-AWS authentication.
-aws-auth = ["dep:reqwest", "aws-config", "aws-types", "aws-credential-types", "aws-sigv4", "http"]
+aws-auth = ["dep:reqwest", "dep:aws-config", "dep:aws-types", "dep:aws-credential-types", "dep:aws-sigv4", "dep:http"]
 
 # Enable support for on-demand Azure KMS credentials.
 azure-kms = ["dep:reqwest"]

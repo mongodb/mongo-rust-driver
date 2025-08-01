@@ -1,8 +1,10 @@
 use serde::Deserialize;
 
+#[cfg(feature = "bson-3")]
+use crate::bson_compat::RawDocumentBufExt as _;
 use crate::{
     bson::{doc, rawdoc, Document, RawArrayBuf, RawBson, RawDocumentBuf},
-    bson_compat::{cstr, CStr, RawDocumentBufExt as _},
+    bson_compat::{cstr, CStr},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{convert_insert_many_error, Result},
@@ -25,7 +27,7 @@ impl UpdateOrReplace {
         match self {
             Self::UpdateModifications(update_modifications) => match update_modifications {
                 UpdateModifications::Document(document) => {
-                    let raw = RawDocumentBuf::from_document(document)?;
+                    let raw = RawDocumentBuf::try_from(document)?;
                     doc.append(key, raw);
                 }
                 UpdateModifications::Pipeline(pipeline) => {
@@ -35,7 +37,7 @@ impl UpdateOrReplace {
             },
             Self::Replacement(replacement_doc) => {
                 bson_util::replacement_raw_document_check(replacement_doc)?;
-                doc.append_ref_compat(key, replacement_doc);
+                doc.append_ref(key, replacement_doc);
             }
         }
 
@@ -103,7 +105,7 @@ impl OperationWithDefaults for Update {
         };
 
         let mut update = rawdoc! {
-            "q": RawDocumentBuf::from_document(&self.filter)?,
+            "q": RawDocumentBuf::try_from(&self.filter)?,
         };
         self.update.append_to_rawdoc(&mut update, cstr!("u"))?;
 
@@ -144,10 +146,7 @@ impl OperationWithDefaults for Update {
             }
 
             if let Some(ref let_vars) = options.let_vars {
-                body.append(
-                    cstr!("let"),
-                    crate::bson_compat::serialize_to_raw_document_buf(&let_vars)?,
-                );
+                body.append(cstr!("let"), RawDocumentBuf::try_from(let_vars)?);
             }
 
             if let Some(ref comment) = options.comment {
@@ -155,7 +154,7 @@ impl OperationWithDefaults for Update {
             }
 
             if let Some(ref sort) = options.sort {
-                update.append(cstr!("sort"), RawDocumentBuf::from_document(sort)?);
+                update.append(cstr!("sort"), RawDocumentBuf::try_from(sort)?);
             }
         };
 

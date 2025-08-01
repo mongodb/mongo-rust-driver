@@ -20,6 +20,8 @@ use serde::de::DeserializeOwned;
 #[cfg(test)]
 use tokio::sync::oneshot;
 
+#[cfg(feature = "bson-3")]
+use crate::bson_compat::RawBsonRefExt as _;
 use crate::{
     change_stream::event::{ChangeStreamEvent, ResumeToken},
     cursor::{stream_poll_next, BatchValue, CursorStream, NextInBatchFuture},

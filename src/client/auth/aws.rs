@@ -25,9 +25,6 @@ use crate::{
     serde_util,
 };
 
-#[cfg(not(feature = "bson-3"))]
-use crate::bson_compat::DocumentExt as _;
-
 #[cfg(feature = "aws-auth")]
 use aws_config::BehaviorVersion;
 
@@ -91,7 +88,8 @@ async fn authenticate_stream_inner(
         // channel binding is not supported.
         "p": 110i32,
     };
-    let client_first_payload_bytes = client_first_payload.encode_to_vec()?;
+    let mut client_first_payload_bytes = vec![];
+    client_first_payload.to_writer(&mut client_first_payload_bytes)?;
 
     let sasl_start = SaslStart::new(
         source.into(),
@@ -414,6 +412,16 @@ impl AwsCredential {
             Self::get_from_ecs(relative_uri, http_client).await
         } else {
             Self::get_from_ec2(http_client).await
+        }
+    }
+
+    // Creates AwsCredential from keys.
+    fn from_sdk_creds(creds: Credentials) -> Self {
+        Self {
+            access_key_id: creds.access_key_id().to_string(),
+            secret_access_key: creds.secret_access_key().to_string(),
+            session_token: creds.session_token().map(|s| s.to_string()),
+            expiration: None,
         }
     }
 

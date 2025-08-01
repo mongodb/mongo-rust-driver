@@ -8,7 +8,7 @@ use super::{Entity, TestOperation, TestRunner};
 
 use crate::{
     action::csfle::DataKeyOptions,
-    bson::{doc, Binary, Bson, RawBson},
+    bson::{doc, Binary, Bson, Document, RawBson},
     client_encryption::{LocalMasterKey, MasterKey},
     error::Result,
 };
@@ -29,7 +29,7 @@ impl TestOperation for GetKeyByAltName {
             let ce = test_runner.get_client_encryption(id).await;
             let key = ce.get_key_by_alt_name(&self.key_alt_name).await?;
             let ent = match key {
-                Some(rd) => Entity::Bson(Bson::Document(rd.to_document()?)),
+                Some(rd) => Entity::Bson(Bson::Document(Document::try_from(rd)?)),
                 None => Entity::None,
             };
             Ok(Some(ent))
@@ -76,7 +76,7 @@ impl TestOperation for GetKey {
         async move {
             let ce = test_runner.get_client_encryption(id).await;
             let entity = match ce.get_key(&self.id).await? {
-                Some(key) => Entity::Bson(Bson::Document(key.to_document()?)),
+                Some(key) => Entity::Bson(Bson::Document(Document::try_from(key)?)),
                 None => Entity::None,
             };
             Ok(Some(entity))
@@ -101,7 +101,7 @@ impl TestOperation for AddKeyAltName {
         async move {
             let ce = test_runner.get_client_encryption(id).await;
             let entity = match ce.add_key_alt_name(&self.id, &self.key_alt_name).await? {
-                Some(key) => Entity::Bson(Bson::Document(key.to_document()?)),
+                Some(key) => Entity::Bson(Bson::Document(Document::try_from(key)?)),
                 None => Entity::None,
             };
             Ok(Some(entity))
@@ -186,7 +186,7 @@ impl TestOperation for GetKeys {
             let mut cursor = ce.get_keys().await?;
             let mut keys = vec![];
             while let Some(key) = cursor.try_next().await? {
-                keys.push(Bson::Document(key.to_document()?));
+                keys.push(Bson::Document(Document::try_from(key)?));
             }
             Ok(Some(Entity::Bson(Bson::Array(keys))))
         }
@@ -210,7 +210,7 @@ impl TestOperation for RemoveKeyAltName {
         async move {
             let ce = test_runner.get_client_encryption(id).await;
             let entity = match ce.remove_key_alt_name(&self.id, &self.key_alt_name).await? {
-                Some(key) => Entity::Bson(Bson::Document(key.to_document()?)),
+                Some(key) => Entity::Bson(Bson::Document(Document::try_from(key)?)),
                 None => Entity::None,
             };
             Ok(Some(entity))
