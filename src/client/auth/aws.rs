@@ -153,7 +153,8 @@ async fn authenticate_stream_inner(
     )
     .await?;
 
-    let client_second_payload_bytes = client_second_payload.encode_to_vec()?;
+    let mut client_second_payload_bytes = vec![];
+    client_second_payload.to_writer(&mut client_second_payload_bytes)?;
 
     let sasl_continue = SaslContinue::new(
         source.into(),
