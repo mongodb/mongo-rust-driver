@@ -534,36 +534,61 @@ pub(crate) async fn reauthenticate_stream(
     authenticate_stream(conn, credential, server_api, None).await
 }
 
-async fn setup_automatic_providers(credential: &Credential, callback: &mut Option<CallbackInner>) {
-    // If there is already a function, there is no need to set up an automatic provider
-    // this could happen in the case of a reauthentication, or if the user has already set up
-    // a function. A situation where the user has set up a function and an automatic provider
-    // would already have caused an InvalidArgument error in `validate_credential`.
-    if callback.is_some() {
-        return;
-    }
-    if let Some(ref p) = credential.mechanism_properties {
-        let environment = p.get_str(ENVIRONMENT_PROP_STR).unwrap_or("");
-        #[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
-        let resource = p.get_str(TOKEN_RESOURCE_PROP_STR).unwrap_or("");
-        let function = match environment {
-            #[cfg(feature = "azure-oidc")]
-            AZURE_ENVIRONMENT_VALUE_STR => {
-                let client_id = credential.username.as_deref();
-                Some(Callback::azure_callback(client_id, resource))
-            }
-            #[cfg(feature = "gcp-oidc")]
-            GCP_ENVIRONMENT_VALUE_STR => Some(Callback::gcp_callback(resource)),
-            K8S_ENVIRONMENT_VALUE_STR => Some(Callback::k8s_callback()),
-            _ => None,
-        };
-        if let Some(function) = function {
-            *callback = Some(CallbackInner {
-                function,
-                cache: Cache::new(),
-            })
+fn get_automatic_provider_callback(credential: &Credential) -> Result<CallbackInner> {
+    let Some(ref mechanism_properties) = credential.mechanism_properties else {
+        return Err(auth_error(
+            "no callback or mechanism properties provided for OIDC authentication",
+        ));
+    };
+
+    let environment = mechanism_properties.get_str(ENVIRONMENT_PROP_STR).ok();
+    #[cfg(any(feature = "azure-oidc", feature = "gcp-oidc"))]
+    let token_resource = mechanism_properties
+        .get_str(TOKEN_RESOURCE_PROP_STR)
+        .map_err(|_| {
+            auth_error(format!(
+                "the {TOKEN_RESOURCE_PROP_STR} authentication mechanism property must be set"
+            ))
+        });
+
+    let function = match environment {
+        #[cfg(feature = "azure-oidc")]
+        Some(AZURE_ENVIRONMENT_VALUE_STR) => {
+            let client_id = credential.username.as_deref();
+            Callback::azure_callback(client_id, token_resource?)
         }
-    }
+        #[cfg(not(feature = "azure-oidc"))]
+        Some(AZURE_ENVIRONMENT_VALUE_STR) => {
+            return Err(auth_error(
+                "the `azure-oidc` feature flag must be enabled for Azure OIDC authentication",
+            ));
+        }
+        #[cfg(feature = "gcp-oidc")]
+        Some(GCP_ENVIRONMENT_VALUE_STR) => Callback::gcp_callback(token_resource?),
+        #[cfg(not(feature = "gcp-oidc"))]
+        Some(GCP_ENVIRONMENT_VALUE_STR) => {
+            return Err(auth_error(
+                "the `gcp-oidc` feature flag must be enabled for GCP OIDC authentication",
+            ));
+        }
+        Some(K8S_ENVIRONMENT_VALUE_STR) => Callback::k8s_callback(),
+        Some(other) => {
+            return Err(auth_error(format!(
+                "unsupported value for authentication mechanism property {ENVIRONMENT_PROP_STR}: \
+                 {other}"
+            )));
+        }
+        None => {
+            return Err(auth_error(
+                "no callback or environment configured for OIDC authentication",
+            ));
+        }
+    };
+
+    Ok(CallbackInner {
+        function,
+        cache: Cache::new(),
+    })
 }
 
 pub(crate) async fn authenticate_stream(
@@ -575,16 +600,18 @@ pub(crate) async fn authenticate_stream(
     // We need to hold the lock for the entire function so that multiple functions
     // are not called during an authentication race, and so that token_gen_id on the Connection
     // always matches that in the Credential Cache.
-    let mut guard = credential.oidc_callback.inner.lock().await;
+    let mut callback_guard = credential.oidc_callback.inner.lock().await;
 
-    setup_automatic_providers(credential, &mut guard).await;
     let CallbackInner {
         cache,
         function: Function { inner, kind },
-    } = &mut guard
-        .as_mut()
-        .ok_or_else(|| auth_error("no functions supplied"))?;
-
+    } = match callback_guard.as_mut() {
+        Some(callback) => callback,
+        None => {
+            let callback = get_automatic_provider_callback(credential)?;
+            callback_guard.insert(callback)
+        }
+    };
     cache.propagate_token_gen_id(conn).await;
 
     if server_first.into().is_some() {

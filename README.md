@@ -55,6 +55,8 @@ features = ["sync"]
 | `in-use-encryption`  | Enable support for client-side field level encryption and queryable encryption. Note that re-exports from the `mongocrypt` crate may change in backwards-incompatible ways while that crate is below version 1.0. |
 | `tracing-unstable`   | Enable support for emitting [`tracing`](https://docs.rs/tracing/latest/tracing/) events. This API is unstable and may be subject to breaking changes in minor releases.                                           |
 | `compat-3-0-0`       | Required for future compatibility if default features are disabled.                                                                                                                                               |
+| `azure-oidc`         | Enable support for Azure OIDC environment authentication. |
+| `gcp-oidc`           | Enable support for GCP OIDC environment authentication. |
 
 ## Web Framework Examples
 
