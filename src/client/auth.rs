@@ -5,7 +5,6 @@
 pub(crate) mod aws;
 #[cfg(feature = "gssapi-auth")]
 mod gssapi;
-/// Contains the functionality for [`OIDC`](https://openid.net/developers/how-connect-works/) authorization and authentication.
 pub mod oidc;
 mod plain;
 mod sasl;
