@@ -88,7 +88,7 @@ async fn metadata_with_options() {
     );
     assert_eq!(
         driver.get_str("name").unwrap(),
-        format!("mongo-rust-driver|{}", name).as_str()
+        format!("mongo-rust-driver|{name}").as_str()
     );
     assert_eq!(
         driver.get_str("version").unwrap(),

@@ -2,7 +2,7 @@ use crate::error::{ErrorKind, Result};
 
 pub(crate) fn decrypt_private_key(pem_data: &[u8], password: &[u8]) -> Result<Vec<u8>> {
     let pems = pem::parse_many(pem_data).map_err(|error| ErrorKind::InvalidTlsConfig {
-        message: format!("Could not parse pemfile: {}", error),
+        message: format!("Could not parse pemfile: {error}"),
     })?;
     let mut iter = pems
         .into_iter()
@@ -18,13 +18,13 @@ pub(crate) fn decrypt_private_key(pem_data: &[u8], password: &[u8]) -> Result<Ve
     };
     let encrypted_key = pkcs8::EncryptedPrivateKeyInfo::try_from(encrypted_bytes.as_slice())
         .map_err(|error| ErrorKind::InvalidTlsConfig {
-            message: format!("Invalid encrypted private key: {}", error),
+            message: format!("Invalid encrypted private key: {error}"),
         })?;
     let decrypted_key =
         encrypted_key
             .decrypt(password)
             .map_err(|error| ErrorKind::InvalidTlsConfig {
-                message: format!("Failed to decrypt private key: {}", error),
+                message: format!("Failed to decrypt private key: {error}"),
             })?;
     Ok(decrypted_key.as_bytes().to_vec())
 }

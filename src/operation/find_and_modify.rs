@@ -72,7 +72,7 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
 
         let mut body = rawdoc! {
             Self::NAME: self.ns.coll.clone(),
-            "query": RawDocumentBuf::from_document(&self.query)?,
+            "query": RawDocumentBuf::try_from(&self.query)?,
         };
 
         match &self.modification {
@@ -104,8 +104,7 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
             other => Err(ErrorKind::InvalidResponse {
                 message: format!(
                     "expected document for value field of findAndModify response, but instead got \
-                     {:?}",
-                    other
+                     {other:?}"
                 ),
             }
             .into()),

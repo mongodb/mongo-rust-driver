@@ -60,8 +60,7 @@ impl<'de> Deserialize<'de> for ReturnDocument {
             "after" => Ok(ReturnDocument::After),
             "before" => Ok(ReturnDocument::Before),
             other => Err(D::Error::custom(format!(
-                "Unknown return document value: {}",
-                other
+                "Unknown return document value: {other}"
             ))),
         }
     }
@@ -81,7 +80,7 @@ pub enum Hint {
 impl Hint {
     pub(crate) fn to_raw_bson(&self) -> Result<RawBson> {
         Ok(match self {
-            Hint::Keys(ref d) => RawBson::Document(RawDocumentBuf::from_document(d)?),
+            Hint::Keys(ref d) => RawBson::Document(RawDocumentBuf::try_from(d)?),
             Hint::Name(ref s) => RawBson::String(s.clone()),
         })
     }

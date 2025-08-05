@@ -39,16 +39,15 @@ async fn run_document_test(test_file: TestFile) {
                 Ok(write_concern) => {
                     assert!(
                         test_case.valid,
-                        "Write concern deserialization/validation should fail: {}",
-                        description
+                        "Write concern deserialization/validation should fail: {description}"
                     );
                     write_concern
                 }
                 Err(err) => {
                     assert!(
                         !test_case.valid,
-                        "Write concern deserialization/validation should succeed but got {:?}: {}",
-                        err, description,
+                        "Write concern deserialization/validation should succeed but got {err:?}: \
+                         {description}",
                     );
                     continue;
                 }
@@ -80,17 +79,13 @@ async fn run_document_test(test_file: TestFile) {
                 &specified_write_concern,
             )
             .unwrap_or_else(|err| {
-                panic!(
-                    "Write concern serialization should succeed but got {:?}: {}",
-                    err, description
-                )
+                panic!("Write concern serialization should succeed but got {err:?}: {description}")
             });
 
             if let Some(expected_write_concern_document) = test_case.write_concern_document {
                 assert_eq!(
                     actual_write_concern_document, expected_write_concern_document,
-                    "{}",
-                    description
+                    "{description}"
                 );
             }
         }
@@ -106,8 +101,8 @@ async fn run_document_test(test_file: TestFile) {
                 crate::bson_compat::deserialize_from_document(specified_read_concern_document)
                     .unwrap_or_else(|err| {
                         panic!(
-                            "Read concern deserialization should succeed but got {:?}: {}",
-                            err, description,
+                            "Read concern deserialization should succeed but got {err:?}: \
+                             {description}",
                         )
                     });
 
@@ -115,17 +110,13 @@ async fn run_document_test(test_file: TestFile) {
                 &specified_read_concern,
             )
             .unwrap_or_else(|err| {
-                panic!(
-                    "Read concern serialization should succeed but got: {:?}: {}",
-                    err, description
-                )
+                panic!("Read concern serialization should succeed but got: {err:?}: {description}")
             });
 
             if let Some(expected_read_concern_document) = test_case.read_concern_document {
                 assert_eq!(
                     actual_read_concern_document, expected_read_concern_document,
-                    "{}",
-                    description
+                    "{description}"
                 );
             }
         }

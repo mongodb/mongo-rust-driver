@@ -25,7 +25,7 @@ async fn run_test(test_file: TestFile) {
         AverageRtt::F(f) => Some(f),
         AverageRtt::S(ref s) if s == "NULL" => None,
         AverageRtt::I(i) => Some(i as f64),
-        AverageRtt::S(ref s) => panic!("invalid average round trip time: {}", s),
+        AverageRtt::S(ref s) => panic!("invalid average round trip time: {s}"),
     };
 
     let mut rtt_info = RttInfo {

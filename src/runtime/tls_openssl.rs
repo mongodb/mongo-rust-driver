@@ -54,7 +54,7 @@ pub(super) async fn tls_connect(
         use std::io;
         match err.into_io_error() {
             Ok(err) => err,
-            Err(err) => io::Error::new(io::ErrorKind::Other, err),
+            Err(err) => io::Error::other(err),
         }
     })?;
     Ok(stream)

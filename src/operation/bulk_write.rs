@@ -201,7 +201,7 @@ where
     fn get_model(&self, index: usize) -> Result<&WriteModel> {
         self.models.get(index).ok_or_else(|| {
             ErrorKind::InvalidResponse {
-                message: format!("invalid operation index returned from bulkWrite: {}", index),
+                message: format!("invalid operation index returned from bulkWrite: {index}"),
             }
             .into()
         })
@@ -211,7 +211,7 @@ where
         match self.inserted_ids.get(&index) {
             Some(inserted_id) => Ok(inserted_id.clone()),
             None => Err(ErrorKind::InvalidResponse {
-                message: format!("invalid index returned for insert operation: {}", index),
+                message: format!("invalid index returned for insert operation: {index}"),
             }
             .into()),
         }

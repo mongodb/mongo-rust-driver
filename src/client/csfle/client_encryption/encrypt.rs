@@ -23,7 +23,7 @@ impl<'a> Action for Encrypt<'a, Value> {
         let result = self.client_enc.exec.run_ctx(ctx, None).await?;
         let bin_ref = result
             .get_binary("v")
-            .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
+            .map_err(|e| Error::internal(format!("invalid encryption result: {e}")))?;
         Ok(bin_ref.to_binary())
     }
 }
@@ -38,8 +38,7 @@ impl<'a> Action for Encrypt<'a, Expression> {
             Some(ref query_type) => {
                 if query_type != "range" {
                     return Err(Error::invalid_argument(format!(
-                        "query_type cannot be set for encrypt_expression, got {}",
-                        query_type
+                        "query_type cannot be set for encrypt_expression, got {query_type}"
                     )));
                 }
             }
@@ -53,11 +52,9 @@ impl<'a> Action for Encrypt<'a, Expression> {
         let result = self.client_enc.exec.run_ctx(ctx, None).await?;
         let doc_ref = result
             .get_document("v")
-            .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
-        let doc = doc_ref
-            .to_owned()
-            .to_document()
-            .map_err(|e| Error::internal(format!("invalid encryption result: {}", e)))?;
+            .map_err(|e| Error::internal(format!("invalid encryption result: {e}")))?;
+        let doc = Document::try_from(doc_ref.to_owned())
+            .map_err(|e| Error::internal(format!("invalid encryption result: {e}")))?;
         Ok(doc)
     }
 }

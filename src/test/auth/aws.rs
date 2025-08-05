@@ -21,6 +21,11 @@ async fn get_client() -> Client {
     Client::with_uri_str(DEFAULT_URI.clone()).await.unwrap()
 }
 
+// Ignored because the AWS SDK handles caching internally, making this manual caching test
+// unnecessary. This test will be removed in a future PR as part of RUST-1529,
+// depending on whether we fully switch to the SDK-based implementation,
+// or gate it behind a feature flag and retain the original approach by default.
+#[ignore]
 #[tokio::test]
 async fn credential_caching() {
     // This test should only be run when authenticating using AWS endpoints.
@@ -61,6 +66,11 @@ async fn credential_caching() {
     assert!(cached_credential().await.is_some());
 }
 
+// Ignored because the AWS SDK handles caching internally, making this manual caching test
+// unnecessary. This test will be removed in a future PR as part of RUST-1529,
+// depending on whether we fully switch to the SDK-based implementation,
+// or gate it behind a feature flag and retain the original approach by default.
+#[ignore]
 #[tokio::test]
 async fn credential_caching_environment_vars() {
     // This test should only be run when authenticating using AWS endpoints.

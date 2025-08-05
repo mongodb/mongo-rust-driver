@@ -111,7 +111,7 @@ impl Operation {
         }
 
         if let Some(error) = self.error {
-            assert_eq!(error, result.is_err(), "{}", description);
+            assert_eq!(error, result.is_err(), "{description}");
         }
 
         if let Some(expected_result) = &self.result {
@@ -119,35 +119,31 @@ impl Operation {
                 OperationResult::Success(expected) => {
                     let result = match result.as_ref() {
                         Ok(Some(r)) => r,
-                        _ => panic!("{}: expected value, got {:?}", description, result),
+                        _ => panic!("{description}: expected value, got {result:?}"),
                     };
                     assert_matches(result, expected, Some(description));
                 }
                 OperationResult::Error(operation_error) => {
                     assert!(
                         result.is_err(),
-                        "{}: expected error\n{:#?}  got value\n{:#?}",
-                        description,
-                        operation_error,
-                        result,
+                        "{description}: expected error\n{operation_error:#?}  got \
+                         value\n{result:#?}",
                     );
                     let error = result.as_ref().unwrap_err();
                     if let Some(error_contains) = &operation_error.error_contains {
                         let message = error.message().unwrap().to_lowercase();
                         assert!(
                             message.contains(&error_contains.to_lowercase()),
-                            "{}: expected error message to contain \"{}\" but got \"{}\"",
-                            description,
-                            error_contains,
-                            message
+                            "{description}: expected error message to contain \
+                             \"{error_contains}\" but got \"{message}\""
                         );
                     }
                     if let Some(error_code_name) = &operation_error.error_code_name {
                         let code_name = error.code_name().unwrap();
                         assert_eq!(
                             error_code_name, code_name,
-                            "{}: expected error with codeName {:?}, instead got {:#?}",
-                            description, error_code_name, error
+                            "{description}: expected error with codeName {error_code_name:?}, \
+                             instead got {error:#?}"
                         );
                     }
                     if let Some(error_code) = operation_error.error_code {
@@ -294,7 +290,7 @@ impl<'de> Deserialize<'de> for Operation {
             "wait" => deserialize_op::<Wait>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
-        .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
+        .map_err(|e| serde::de::Error::custom(format!("{e}")))?;
 
         Ok(Operation {
             operation: boxed_op,
@@ -994,7 +990,7 @@ impl TestOperation for AssertSessionTransactionState {
                     session.transaction.state,
                     TransactionState::Aborted
                 )),
-                other => panic!("Unknown transaction state: {}", other),
+                other => panic!("Unknown transaction state: {other}"),
             }
             Ok(None)
         }

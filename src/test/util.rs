@@ -261,7 +261,7 @@ fn get_exe_name_skip_ci() {
         .into_os_string()
         .into_string()
         .expect("Failed to convert OS string to string");
-    write!(file, "{}", exe_name).expect("Failed to write executable name to file");
+    write!(file, "{exe_name}").expect("Failed to write executable name to file");
 }
 
 /// Log a message on stderr that won't be captured by `cargo test`.  Panics if the write fails.

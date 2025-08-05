@@ -87,13 +87,13 @@ async fn insert_err_details() {
                         Ok(write_concern_doc) => {
                             assert!(write_concern_doc.contains_key("provenance"));
                         }
-                        Err(e) => panic!("{:?}", e),
+                        Err(e) => panic!("{e:?}"),
                     }
                 }
                 None => panic!("expected details field"),
             }
         }
-        ref e => panic!("expected write concern error, got {:?}", e),
+        ref e => panic!("expected write concern error, got {e:?}"),
     }
 }
 
@@ -136,7 +136,7 @@ async fn find() {
 
     while let Some((i, result)) = cursor.next().await {
         let doc = result.unwrap();
-        assert!(i <= 4, "expected 4 result, got {}", i);
+        assert!(i <= 4, "expected 4 result, got {i}");
         assert_eq!(doc.len(), 2);
         assert!(doc.contains_key("_id"));
         assert_eq!(doc.get("x"), Some(&Bson::Int32(i as i32)));
@@ -446,7 +446,7 @@ async fn large_insert_unordered_with_errors() {
             assert_eq!(write_errors[1].index, 22499);
             assert_eq!(write_errors[2].index, 32499);
         }
-        e => panic!("expected bulk write error, got {:?} instead", e),
+        e => panic!("expected bulk write error, got {e:?} instead"),
     }
 }
 
@@ -486,7 +486,7 @@ async fn large_insert_ordered_with_errors() {
                 7499
             );
         }
-        e => panic!("expected bulk write error, got {:?} instead", e),
+        e => panic!("expected bulk write error, got {e:?} instead"),
     }
 }
 
@@ -504,7 +504,7 @@ async fn empty_insert() {
         .kind
     {
         ErrorKind::InvalidArgument { .. } => {}
-        e => panic!("expected argument error, got {:?}", e),
+        e => panic!("expected argument error, got {e:?}"),
     };
 }
 
@@ -1088,7 +1088,7 @@ fn assert_duplicate_key_error_with_utf8_replacement(error: &ErrorKind) {
                 assert_eq!(err.code, 11000);
                 assert!(err.message.contains('�'));
             }
-            e => panic!("expected WriteFailure::WriteError, got {:?} instead", e),
+            e => panic!("expected WriteFailure::WriteError, got {e:?} instead"),
         },
         ErrorKind::InsertMany(ref failure) => match &failure.write_errors {
             Some(write_errors) => {
@@ -1096,15 +1096,11 @@ fn assert_duplicate_key_error_with_utf8_replacement(error: &ErrorKind) {
                 assert_eq!(write_errors[0].code, 11000);
                 assert!(write_errors[0].message.contains('�'));
             }
-            None => panic!(
-                "expected BulkWriteFailure containing write errors, got {:?} instead",
-                failure
-            ),
+            None => {
+                panic!("expected BulkWriteFailure containing write errors, got {failure:?} instead")
+            }
         },
-        e => panic!(
-            "expected ErrorKind::Write or ErrorKind::BulkWrite, got {:?} instead",
-            e
-        ),
+        e => panic!("expected ErrorKind::Write or ErrorKind::BulkWrite, got {e:?} instead"),
     }
 }
 

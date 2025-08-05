@@ -5,7 +5,6 @@
 pub(crate) mod aws;
 #[cfg(feature = "gssapi-auth")]
 mod gssapi;
-/// Contains the functionality for [`OIDC`](https://openid.net/developers/how-connect-works/) authorization and authentication.
 pub mod oidc;
 mod plain;
 mod sasl;
@@ -350,24 +349,21 @@ impl AuthMechanism {
             | AuthMechanism::Plain
             | AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
                 message: format!(
-                    "Reauthentication for authentication mechanism {:?} is not supported.",
-                    self
+                    "Reauthentication for authentication mechanism {self:?} is not supported."
                 ),
             }
             .into()),
             #[cfg(feature = "gssapi-auth")]
             AuthMechanism::Gssapi => Err(ErrorKind::Authentication {
                 message: format!(
-                    "Reauthentication for authentication mechanism {:?} is not supported.",
-                    self
+                    "Reauthentication for authentication mechanism {self:?} is not supported."
                 ),
             }
             .into()),
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => Err(ErrorKind::Authentication {
                 message: format!(
-                    "Reauthentication for authentication mechanism {:?} is not supported.",
-                    self
+                    "Reauthentication for authentication mechanism {self:?} is not supported."
                 ),
             }
             .into()),
@@ -407,7 +403,7 @@ impl FromStr for AuthMechanism {
             .into()),
 
             _ => Err(ErrorKind::InvalidArgument {
-                message: format!("invalid mechanism string: {}", str),
+                message: format!("invalid mechanism string: {str}"),
             }
             .into()),
         }

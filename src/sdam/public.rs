@@ -153,39 +153,39 @@ impl fmt::Display for ServerInfo<'_> {
         match self.description.reply {
             Ok(_) => {
                 if let Some(avg_rtt) = self.average_round_trip_time() {
-                    write!(f, ", Average RTT: {:?}", avg_rtt)?;
+                    write!(f, ", Average RTT: {avg_rtt:?}")?;
                 }
 
                 if let Some(last_update_time) = self.last_update_time() {
-                    write!(f, ", Last Update Time: {}", last_update_time)?;
+                    write!(f, ", Last Update Time: {last_update_time}")?;
                 }
 
                 if let Some(max_wire_version) = self.max_wire_version() {
-                    write!(f, ", Max Wire Version: {}", max_wire_version)?;
+                    write!(f, ", Max Wire Version: {max_wire_version}")?;
                 }
 
                 if let Some(min_wire_version) = self.min_wire_version() {
-                    write!(f, ", Min Wire Version: {}", min_wire_version)?;
+                    write!(f, ", Min Wire Version: {min_wire_version}")?;
                 }
 
                 if let Some(rs_name) = self.replica_set_name() {
-                    write!(f, ", Replica Set Name: {}", rs_name)?;
+                    write!(f, ", Replica Set Name: {rs_name}")?;
                 }
 
                 if let Some(rs_version) = self.replica_set_version() {
-                    write!(f, ", Replica Set Version: {}", rs_version)?;
+                    write!(f, ", Replica Set Version: {rs_version}")?;
                 }
 
                 if let Some(tags) = self.tags() {
-                    write!(f, ", Tags: {:?}", tags)?;
+                    write!(f, ", Tags: {tags:?}")?;
                 }
 
                 if let Some(compatibility_error) = self.description.compatibility_error_message() {
-                    write!(f, ", Compatiblity Error: {}", compatibility_error)?;
+                    write!(f, ", Compatiblity Error: {compatibility_error}")?;
                 }
             }
             Err(ref e) => {
-                write!(f, ", Error: {}", e)?;
+                write!(f, ", Error: {e}")?;
             }
         }
 

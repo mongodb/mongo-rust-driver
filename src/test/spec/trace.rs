@@ -87,7 +87,7 @@ async fn command_logging_truncation_default_limit() {
     )]));
     let mut tracing_stream = DEFAULT_GLOBAL_TRACING_HANDLER.event_stream();
 
-    let docs = iter::repeat(doc! { "x": "y" }).take(100);
+    let docs = iter::repeat_n(doc! { "x": "y" }, 100);
     coll.insert_many(docs)
         .await
         .expect("insert many should succeed");
@@ -179,7 +179,7 @@ async fn command_logging_truncation_mid_codepoint() {
     )]));
     let mut tracing_stream = DEFAULT_GLOBAL_TRACING_HANDLER.event_stream();
 
-    let docs = iter::repeat(doc! { "🤔": "🤔🤔🤔🤔🤔🤔" }).take(10);
+    let docs = iter::repeat_n(doc! { "🤔": "🤔🤔🤔🤔🤔🤔" }, 10);
     coll.insert_many(docs)
         .await
         .expect("insert many should succeed");

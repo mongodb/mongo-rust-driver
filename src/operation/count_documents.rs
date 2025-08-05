@@ -31,7 +31,7 @@ impl CountDocuments {
         if let Some(skip) = options.as_ref().and_then(|opts| opts.skip) {
             let s: i64 = skip.try_into().map_err(|_| {
                 Error::from(ErrorKind::InvalidArgument {
-                    message: format!("skip exceeds range of i64: {}", skip),
+                    message: format!("skip exceeds range of i64: {skip}"),
                 })
             })?;
             pipeline.push(doc! {
@@ -42,7 +42,7 @@ impl CountDocuments {
         if let Some(limit) = options.as_ref().and_then(|opts| opts.limit) {
             let l: i64 = limit.try_into().map_err(|_| {
                 Error::from(ErrorKind::InvalidArgument {
-                    message: format!("limit exceeds range of i64: {}", limit),
+                    message: format!("limit exceeds range of i64: {limit}"),
                 })
             })?;
             pipeline.push(doc! {

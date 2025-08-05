@@ -434,14 +434,14 @@ impl Entity {
     pub(crate) fn as_thread(&self) -> &ThreadEntity {
         match self {
             Self::Thread(thread) => thread,
-            _ => panic!("Expected thread, got {:?}", self),
+            _ => panic!("Expected thread, got {self:?}"),
         }
     }
 
     pub(crate) fn as_topology_description(&self) -> &TopologyDescription {
         match self {
             Self::TopologyDescription(desc) => desc,
-            _ => panic!("Expected Topologydescription, got {:?}", self),
+            _ => panic!("Expected Topologydescription, got {self:?}"),
         }
     }
 

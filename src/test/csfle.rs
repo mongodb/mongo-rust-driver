@@ -70,9 +70,8 @@ fn get_env_var(name: &str) -> String {
         Ok(v) if !v.is_empty() => v,
         _ => {
             panic!(
-                "Missing environment variable for {}. See src/test/csfle.rs for the list of \
-                 required variables and instructions for retrieving them.",
-                name
+                "Missing environment variable for {name}. See src/test/csfle.rs for the list of \
+                 required variables and instructions for retrieving them."
             )
         }
     }
@@ -320,11 +319,11 @@ use failure;
 
 async fn fle2v2_ok(name: &str) -> bool {
     if server_version_lt(7, 0).await {
-        log_uncaptured(format!("Skipping {}: not supported on server < 7.0", name));
+        log_uncaptured(format!("Skipping {name}: not supported on server < 7.0"));
         return false;
     }
     if topology_is_standalone().await {
-        log_uncaptured(format!("Skipping {}: not supported on standalone", name));
+        log_uncaptured(format!("Skipping {name}: not supported on standalone"));
         return false;
     }
     true
@@ -350,11 +349,12 @@ pub(crate) fn fill_kms_placeholders(
 
         for (key, value) in config.iter_mut() {
             if value.as_document() == Some(&placeholder) {
-                let test_kms_provider = test_kms_provider
-                    .unwrap_or_else(|| panic!("missing config for {:?}", provider));
-                let placeholder_value = test_kms_provider.1.get(key).unwrap_or_else(|| {
-                    panic!("provider config {:?} missing key {:?}", provider, key)
-                });
+                let test_kms_provider =
+                    test_kms_provider.unwrap_or_else(|| panic!("missing config for {provider:?}"));
+                let placeholder_value = test_kms_provider
+                    .1
+                    .get(key)
+                    .unwrap_or_else(|| panic!("provider config {provider:?} missing key {key:?}"));
                 *value = placeholder_value.clone();
             }
         }

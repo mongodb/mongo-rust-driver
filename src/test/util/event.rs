@@ -33,7 +33,7 @@ impl Event {
         if let Event::Sdam(e) = self {
             e
         } else {
-            panic!("expected SDAM event, instead got {:#?}", self)
+            panic!("expected SDAM event, instead got {self:#?}")
         }
     }
 

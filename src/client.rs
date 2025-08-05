@@ -556,7 +556,7 @@ impl Client {
         state
             .servers()
             .keys()
-            .map(|stream_address| format!("{}", stream_address))
+            .map(|stream_address| format!("{stream_address}"))
             .collect()
     }
 

@@ -34,7 +34,7 @@ impl TestOperation for Rename {
                         crate::bson_compat::deserialize_from_document(self.0.clone()).unwrap();
                     args.run(b.clone()).await
                 }
-                other => panic!("cannot execute rename on {:?}", other),
+                other => panic!("cannot execute rename on {other:?}"),
             }
         }
         .boxed()

@@ -200,8 +200,7 @@ impl Executor {
                 panic!("Expected {}, but no error occurred", expected.type_)
             }
             (None, Some(ref actual)) => panic!(
-                "Expected no error to occur, but the following error was returned: {:?}",
-                actual
+                "Expected no error to occur, but the following error was returned: {actual:?}"
             ),
             (None, None) | (Some(_), Some(_)) => {}
         }
@@ -214,10 +213,7 @@ impl Executor {
                 .next_match(EVENT_TIMEOUT, filter)
                 .await
                 .unwrap_or_else(|| {
-                    panic!(
-                        "{}: did not receive expected event: {:?}",
-                        description, expected_event
-                    )
+                    panic!("{description}: did not receive expected event: {expected_event:?}")
                 });
             assert_matches(&actual_event, &expected_event, Some(description.as_str()));
         }
@@ -225,8 +221,7 @@ impl Executor {
         assert_eq!(
             event_stream.collect_now(filter),
             Vec::new(),
-            "{}",
-            description
+            "{description}"
         );
     }
 }
@@ -260,7 +255,7 @@ impl Operation {
                 runtime::timeout(timeout.unwrap_or(EVENT_TIMEOUT), task)
                     .await
                     .unwrap_or_else(|_| {
-                        panic!("waiting for {} {} event(s) timed out", count, event_name)
+                        panic!("waiting for {count} {event_name} event(s) timed out")
                     });
             }
             Operation::CheckOut { label } => {
@@ -290,8 +285,7 @@ impl Operation {
                     .await
                     .unwrap_or_else(|| {
                         panic!(
-                            "did not receive checkin event after dropping connection (id={})",
-                            connection
+                            "did not receive checkin event after dropping connection (id={connection})"
                         )
                     });
             }
@@ -433,7 +427,7 @@ impl Matchable for CmapEvent {
             (CmapEvent::PoolCleared(_), CmapEvent::PoolCleared(_)) => Ok(()),
             (CmapEvent::PoolReady(_), CmapEvent::PoolReady(_)) => Ok(()),
             (CmapEvent::PoolClosed(_), CmapEvent::PoolClosed(_)) => Ok(()),
-            (actual, expected) => Err(format!("expected event {:?}, got {:?}", actual, expected)),
+            (actual, expected) => Err(format!("expected event {actual:?}, got {expected:?}")),
         }
     }
 }

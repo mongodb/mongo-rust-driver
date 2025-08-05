@@ -107,7 +107,7 @@ impl TryFrom<u32> for CollationStrength {
             5 => CollationStrength::Identical,
             _ => {
                 return Err(ErrorKind::InvalidArgument {
-                    message: (format!("invalid collation strength: {}", level)),
+                    message: (format!("invalid collation strength: {level}")),
                 }
                 .into())
             }
@@ -167,7 +167,7 @@ impl std::str::FromStr for CollationCaseFirst {
             "lower" => Ok(CollationCaseFirst::Lower),
             "off" => Ok(CollationCaseFirst::Off),
             _ => Err(ErrorKind::InvalidArgument {
-                message: format!("invalid CollationCaseFirst: {}", s),
+                message: format!("invalid CollationCaseFirst: {s}"),
             }
             .into()),
         }
@@ -213,7 +213,7 @@ impl std::str::FromStr for CollationAlternate {
             "non-ignorable" => Ok(CollationAlternate::NonIgnorable),
             "shifted" => Ok(CollationAlternate::Shifted),
             _ => Err(ErrorKind::InvalidArgument {
-                message: format!("invalid collation alternate: {}", s),
+                message: format!("invalid collation alternate: {s}"),
             }
             .into()),
         }
@@ -256,7 +256,7 @@ impl std::str::FromStr for CollationMaxVariable {
             "punct" => Ok(CollationMaxVariable::Punct),
             "space" => Ok(CollationMaxVariable::Space),
             _ => Err(ErrorKind::InvalidArgument {
-                message: format!("invalid collation max variable: {}", s),
+                message: format!("invalid collation max variable: {s}"),
             }
             .into()),
         }

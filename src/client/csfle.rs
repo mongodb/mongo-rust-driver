@@ -219,7 +219,7 @@ pub(crate) fn aux_collections(
 ) -> Result<Vec<Namespace>> {
     let mut out = vec![];
     for &key in &["esc", "ecoc"] {
-        let coll = match enc_fields.get_str(format!("{}Collection", key)) {
+        let coll = match enc_fields.get_str(format!("{key}Collection")) {
             Ok(s) => s.to_string(),
             Err(_) => format!("enxcol_.{}.{}", base_ns.coll, key),
         };
