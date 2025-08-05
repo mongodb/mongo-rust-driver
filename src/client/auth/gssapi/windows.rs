@@ -1,20 +1,41 @@
 use std::ptr;
-use windows_sys::Win32::Foundation::{SEC_E_OK, SEC_I_CONTINUE_NEEDED};
-use windows_sys::Win32::Security::Authentication::Identity::{
-    AcquireCredentialsHandleW, DecryptMessage, DeleteSecurityContext, EncryptMessage,
-    FreeCredentialsHandle, InitializeSecurityContextW, QueryContextAttributesW, SecBuffer,
-    SecBufferDesc, SecPkgContext_Sizes, ISC_REQ_ALLOCATE_MEMORY, ISC_REQ_MUTUAL_AUTH,
-    SECBUFFER_DATA, SECBUFFER_PADDING, SECBUFFER_STREAM, SECBUFFER_TOKEN, SECBUFFER_VERSION,
-    SECPKG_ATTR_SIZES, SECPKG_CRED_OUTBOUND, SECQOP_WRAP_NO_ENCRYPT, SECURITY_NETWORK_DREP,
+use windows_sys::Win32::{
+    Foundation::{SEC_E_OK, SEC_I_CONTINUE_NEEDED},
+    Security::{
+        Authentication::Identity::{
+            AcquireCredentialsHandleW,
+            DecryptMessage,
+            DeleteSecurityContext,
+            EncryptMessage,
+            FreeCredentialsHandle,
+            InitializeSecurityContextW,
+            QueryContextAttributesW,
+            SecBuffer,
+            SecBufferDesc,
+            SecPkgContext_Sizes,
+            ISC_REQ_ALLOCATE_MEMORY,
+            ISC_REQ_MUTUAL_AUTH,
+            SECBUFFER_DATA,
+            SECBUFFER_PADDING,
+            SECBUFFER_STREAM,
+            SECBUFFER_TOKEN,
+            SECBUFFER_VERSION,
+            SECPKG_ATTR_SIZES,
+            SECPKG_CRED_OUTBOUND,
+            SECQOP_WRAP_NO_ENCRYPT,
+            SECURITY_NETWORK_DREP,
+        },
+        Credentials::SecHandle,
+    },
+    System::Rpc::{SEC_WINNT_AUTH_IDENTITY_UNICODE, SEC_WINNT_AUTH_IDENTITY_W},
 };
-use windows_sys::Win32::Security::Credentials::SecHandle;
-use windows_sys::Win32::System::Rpc::{SEC_WINNT_AUTH_IDENTITY_UNICODE, SEC_WINNT_AUTH_IDENTITY_W};
 
 use crate::{
     client::{
         auth::{
             sasl::{SaslContinue, SaslResponse, SaslStart},
-            Credential, GSSAPI_STR,
+            Credential,
+            GSSAPI_STR,
         },
         options::ServerApi,
     },
