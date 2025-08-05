@@ -7,7 +7,11 @@ mod nix;
 use crate::{
     bson::Bson,
     client::{
-        auth::{Credential, GSSAPI_STR},
+        auth::{
+            sasl::{SaslContinue, SaslResponse, SaslStart},
+            Credential,
+            GSSAPI_STR,
+        },
         options::ServerApi,
     },
     cmap::Connection,
@@ -58,14 +62,92 @@ pub(crate) async fn authenticate_stream(
     let source = credential.source.as_deref().unwrap_or("$external");
 
     #[cfg(target_os = "windows")]
-    let result =
-        windows::authenticate_stream(conn, credential, server_api, service_principal, source).await;
+    let (mut authenticator, initial_token) = windows::SspiAuthenticator::init(
+        user_principal,
+        credential.password.clone(),
+        service_principal,
+    )?;
 
     #[cfg(not(target_os = "windows"))]
-    let result =
-        nix::authenticate_stream(conn, server_api, user_principal, service_principal, source).await;
+    let (mut authenticator, initial_token) =
+        nix::GssapiAuthenticator::init(user_principal, service_principal)?;
 
-    result
+    let command = SaslStart::new(
+        source.to_string(),
+        crate::client::auth::AuthMechanism::Gssapi,
+        initial_token,
+        server_api.cloned(),
+    )
+    .into_command()?;
+
+    let response_doc = conn.send_message(command).await?;
+    let sasl_response =
+        SaslResponse::parse(GSSAPI_STR, response_doc.auth_response_body(GSSAPI_STR)?)?;
+
+    let mut conversation_id = Some(sasl_response.conversation_id);
+    let mut payload = sasl_response.payload;
+
+    // Limit number of auth challenge steps (typically, only one step is needed, however
+    // different configurations may require more).
+    for _ in 0..10 {
+        let challenge = payload.as_slice();
+        let output_token = authenticator.step(challenge)?;
+
+        // The step may return None, which is a valid final step. We still need to
+        // send a saslContinue command, so we send an empty payload if there is no
+        // token.
+        let token = output_token.unwrap_or(vec![]);
+        let command = SaslContinue::new(
+            source.to_string(),
+            conversation_id.clone().unwrap(),
+            token,
+            server_api.cloned(),
+        )
+        .into_command();
+
+        let response_doc = conn.send_message(command).await?;
+        let sasl_response =
+            SaslResponse::parse(GSSAPI_STR, response_doc.auth_response_body(GSSAPI_STR)?)?;
+
+        conversation_id = Some(sasl_response.conversation_id);
+        payload = sasl_response.payload;
+
+        // Although unlikely, there are cases where authentication can be done
+        // at this point.
+        if sasl_response.done {
+            return Ok(());
+        }
+
+        // The authenticator is considered "complete" when the Kerberos auth
+        // process is done. However, this is not the end of the full auth flow.
+        // We no longer need to issue challenges to the authenticator, so we
+        // break the loop and continue with the rest of the flow.
+        if authenticator.is_complete() {
+            break;
+        }
+    }
+
+    let output_token = authenticator.do_unwrap_wrap(payload.as_slice())?;
+    let command = SaslContinue::new(
+        source.to_string(),
+        conversation_id.unwrap(),
+        output_token,
+        server_api.cloned(),
+    )
+    .into_command();
+
+    let response_doc = conn.send_message(command).await?;
+    let sasl_response =
+        SaslResponse::parse(GSSAPI_STR, response_doc.auth_response_body(GSSAPI_STR)?)?;
+
+    if sasl_response.done {
+        Ok(())
+    } else {
+        Err(Error::authentication_error(
+            GSSAPI_STR,
+            "GSSAPI authentication failed after 10 attempts",
+        ))
+    }
 }
 
 impl GssapiProperties {

@@ -1,106 +1,11 @@
 use cross_krb5::{ClientCtx, InitiateFlags, K5Ctx, PendingClientCtx, Step};
 
 use crate::{
-    client::{
-        auth::{
-            sasl::{SaslContinue, SaslResponse, SaslStart},
-            GSSAPI_STR,
-        },
-        options::ServerApi,
-    },
-    cmap::Connection,
+    client::auth::GSSAPI_STR,
     error::{Error, Result},
 };
 
-pub(super) async fn authenticate_stream(
-    conn: &mut Connection,
-    server_api: Option<&ServerApi>,
-    user_principal: Option<String>,
-    service_principal: String,
-    source: &str,
-) -> Result<()> {
-    let (mut authenticator, initial_token) =
-        GssapiAuthenticator::init(user_principal, service_principal).await?;
-
-    let command = SaslStart::new(
-        source.to_string(),
-        crate::client::auth::AuthMechanism::Gssapi,
-        initial_token,
-        server_api.cloned(),
-    )
-    .into_command()?;
-
-    let response_doc = conn.send_message(command).await?;
-    let sasl_response =
-        SaslResponse::parse(GSSAPI_STR, response_doc.auth_response_body(GSSAPI_STR)?)?;
-
-    let mut conversation_id = Some(sasl_response.conversation_id);
-    let mut payload = sasl_response.payload;
-
-    // Limit number of auth challenge steps (typically, only one step is needed, however
-    // different configurations may require more).
-    for _ in 0..10 {
-        let challenge = payload.as_slice();
-        let output_token = authenticator.step(challenge).await?;
-
-        // The step may return None, which is a valid final step. We still need to
-        // send a saslContinue command, so we send an empty payload if there is no
-        // token.
-        let token = output_token.unwrap_or(vec![]);
-        let command = SaslContinue::new(
-            source.to_string(),
-            conversation_id.clone().unwrap(),
-            token,
-            server_api.cloned(),
-        )
-        .into_command();
-
-        let response_doc = conn.send_message(command).await?;
-        let sasl_response =
-            SaslResponse::parse(GSSAPI_STR, response_doc.auth_response_body(GSSAPI_STR)?)?;
-
-        conversation_id = Some(sasl_response.conversation_id);
-        payload = sasl_response.payload;
-
-        // Although unlikely, there are cases where authentication can be done
-        // at this point.
-        if sasl_response.done {
-            return Ok(());
-        }
-
-        // The authenticator is considered "complete" when the Kerberos auth
-        // process is done. However, this is not the end of the full auth flow.
-        // We no longer need to issue challenges to the authenticator, so we
-        // break the loop and continue with the rest of the flow.
-        if authenticator.is_complete() {
-            break;
-        }
-    }
-
-    let output_token = authenticator.do_unwrap_wrap(payload.as_slice())?;
-    let command = SaslContinue::new(
-        source.to_string(),
-        conversation_id.unwrap(),
-        output_token,
-        server_api.cloned(),
-    )
-    .into_command();
-
-    let response_doc = conn.send_message(command).await?;
-    let sasl_response =
-        SaslResponse::parse(GSSAPI_STR, response_doc.auth_response_body(GSSAPI_STR)?)?;
-
-    if sasl_response.done {
-        Ok(())
-    } else {
-        Err(Error::authentication_error(
-            GSSAPI_STR,
-            "GSSAPI authentication failed after 10 attempts",
-        ))
-    }
-}
-
-struct GssapiAuthenticator {
+pub(super) struct GssapiAuthenticator {
     pending_ctx: Option<PendingClientCtx>,
     established_ctx: Option<ClientCtx>,
     user_principal: Option<String>,
@@ -110,7 +15,7 @@ struct GssapiAuthenticator {
 impl GssapiAuthenticator {
     // Initialize the GssapiAuthenticator by creating a PendingClientCtx and
     // getting an initial token to send to the server.
-    async fn init(
+    pub(super) fn init(
         user_principal: Option<String>,
         service_principal: String,
     ) -> Result<(Self, Vec<u8>)> {
@@ -142,7 +47,7 @@ impl GssapiAuthenticator {
     // is established, an optional final token that must be sent to the server
     // may be returned; otherwise another token to pass to the server is
     // returned and the client context remains in the pending state.
-    async fn step(&mut self, challenge: &[u8]) -> Result<Option<Vec<u8>>> {
+    pub(super) fn step(&mut self, challenge: &[u8]) -> Result<Option<Vec<u8>>> {
         if challenge.is_empty() {
             Err(Error::authentication_error(
                 GSSAPI_STR,
@@ -173,7 +78,7 @@ impl GssapiAuthenticator {
     // Perform the final step of Kerberos authentication by gss_unwrap-ing the
     // final server challenge, then wrapping the protocol bytes + user principal.
     // The resulting token must be sent to the server.
-    fn do_unwrap_wrap(&mut self, payload: &[u8]) -> Result<Vec<u8>> {
+    pub(super) fn do_unwrap_wrap(&mut self, payload: &[u8]) -> Result<Vec<u8>> {
         if let Some(mut established_ctx) = self.established_ctx.take() {
             let _ = established_ctx.unwrap(payload).map_err(|e| {
                 Error::authentication_error(GSSAPI_STR, &format!("GSSAPI unwrap failed: {e}"))
@@ -200,7 +105,7 @@ impl GssapiAuthenticator {
         }
     }
 
-    fn is_complete(&self) -> bool {
+    pub(super) fn is_complete(&self) -> bool {
         self.is_complete
     }
 }
