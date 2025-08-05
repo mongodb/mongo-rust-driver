@@ -21,7 +21,6 @@ pub(crate) static TOKIO_RUNTIME: once_cell::sync::Lazy<tokio::runtime::Runtime> 
     once_cell::sync::Lazy::new(|| match tokio::runtime::Runtime::new() {
         Ok(runtime) => runtime,
         Err(err) => panic!(
-            "Error occurred when starting the underlying async runtime: {}",
-            err
+            "Error occurred when starting the underlying async runtime: {err}"
         ),
     });

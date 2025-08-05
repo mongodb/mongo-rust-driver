@@ -75,6 +75,6 @@ pub(crate) async fn timeout<F: Future>(timeout: Duration, future: F) -> Result<F
 pub(crate) async fn resolve_address(
     address: &ServerAddress,
 ) -> Result<impl Iterator<Item = SocketAddr>> {
-    let socket_addrs = tokio::net::lookup_host(format!("{}", address)).await?;
+    let socket_addrs = tokio::net::lookup_host(format!("{address}")).await?;
     Ok(socket_addrs)
 }

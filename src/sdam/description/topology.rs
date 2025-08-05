@@ -432,16 +432,15 @@ impl TopologyDescription {
                     )
                 {
                     let got_display = match got_name {
-                        Ok(Some(s)) => format!("{:?}", s),
+                        Ok(Some(s)) => format!("{s:?}"),
                         Ok(None) => "<none>".to_string(),
-                        Err(s) => format!("<error: {}>", s),
+                        Err(s) => format!("<error: {s}>"),
                     };
                     // Mark server as unknown.
                     server_description = ServerDescription::new_from_error(
                         server_description.address,
                         Error::invalid_argument(format!(
-                            "Connection string replicaSet name {:?} does not match actual name {}",
-                            expected_name, got_display,
+                            "Connection string replicaSet name {expected_name:?} does not match actual name {got_display}",
                         )),
                     );
                 }

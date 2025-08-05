@@ -72,7 +72,7 @@ impl TryFrom<TestReadPreference> for ReadPreference {
             },
             Some(m) => {
                 return Err(Error::invalid_argument(
-                    format!("invalid read preference mode: {}", m).as_str(),
+                    format!("invalid read preference mode: {m}").as_str(),
                 ))
             }
         };
@@ -120,13 +120,13 @@ async fn run_test(test_file: TestFile) {
 
         let mut uri_options = Vec::new();
         if let Some(ref mode) = test_file.read_preference.mode {
-            uri_options.push(format!("readPreference={}", mode));
+            uri_options.push(format!("readPreference={mode}"));
         }
         if let Some(max_staleness_seconds) = test_file.read_preference.max_staleness_seconds {
-            uri_options.push(format!("maxStalenessSeconds={}", max_staleness_seconds));
+            uri_options.push(format!("maxStalenessSeconds={max_staleness_seconds}"));
         }
         if let Some(heartbeat_freq) = test_file.heartbeat_frequency_ms {
-            uri_options.push(format!("heartbeatFrequencyMS={}", heartbeat_freq));
+            uri_options.push(format!("heartbeatFrequencyMS={heartbeat_freq}"));
         }
 
         let uri_str = format!("mongodb://localhost:27017/?{}", uri_options.join("&"));
@@ -151,8 +151,7 @@ async fn run_test(test_file: TestFile) {
             }
             Client::with_options(opts.clone()).err().unwrap_or_else(|| {
                 panic!(
-                    "expected client construction to fail with options: {:#?}",
-                    opts
+                    "expected client construction to fail with options: {opts:#?}"
                 )
             });
         }

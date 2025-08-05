@@ -67,7 +67,7 @@ impl LookupHosts {
 
         if self.hosts.is_empty() {
             return Err(ErrorKind::DnsResolve {
-                message: format!("SRV lookup for {} returned no records", original_hostname),
+                message: format!("SRV lookup for {original_hostname} returned no records"),
             }
             .into());
         }
@@ -186,9 +186,8 @@ impl SrvResolver {
         if txt_records.next().is_some() {
             return Err(ErrorKind::DnsResolve {
                 message: format!(
-                    "TXT lookup for {} returned more than one record, but more than one are not \
+                    "TXT lookup for {original_hostname} returned more than one record, but more than one are not \
                      allowed with 'mongodb+srv'",
-                    original_hostname,
                 ),
             }
             .into());
@@ -208,8 +207,7 @@ impl SrvResolver {
             if parts.len() != 2 {
                 return Err(ErrorKind::DnsResolve {
                     message: format!(
-                        "TXT record string '{}' is not a value `key=value` option pair",
-                        option_pair
+                        "TXT record string '{option_pair}' is not a value `key=value` option pair"
                     ),
                 }
                 .into());
@@ -242,9 +240,8 @@ impl SrvResolver {
                 other => {
                     return Err(ErrorKind::DnsResolve {
                         message: format!(
-                            "TXT record option '{}' was returned, but only 'authSource', \
-                             'replicaSet', and 'loadBalanced' are allowed",
-                            other
+                            "TXT record option '{other}' was returned, but only 'authSource', \
+                             'replicaSet', and 'loadBalanced' are allowed"
                         ),
                     }
                     .into())

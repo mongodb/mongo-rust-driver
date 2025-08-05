@@ -29,7 +29,7 @@ impl<'a> Action for CreateDataKey<'a> {
         self.client_enc.key_vault.insert_one(&data_key).await?;
         let bin_ref = data_key
             .get_binary("_id")
-            .map_err(|e| Error::internal(format!("invalid data key id: {}", e)))?;
+            .map_err(|e| Error::internal(format!("invalid data key id: {e}")))?;
         Ok(bin_ref.to_binary())
     }
 }

@@ -41,7 +41,7 @@ impl CommandStartedEvent {
                 "session1" => {
                     expected.insert("lsid", session1_lsid.clone());
                 }
-                other => panic!("unknown session name: {}", other),
+                other => panic!("unknown session name: {other}"),
             }
         }
 

@@ -75,8 +75,7 @@ impl RunOn {
             let actual_topology = get_topology().await;
             if !topology.contains(actual_topology) {
                 log_uncaptured(format!(
-                    "runOn mismatch: required topology in {:?}, got {:?}",
-                    topology, actual_topology
+                    "runOn mismatch: required topology in {topology:?}, got {actual_topology:?}"
                 ));
                 return false;
             }
@@ -84,8 +83,7 @@ impl RunOn {
         if let Some(ref serverless) = self.serverless {
             if !serverless.can_run() {
                 log_uncaptured(format!(
-                    "runOn mismatch: required serverless {:?}",
-                    serverless
+                    "runOn mismatch: required serverless {serverless:?}"
                 ));
                 return false;
             }
@@ -194,9 +192,7 @@ fn assert_data_matches(actual: &[Document], expected: &[Document]) {
     assert_eq!(
         actual.len(),
         expected.len(),
-        "data length mismatch, expected {:?}, got {:?}",
-        expected,
-        actual
+        "data length mismatch, expected {expected:?}, got {actual:?}"
     );
     for (a, e) in actual.iter().zip(expected.iter()) {
         assert_doc_matches(a, e);
@@ -207,26 +203,24 @@ fn assert_doc_matches(actual: &Document, expected: &Document) {
     assert_eq!(
         actual.len(),
         expected.len(),
-        "doc length mismatch, expected {:?}, got {:?}",
-        expected,
-        actual
+        "doc length mismatch, expected {expected:?}, got {actual:?}"
     );
     for (k, expected_val) in expected {
         let actual_val = if let Some(v) = actual.get(k) {
             v
         } else {
-            panic!("no value for {:?}, expected {:?}", k, expected_val);
+            panic!("no value for {k:?}, expected {expected_val:?}");
         };
         if let Some(types) = is_expected_type(expected_val) {
             if types.contains(&actual_val.element_type()) {
                 continue;
             } else {
-                panic!("expected type {:?}, actual value {:?}", types, actual_val);
+                panic!("expected type {types:?}, actual value {actual_val:?}");
             }
         }
         match (expected_val, actual_val) {
             (Bson::Document(exp_d), Bson::Document(act_d)) => assert_doc_matches(act_d, exp_d),
-            (e, a) => assert_eq!(e, a, "mismatch for {:?}, expected {:?} got {:?}", k, e, a),
+            (e, a) => assert_eq!(e, a, "mismatch for {k:?}, expected {e:?} got {a:?}"),
         }
     }
 }

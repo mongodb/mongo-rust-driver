@@ -71,7 +71,7 @@ async fn explicit_session_created_on_same_client() {
         .unwrap_err();
     match *err.kind {
         ErrorKind::InvalidArgument { message } => assert!(message.contains("session provided")),
-        other => panic!("expected InvalidArgument error, got {:?}", other),
+        other => panic!("expected InvalidArgument error, got {other:?}"),
     }
 
     let coll = client1
@@ -84,7 +84,7 @@ async fn explicit_session_created_on_same_client() {
         .unwrap_err();
     match *err.kind {
         ErrorKind::InvalidArgument { message } => assert!(message.contains("session provided")),
-        other => panic!("expected InvalidArgument error, got {:?}", other),
+        other => panic!("expected InvalidArgument error, got {other:?}"),
     }
 }
 
@@ -191,15 +191,11 @@ async fn implicit_session_after_connection() {
     // when the next one is checked out.
     assert!(
         min_lsids <= 2,
-        "min lsids is {}, expected <= 2 (max is {})",
-        min_lsids,
-        max_lsids,
+        "min lsids is {min_lsids}, expected <= 2 (max is {max_lsids})",
     );
     assert!(
         max_lsids < 7,
-        "max lsids is {}, expected < 7 (min is {})",
-        max_lsids,
-        min_lsids,
+        "max lsids is {max_lsids}, expected < 7 (min is {min_lsids})",
     );
 }
 

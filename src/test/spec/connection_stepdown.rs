@@ -25,8 +25,7 @@ async fn run_test<F: Future>(
 ) {
     if !topology_is_replica_set().await {
         log_uncaptured(format!(
-            "skipping test {:?} due to not running on a replica set",
-            name
+            "skipping test {name:?} due to not running on a replica set"
         ));
         return;
     }
@@ -39,7 +38,7 @@ async fn run_test<F: Future>(
         .monitor_events()
         .await;
 
-    let name = format!("step-down-{}", name);
+    let name = format!("step-down-{name}");
 
     let db = client.database(&name);
     let coll = db.collection(&name);

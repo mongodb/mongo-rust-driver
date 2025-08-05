@@ -21,7 +21,7 @@ pub enum SelectionCriteria {
     /// staleness, and server tags.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/core/read-preference/) for more details.
-    #[display(fmt = "ReadPreference {}", _0)]
+    #[display(fmt = "ReadPreference {_0}")]
     ReadPreference(ReadPreference),
 
     /// A predicate used to filter servers that are considered suitable. A `server` will be
@@ -131,14 +131,14 @@ impl std::fmt::Display for ReadPreference {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut mode = self.mode().to_string();
         mode[0..1].make_ascii_uppercase();
-        write!(f, "{{ Mode: {}", mode)?;
+        write!(f, "{{ Mode: {mode}")?;
 
         if let Some(options) = self.options() {
             if let Some(ref tag_sets) = options.tag_sets {
-                write!(f, ", Tag Sets: {:?}", tag_sets)?;
+                write!(f, ", Tag Sets: {tag_sets:?}")?;
             }
             if let Some(ref max_staleness) = options.max_staleness {
-                write!(f, ", Max Staleness: {:?}", max_staleness)?;
+                write!(f, ", Max Staleness: {max_staleness:?}")?;
             }
             #[allow(deprecated)]
             if let Some(ref hedge) = options.hedge {
@@ -186,8 +186,7 @@ impl<'de> Deserialize<'de> for ReadPreference {
                 options: Some(helper.options),
             }),
             other => Err(D::Error::custom(format!(
-                "Unknown read preference mode: {}",
-                other
+                "Unknown read preference mode: {other}"
             ))),
         }
     }

@@ -291,7 +291,7 @@ impl Message {
             Checked::try_from(max_message_size_bytes.unwrap_or(DEFAULT_MAX_MESSAGE_SIZE_BYTES))?;
         if total_length > max_len {
             return Err(ErrorKind::InvalidArgument {
-                message: format!("Message length {} over maximum {}", total_length, max_len),
+                message: format!("Message length {total_length} over maximum {max_len}"),
             }
             .into());
         }
@@ -344,7 +344,7 @@ impl Message {
             Checked::try_from(max_message_size_bytes.unwrap_or(DEFAULT_MAX_MESSAGE_SIZE_BYTES))?;
         if total_length > max_len {
             return Err(ErrorKind::InvalidArgument {
-                message: format!("Message length {} over maximum {}", total_length, max_len),
+                message: format!("Message length {total_length} over maximum {max_len}"),
             }
             .into());
         }

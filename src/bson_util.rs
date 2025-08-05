@@ -197,8 +197,7 @@ pub(crate) fn extend_raw_document_buf(
         let (k, v) = result?;
         if keys.contains(k) {
             return Err(Error::internal(format!(
-                "duplicate raw document key {:?}",
-                k
+                "duplicate raw document key {k:?}"
             )));
         }
         this.append(k, v.to_raw_bson());

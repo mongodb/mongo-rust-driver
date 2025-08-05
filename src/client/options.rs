@@ -239,8 +239,7 @@ impl ServerAddress {
             let Some((hostname, port)) = ip_literal.split_once("]") else {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
-                        "invalid server address {}: missing closing ']' in IP literal hostname",
-                        address
+                        "invalid server address {address}: missing closing ']' in IP literal hostname"
                     ),
                 }
                 .into());
@@ -248,7 +247,7 @@ impl ServerAddress {
 
             if let Err(parse_error) = Ipv6Addr::from_str(hostname) {
                 return Err(ErrorKind::InvalidArgument {
-                    message: format!("invalid server address {}: {}", address, parse_error),
+                    message: format!("invalid server address {address}: {parse_error}"),
                 }
                 .into());
             }
@@ -260,9 +259,8 @@ impl ServerAddress {
             } else {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
-                        "invalid server address {}: the hostname can only be followed by a port \
-                         prefixed with ':', got {}",
-                        address, port
+                        "invalid server address {address}: the hostname can only be followed by a port \
+                         prefixed with ':', got {port}"
                     ),
                 }
                 .into());
@@ -279,8 +277,7 @@ impl ServerAddress {
         if hostname.is_empty() {
             return Err(ErrorKind::InvalidArgument {
                 message: format!(
-                    "invalid server address {}: the hostname cannot be empty",
-                    address
+                    "invalid server address {address}: the hostname cannot be empty"
                 ),
             }
             .into());
@@ -299,9 +296,8 @@ impl ServerAddress {
                 Ok(0) | Err(_) => {
                     return Err(ErrorKind::InvalidArgument {
                         message: format!(
-                            "invalid server address {}: the port must be an integer between 1 and \
-                             65535, got {}",
-                            address, port
+                            "invalid server address {address}: the port must be an integer between 1 and \
+                             65535, got {port}"
                         ),
                     }
                     .into())
@@ -356,7 +352,7 @@ impl FromStr for ServerApiVersion {
         match str {
             "1" => Ok(Self::V1),
             _ => Err(ErrorKind::InvalidArgument {
-                message: format!("invalid server api version string: {}", str),
+                message: format!("invalid server api version string: {str}"),
             }
             .into()),
         }
@@ -762,7 +758,7 @@ impl Serialize for ClientOptions {
             servermonitoringmode: self
                 .server_monitoring_mode
                 .as_ref()
-                .map(|m| format!("{:?}", m).to_lowercase()),
+                .map(|m| format!("{m:?}").to_lowercase()),
             selectioncriteria: &self.selection_criteria,
             serverselectiontimeoutms: &self.server_selection_timeout,
             sockettimeoutms: &self.socket_timeout,
@@ -1375,8 +1371,7 @@ fn percent_decode(s: &str, err_message: &str) -> Result<String> {
 fn validate_and_parse_userinfo(s: &str, userinfo_type: &str) -> Result<String> {
     if s.chars().any(|c| USERINFO_RESERVED_CHARACTERS.contains(&c)) {
         return Err(Error::invalid_argument(format!(
-            "{} must be URL encoded",
-            userinfo_type
+            "{userinfo_type} must be URL encoded"
         )));
     }
 
@@ -1387,12 +1382,11 @@ fn validate_and_parse_userinfo(s: &str, userinfo_type: &str) -> Result<String> {
         .any(|part| part.len() < 2 || part[0..2].chars().any(|c| !c.is_ascii_hexdigit()))
     {
         return Err(Error::invalid_argument(format!(
-            "{} cannot contain unescaped %",
-            userinfo_type
+            "{userinfo_type} cannot contain unescaped %"
         )));
     }
 
-    percent_decode(s, &format!("{} must be URL encoded", userinfo_type))
+    percent_decode(s, &format!("{userinfo_type} must be URL encoded"))
 }
 
 impl TryFrom<&str> for ConnectionString {
@@ -1444,8 +1438,7 @@ impl ConnectionString {
             }
             other => {
                 return Err(Error::invalid_argument(format!(
-                    "unsupported connection string scheme: {}",
-                    other
+                    "unsupported connection string scheme: {other}"
                 )))
             }
         };
@@ -1512,8 +1505,7 @@ impl ConnectionString {
                 for c in decoded.chars() {
                     if ILLEGAL_DATABASE_CHARACTERS.contains(&c) {
                         return Err(Error::invalid_argument(format!(
-                            "illegal character in database name: {}",
-                            c
+                            "illegal character in database name: {c}"
                         )));
                     }
                 }
@@ -1587,10 +1579,9 @@ impl ConnectionString {
                                 _ => {
                                     return Err(ErrorKind::InvalidArgument {
                                         message: format!(
-                                            "Invalid CANONICALIZE_HOST_NAME value: {}. Valid \
+                                            "Invalid CANONICALIZE_HOST_NAME value: {s}. Valid \
                                              values are 'none', 'forward', 'forwardAndReverse', \
-                                             'true', 'false'",
-                                            s
+                                             'true', 'false'"
                                         ),
                                     }
                                     .into());
@@ -1680,8 +1671,7 @@ impl ConnectionString {
                 None => {
                     return Err(ErrorKind::InvalidArgument {
                         message: format!(
-                            "connection string options is not a `key=value` pair: {}",
-                            option_pair,
+                            "connection string options is not a `key=value` pair: {option_pair}",
                         ),
                     }
                     .into())
@@ -1856,14 +1846,12 @@ impl ConnectionString {
                     let Some((k, v)) = property.split_once(":") else {
                         return Err(Error::invalid_argument(format!(
                             "each entry in authMechanismProperties must be a colon-separated \
-                             key-value pair, got {}",
-                            property
+                             key-value pair, got {property}"
                         )));
                     };
                     if k == "ALLOWED_HOSTS" || k == "OIDC_CALLBACK" || k == "OIDC_HUMAN_CALLBACK" {
                         return Err(Error::invalid_argument(format!(
-                            "{} must only be specified through client options",
-                            k
+                            "{k} must only be specified through client options"
                         )));
                     }
                     properties.insert(k, v);
@@ -1910,14 +1898,13 @@ impl ConnectionString {
             }
             "maxstalenessseconds" => {
                 let max_staleness_seconds = value.parse::<i64>().map_err(|e| {
-                    Error::invalid_argument(format!("invalid maxStalenessSeconds value: {}", e))
+                    Error::invalid_argument(format!("invalid maxStalenessSeconds value: {e}"))
                 })?;
 
                 let max_staleness = match max_staleness_seconds.cmp(&-1) {
                     Ordering::Less => {
                         return Err(Error::invalid_argument(format!(
-                            "maxStalenessSeconds must be -1 or positive, instead got {}",
-                            max_staleness_seconds
+                            "maxStalenessSeconds must be -1 or positive, instead got {max_staleness_seconds}"
                         )));
                     }
                     Ordering::Equal => {
@@ -1958,7 +1945,7 @@ impl ConnectionString {
                     },
                     other => {
                         return Err(ErrorKind::InvalidArgument {
-                            message: format!("'{}' is not a valid read preference", other),
+                            message: format!("'{other}' is not a valid read preference"),
                         }
                         .into())
                     }
@@ -1979,9 +1966,8 @@ impl ConnectionString {
                                 }
                                 _ => Err(ErrorKind::InvalidArgument {
                                     message: format!(
-                                        "'{}' is not a valid read preference tag (which must be \
+                                        "'{value}' is not a valid read preference tag (which must be \
                                          of the form 'key:value'",
-                                        value,
                                     ),
                                 }
                                 .into()),
@@ -2011,8 +1997,7 @@ impl ConnectionString {
                     "auto" => ServerMonitoringMode::Auto,
                     other => {
                         return Err(Error::invalid_argument(format!(
-                            "{:?} is not a valid server monitoring mode",
-                            other
+                            "{other:?} is not a valid server monitoring mode"
                         )));
                     }
                 });
@@ -2163,8 +2148,7 @@ impl ConnectionString {
                         message: format!(
                             "connection string `uuidRepresentation` option can be one of \
                              `csharpLegacy`, `javaLegacy`, or `pythonLegacy`. Received invalid \
-                             `{}`",
-                            value
+                             `{value}`"
                         ),
                     }
                     .into())
@@ -2224,12 +2208,11 @@ impl ConnectionString {
                     }
                     acc
                 });
-                let mut message = format!("{} is an invalid option", other);
+                let mut message = format!("{other} is an invalid option");
                 if jaro_winkler >= 0.84 {
                     let _ = write!(
                         message,
-                        ". An option with a similar name exists: {}",
-                        option
+                        ". An option with a similar name exists: {option}"
                     );
                 }
                 return Err(ErrorKind::InvalidArgument { message }.into());

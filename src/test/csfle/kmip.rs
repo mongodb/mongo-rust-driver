@@ -207,8 +207,7 @@ async fn data_key_double_encryption() -> Result<()> {
         let err = result.unwrap_err();
         assert!(
             matches!(*err.kind, ErrorKind::Encryption(..)) || err.is_command_error(),
-            "unexpected error: {}",
-            err
+            "unexpected error: {err}"
         );
     }
 
@@ -266,7 +265,7 @@ async fn external_key_vault() -> Result<()> {
             .await;
         if with_external_key_vault {
             let err = result.unwrap_err();
-            assert!(err.is_auth_error(), "unexpected error: {}", err);
+            assert!(err.is_auth_error(), "unexpected error: {err}");
         } else {
             assert!(
                 result.is_ok(),
@@ -287,7 +286,7 @@ async fn external_key_vault() -> Result<()> {
             .await;
         if with_external_key_vault {
             let err = result.unwrap_err();
-            assert!(err.is_auth_error(), "unexpected error: {}", err);
+            assert!(err.is_auth_error(), "unexpected error: {err}");
         } else {
             assert!(
                 result.is_ok(),
@@ -610,8 +609,7 @@ mod kms_tls {
         let err = run_kms_tls_test(KMS_EXPIRED).await.unwrap_err();
         assert!(
             err.to_string().contains("certificate verify failed"),
-            "unexpected error: {}",
-            err
+            "unexpected error: {err}"
         );
     }
 
@@ -620,8 +618,7 @@ mod kms_tls {
         let err = run_kms_tls_test(KMS_WRONG_HOST).await.unwrap_err();
         assert!(
             err.to_string().contains("certificate verify failed"),
-            "unexpected error: {}",
-            err
+            "unexpected error: {err}"
         );
     }
 }
