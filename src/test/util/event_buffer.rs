@@ -230,16 +230,15 @@ impl EventBuffer<Event> {
     ) -> (CommandStartedEvent, CommandSucceededEvent) {
         let cevs = self.get_command_events(&[command_name]);
         if cevs.len() < 2 {
-            panic!("too few command events for {:?}: {:?}", command_name, cevs);
+            panic!("too few command events for {command_name:?}: {cevs:?}");
         }
         match &cevs[0..2] {
             [CommandEvent::Started(started), CommandEvent::Succeeded(succeeded)] => {
                 (started.clone(), succeeded.clone())
             }
-            pair => panic!(
-                "First event pair for {:?} not (Started, Succeded): {:?}",
-                command_name, pair
-            ),
+            pair => {
+                panic!("First event pair for {command_name:?} not (Started, Succeded): {pair:?}")
+            }
         }
     }
 

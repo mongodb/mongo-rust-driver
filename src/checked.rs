@@ -43,7 +43,7 @@ impl<T> Checked<T> {
         value
             .try_into()
             .map(|v| Self(Some(v)))
-            .map_err(|e| crate::error::Error::invalid_argument(format! {"{}", e}))
+            .map_err(|e| crate::error::Error::invalid_argument(format! {"{e}"}))
     }
 
     pub fn get(self) -> crate::error::Result<T> {
@@ -58,7 +58,7 @@ impl<T> Checked<T> {
     {
         self.get().and_then(|v| {
             v.try_into()
-                .map_err(|e| crate::error::Error::invalid_argument(format!("{}", e)))
+                .map_err(|e| crate::error::Error::invalid_argument(format!("{e}")))
         })
     }
 }

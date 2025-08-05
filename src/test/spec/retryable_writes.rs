@@ -76,7 +76,7 @@ async fn mmapv1_error_raised() {
                  retryWrites=false to your connection string."
             );
         }
-        e => panic!("expected command error, got: {:?}", e),
+        e => panic!("expected command error, got: {e:?}"),
     }
 }
 
@@ -212,8 +212,7 @@ async fn retry_write_pool_cleared() {
     }) {
         panic!(
             "Expected second checkout to fail, but no ConnectionCheckoutFailed event observed. \
-             CMAP events:\n{:?}",
-            next_cmap_events
+             CMAP events:\n{next_cmap_events:?}"
         );
     }
 
@@ -372,8 +371,7 @@ async fn retry_write_different_mongos() {
                 CommandEvent::Failed(_),
             ]
         ),
-        "unexpected events: {:#?}",
-        events,
+        "unexpected events: {events:#?}",
     );
     let first_failed = events[1].as_command_failed().unwrap();
     let first_address = &first_failed.connection.address;
@@ -423,7 +421,7 @@ async fn retry_write_same_mongos() {
         .collection::<crate::bson::Document>("retry_write_same_mongos")
         .insert_one(doc! {})
         .await;
-    assert!(result.is_ok(), "{:?}", result);
+    assert!(result.is_ok(), "{result:?}");
     let events = client.events.get_command_events(&["insert"]);
     assert!(
         matches!(
@@ -435,8 +433,7 @@ async fn retry_write_same_mongos() {
                 CommandEvent::Succeeded(_),
             ]
         ),
-        "unexpected events: {:#?}",
-        events,
+        "unexpected events: {events:#?}",
     );
     let first_failed = events[1].as_command_failed().unwrap();
     let first_address = &first_failed.connection.address;

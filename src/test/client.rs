@@ -167,9 +167,9 @@ async fn server_selection_timeout_message() {
         .await
         .expect_err("should fail with server selection timeout error");
 
-    let error_description = format!("{}", error);
+    let error_description = format!("{error}");
     for host in options.hosts.iter() {
-        assert!(error_description.contains(format!("{}", host).as_str()));
+        assert!(error_description.contains(format!("{host}").as_str()));
     }
 }
 
@@ -276,7 +276,7 @@ async fn list_authorized_databases() {
             .unwrap();
         client
             .create_user(
-                &format!("user_{}", name),
+                &format!("user_{name}"),
                 "pwd",
                 &[Bson::from(doc! { "role": "readWrite", "db": name })],
                 &[AuthMechanism::ScramSha256],
@@ -289,7 +289,7 @@ async fn list_authorized_databases() {
     for name in dbs {
         let mut options = get_client_options().await.clone();
         let credential = Credential::builder()
-            .username(format!("user_{}", name))
+            .username(format!("user_{name}"))
             .password(String::from("pwd"))
             .build();
         options.credential = Some(credential);

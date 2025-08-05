@@ -114,9 +114,8 @@ where
     D: Deserializer<'de>,
 {
     let bson = Bson::deserialize(deserializer)?;
-    get_u64(&bson).ok_or_else(|| {
-        serde::de::Error::custom(format!("could not deserialize u64 from {:?}", bson))
-    })
+    get_u64(&bson)
+        .ok_or_else(|| serde::de::Error::custom(format!("could not deserialize u64 from {bson:?}")))
 }
 
 pub(crate) fn serialize_error_as_string<S: Serializer>(
@@ -156,7 +155,7 @@ where
             crate::bson::DateTime::from_millis(millis as i64)
         }
         AwsDateTime::String(string) => crate::bson::DateTime::parse_rfc3339_str(string)
-            .map_err(|e| serde::de::Error::custom(format!("invalid RFC 3339 string: {}", e)))?,
+            .map_err(|e| serde::de::Error::custom(format!("invalid RFC 3339 string: {e}")))?,
     };
 
     Ok(Some(date_time))
@@ -234,8 +233,7 @@ pub(crate) fn serialize_u32_as_i32<S: Serializer>(
     match i32::try_from(*n) {
         Ok(n) => n.serialize(serializer),
         Err(_) => Err(serde::ser::Error::custom(format!(
-            "cannot serialize u32 {} as i32",
-            n
+            "cannot serialize u32 {n} as i32"
         ))),
     }
 }
@@ -247,8 +245,7 @@ pub(crate) fn serialize_u64_as_i64<S: Serializer>(
     match i64::try_from(*n) {
         Ok(n) => n.serialize(serializer),
         Err(_) => Err(serde::ser::Error::custom(format!(
-            "cannot serialize u64 {} as i64",
-            n
+            "cannot serialize u64 {n} as i64"
         ))),
     }
 }

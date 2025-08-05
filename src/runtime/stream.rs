@@ -50,7 +50,7 @@ impl AsyncStream {
                 let resolved: Vec<_> = runtime::resolve_address(&address).await?.collect();
                 if resolved.is_empty() {
                     return Err(ErrorKind::DnsResolve {
-                        message: format!("No DNS results for domain {}", address),
+                        message: format!("No DNS results for domain {address}"),
                     }
                     .into());
                 }
@@ -99,7 +99,7 @@ pub(crate) async fn tcp_connect(resolved: Vec<SocketAddr>) -> Result<TcpStream> 
             Ok(r) => r,
             // JoinError indicates the task was cancelled or paniced, which should never happen
             // here.
-            Err(e) => Err(Error::internal(format!("TCP connect task failure: {}", e))),
+            Err(e) => Err(Error::internal(format!("TCP connect task failure: {e}"))),
         }
     }
 

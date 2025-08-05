@@ -163,11 +163,10 @@ impl Callback {
         let resource = resource.to_string();
         let client_id = client_id.map(|s| s.to_string());
         let mut url = format!(
-            "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource={}",
-            resource
+            "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource={resource}"
         );
         if let Some(ref client_id) = client_id {
-            url.push_str(&format!("&client_id={}", client_id));
+            url.push_str(&format!("&client_id={client_id}"));
         }
         Self::new_function(
             move |_| {
@@ -182,7 +181,7 @@ impl Callback {
                         .map_err(|e| {
                             Error::authentication_error(
                                 MONGODB_OIDC_STR,
-                                &format!("Failed to get access token from Azure IDMS: {}", e),
+                                &format!("Failed to get access token from Azure IDMS: {e}"),
                             )
                         });
                     let response = response?;
@@ -191,7 +190,7 @@ impl Callback {
                         .map_err(|e| {
                             Error::authentication_error(
                                 MONGODB_OIDC_STR,
-                                &format!("Failed to get access token from Azure IDMS: {}", e),
+                                &format!("Failed to get access token from Azure IDMS: {e}"),
                             )
                         })?
                         .to_string();
@@ -200,17 +199,14 @@ impl Callback {
                         .map_err(|e| {
                             Error::authentication_error(
                                 MONGODB_OIDC_STR,
-                                &format!("Failed to get expires_in from Azure IDMS: {}", e),
+                                &format!("Failed to get expires_in from Azure IDMS: {e}"),
                             )
                         })?
                         .parse::<u64>()
                         .map_err(|e| {
                             Error::authentication_error(
                                 MONGODB_OIDC_STR,
-                                &format!(
-                                    "Failed to parse expires_in from Azure IDMS as u64: {}",
-                                    e
-                                ),
+                                &format!("Failed to parse expires_in from Azure IDMS as u64: {e}"),
                             )
                         })?;
                     let expires = Some(Instant::now() + Duration::from_secs(expires_in));
@@ -231,8 +227,7 @@ impl Callback {
     fn gcp_callback(resource: &str) -> Function {
         use futures_util::FutureExt;
         let url = format!(
-            "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity?audience={}",
-            resource
+            "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity?audience={resource}"
         );
         Self::new_function(
             move |_| {
@@ -247,7 +242,7 @@ impl Callback {
                         .map_err(|e| {
                             Error::authentication_error(
                                 MONGODB_OIDC_STR,
-                                &format!("Failed to get access token from GCP IDMS: {}", e),
+                                &format!("Failed to get access token from GCP IDMS: {e}"),
                             )
                         });
                     let access_token = response?;
@@ -732,8 +727,7 @@ fn get_allowed_hosts(mechanism_properties: Option<&Document>) -> Result<Vec<&str
             .map(|host| {
                 host.as_str().ok_or_else(|| {
                     auth_error(format!(
-                        "`{}` must contain only strings",
-                        ALLOWED_HOSTS_PROP_STR
+                        "`{ALLOWED_HOSTS_PROP_STR}` must contain only strings"
                     ))
                 })
             })
@@ -928,16 +922,15 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
     for k in properties.keys() {
         if VALID_PROPERTIES.iter().all(|p| *p != k) {
             return Err(Error::invalid_argument(format!(
-                "'{}' is not a valid property for {} authentication",
-                k, MONGODB_OIDC_STR,
+                "'{k}' is not a valid property for {MONGODB_OIDC_STR} authentication",
             )));
         }
     }
     let environment = properties.get_str(ENVIRONMENT_PROP_STR);
     if environment.is_ok() && credential.oidc_callback.is_user_provided() {
         return Err(Error::invalid_argument(format!(
-            "OIDC callback cannot be set for {} authentication, if an `{}` is set",
-            MONGODB_OIDC_STR, ENVIRONMENT_PROP_STR
+            "OIDC callback cannot be set for {MONGODB_OIDC_STR} authentication, if an \
+             `{ENVIRONMENT_PROP_STR}` is set"
         )));
     }
     let has_token_resource = properties.contains_key(TOKEN_RESOURCE_PROP_STR);
@@ -945,24 +938,18 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
         Ok(AZURE_ENVIRONMENT_VALUE_STR) | Ok(GCP_ENVIRONMENT_VALUE_STR) => {
             if !has_token_resource {
                 return Err(Error::invalid_argument(format!(
-                    "`{}` must be set for {} authentication in the `{}` or `{}` `{}`",
-                    TOKEN_RESOURCE_PROP_STR,
-                    MONGODB_OIDC_STR,
-                    AZURE_ENVIRONMENT_VALUE_STR,
-                    GCP_ENVIRONMENT_VALUE_STR,
-                    ENVIRONMENT_PROP_STR,
+                    "`{TOKEN_RESOURCE_PROP_STR}` must be set for {MONGODB_OIDC_STR} \
+                     authentication in the `{AZURE_ENVIRONMENT_VALUE_STR}` or \
+                     `{GCP_ENVIRONMENT_VALUE_STR}` `{ENVIRONMENT_PROP_STR}`",
                 )));
             }
         }
         _ => {
             if has_token_resource {
                 return Err(Error::invalid_argument(format!(
-                    "`{}` must not be set for {} authentication unless using the `{}` or `{}` `{}`",
-                    TOKEN_RESOURCE_PROP_STR,
-                    MONGODB_OIDC_STR,
-                    AZURE_ENVIRONMENT_VALUE_STR,
-                    GCP_ENVIRONMENT_VALUE_STR,
-                    ENVIRONMENT_PROP_STR,
+                    "`{TOKEN_RESOURCE_PROP_STR}` must not be set for {MONGODB_OIDC_STR} \
+                     authentication unless using the `{AZURE_ENVIRONMENT_VALUE_STR}` or \
+                     `{GCP_ENVIRONMENT_VALUE_STR}` `{ENVIRONMENT_PROP_STR}`",
                 )));
             }
         }
@@ -983,27 +970,25 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
         && credential.username.is_some()
     {
         return Err(Error::invalid_argument(format!(
-            "username must not be set for {} authentication in the {} {}",
-            MONGODB_OIDC_STR, TEST_ENVIRONMENT_VALUE_STR, ENVIRONMENT_PROP_STR,
+            "username must not be set for {MONGODB_OIDC_STR} authentication in the \
+             {TEST_ENVIRONMENT_VALUE_STR} {ENVIRONMENT_PROP_STR}",
         )));
     }
     if credential.password.is_some() {
         return Err(Error::invalid_argument(format!(
-            "password must not be set for {} authentication",
-            MONGODB_OIDC_STR
+            "password must not be set for {MONGODB_OIDC_STR} authentication"
         )));
     }
     if let Ok(env) = environment {
         if VALID_ENVIRONMENTS.iter().all(|e| *e != env) {
             return Err(Error::invalid_argument(format!(
-                "unsupported environment for {} authentication: {}",
-                MONGODB_OIDC_STR, env,
+                "unsupported environment for {MONGODB_OIDC_STR} authentication: {env}",
             )));
         }
     }
     if let Some(allowed_hosts) = properties.get(ALLOWED_HOSTS_PROP_STR) {
         allowed_hosts.as_array().ok_or_else(|| {
-            Error::invalid_argument(format!("`{}` must be an array", ALLOWED_HOSTS_PROP_STR))
+            Error::invalid_argument(format!("`{ALLOWED_HOSTS_PROP_STR}` must be an array"))
         })?;
     }
     Ok(())

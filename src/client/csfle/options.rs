@@ -215,8 +215,7 @@ impl AutoEncryptionOptions {
             Some(b) => match Opt::as_type(b) {
                 Some(v) => Ok(Some(v)),
                 None => Err(Error::invalid_argument(format!(
-                    "unexpected type for extra option {:?}: {:?}",
-                    key, b
+                    "unexpected type for extra option {key:?}: {b:?}"
                 ))),
             },
         }

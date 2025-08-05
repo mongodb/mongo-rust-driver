@@ -98,8 +98,7 @@ impl TestRunner {
         let schema_version = &test_file.schema_version;
         assert!(
             schema_version >= &MIN_SPEC_VERSION && schema_version <= &MAX_SPEC_VERSION,
-            "Test runner not compatible with schema version {}",
-            schema_version
+            "Test runner not compatible with schema version {schema_version}"
         );
 
         let test_description = match path.into() {
@@ -126,7 +125,7 @@ impl TestRunner {
             }
         }
 
-        file_level_log(format!("Running tests from {}", test_description));
+        file_level_log(format!("Running tests from {test_description}"));
 
         for test_case in &test_file.tests {
             if let Ok(description) = std::env::var("TEST_DESCRIPTION") {
@@ -347,18 +346,15 @@ impl TestRunner {
                             client_actual_events.len(),
                             expected_events.len(),
                             "Actual tracing event count should match expected. Expected events = \
-                             {:#?}, actual events = {:#?}",
-                            expected_events,
-                            client_actual_events,
+                             {expected_events:#?}, actual events = {client_actual_events:#?}",
                         );
                     }
 
                     for (actual, expected) in client_actual_events.iter().zip(expected_events) {
                         if let Err(e) = tracing_events_match(actual, expected) {
                             panic!(
-                                "tracing event mismatch: expected = {:#?}, actual = \
-                                 {:#?}\nmismatch detail: {}",
-                                expected, actual, e,
+                                "tracing event mismatch: expected = {expected:#?}, actual = \
+                                 {actual:#?}\nmismatch detail: {e}",
                             );
                         }
                     }

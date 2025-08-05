@@ -97,10 +97,7 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
         &'a self,
         _test_runner: &'a TestRunner,
     ) -> BoxFuture<'a, ()> {
-        panic!(
-            "execute_test_runner_operation called on unsupported operation {:?}",
-            self
-        )
+        panic!("execute_test_runner_operation called on unsupported operation {self:?}")
     }
 
     fn execute_entity_operation<'a>(
@@ -111,8 +108,7 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
         async move {
             Err(ErrorKind::InvalidArgument {
                 message: format!(
-                    "execute_entity_operation called on unsupported operation {:?}",
-                    self
+                    "execute_entity_operation called on unsupported operation {self:?}"
                 ),
             }
             .into())
@@ -245,9 +241,9 @@ impl Operation {
                                     Some(&*test_runner.entities.read().await),
                                 ) {
                                     panic!(
-                                        "[{}] result mismatch, expected = {:#?}  actual = \
-                                         {:#?}\nmismatch detail: {}",
-                                        description, expected_bson, actual, e
+                                        "[{description}] result mismatch, expected = \
+                                         {expected_bson:#?}  actual = {actual:#?}\nmismatch \
+                                         detail: {e}"
                                     );
                                 }
                             }
@@ -441,7 +437,7 @@ impl<'de> Deserialize<'de> for Operation {
                 _name: s.to_string(),
             }) as Box<dyn TestOperation>),
         }
-        .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
+        .map_err(|e| serde::de::Error::custom(format!("{e}")))?;
 
         let expectation = if let Some(true) = definition.ignore_result_and_error {
             if definition.expect_result.is_some()

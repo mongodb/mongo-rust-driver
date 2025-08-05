@@ -204,7 +204,7 @@ impl<'a> Action for CreateSearchIndex<'a, Single> {
             .await?;
         match names.len() {
             1 => Ok(names.pop().unwrap()),
-            n => Err(Error::internal(format!("expected 1 index name, got {}", n))),
+            n => Err(Error::internal(format!("expected 1 index name, got {n}"))),
         }
     }
 }

@@ -206,7 +206,7 @@ impl<'de> Deserialize<'de> for TestFileResult {
 // variable for skipping tests is set.
 async fn expect_failures(spec: &[&str], skipped_files: Option<&'static [&'static str]>) {
     for (test_file_result, path) in deserialize_spec_tests::<TestFileResult>(spec, skipped_files) {
-        log_uncaptured(format!("Expecting failure for {:?}", path));
+        log_uncaptured(format!("Expecting failure for {path:?}"));
         // If the test deserialized properly, then expect an error to occur during execution.
         if let TestFileResult::Ok(test_file) = test_file_result {
             std::panic::AssertUnwindSafe(async {

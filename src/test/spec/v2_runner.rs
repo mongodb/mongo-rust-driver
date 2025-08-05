@@ -280,7 +280,7 @@ impl TestContext {
             let session = match &operation.object {
                 Some(OperationObject::Session0) => &mut self.session0,
                 Some(OperationObject::Session1) => &mut self.session1,
-                other => panic!("invalid object for `endSession`: {:?}", other),
+                other => panic!("invalid object for `endSession`: {other:?}"),
             };
             drop(session.take());
             tokio::time::sleep(Duration::from_secs(1)).await;
@@ -383,7 +383,7 @@ impl OpRunner<'_> {
         let session = match operation.session.as_deref() {
             Some("session0") => sessions.session0.as_deref_mut(),
             Some("session1") => sessions.session1.as_deref_mut(),
-            Some(other) => panic!("unknown session name: {}", other),
+            Some(other) => panic!("unknown session name: {other}"),
             None => None,
         };
 
@@ -468,7 +468,7 @@ impl OpRunner<'_> {
                         self.fail_point_guards.push(guard);
                     }
                     "wait" => operation.execute().await,
-                    other => panic!("unknown operation: {}", other),
+                    other => panic!("unknown operation: {other}"),
                 }
                 return None;
             }

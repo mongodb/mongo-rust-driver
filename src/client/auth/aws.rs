@@ -352,7 +352,7 @@ impl AwsCredential {
     /// Obtains credentials from the ECS endpoint.
     async fn get_from_ecs(relative_uri: String, http_client: &HttpClient) -> Result<Self> {
         // Use the local IP address that AWS uses for ECS agents.
-        let uri = format!("http://{}/{}", AWS_ECS_IP, relative_uri);
+        let uri = format!("http://{AWS_ECS_IP}/{relative_uri}");
 
         http_client
             .get(&uri)
@@ -364,16 +364,14 @@ impl AwsCredential {
     /// Obtains temporary credentials for an EC2 instance to use for authentication.
     async fn get_from_ec2(http_client: &HttpClient) -> Result<Self> {
         let temporary_token = http_client
-            .put(format!("http://{}/latest/api/token", AWS_EC2_IP))
+            .put(format!("http://{AWS_EC2_IP}/latest/api/token"))
             .headers(&[("X-aws-ec2-metadata-token-ttl-seconds", "30")])
             .send_and_get_string()
             .await
             .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?;
 
-        let role_name_uri = format!(
-            "http://{}/latest/meta-data/iam/security-credentials/",
-            AWS_EC2_IP
-        );
+        let role_name_uri =
+            format!("http://{AWS_EC2_IP}/latest/meta-data/iam/security-credentials/");
 
         let role_name = http_client
             .get(&role_name_uri)
@@ -382,7 +380,7 @@ impl AwsCredential {
             .await
             .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?;
 
-        let credential_uri = format!("{}/{}", role_name_uri, role_name);
+        let credential_uri = format!("{role_name_uri}/{role_name}");
 
         http_client
             .get(&credential_uri)
@@ -407,7 +405,7 @@ impl AwsCredential {
         let token = self
             .session_token
             .as_ref()
-            .map(|s| format!("x-amz-security-token:{}\n", s))
+            .map(|s| format!("x-amz-security-token:{s}\n"))
             .unwrap_or_default();
 
         // Similarly, we need to put "x-amz-security-token" into the list of signed headers if the
@@ -430,7 +428,6 @@ impl AwsCredential {
               x-mongodb-gs2-cb-flag;\
               x-mongodb-server-nonce\
             ",
-            token_signed_header = token_signed_header,
         );
 
         let body = "Action=GetCallerIdentity&Version=2011-06-15";
@@ -446,19 +443,13 @@ impl AwsCredential {
              content-length:43\n\
              content-type:application/x-www-form-urlencoded\n\
              host:{host}\n\
-             x-amz-date:{date}\n\
+             x-amz-date:{date_str}\n\
              {token}\
              x-mongodb-gs2-cb-flag:n\n\
              x-mongodb-server-nonce:{nonce}\n\n\
              {signed_headers}\n\
              {hashed_body}\
              ",
-            host = host,
-            date = date_str,
-            token = token,
-            nonce = nonce,
-            signed_headers = signed_headers,
-            hashed_body = hashed_body,
         );
 
         let hashed_request = hex::encode(Sha256::digest(request.as_bytes()));
@@ -476,14 +467,10 @@ impl AwsCredential {
         let string_to_sign = format!(
             "\
              AWS4-HMAC-SHA256\n\
-             {full_date}\n\
+             {date_str}\n\
              {small_date}/{region}/sts/aws4_request\n\
              {hashed_request}\
             ",
-            full_date = date_str,
-            small_date = small_date,
-            region = region,
-            hashed_request = hashed_request,
         );
 
         let first_hmac_key = format!("AWS4{}", self.secret_access_key);

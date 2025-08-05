@@ -216,8 +216,7 @@ async fn bson_size_limits() -> Result<()> {
     let err = result.unwrap_err();
     assert!(
         matches!(*err.kind, ErrorKind::Write(_)),
-        "unexpected error: {}",
-        err
+        "unexpected error: {err}"
     );
 
     Ok(())
@@ -259,8 +258,7 @@ async fn views_prohibited() -> Result<()> {
     let err = result.unwrap_err();
     assert!(
         err.to_string().contains("cannot auto encrypt a view"),
-        "unexpected error: {}",
-        err
+        "unexpected error: {err}"
     );
 
     Ok(())
@@ -434,8 +432,7 @@ mod custom_endpoint {
         assert!(err.is_csfle_error());
         assert!(
             err.to_string().contains("Invalid KMS response"),
-            "unexpected error: {}",
-            err
+            "unexpected error: {err}"
         );
 
         Ok(())
@@ -609,7 +606,7 @@ mod bypass_spawning_mongocryptd {
             .insert_one(doc! { "encrypted": "test" })
             .await
             .unwrap_err();
-        assert!(err.is_server_selection_error(), "unexpected error: {}", err);
+        assert!(err.is_server_selection_error(), "unexpected error: {err}");
 
         Ok(())
     }
@@ -777,10 +774,7 @@ mod deadlock {
                     return;
                 }
             }
-            panic!(
-                "No {} command matching {:?} found, events=\n{:?}",
-                name, self, commands
-            );
+            panic!("No {name} command matching {self:?} found, events=\n{commands:?}");
         }
     }
 
@@ -1249,24 +1243,14 @@ mod unique_index_on_key_alt_names {
             .key_alt_names(vec!["abc".to_string()])
             .await
             .unwrap_err();
-        assert_eq!(
-            Some(11000),
-            write_err_code(&err),
-            "unexpected error: {}",
-            err
-        );
+        assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {err}");
         // Fails: duplicate key
         let err = client_encryption
             .create_data_key(LocalMasterKey::builder().build())
             .key_alt_names(vec!["def".to_string()])
             .await
             .unwrap_err();
-        assert_eq!(
-            Some(11000),
-            write_err_code(&err),
-            "unexpected error: {}",
-            err
-        );
+        assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {err}");
 
         Ok(())
     }
@@ -1292,12 +1276,7 @@ mod unique_index_on_key_alt_names {
             .add_key_alt_name(&new_key, "def")
             .await
             .unwrap_err();
-        assert_eq!(
-            Some(11000),
-            write_err_code(&err),
-            "unexpected error: {}",
-            err
-        );
+        assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {err}");
         // Succeds: re-adding alt name to `new_key`
         let prev_key = client_encryption
             .add_key_alt_name(&key, "def")
@@ -1443,7 +1422,7 @@ mod decryption_events {
             .aggregate(vec![doc! { "$count": "total" }])
             .await
             .unwrap_err();
-        assert!(err.is_network_error(), "unexpected error: {}", err);
+        assert!(err.is_network_error(), "unexpected error: {err}");
         assert!(td.ev_handler.failed.lock().unwrap().is_some());
 
         Ok(())
@@ -1526,7 +1505,7 @@ async fn azure_imds_integration_failure() -> Result<()> {
         )
         .await;
 
-    assert!(result.is_err(), "expected error, got {:?}", result);
+    assert!(result.is_err(), "expected error, got {result:?}");
     assert!(result.unwrap_err().is_auth_error());
 
     Ok(())
@@ -1614,8 +1593,7 @@ mod auto_encryption_keys {
         let result = coll.insert_one(doc! { "ssn": "123-45-6789" }).await;
         assert!(
             result.as_ref().unwrap_err().code() == Some(121),
-            "Expected error 121 (failed validation), got {:?}",
-            result
+            "Expected error 121 (failed validation), got {result:?}"
         );
 
         // Case 2: Missing encryptedFields
@@ -1625,8 +1603,7 @@ mod auto_encryption_keys {
             .1;
         assert!(
             result.as_ref().unwrap_err().is_invalid_argument(),
-            "Expected invalid argument error, got {:?}",
-            result
+            "Expected invalid argument error, got {result:?}"
         );
 
         // Case 3: Invalid keyId
@@ -1643,8 +1620,7 @@ mod auto_encryption_keys {
             .1;
         assert!(
             result.as_ref().unwrap_err().code() == Some(14),
-            "Expected error 14 (type mismatch), got {:?}",
-            result
+            "Expected error 14 (type mismatch), got {result:?}"
         );
 
         // Case 4: Insert encrypted value
@@ -1666,7 +1642,7 @@ mod auto_encryption_keys {
             .unwrap()
         {
             Bson::Binary(bin) => bin.clone(),
-            v => panic!("invalid keyId {:?}", v),
+            v => panic!("invalid keyId {v:?}"),
         };
         let encrypted_payload = ce.encrypt("123-45-6789", key, Algorithm::Unindexed).await?;
         let coll = db.collection::<Document>("case_1");
@@ -1703,7 +1679,7 @@ mod range_explicit_encryption {
         let util_client = Client::for_test().await;
 
         let encrypted_fields =
-            load_testdata(&format!("data/range-encryptedFields-{}.json", bson_type))?;
+            load_testdata(&format!("data/range-encryptedFields-{bson_type}.json"))?;
 
         let key1_document = load_testdata("data/keys/key1-document.json")?;
         let key1_id = match key1_document.get("_id").unwrap() {
@@ -1757,7 +1733,7 @@ mod range_explicit_encryption {
         .build()
         .await?;
 
-        let key = format!("encrypted{}", bson_type);
+        let key = format!("encrypted{bson_type}");
         let bson_numbers: BTreeMap<i32, RawBson> = [0, 6, 30, 200]
             .iter()
             .map(|num| (*num, get_raw_bson_from_num(bson_type, *num)))

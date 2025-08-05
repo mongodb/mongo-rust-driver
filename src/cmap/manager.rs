@@ -57,6 +57,7 @@ impl PoolManager {
     /// Check in the given connection to the pool. This returns an error containing the connection
     /// if the pool has been dropped. The connection's state will be transitioned to checked-in upon
     /// success.
+    #[allow(clippy::result_large_err)]
     pub(crate) fn check_in(
         &self,
         connection: PooledConnection,
@@ -135,7 +136,7 @@ impl PoolManagementRequest {
     fn unwrap_check_in(self) -> PooledConnection {
         match self {
             PoolManagementRequest::CheckIn(conn) => *conn,
-            _ => panic!("tried to unwrap checkin but got {:?}", self),
+            _ => panic!("tried to unwrap checkin but got {self:?}"),
         }
     }
 }

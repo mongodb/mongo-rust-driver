@@ -77,13 +77,11 @@ async fn min_heartbeat_frequency() {
     let elapsed = Instant::now().duration_since(start).as_millis();
     assert!(
         elapsed >= 2000,
-        "expected to take at least 2 seconds, instead took {}ms",
-        elapsed
+        "expected to take at least 2 seconds, instead took {elapsed}ms"
     );
     assert!(
         elapsed <= 3500,
-        "expected to take at most 3.5 seconds, instead took {}ms",
-        elapsed
+        "expected to take at most 3.5 seconds, instead took {elapsed}ms"
     );
 }
 
@@ -237,8 +235,7 @@ async fn repl_set_name_mismatch() -> crate::error::Result<()> {
             Err(Error { ref kind, .. }) => matches!(**kind, ErrorKind::ServerSelection { .. }),
             _ => false,
         },
-        "Unexpected result {:?}",
-        result
+        "Unexpected result {result:?}"
     );
 
     Ok(())

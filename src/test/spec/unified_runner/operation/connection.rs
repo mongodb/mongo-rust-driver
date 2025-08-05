@@ -62,8 +62,8 @@ impl TestOperation for Close {
                     Ok(None)
                 }
                 _ => panic!(
-                    "Unsupported entity {:?} for close operation; expected Client or Cursor",
-                    target_entity
+                    "Unsupported entity {target_entity:?} for close operation; expected Client or \
+                     Cursor"
                 ),
             }
         }

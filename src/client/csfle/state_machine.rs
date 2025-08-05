@@ -52,7 +52,7 @@ impl CryptExecutor {
         let crypto_threads = rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
             .build()
-            .map_err(|e| Error::internal(format!("could not initialize thread pool: {}", e)))?;
+            .map_err(|e| Error::internal(format!("could not initialize thread pool: {e}")))?;
         Ok(Self {
             key_vault_client,
             key_vault_namespace,
@@ -196,7 +196,7 @@ impl CryptExecutor {
                         let mut buf = vec![0];
                         while kms_ctx.bytes_needed() > 0 {
                             let buf_size = kms_ctx.bytes_needed().try_into().map_err(|e| {
-                                Error::internal(format!("buffer size overflow: {}", e))
+                                Error::internal(format!("buffer size overflow: {e}"))
                             })?;
                             buf.resize(buf_size, 0);
                             let count = stream.read(&mut buf).await?;
@@ -301,8 +301,8 @@ impl CryptExecutor {
 
                                     fn kms_error(error: String) -> Error {
                                         let message = format!(
-                                            "An error occurred when obtaining GCP credentials: {}",
-                                            error
+                                            "An error occurred when obtaining GCP credentials: \
+                                             {error}"
                                         );
                                         let error = mongocrypt::error::Error {
                                             kind: mongocrypt::error::ErrorKind::Kms,
@@ -316,8 +316,7 @@ impl CryptExecutor {
                                     let host = std::env::var("GCE_METADATA_HOST")
                                         .unwrap_or_else(|_| "metadata.google.internal".into());
                                     let uri = format!(
-                                        "http://{}/computeMetadata/v1/instance/service-accounts/default/token",
-                                        host
+                                        "http://{host}/computeMetadata/v1/instance/service-accounts/default/token"
                                     );
 
                                     let response: ResponseBody = http_client
@@ -361,7 +360,7 @@ impl CryptExecutor {
                     result = Some(output?);
                 }
                 State::Done => break,
-                s => return Err(Error::internal(format!("unhandled state {:?}", s))),
+                s => return Err(Error::internal(format!("unhandled state {s:?}"))),
             }
         }
         match result {
@@ -446,7 +445,7 @@ fn result_mut<T>(r: &mut Result<T>) -> Result<&mut T> {
 
 fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
     raw.try_into()
-        .map_err(|e| Error::internal(format!("could not parse raw document: {}", e)))
+        .map_err(|e| Error::internal(format!("could not parse raw document: {e}")))
 }
 
 #[cfg(feature = "azure-kms")]
@@ -507,11 +506,11 @@ pub(crate) mod azure {
                 .headers(&self.make_headers())
                 .send()
                 .await
-                .map_err(|e| Error::authentication_error("azure imds", &format!("{}", e)))?;
+                .map_err(|e| Error::authentication_error("azure imds", &format!("{e}")))?;
             let expires_in_secs: u64 = server_response.expires_in.parse().map_err(|e| {
                 Error::authentication_error(
                     "azure imds",
-                    &format!("invalid `expires_in` response field: {}", e),
+                    &format!("invalid `expires_in` response field: {e}"),
                 )
             })?;
             #[allow(clippy::redundant_clone)]
@@ -531,15 +530,15 @@ pub(crate) mod azure {
                     ("resource", "https://vault.azure.net"),
                 ],
             )
-            .map_err(|e| Error::internal(format!("invalid Azure IMDS URL: {}", e)))?;
+            .map_err(|e| Error::internal(format!("invalid Azure IMDS URL: {e}")))?;
             #[cfg(test)]
             let url = {
                 let mut url = url;
                 if let Some((host, port)) = self.test_host {
                     url.set_host(Some(host))
-                        .map_err(|e| Error::internal(format!("invalid test host: {}", e)))?;
+                        .map_err(|e| Error::internal(format!("invalid test host: {e}")))?;
                     url.set_port(Some(port))
-                        .map_err(|()| Error::internal(format!("invalid test port {}", port)))?;
+                        .map_err(|()| Error::internal(format!("invalid test port {port}")))?;
                 }
                 url
             };

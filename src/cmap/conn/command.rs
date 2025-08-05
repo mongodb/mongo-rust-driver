@@ -204,7 +204,7 @@ impl RawCommandResponse {
     pub(crate) fn body<'a, T: Deserialize<'a>>(&'a self) -> Result<T> {
         crate::bson_compat::deserialize_from_slice(self.raw.as_bytes()).map_err(|e| {
             Error::from(ErrorKind::InvalidResponse {
-                message: format!("{}", e),
+                message: format!("{e}"),
             })
         })
     }

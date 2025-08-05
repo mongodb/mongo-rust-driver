@@ -319,7 +319,7 @@ impl ScramVersion {
             ScramVersion::Sha1 => {
                 // nosemgrep: insecure-hashes
                 let mut md5 = Md5::new(); // mongodb rating: No Fix Needed
-                md5.update(format!("{}:mongo:{}", username, password));
+                md5.update(format!("{username}:mongo:{password}"));
                 Cow::Owned(hex::encode(md5.finalize()))
             }
             ScramVersion::Sha256 => match stringprep::saslprep(password) {
@@ -415,8 +415,8 @@ pub(crate) struct ClientFirst {
 impl ClientFirst {
     fn new(source: &str, username: &str, include_db: bool, server_api: Option<ServerApi>) -> Self {
         let nonce = auth::generate_nonce();
-        let gs2_header = format!("{},,", NO_CHANNEL_BINDING);
-        let bare = format!("{}={},{}={}", USERNAME_KEY, username, NONCE_KEY, nonce);
+        let gs2_header = format!("{NO_CHANNEL_BINDING},,");
+        let bare = format!("{USERNAME_KEY}={username},{NONCE_KEY}={nonce}");
         let full = format!("{}{}", &gs2_header, &bare);
         let end = full.len();
         ClientFirst {
@@ -602,7 +602,7 @@ impl ClientFinal {
         let client_proof =
             base64::encode(xor(client_key.as_ref(), client_signature.as_ref()).as_slice());
 
-        let message = format!("{},{}={}", without_proof, PROOF_KEY, client_proof);
+        let message = format!("{without_proof},{PROOF_KEY}={client_proof}");
 
         Ok(ClientFinal {
             source: source.into(),
