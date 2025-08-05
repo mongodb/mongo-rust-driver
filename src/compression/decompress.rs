@@ -23,9 +23,7 @@ pub(crate) fn decompress_message(message: &[u8], compressor_id: u8) -> Result<Ve
     }
 
     Err(ErrorKind::InvalidResponse {
-        message: format!(
-            "Unsupported compressor ID returned from the server: {compressor_id}"
-        ),
+        message: format!("Unsupported compressor ID returned from the server: {compressor_id}"),
     }
     .into())
 }

@@ -47,9 +47,7 @@ pub fn eq_matches<T: PartialEq + Debug>(
     expected: &T,
 ) -> Result<(), String> {
     if actual != expected {
-        return Err(format!(
-            "expected {name} {expected:?}, got {actual:?}"
-        ));
+        return Err(format!("expected {name} {expected:?}, got {actual:?}"));
     }
     Ok(())
 }
@@ -111,9 +109,7 @@ impl Matchable for Bson {
             if types.contains(&self.element_type()) {
                 return Ok(());
             } else {
-                return Err(format!(
-                    "expected type {types:?}, actual value {self:?}"
-                ));
+                return Err(format!("expected type {types:?}, actual value {self:?}"));
             }
         }
         match (self, expected) {

@@ -213,9 +213,7 @@ impl Executor {
                 .next_match(EVENT_TIMEOUT, filter)
                 .await
                 .unwrap_or_else(|| {
-                    panic!(
-                        "{description}: did not receive expected event: {expected_event:?}"
-                    )
+                    panic!("{description}: did not receive expected event: {expected_event:?}")
                 });
             assert_matches(&actual_event, &expected_event, Some(description.as_str()));
         }

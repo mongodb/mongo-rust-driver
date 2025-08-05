@@ -126,21 +126,24 @@ impl Operation {
                 OperationResult::Error(operation_error) => {
                     assert!(
                         result.is_err(),
-                        "{description}: expected error\n{operation_error:#?}  got value\n{result:#?}",
+                        "{description}: expected error\n{operation_error:#?}  got \
+                         value\n{result:#?}",
                     );
                     let error = result.as_ref().unwrap_err();
                     if let Some(error_contains) = &operation_error.error_contains {
                         let message = error.message().unwrap().to_lowercase();
                         assert!(
                             message.contains(&error_contains.to_lowercase()),
-                            "{description}: expected error message to contain \"{error_contains}\" but got \"{message}\""
+                            "{description}: expected error message to contain \
+                             \"{error_contains}\" but got \"{message}\""
                         );
                     }
                     if let Some(error_code_name) = &operation_error.error_code_name {
                         let code_name = error.code_name().unwrap();
                         assert_eq!(
                             error_code_name, code_name,
-                            "{description}: expected error with codeName {error_code_name:?}, instead got {error:#?}"
+                            "{description}: expected error with codeName {error_code_name:?}, \
+                             instead got {error:#?}"
                         );
                     }
                     if let Some(error_code) = operation_error.error_code {

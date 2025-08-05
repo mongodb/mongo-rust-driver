@@ -186,8 +186,8 @@ impl SrvResolver {
         if txt_records.next().is_some() {
             return Err(ErrorKind::DnsResolve {
                 message: format!(
-                    "TXT lookup for {original_hostname} returned more than one record, but more than one are not \
-                     allowed with 'mongodb+srv'",
+                    "TXT lookup for {original_hostname} returned more than one record, but more \
+                     than one are not allowed with 'mongodb+srv'",
                 ),
             }
             .into());

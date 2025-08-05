@@ -385,12 +385,14 @@ async fn run_test(test_file: TestFile) {
                 assert_eq!(
                     actual.len(),
                     expected.len(),
-                    "{test_description}: {phase_description}: event list length mismatch:\n actual: {actual:#?}, expected: {expected:#?}"
+                    "{test_description}: {phase_description}: event list length mismatch:\n \
+                     actual: {actual:#?}, expected: {expected:#?}"
                 );
                 for (actual, expected) in actual.zip(expected.into_iter()) {
                     assert_eq!(
                         actual, expected,
-                        "{test_description}: {phase_description}: SDAM events do not match:\n actual: {actual:#?}, expected: {expected:#?}"
+                        "{test_description}: {phase_description}: SDAM events do not match:\n \
+                         actual: {actual:#?}, expected: {expected:#?}"
                     );
                 }
             }
@@ -439,9 +441,7 @@ fn verify_description_outcome(
 
     for (address, server) in outcome.servers {
         let address = ServerAddress::parse(&address).unwrap_or_else(|_| {
-            panic!(
-                "{test_description}: couldn't parse address \"{address:?}\""
-            )
+            panic!("{test_description}: couldn't parse address \"{address:?}\"")
         });
         let actual_server = &topology_description
             .servers

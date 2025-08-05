@@ -301,7 +301,8 @@ impl CryptExecutor {
 
                                     fn kms_error(error: String) -> Error {
                                         let message = format!(
-                                            "An error occurred when obtaining GCP credentials: {error}"
+                                            "An error occurred when obtaining GCP credentials: \
+                                             {error}"
                                         );
                                         let error = mongocrypt::error::Error {
                                             kind: mongocrypt::error::ErrorKind::Kms,

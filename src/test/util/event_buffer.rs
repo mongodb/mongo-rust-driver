@@ -236,9 +236,9 @@ impl EventBuffer<Event> {
             [CommandEvent::Started(started), CommandEvent::Succeeded(succeeded)] => {
                 (started.clone(), succeeded.clone())
             }
-            pair => panic!(
-                "First event pair for {command_name:?} not (Started, Succeded): {pair:?}"
-            ),
+            pair => {
+                panic!("First event pair for {command_name:?} not (Started, Succeded): {pair:?}")
+            }
         }
     }
 

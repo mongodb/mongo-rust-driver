@@ -239,7 +239,8 @@ impl ServerAddress {
             let Some((hostname, port)) = ip_literal.split_once("]") else {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
-                        "invalid server address {address}: missing closing ']' in IP literal hostname"
+                        "invalid server address {address}: missing closing ']' in IP literal \
+                         hostname"
                     ),
                 }
                 .into());
@@ -259,8 +260,8 @@ impl ServerAddress {
             } else {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
-                        "invalid server address {address}: the hostname can only be followed by a port \
-                         prefixed with ':', got {port}"
+                        "invalid server address {address}: the hostname can only be followed by a \
+                         port prefixed with ':', got {port}"
                     ),
                 }
                 .into());
@@ -276,9 +277,7 @@ impl ServerAddress {
 
         if hostname.is_empty() {
             return Err(ErrorKind::InvalidArgument {
-                message: format!(
-                    "invalid server address {address}: the hostname cannot be empty"
-                ),
+                message: format!("invalid server address {address}: the hostname cannot be empty"),
             }
             .into());
         }
@@ -296,8 +295,8 @@ impl ServerAddress {
                 Ok(0) | Err(_) => {
                     return Err(ErrorKind::InvalidArgument {
                         message: format!(
-                            "invalid server address {address}: the port must be an integer between 1 and \
-                             65535, got {port}"
+                            "invalid server address {address}: the port must be an integer \
+                             between 1 and 65535, got {port}"
                         ),
                     }
                     .into())
@@ -1904,7 +1903,8 @@ impl ConnectionString {
                 let max_staleness = match max_staleness_seconds.cmp(&-1) {
                     Ordering::Less => {
                         return Err(Error::invalid_argument(format!(
-                            "maxStalenessSeconds must be -1 or positive, instead got {max_staleness_seconds}"
+                            "maxStalenessSeconds must be -1 or positive, instead got \
+                             {max_staleness_seconds}"
                         )));
                     }
                     Ordering::Equal => {
@@ -1966,8 +1966,8 @@ impl ConnectionString {
                                 }
                                 _ => Err(ErrorKind::InvalidArgument {
                                     message: format!(
-                                        "'{value}' is not a valid read preference tag (which must be \
-                                         of the form 'key:value'",
+                                        "'{value}' is not a valid read preference tag (which must \
+                                         be of the form 'key:value'",
                                     ),
                                 }
                                 .into()),
@@ -2210,10 +2210,7 @@ impl ConnectionString {
                 });
                 let mut message = format!("{other} is an invalid option");
                 if jaro_winkler >= 0.84 {
-                    let _ = write!(
-                        message,
-                        ". An option with a similar name exists: {option}"
-                    );
+                    let _ = write!(message, ". An option with a similar name exists: {option}");
                 }
                 return Err(ErrorKind::InvalidArgument { message }.into());
             }

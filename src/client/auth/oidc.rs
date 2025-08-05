@@ -206,9 +206,7 @@ impl Callback {
                         .map_err(|e| {
                             Error::authentication_error(
                                 MONGODB_OIDC_STR,
-                                &format!(
-                                    "Failed to parse expires_in from Azure IDMS as u64: {e}"
-                                ),
+                                &format!("Failed to parse expires_in from Azure IDMS as u64: {e}"),
                             )
                         })?;
                     let expires = Some(Instant::now() + Duration::from_secs(expires_in));
@@ -931,7 +929,8 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
     let environment = properties.get_str(ENVIRONMENT_PROP_STR);
     if environment.is_ok() && credential.oidc_callback.is_user_provided() {
         return Err(Error::invalid_argument(format!(
-            "OIDC callback cannot be set for {MONGODB_OIDC_STR} authentication, if an `{ENVIRONMENT_PROP_STR}` is set"
+            "OIDC callback cannot be set for {MONGODB_OIDC_STR} authentication, if an \
+             `{ENVIRONMENT_PROP_STR}` is set"
         )));
     }
     let has_token_resource = properties.contains_key(TOKEN_RESOURCE_PROP_STR);
@@ -939,14 +938,18 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
         Ok(AZURE_ENVIRONMENT_VALUE_STR) | Ok(GCP_ENVIRONMENT_VALUE_STR) => {
             if !has_token_resource {
                 return Err(Error::invalid_argument(format!(
-                    "`{TOKEN_RESOURCE_PROP_STR}` must be set for {MONGODB_OIDC_STR} authentication in the `{AZURE_ENVIRONMENT_VALUE_STR}` or `{GCP_ENVIRONMENT_VALUE_STR}` `{ENVIRONMENT_PROP_STR}`",
+                    "`{TOKEN_RESOURCE_PROP_STR}` must be set for {MONGODB_OIDC_STR} \
+                     authentication in the `{AZURE_ENVIRONMENT_VALUE_STR}` or \
+                     `{GCP_ENVIRONMENT_VALUE_STR}` `{ENVIRONMENT_PROP_STR}`",
                 )));
             }
         }
         _ => {
             if has_token_resource {
                 return Err(Error::invalid_argument(format!(
-                    "`{TOKEN_RESOURCE_PROP_STR}` must not be set for {MONGODB_OIDC_STR} authentication unless using the `{AZURE_ENVIRONMENT_VALUE_STR}` or `{GCP_ENVIRONMENT_VALUE_STR}` `{ENVIRONMENT_PROP_STR}`",
+                    "`{TOKEN_RESOURCE_PROP_STR}` must not be set for {MONGODB_OIDC_STR} \
+                     authentication unless using the `{AZURE_ENVIRONMENT_VALUE_STR}` or \
+                     `{GCP_ENVIRONMENT_VALUE_STR}` `{ENVIRONMENT_PROP_STR}`",
                 )));
             }
         }
@@ -967,7 +970,8 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
         && credential.username.is_some()
     {
         return Err(Error::invalid_argument(format!(
-            "username must not be set for {MONGODB_OIDC_STR} authentication in the {TEST_ENVIRONMENT_VALUE_STR} {ENVIRONMENT_PROP_STR}",
+            "username must not be set for {MONGODB_OIDC_STR} authentication in the \
+             {TEST_ENVIRONMENT_VALUE_STR} {ENVIRONMENT_PROP_STR}",
         )));
     }
     if credential.password.is_some() {

@@ -97,9 +97,7 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
         &'a self,
         _test_runner: &'a TestRunner,
     ) -> BoxFuture<'a, ()> {
-        panic!(
-            "execute_test_runner_operation called on unsupported operation {self:?}"
-        )
+        panic!("execute_test_runner_operation called on unsupported operation {self:?}")
     }
 
     fn execute_entity_operation<'a>(
@@ -243,8 +241,9 @@ impl Operation {
                                     Some(&*test_runner.entities.read().await),
                                 ) {
                                     panic!(
-                                        "[{description}] result mismatch, expected = {expected_bson:#?}  actual = \
-                                         {actual:#?}\nmismatch detail: {e}"
+                                        "[{description}] result mismatch, expected = \
+                                         {expected_bson:#?}  actual = {actual:#?}\nmismatch \
+                                         detail: {e}"
                                     );
                                 }
                             }

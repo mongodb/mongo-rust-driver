@@ -140,10 +140,8 @@ impl GridFsBucket {
             &format!("{bucket_name}.files"),
             collection_options.clone(),
         );
-        let chunks = db.collection_with_options::<Chunk>(
-            &format!("{bucket_name}.chunks"),
-            collection_options,
-        );
+        let chunks = db
+            .collection_with_options::<Chunk>(&format!("{bucket_name}.chunks"), collection_options);
 
         GridFsBucket {
             inner: Arc::new(GridFsBucketInner {

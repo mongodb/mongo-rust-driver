@@ -132,7 +132,8 @@ impl RunOnRequirement {
             .is_err()
             {
                 return Err(format!(
-                    "required server parameters {required_server_parameters:?}, actual {actual_server_parameters:?}"
+                    "required server parameters {required_server_parameters:?}, actual \
+                     {actual_server_parameters:?}"
                 ));
             }
         }
@@ -673,9 +674,7 @@ fn deserialize_selection_criteria() {
                     Some(HedgedReadOptions::builder().enabled(true).build())
                 );
             }
-            other => panic!(
-                "Expected mode SecondaryPreferred with options, got {other:?}"
-            ),
+            other => panic!("Expected mode SecondaryPreferred with options, got {other:?}"),
         },
         SelectionCriteria::Predicate(_) => panic!("Expected read preference, got predicate"),
     }

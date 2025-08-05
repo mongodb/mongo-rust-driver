@@ -150,9 +150,7 @@ async fn run_test(test_file: TestFile) {
                 opts.heartbeat_freq = Some(Duration::from_secs(heartbeat_freq));
             }
             Client::with_options(opts.clone()).err().unwrap_or_else(|| {
-                panic!(
-                    "expected client construction to fail with options: {opts:#?}"
-                )
+                panic!("expected client construction to fail with options: {opts:#?}")
             });
         }
     }

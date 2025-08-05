@@ -61,8 +61,8 @@ impl Compressor {
             if !valid_levels.contains(level) {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
-                        "Invalid zstd compression level {level}: compression level must be within the \
-                         range {valid_levels:?}"
+                        "Invalid zstd compression level {level}: compression level must be within \
+                         the range {valid_levels:?}"
                     ),
                 }
                 .into());
@@ -74,8 +74,8 @@ impl Compressor {
             if *level > 9 {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
-                        "Invalid zlib compression level {level}: compression level must be between 0 \
-                         and 9 (inclusive)"
+                        "Invalid zlib compression level {level}: compression level must be \
+                         between 0 and 9 (inclusive)"
                     ),
                 }
                 .into());
@@ -96,9 +96,9 @@ impl Compressor {
                 let zlib_compression_level =
                     u32::try_from(uri_level).map_err(|_| ErrorKind::InvalidArgument {
                         message: format!(
-                            "Invalid zlib compression level specified: {uri_level}\nzlib compression level \
-                             must be a nonnegative integer or -1 to use the default compression \
-                             level"
+                            "Invalid zlib compression level specified: {uri_level}\nzlib \
+                             compression level must be a nonnegative integer or -1 to use the \
+                             default compression level"
                         ),
                     })?;
                 *level = Some(zlib_compression_level);

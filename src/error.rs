@@ -101,7 +101,8 @@ impl Error {
     pub(crate) fn pool_cleared_error(address: &ServerAddress, cause: &Error) -> Self {
         ErrorKind::ConnectionPoolCleared {
             message: format!(
-                "Connection pool for {address} cleared because another operation failed with: {cause}"
+                "Connection pool for {address} cleared because another operation failed with: \
+                 {cause}"
             ),
         }
         .into()
@@ -450,7 +451,8 @@ impl Error {
             if [
                 6, 7, 89, 91, 189, 262, 9001, 10107, 11600, 11602, 13435, 13436, 63, 150, 13388,
                 234, 133,
-            ].contains(&code)
+            ]
+            .contains(&code)
             {
                 return true;
             }

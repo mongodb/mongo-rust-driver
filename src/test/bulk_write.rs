@@ -368,9 +368,7 @@ async fn failed_cursor_iteration() {
         ..
     }) = *error.kind
     else {
-        panic!(
-            "Expected bulk write error with partial result, got {error:?}"
-        );
+        panic!("Expected bulk write error with partial result, got {error:?}");
     };
     assert_eq!(partial_result.upserted_count(), 2);
     assert_eq!(partial_result.update_results().unwrap().len(), 1);

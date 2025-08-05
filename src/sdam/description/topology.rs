@@ -440,7 +440,8 @@ impl TopologyDescription {
                     server_description = ServerDescription::new_from_error(
                         server_description.address,
                         Error::invalid_argument(format!(
-                            "Connection string replicaSet name {expected_name:?} does not match actual name {got_display}",
+                            "Connection string replicaSet name {expected_name:?} does not match \
+                             actual name {got_display}",
                         )),
                     );
                 }

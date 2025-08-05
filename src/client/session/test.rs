@@ -258,9 +258,7 @@ async fn cluster_time_in_commands() {
             .next_successful_command_execution(Duration::from_secs(5), command_name)
             .await
             .unwrap_or_else(|| {
-                panic!(
-                    "did not see command started and succeeded events for {command_name}"
-                )
+                panic!("did not see command started and succeeded events for {command_name}")
             });
 
         assert!(first_command_started.command.get("$clusterTime").is_some());
@@ -273,9 +271,7 @@ async fn cluster_time_in_commands() {
             .next_successful_command_execution(Duration::from_secs(5), command_name)
             .await
             .unwrap_or_else(|| {
-                panic!(
-                    "did not see command started and succeeded events for {command_name}"
-                )
+                panic!("did not see command started and succeeded events for {command_name}")
             });
 
         assert_eq!(
@@ -553,13 +549,12 @@ async fn find_and_getmore_share_session() {
                 .next()
                 .await
                 .unwrap_or_else(|| {
-                    panic!(
-                        "should get result with read preference {read_preference:?}"
-                    )
+                    panic!("should get result with read preference {read_preference:?}")
                 })
                 .unwrap_or_else(|e| {
                     panic!(
-                        "result should not be error with read preference {read_preference:?}, but got {e:?}"
+                        "result should not be error with read preference {read_preference:?}, but \
+                         got {e:?}"
                     )
                 });
         }

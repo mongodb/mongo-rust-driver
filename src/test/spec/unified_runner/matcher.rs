@@ -26,9 +26,7 @@ use crate::test::util::{TracingEvent, TracingEventValue};
 
 #[cfg(feature = "tracing-unstable")]
 fn mismatch_message(kind: &str, actual: impl Debug, expected: impl Debug) -> String {
-    format!(
-        "{kind} do not match. Actual:\n{actual:?}\nExpected:\n{expected:?}"
-    )
+    format!("{kind} do not match. Actual:\n{actual:?}\nExpected:\n{expected:?}")
 }
 
 use std::convert::TryInto;
@@ -530,8 +528,8 @@ fn special_operator_matches(
                 }
             }
             (actual, expected) => Err(format!(
-                "actual and expected should both be BSON strings but got: actual {actual:?}, expected \
-                 {expected:?}"
+                "actual and expected should both be BSON strings but got: actual {actual:?}, \
+                 expected {expected:?}"
             )),
         },
         "$$sessionLsid" => match entities {
@@ -569,9 +567,7 @@ fn special_operator_matches(
                 return Err(format!("expected actual to be a number, got {actual:?}"));
             };
             if actual > expected {
-                return Err(format!(
-                    "expected actual to be <= {expected}, got {actual}"
-                ));
+                return Err(format!("expected actual to be <= {expected}, got {actual}"));
             }
             Ok(())
         }

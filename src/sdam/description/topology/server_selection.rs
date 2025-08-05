@@ -100,9 +100,7 @@ impl TopologyDescription {
                  {criteria:?}. Topology: {self}"
             )
         } else {
-            format!(
-                "Server selection timeout: No available servers. Topology: {self}"
-            )
+            format!("Server selection timeout: No available servers. Topology: {self}")
         }
     }
 

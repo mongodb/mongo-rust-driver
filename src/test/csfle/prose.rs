@@ -774,9 +774,7 @@ mod deadlock {
                     return;
                 }
             }
-            panic!(
-                "No {name} command matching {self:?} found, events=\n{commands:?}"
-            );
+            panic!("No {name} command matching {self:?} found, events=\n{commands:?}");
         }
     }
 
@@ -1245,22 +1243,14 @@ mod unique_index_on_key_alt_names {
             .key_alt_names(vec!["abc".to_string()])
             .await
             .unwrap_err();
-        assert_eq!(
-            Some(11000),
-            write_err_code(&err),
-            "unexpected error: {err}"
-        );
+        assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {err}");
         // Fails: duplicate key
         let err = client_encryption
             .create_data_key(LocalMasterKey::builder().build())
             .key_alt_names(vec!["def".to_string()])
             .await
             .unwrap_err();
-        assert_eq!(
-            Some(11000),
-            write_err_code(&err),
-            "unexpected error: {err}"
-        );
+        assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {err}");
 
         Ok(())
     }
@@ -1286,11 +1276,7 @@ mod unique_index_on_key_alt_names {
             .add_key_alt_name(&new_key, "def")
             .await
             .unwrap_err();
-        assert_eq!(
-            Some(11000),
-            write_err_code(&err),
-            "unexpected error: {err}"
-        );
+        assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {err}");
         // Succeds: re-adding alt name to `new_key`
         let prev_key = client_encryption
             .add_key_alt_name(&key, "def")

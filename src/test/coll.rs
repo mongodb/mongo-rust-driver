@@ -1096,13 +1096,11 @@ fn assert_duplicate_key_error_with_utf8_replacement(error: &ErrorKind) {
                 assert_eq!(write_errors[0].code, 11000);
                 assert!(write_errors[0].message.contains('�'));
             }
-            None => panic!(
-                "expected BulkWriteFailure containing write errors, got {failure:?} instead"
-            ),
+            None => {
+                panic!("expected BulkWriteFailure containing write errors, got {failure:?} instead")
+            }
         },
-        e => panic!(
-            "expected ErrorKind::Write or ErrorKind::BulkWrite, got {e:?} instead"
-        ),
+        e => panic!("expected ErrorKind::Write or ErrorKind::BulkWrite, got {e:?} instead"),
     }
 }
 

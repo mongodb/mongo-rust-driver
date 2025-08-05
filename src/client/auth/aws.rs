@@ -370,9 +370,8 @@ impl AwsCredential {
             .await
             .map_err(|_| Error::unknown_authentication_error(MECH_NAME))?;
 
-        let role_name_uri = format!(
-            "http://{AWS_EC2_IP}/latest/meta-data/iam/security-credentials/"
-        );
+        let role_name_uri =
+            format!("http://{AWS_EC2_IP}/latest/meta-data/iam/security-credentials/");
 
         let role_name = http_client
             .get(&role_name_uri)

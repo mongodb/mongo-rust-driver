@@ -349,11 +349,12 @@ pub(crate) fn fill_kms_placeholders(
 
         for (key, value) in config.iter_mut() {
             if value.as_document() == Some(&placeholder) {
-                let test_kms_provider = test_kms_provider
-                    .unwrap_or_else(|| panic!("missing config for {provider:?}"));
-                let placeholder_value = test_kms_provider.1.get(key).unwrap_or_else(|| {
-                    panic!("provider config {provider:?} missing key {key:?}")
-                });
+                let test_kms_provider =
+                    test_kms_provider.unwrap_or_else(|| panic!("missing config for {provider:?}"));
+                let placeholder_value = test_kms_provider
+                    .1
+                    .get(key)
+                    .unwrap_or_else(|| panic!("provider config {provider:?} missing key {key:?}"));
                 *value = placeholder_value.clone();
             }
         }

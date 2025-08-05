@@ -114,9 +114,8 @@ where
     D: Deserializer<'de>,
 {
     let bson = Bson::deserialize(deserializer)?;
-    get_u64(&bson).ok_or_else(|| {
-        serde::de::Error::custom(format!("could not deserialize u64 from {bson:?}"))
-    })
+    get_u64(&bson)
+        .ok_or_else(|| serde::de::Error::custom(format!("could not deserialize u64 from {bson:?}")))
 }
 
 pub(crate) fn serialize_error_as_string<S: Serializer>(
