@@ -29,6 +29,8 @@ pub(super) struct SspiAuthenticator {
 }
 
 impl SspiAuthenticator {
+    // Initialize the SspiAuthenticator by acquiring a credentials handle and
+    // making the first call to InitializeSecurityContext.
     pub(super) fn init(
         user_principal: Option<String>,
         password: Option<String>,
@@ -51,16 +53,11 @@ impl SspiAuthenticator {
             user_principal: user_principal.clone(),
         };
 
-        let initial_token =
-            authenticator.acquire_credentials_and_init(Some(user_principal), password)?;
+        let initial_token = authenticator.acquire_credentials_and_init(password)?;
         Ok((authenticator, initial_token))
     }
 
-    fn acquire_credentials_and_init(
-        &mut self,
-        user_principal: Option<String>,
-        password: Option<String>,
-    ) -> Result<Vec<u8>> {
+    fn acquire_credentials_and_init(&mut self, password: Option<String>) -> Result<Vec<u8>> {
         unsafe {
             let mut cred_handle = SecHandle::default();
             let mut expiry: i64 = 0;
@@ -68,31 +65,32 @@ impl SspiAuthenticator {
             let mut auth_identity = SEC_WINNT_AUTH_IDENTITY_W::default();
             auth_identity.Flags = SEC_WINNT_AUTH_IDENTITY_UNICODE;
 
+            // Note that SSPI uses the term "domain" instead of
+            // "realm" in this context.
             let username_wide: Vec<u16>;
             let domain_wide: Vec<u16>;
             let password_wide: Vec<u16>;
 
-            if let Some(user_principal) = &user_principal {
-                if let Some(at_pos) = user_principal.find('@') {
-                    let username = &user_principal[..at_pos];
-                    let domain = &user_principal[at_pos + 1..];
+            if let Some(at_pos) = self.user_principal.find('@') {
+                let username = &self.user_principal[..at_pos];
+                let domain = &self.user_principal[at_pos + 1..];
 
-                    username_wide = username.encode_utf16().chain(std::iter::once(0)).collect();
-                    domain_wide = domain.encode_utf16().chain(std::iter::once(0)).collect();
+                username_wide = username.encode_utf16().chain(std::iter::once(0)).collect();
+                domain_wide = domain.encode_utf16().chain(std::iter::once(0)).collect();
 
-                    auth_identity.User = username_wide.as_ptr() as *mut u16;
-                    auth_identity.UserLength = username.len() as u32;
-                    auth_identity.Domain = domain_wide.as_ptr() as *mut u16;
-                    auth_identity.DomainLength = domain.len() as u32;
+                auth_identity.User = username_wide.as_ptr() as *mut u16;
+                auth_identity.UserLength = username.len() as u32;
+                auth_identity.Domain = domain_wide.as_ptr() as *mut u16;
+                auth_identity.DomainLength = domain.len() as u32;
 
-                    if let Some(password) = &password {
-                        password_wide = password.encode_utf16().chain(std::iter::once(0)).collect();
-                        auth_identity.Password = password_wide.as_ptr() as *mut u16;
-                        auth_identity.PasswordLength = password.len() as u32;
-                    }
+                if let Some(password) = &password {
+                    password_wide = password.encode_utf16().chain(std::iter::once(0)).collect();
+                    auth_identity.Password = password_wide.as_ptr() as *mut u16;
+                    auth_identity.PasswordLength = password.len() as u32;
                 }
             }
 
+            // Security package name
             let package_name: Vec<u16> = "kerberos\0".encode_utf16().collect();
             let result = AcquireCredentialsHandleW(
                 std::ptr::null(),
@@ -124,6 +122,8 @@ impl SspiAuthenticator {
         }
     }
 
+    // Issue the server provided token to the context handle. If auth is complete,
+    // no token is returned; otherwise, return the next token to send to the server.
     pub(super) fn step(&mut self, challenge: &[u8]) -> Result<Option<Vec<u8>>> {
         if self.auth_complete {
             return Ok(None);
@@ -219,6 +219,12 @@ impl SspiAuthenticator {
         }
     }
 
+    // Perform the final step of Kerberos authentication by decrypting the
+    // final server challenge, then encrypting the protocol bytes + user
+    // principal. The resulting token must be sent to the server.
+    // For consistency with nix/GSSAPI, we use the terminology "unwrap" and
+    // "wrap" here, even though in the context of SSPI it is "decrypt" and
+    // "encrypt" (as seen in the implementation of this method).
     pub(super) fn do_unwrap_wrap(&mut self, payload: &[u8]) -> Result<Vec<u8>> {
         unsafe {
             let mut message = payload.to_vec();
