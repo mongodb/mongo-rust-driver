@@ -32,10 +32,9 @@ impl GssapiAuthenticator {
             )
         })?;
 
-        let user_principal = user_principal.ok_or_else(Error::authentication_error(
-            GSSAPI_STR,
-            "User principal not specified",
-        ))?;
+        let user_principal = user_principal.ok_or_else(|| {
+            Error::authentication_error(GSSAPI_STR, "User principal not specified")
+        })?;
 
         Ok((
             Self {
