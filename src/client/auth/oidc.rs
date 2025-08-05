@@ -608,7 +608,7 @@ pub(crate) async fn authenticate_stream(
     } = match callback_guard.as_mut() {
         Some(callback) => callback,
         None => {
-            let callback = get_automatic_provider_callback(&credential)?;
+            let callback = get_automatic_provider_callback(credential)?;
             callback_guard.insert(callback)
         }
     };
