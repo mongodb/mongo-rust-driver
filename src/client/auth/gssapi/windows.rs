@@ -3,26 +3,11 @@ use windows_sys::Win32::{
     Foundation::{SEC_E_OK, SEC_I_CONTINUE_NEEDED},
     Security::{
         Authentication::Identity::{
-            AcquireCredentialsHandleW,
-            DecryptMessage,
-            DeleteSecurityContext,
-            EncryptMessage,
-            FreeCredentialsHandle,
-            InitializeSecurityContextW,
-            QueryContextAttributesW,
-            SecBuffer,
-            SecBufferDesc,
-            SecPkgContext_Sizes,
-            ISC_REQ_ALLOCATE_MEMORY,
-            ISC_REQ_MUTUAL_AUTH,
-            SECBUFFER_DATA,
-            SECBUFFER_PADDING,
-            SECBUFFER_STREAM,
-            SECBUFFER_TOKEN,
-            SECBUFFER_VERSION,
-            SECPKG_ATTR_SIZES,
-            SECPKG_CRED_OUTBOUND,
-            SECQOP_WRAP_NO_ENCRYPT,
+            AcquireCredentialsHandleW, DecryptMessage, DeleteSecurityContext, EncryptMessage,
+            FreeCredentialsHandle, InitializeSecurityContextW, QueryContextAttributesW, SecBuffer,
+            SecBufferDesc, SecPkgContext_Sizes, ISC_REQ_ALLOCATE_MEMORY, ISC_REQ_MUTUAL_AUTH,
+            SECBUFFER_DATA, SECBUFFER_PADDING, SECBUFFER_STREAM, SECBUFFER_TOKEN,
+            SECBUFFER_VERSION, SECPKG_ATTR_SIZES, SECPKG_CRED_OUTBOUND, SECQOP_WRAP_NO_ENCRYPT,
             SECURITY_NETWORK_DREP,
         },
         Credentials::SecHandle,
@@ -38,11 +23,9 @@ use crate::{
 pub(super) struct SspiAuthenticator {
     cred_handle: Option<SecHandle>,
     ctx_handle: Option<SecHandle>,
-    have_cred: bool,
-    have_context: bool,
     auth_complete: bool,
-    name_token: Vec<u16>,
-    user_plus_realm: String,
+    service_principal: Vec<u16>,
+    user_principal: String,
 }
 
 impl SspiAuthenticator {
@@ -51,10 +34,11 @@ impl SspiAuthenticator {
         password: Option<String>,
         service_principal: String,
     ) -> Result<(Self, Vec<u8>)> {
-        let user_plus_realm = user_principal.clone().unwrap_or_default();
+        let user_principal = user_principal.ok_or_else(|| {
+            Error::authentication_error(GSSAPI_STR, "User principal not specified")
+        })?;
 
-        let name_token_string = service_principal.clone();
-        let name_token: Vec<u16> = name_token_string
+        let service_principal: Vec<u16> = service_principal
             .encode_utf16()
             .chain(std::iter::once(0))
             .collect();
@@ -62,14 +46,13 @@ impl SspiAuthenticator {
         let mut authenticator = Self {
             cred_handle: None,
             ctx_handle: None,
-            have_cred: false,
-            have_context: false,
             auth_complete: false,
-            name_token,
-            user_plus_realm,
+            service_principal,
+            user_principal: user_principal.clone(),
         };
 
-        let initial_token = authenticator.acquire_credentials_and_init(user_principal, password)?;
+        let initial_token =
+            authenticator.acquire_credentials_and_init(Some(user_principal), password)?;
         Ok((authenticator, initial_token))
     }
 
@@ -135,7 +118,6 @@ impl SspiAuthenticator {
             }
 
             self.cred_handle = Some(cred_handle);
-            self.have_cred = true;
 
             let initial_token = self.initialize_security_context(&[])?;
             Ok(initial_token)
@@ -153,11 +135,7 @@ impl SspiAuthenticator {
 
     fn initialize_security_context(&mut self, input_token: &[u8]) -> Result<Vec<u8>> {
         unsafe {
-            let mut ctx_handle = if self.have_context {
-                self.ctx_handle.unwrap()
-            } else {
-                SecHandle::default()
-            };
+            let mut ctx_handle = self.ctx_handle.unwrap_or_default();
 
             let mut input_buffer = SecBuffer {
                 cbBuffer: input_token.len() as u32,
@@ -191,16 +169,16 @@ impl SspiAuthenticator {
 
             let result = InitializeSecurityContextW(
                 &self.cred_handle.unwrap(),
-                if self.have_context {
+                if self.ctx_handle.is_some() {
                     &ctx_handle
                 } else {
                     ptr::null()
                 },
-                self.name_token.as_ptr(),
+                self.service_principal.as_ptr(),
                 ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_MUTUAL_AUTH,
                 0,
                 SECURITY_NETWORK_DREP,
-                if self.have_context {
+                if self.ctx_handle.is_some() {
                     &input_buffer_desc
                 } else {
                     ptr::null()
@@ -213,7 +191,6 @@ impl SspiAuthenticator {
             );
 
             self.ctx_handle = Some(ctx_handle);
-            self.have_context = true;
 
             match result {
                 SEC_E_OK => {
@@ -307,8 +284,8 @@ impl SspiAuthenticator {
                 ));
             }
 
-            let user_plus_realm = &self.user_plus_realm;
-            let plaintext_message_size = 4 + user_plus_realm.len();
+            let user_principal = &self.user_principal;
+            let plaintext_message_size = 4 + user_principal.len();
             let total_size = sizes.cbSecurityTrailer as usize
                 + plaintext_message_size
                 + sizes.cbBlockSize as usize;
@@ -319,8 +296,8 @@ impl SspiAuthenticator {
             message_buf[plaintext_start + 1] = 0;
             message_buf[plaintext_start + 2] = 0;
             message_buf[plaintext_start + 3] = 0;
-            message_buf[plaintext_start + 4..plaintext_start + 4 + user_plus_realm.len()]
-                .copy_from_slice(user_plus_realm.as_bytes());
+            message_buf[plaintext_start + 4..plaintext_start + 4 + user_principal.len()]
+                .copy_from_slice(user_principal.as_bytes());
 
             let mut encrypt_bufs = [
                 SecBuffer {

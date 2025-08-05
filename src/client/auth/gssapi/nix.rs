@@ -8,7 +8,7 @@ use crate::{
 pub(super) struct GssapiAuthenticator {
     pending_ctx: Option<PendingClientCtx>,
     established_ctx: Option<ClientCtx>,
-    user_principal: Option<String>,
+    user_principal: String,
     is_complete: bool,
 }
 
@@ -31,6 +31,11 @@ impl GssapiAuthenticator {
                 &format!("Failed to initialize GSSAPI context: {e}"),
             )
         })?;
+
+        let user_principal = user_principal.ok_or_else(Error::authentication_error(
+            GSSAPI_STR,
+            "User principal not specified",
+        ))?;
 
         Ok((
             Self {
@@ -84,19 +89,12 @@ impl GssapiAuthenticator {
                 Error::authentication_error(GSSAPI_STR, &format!("GSSAPI unwrap failed: {e}"))
             })?;
 
-            if let Some(user_principal) = self.user_principal.take() {
-                let bytes: &[u8] = &[0x1, 0x0, 0x0, 0x0];
-                let bytes = [bytes, user_principal.as_bytes()].concat();
-                let output_token = established_ctx.wrap(false, bytes.as_slice()).map_err(|e| {
-                    Error::authentication_error(GSSAPI_STR, &format!("GSSAPI wrap failed: {e}"))
-                })?;
-                Ok(output_token.to_vec())
-            } else {
-                Err(Error::authentication_error(
-                    GSSAPI_STR,
-                    "User principal not specified",
-                ))
-            }
+            let bytes: &[u8] = &[0x1, 0x0, 0x0, 0x0];
+            let bytes = [bytes, self.user_principal.as_bytes()].concat();
+            let output_token = established_ctx.wrap(false, bytes.as_slice()).map_err(|e| {
+                Error::authentication_error(GSSAPI_STR, &format!("GSSAPI wrap failed: {e}"))
+            })?;
+            Ok(output_token.to_vec())
         } else {
             Err(Error::authentication_error(
                 GSSAPI_STR,
