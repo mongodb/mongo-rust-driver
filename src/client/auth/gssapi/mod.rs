@@ -25,7 +25,7 @@ const SERVICE_REALM: &str = "SERVICE_REALM";
 const SERVICE_HOST: &str = "SERVICE_HOST";
 
 #[derive(Debug, Clone)]
-pub(crate) struct GssapiProperties {
+struct GssapiProperties {
     pub service_name: String,
     pub canonicalize_host_name: CanonicalizeHostName,
     pub service_realm: Option<String>,
@@ -33,7 +33,7 @@ pub(crate) struct GssapiProperties {
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
-pub(crate) enum CanonicalizeHostName {
+enum CanonicalizeHostName {
     #[default]
     None,
     Forward,
@@ -223,7 +223,7 @@ impl GssapiProperties {
     }
 }
 
-pub(crate) async fn canonicalize_hostname(
+async fn canonicalize_hostname(
     hostname: &str,
     mode: &CanonicalizeHostName,
     resolver_config: Option<&ResolverConfig>,

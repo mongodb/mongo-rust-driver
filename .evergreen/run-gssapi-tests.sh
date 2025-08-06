@@ -16,6 +16,10 @@ FEATURE_FLAGS+=("gssapi-auth")
 
 set +o errexit
 
+# On Windows, `kinit`/`kdestroy` and other krb5 config settings are
+# not available, nor are they required steps. Windows uses SSPI which
+# is similar to but distinct from (KRB5) GSSAPI. Therefore, we only
+# run the following steps if we are not on Windows.
 if [[ "Windows_NT" != "$OSTYPE" ]]; then
   # Create a krb5 config file with relevant
   touch krb5.conf
