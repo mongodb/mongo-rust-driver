@@ -9,6 +9,7 @@ use crate::{
 ///   - auth_mechanism_properties is an optional set of authMechanismProperties to append to the uri
 async fn run_gssapi_auth_test(
     user_principal_var: &str,
+    #[cfg(target_os = "windows")] password_var: &str,
     gssapi_db_var: &str,
     auth_mechanism_properties: Option<&str>,
 ) {
@@ -28,9 +29,19 @@ async fn run_gssapi_auth_test(
     };
 
     // Create client
+    #[cfg(not(target_os = "windows"))]
     let uri = format!(
         "mongodb://{user_principal}@{host}/?authSource=%24external&authMechanism=GSSAPI{props}"
     );
+    #[cfg(target_os = "windows")]
+    let uri = {
+        let password =
+            std::env::var(password_var).unwrap_or_else(|_| panic!("{password_var} not set"));
+        format!(
+            "mongodb://{user_principal}:{password}@{host}/?authSource=%24external&\
+             authMechanism=GSSAPI{props}"
+        )
+    };
     let client = Client::with_uri_str(uri)
         .await
         .expect("failed to create MongoDB Client");
@@ -57,13 +68,22 @@ async fn run_gssapi_auth_test(
 
 #[tokio::test]
 async fn no_options() {
-    run_gssapi_auth_test("PRINCIPAL", "GSSAPI_DB", None).await
+    run_gssapi_auth_test(
+        "PRINCIPAL",
+        #[cfg(target_os = "windows")]
+        "SASL_PASS",
+        "GSSAPI_DB",
+        None,
+    )
+    .await
 }
 
 #[tokio::test]
 async fn explicit_canonicalize_host_name_false() {
     run_gssapi_auth_test(
         "PRINCIPAL",
+        #[cfg(target_os = "windows")]
+        "SASL_PASS",
         "GSSAPI_DB",
         Some("CANONICALIZE_HOST_NAME:false"),
     )
@@ -74,6 +94,8 @@ async fn explicit_canonicalize_host_name_false() {
 async fn canonicalize_host_name_forward() {
     run_gssapi_auth_test(
         "PRINCIPAL",
+        #[cfg(target_os = "windows")]
+        "SASL_PASS",
         "GSSAPI_DB",
         Some("CANONICALIZE_HOST_NAME:forward"),
     )
@@ -84,6 +106,8 @@ async fn canonicalize_host_name_forward() {
 async fn canonicalize_host_name_forward_and_reverse() {
     run_gssapi_auth_test(
         "PRINCIPAL",
+        #[cfg(target_os = "windows")]
+        "SASL_PASS",
         "GSSAPI_DB",
         Some("CANONICALIZE_HOST_NAME:forwardAndReverse"),
     )
@@ -100,6 +124,8 @@ async fn with_service_realm_and_host_options() {
 
     run_gssapi_auth_test(
         "PRINCIPAL_CROSS",
+        #[cfg(target_os = "windows")]
+        "SASL_PASS_CROSS",
         "GSSAPI_DB_CROSS",
         Some(format!("SERVICE_REALM:{service_realm},SERVICE_HOST:{service_host}").as_str()),
     )

@@ -274,6 +274,14 @@ buildvariants:
     tasks:
       - test-gssapi-auth
 
+  - name: gssapi-auth-windows
+    display_name: "GSSAPI Authentication - Windows"
+    patchable: true
+    run_on:
+      - windows-64-vsMulti-small
+    tasks:
+      - test-gssapi-auth
+
   - name: x509-auth
     display_name: "x509 Authentication"
     patchable: false
