@@ -278,7 +278,7 @@ buildvariants:
     display_name: "GSSAPI Authentication - Windows"
     patchable: true
     run_on:
-      - windows-64-vsMulti-small
+      - windows-64-vs2017-small
     tasks:
       - test-gssapi-auth
 
@@ -1413,7 +1413,7 @@ functions:
       type: test
       params:
         binary: bash
-        working_dir: ${PROJECT_DIRECTORY}
+        working_dir: src
         args:
           - .evergreen/run-gssapi-tests.sh
         include_expansions_in_env:
