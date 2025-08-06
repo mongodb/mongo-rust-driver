@@ -532,6 +532,15 @@ impl TestRunner {
                     if let Some(opts) = &client.auto_encrypt_opts {
                         use crate::client::csfle::options::{AutoEncryptionOptions, KmsProviders};
 
+                        let mut extra_options = opts.extra_options.clone();
+                        if let Ok(val) = std::env::var("CRYPT_SHARED_LIB_PATH") {
+                            if !val.is_empty() {
+                                extra_options
+                                    .get_or_insert_default()
+                                    .insert("cryptSharedLibPath", val);
+                            }
+                        }
+
                         let real_opts = AutoEncryptionOptions {
                             key_vault_client: None,
                             key_vault_namespace: opts.key_vault_namespace.clone(),
@@ -543,7 +552,7 @@ impl TestRunner {
                             .unwrap(),
                             schema_map: opts.schema_map.clone(),
                             bypass_auto_encryption: opts.bypass_auto_encryption,
-                            extra_options: opts.extra_options.clone(),
+                            extra_options,
                             encrypted_fields_map: opts.encrypted_fields_map.clone(),
                             bypass_query_analysis: opts.bypass_query_analysis,
                             disable_crypt_shared: None,
