@@ -142,6 +142,9 @@ async fn bson_size_limits() -> Result<()> {
     let coll = client_encrypted
         .database("db")
         .collection::<Document>("coll");
+    let coll2 = client_encrypted
+        .database("db")
+        .collection::<Document>("coll2");
 
     // Tests
     // Test operation 1
@@ -218,6 +221,16 @@ async fn bson_size_limits() -> Result<()> {
         matches!(*err.kind, ErrorKind::Write(_)),
         "unexpected error: {err}"
     );
+
+    // Test operation 7
+    let long_string = "a".repeat(2_097_152 - 1_500);
+    let write_models = vec![
+        coll2.insert_one_model(doc! { "_id": "over_2mib_3", "unencrypted": &long_string })?,
+        coll2.insert_one_model(doc! { "_id": "over_2mib_4", "unencrypted": &long_string })?,
+    ];
+    client_encrypted.bulk_write(write_models).await?;
+    let bulk_write_events = buffer.get_command_started_events(&["bulkWrite"]);
+    assert_eq!(bulk_write_events.len(), 2);
 
     Ok(())
 }
