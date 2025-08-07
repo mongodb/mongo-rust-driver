@@ -381,6 +381,8 @@ impl WriteModel {
         &self,
         ns_info_index: usize,
     ) -> Result<(RawDocumentBuf, Option<Bson>)> {
+        // The maximum number of namespaces allowed in a bulkWrite command is much lower than
+        // i32::MAX, so this should never fail.
         let index = i32::try_from(ns_info_index)
             .map_err(|_| Error::internal("nsInfo index exceeds i32::MAX"))?;
         let mut ops_document = rawdoc! { self.operation_name(): index };

@@ -249,7 +249,7 @@ pub(crate) fn get_or_prepend_id_field(doc: &mut RawDocumentBuf) -> Result<Bson> 
 }
 
 /// A helper trait for working with collections of raw documents. This is useful for unifying
-/// command-building implementations that conditionally construct both document sequences and a
+/// command-building implementations that conditionally construct either document sequences or a
 /// single command document.
 pub(crate) trait RawDocumentCollection: Default {
     /// Calculates the total number of bytes that would be added to a collection of this type by the
