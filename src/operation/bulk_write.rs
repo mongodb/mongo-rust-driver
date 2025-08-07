@@ -258,8 +258,8 @@ where
             current_size += namespace_size + operation_size;
             let current_size = current_size.get()?;
 
-            if current_size < max_size
-                || self.encrypted && i == 0 && current_size < first_write_max_encrypted_size
+            if current_size <= max_size
+                || self.encrypted && i == 0 && current_size <= first_write_max_encrypted_size
             {
                 self.n_attempted += 1;
                 if let Some(inserted_id) = inserted_id {
