@@ -5,10 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    bson::{rawdoc, Document, RawDocument, RawDocumentBuf},
-    bson_compat::{cstr, CString},
-};
+use crate::bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
 use mongocrypt::ctx::{Ctx, KmsCtx, KmsProviderType, State};
 use rayon::ThreadPool;
@@ -245,7 +242,9 @@ impl CryptExecutor {
                             continue;
                         }
 
-                        let prov_name: CString = provider.as_string().try_into()?;
+                        #[cfg(any(feature = "aws-auth", feature = "azure-kms"))]
+                        let prov_name: crate::bson_compat::CString =
+                            provider.as_string().try_into()?;
                         match provider.provider_type() {
                             KmsProviderType::Aws => {
                                 #[cfg(feature = "aws-auth")]
@@ -263,7 +262,10 @@ impl CryptExecutor {
                                         "secretAccessKey": aws_creds.secret_access_key().to_string(),
                                     };
                                     if let Some(token) = aws_creds.session_token() {
-                                        creds.append(cstr!("sessionToken"), token);
+                                        creds.append(
+                                            crate::bson_compat::cstr!("sessionToken"),
+                                            token,
+                                        );
                                     }
                                     kms_providers.append(prov_name, creds);
                                 }
@@ -326,7 +328,7 @@ impl CryptExecutor {
                                         .await
                                         .map_err(|e| kms_error(e.to_string()))?;
                                     kms_providers.append(
-                                        cstr!("gcp"),
+                                        crate::bson_compat::cstr!("gcp"),
                                         rawdoc! { "accessToken": response.access_token },
                                     );
                                 }
