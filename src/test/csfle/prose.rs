@@ -225,6 +225,11 @@ async fn bson_size_limits() -> Result<()> {
         "unexpected error: {err}"
     );
 
+    // The remaining test operations use bulk_write.
+    if server_version_lt(8, 0).await {
+        return Ok(());
+    }
+
     // Test operation 7
     let long_string = "a".repeat(STRING_LEN_2_MIB - 1_500);
     let write_models = vec![
