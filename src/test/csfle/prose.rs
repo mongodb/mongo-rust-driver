@@ -145,6 +145,7 @@ async fn bson_size_limits() -> Result<()> {
     let coll2 = client_encrypted
         .database("db")
         .collection::<Document>("coll2");
+    coll2.drop().await?;
 
     // Tests
     // Test operation 1

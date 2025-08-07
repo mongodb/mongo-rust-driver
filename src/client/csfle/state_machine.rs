@@ -92,6 +92,13 @@ impl CryptExecutor {
         self.mongocryptd_client.is_some()
     }
 
+    fn metadata_client(&self, state: &State) -> Result<Client> {
+        self.metadata_client
+            .as_ref()
+            .and_then(|w| w.upgrade())
+            .ok_or_else(|| Error::internal(format!("metadata client required for {state:?}")))
+    }
+
     pub(crate) async fn run_ctx(&self, ctx: Ctx, db: Option<&str>) -> Result<RawDocumentBuf> {
         let mut result = None;
         // This needs to be a `Result` so that the `Ctx` can be temporarily owned by the processing
@@ -101,16 +108,10 @@ impl CryptExecutor {
         loop {
             let state = result_ref(&ctx)?.state()?;
             match state {
-                State::NeedMongoCollinfo => {
+                State::NeedMongoCollinfo | State::NeedMongoCollinfoWithDb => {
                     let ctx = result_mut(&mut ctx)?;
                     let filter = raw_to_doc(ctx.mongo_op()?)?;
-                    let metadata_client = self
-                        .metadata_client
-                        .as_ref()
-                        .and_then(|w| w.upgrade())
-                        .ok_or_else(|| {
-                        Error::internal("metadata_client required for NeedMongoCollinfo state")
-                    })?;
+                    let metadata_client = self.metadata_client(&state)?;
                     let db = metadata_client.database(db.as_ref().ok_or_else(|| {
                         Error::internal("db required for NeedMongoCollinfo state")
                     })?);
