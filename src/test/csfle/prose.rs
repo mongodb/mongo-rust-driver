@@ -236,7 +236,7 @@ async fn bson_size_limits() -> Result<()> {
     assert_eq!(bulk_write_events.len(), 2);
 
     // Test operation 8
-    let limits: Document = load_testdata("limits/limits-qe-docs.json")?;
+    let limits: Document = load_testdata("limits/limits-qe-doc.json")?;
     let long_string = "a".repeat(STRING_LEN_2_MIB - 2_000 - 1_500);
 
     let mut doc1 = limits.clone();
