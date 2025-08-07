@@ -272,12 +272,19 @@ pub async fn compute_aws_sigv4_payload(
     let signable_request = SignableRequest::new(
         request.method().as_str(),
         request.uri().to_string(),
-        request.headers().iter().map(|(k, v)| {
-            (
-                k.as_str(),
-                std::str::from_utf8(v.as_bytes()).expect("Header value should be valid UTF-8"),
-            )
-        }),
+        request
+            .headers()
+            .iter()
+            .map(|(k, v)| {
+                let value = std::str::from_utf8(v.as_bytes()).map_err(|_| {
+                    Error::authentication_error(
+                        MECH_NAME,
+                        "Failed to convert header value to valid UTF-8",
+                    )
+                })?;
+                Ok((k.as_str(), value))
+            })
+            .filter_map(Result::ok),
         SignableBody::Bytes(request.body().as_bytes()),
     )
     .map_err(|e| {
@@ -287,7 +294,6 @@ pub async fn compute_aws_sigv4_payload(
     let (signing_instructions, _signature) = sign(signable_request, &signing_params)
         .map_err(|e| Error::authentication_error(MECH_NAME, &format!("Signing failed: {e}")))?
         .into_parts();
-
     signing_instructions.apply_to_request_http1x(&mut request);
 
     let headers = request.headers();
@@ -295,13 +301,14 @@ pub async fn compute_aws_sigv4_payload(
         .get("authorization")
         .ok_or_else(|| Error::authentication_error(MECH_NAME, "Missing authorization header"))?
         .to_str()
-        .map_err(|e| Error::authentication_error(MECH_NAME, &format!("Invalid header value: {e}")))?
-        .to_string();
+        .map_err(|e| {
+            Error::authentication_error(MECH_NAME, &format!("Invalid header value: {e}"))
+        })?;
 
     let token_header = headers
         .get("x-amz-security-token")
         .map(|v| {
-            v.to_str().map(|s| s.to_string()).map_err(|e| {
+            v.to_str().map_err(|e| {
                 Error::authentication_error(MECH_NAME, &format!("Invalid token header: {e}"))
             })
         })
