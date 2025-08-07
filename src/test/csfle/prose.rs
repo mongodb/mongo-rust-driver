@@ -132,7 +132,7 @@ async fn bson_size_limits() -> Result<()> {
 
     // Setup: encrypted client.
     let mut opts = get_client_options().await.clone();
-    let buffer = EventBuffer::<Event>::new();
+    let mut buffer = EventBuffer::<Event>::new();
 
     opts.command_event_handler = Some(buffer.handler());
     let client_encrypted =
@@ -241,6 +241,7 @@ async fn bson_size_limits() -> Result<()> {
     assert_eq!(bulk_write_events.len(), 2);
 
     // Test operation 8
+    buffer.clear_cached_events();
     let limits: Document = load_testdata("limits/limits-qe-doc.json")?;
     let long_string = "a".repeat(STRING_LEN_2_MIB - 2_000 - 1_500);
 
@@ -257,8 +258,7 @@ async fn bson_size_limits() -> Result<()> {
     client_encrypted
         .bulk_write(vec![write_model1, write_model2])
         .await?;
-    // ignore the bulkWrite events from test operation 7
-    let bulk_write_events = &buffer.get_command_started_events(&["bulkWrite"])[2..];
+    let bulk_write_events = buffer.get_command_started_events(&["bulkWrite"]);
     assert_eq!(bulk_write_events.len(), 2);
 
     Ok(())
