@@ -268,23 +268,24 @@ pub async fn compute_aws_sigv4_payload(
             Error::authentication_error(MECH_NAME, &format!("Failed to build signing params: {e}"))
         })?
         .into();
+    let headers: Result<Vec<_>> = request
+        .headers()
+        .iter()
+        .map(|(k, v)| {
+            let v = v.to_str().map_err(|_| {
+                Error::authentication_error(
+                    MECH_NAME,
+                    "Failed to convert header value to valid UTF-8",
+                )
+            })?;
+            Ok((k.as_str(), v))
+        })
+        .collect();
 
     let signable_request = SignableRequest::new(
         request.method().as_str(),
         request.uri().to_string(),
-        request
-            .headers()
-            .iter()
-            .map(|(k, v)| {
-                let value = std::str::from_utf8(v.as_bytes()).map_err(|_| {
-                    Error::authentication_error(
-                        MECH_NAME,
-                        "Failed to convert header value to valid UTF-8",
-                    )
-                })?;
-                Ok((k.as_str(), value))
-            })
-            .filter_map(Result::ok),
+        headers?.into_iter(),
         SignableBody::Bytes(request.body().as_bytes()),
     )
     .map_err(|e| {
