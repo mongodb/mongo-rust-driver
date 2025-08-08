@@ -1,4 +1,8 @@
-use cross_krb5::{ClientCtx, InitiateFlags, K5Ctx, PendingClientCtx, Step};
+#[cfg(target_os = "windows")]
+mod windows;
+
+#[cfg(not(target_os = "windows"))]
+mod nix;
 
 use crate::{
     bson::Bson,
@@ -21,7 +25,7 @@ const SERVICE_REALM: &str = "SERVICE_REALM";
 const SERVICE_HOST: &str = "SERVICE_HOST";
 
 #[derive(Debug, Clone)]
-pub(crate) struct GssapiProperties {
+struct GssapiProperties {
     pub service_name: String,
     pub canonicalize_host_name: CanonicalizeHostName,
     pub service_realm: Option<String>,
@@ -29,7 +33,7 @@ pub(crate) struct GssapiProperties {
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
-pub(crate) enum CanonicalizeHostName {
+enum CanonicalizeHostName {
     #[default]
     None,
     Forward,
@@ -54,10 +58,19 @@ pub(crate) async fn authenticate_stream(
     .await?;
 
     let user_principal = credential.username.clone();
-    let (mut authenticator, initial_token) =
-        GssapiAuthenticator::init(user_principal, properties.clone(), &hostname).await?;
-
+    let service_principal = properties.service_principal_name(&hostname, user_principal.as_ref());
     let source = credential.source.as_deref().unwrap_or("$external");
+
+    #[cfg(target_os = "windows")]
+    let (mut authenticator, initial_token) = windows::SspiAuthenticator::init(
+        user_principal,
+        credential.password.clone(),
+        service_principal,
+    )?;
+
+    #[cfg(not(target_os = "windows"))]
+    let (mut authenticator, initial_token) =
+        nix::GssapiAuthenticator::init(user_principal, service_principal)?;
 
     let command = SaslStart::new(
         source.to_string(),
@@ -78,7 +91,7 @@ pub(crate) async fn authenticate_stream(
     // different configurations may require more).
     for _ in 0..10 {
         let challenge = payload.as_slice();
-        let output_token = authenticator.step(challenge).await?;
+        let output_token = authenticator.step(challenge)?;
 
         // The step may return None, which is a valid final step. We still need to
         // send a saslContinue command, so we send an empty payload if there is no
@@ -190,28 +203,14 @@ impl GssapiProperties {
 
         Ok(properties)
     }
-}
 
-struct GssapiAuthenticator {
-    pending_ctx: Option<PendingClientCtx>,
-    established_ctx: Option<ClientCtx>,
-    user_principal: Option<String>,
-    is_complete: bool,
-}
-
-impl GssapiAuthenticator {
-    // Initialize the GssapiAuthenticator by creating a PendingClientCtx and
-    // getting an initial token to send to the server.
-    async fn init(
-        user_principal: Option<String>,
-        properties: GssapiProperties,
-        hostname: &str,
-    ) -> Result<(Self, Vec<u8>)> {
-        let service_name: &str = properties.service_name.as_ref();
+    fn service_principal_name(self, hostname: &String, user_principal: Option<&String>) -> String {
+        // Set the service principal name in addition to the user provided properties
+        let service_name: &str = self.service_name.as_ref();
         let mut service_principal = format!("{service_name}/{hostname}");
-        if let Some(service_realm) = properties.service_realm.as_ref() {
+        if let Some(service_realm) = self.service_realm.as_ref() {
             service_principal = format!("{service_principal}@{service_realm}");
-        } else if let Some(user_principal) = user_principal.as_ref() {
+        } else if let Some(user_principal) = user_principal {
             if let Some(idx) = user_principal.find('@') {
                 // If no SERVICE_REALM was specified, use realm specified in the
                 // username. Note that `realm` starts with '@'.
@@ -220,94 +219,7 @@ impl GssapiAuthenticator {
             }
         }
 
-        let (pending_ctx, initial_token) = ClientCtx::new(
-            InitiateFlags::empty(),
-            user_principal.as_deref(),
-            &service_principal,
-            None, // No channel bindings
-        )
-        .map_err(|e| {
-            Error::authentication_error(
-                GSSAPI_STR,
-                &format!("Failed to initialize GSSAPI context: {e}"),
-            )
-        })?;
-
-        Ok((
-            Self {
-                pending_ctx: Some(pending_ctx),
-                established_ctx: None,
-                user_principal,
-                is_complete: false,
-            },
-            initial_token.to_vec(),
-        ))
-    }
-
-    // Issue the server provided token to the client context. If the ClientCtx
-    // is established, an optional final token that must be sent to the server
-    // may be returned; otherwise another token to pass to the server is
-    // returned and the client context remains in the pending state.
-    async fn step(&mut self, challenge: &[u8]) -> Result<Option<Vec<u8>>> {
-        if challenge.is_empty() {
-            Err(Error::authentication_error(
-                GSSAPI_STR,
-                "Expected challenge data for GSSAPI continuation",
-            ))
-        } else if let Some(pending_ctx) = self.pending_ctx.take() {
-            match pending_ctx.step(challenge).map_err(|e| {
-                Error::authentication_error(GSSAPI_STR, &format!("GSSAPI step failed: {e}"))
-            })? {
-                Step::Finished((ctx, token)) => {
-                    self.is_complete = true;
-                    self.established_ctx = Some(ctx);
-                    Ok(token.map(|t| t.to_vec()))
-                }
-                Step::Continue((ctx, token)) => {
-                    self.pending_ctx = Some(ctx);
-                    Ok(Some(token.to_vec()))
-                }
-            }
-        } else {
-            Err(Error::authentication_error(
-                GSSAPI_STR,
-                "Authentication context not initialized",
-            ))
-        }
-    }
-
-    // Perform the final step of Kerberos authentication by gss_unwrap-ing the
-    // final server challenge, then wrapping the protocol bytes + user principal.
-    // The resulting token must be sent to the server.
-    fn do_unwrap_wrap(&mut self, payload: &[u8]) -> Result<Vec<u8>> {
-        if let Some(mut established_ctx) = self.established_ctx.take() {
-            let _ = established_ctx.unwrap(payload).map_err(|e| {
-                Error::authentication_error(GSSAPI_STR, &format!("GSSAPI unwrap failed: {e}"))
-            })?;
-
-            if let Some(user_principal) = self.user_principal.take() {
-                let bytes: &[u8] = &[0x1, 0x0, 0x0, 0x0];
-                let bytes = [bytes, user_principal.as_bytes()].concat();
-                let output_token = established_ctx.wrap(false, bytes.as_slice()).map_err(|e| {
-                    Error::authentication_error(GSSAPI_STR, &format!("GSSAPI wrap failed: {e}"))
-                })?;
-                Ok(output_token.to_vec())
-            } else {
-                Err(Error::authentication_error(
-                    GSSAPI_STR,
-                    "User principal not specified",
-                ))
-            }
-        } else {
-            Err(Error::authentication_error(
-                GSSAPI_STR,
-                "Authentication context not established",
-            ))
-        }
-    }
-
-    fn is_complete(&self) -> bool {
-        self.is_complete
+        service_principal
     }
 }
 
