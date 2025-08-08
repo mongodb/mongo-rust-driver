@@ -7,9 +7,14 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{rawdoc, Array, Bson, Document, RawDocumentBuf},
-    bson_compat::cstr,
-    bson_util::{get_or_prepend_id_field, replacement_document_check, update_document_check},
-    error::Result,
+    bson_compat::{cstr, serialize_to_raw_document_buf},
+    bson_util::{
+        extend_raw_document_buf,
+        get_or_prepend_id_field,
+        replacement_document_check,
+        update_document_check,
+    },
+    error::{Error, Result},
     options::{UpdateModifications, WriteConcern},
     serde_util::{serialize_bool_or_true, write_concern_is_empty},
     Collection,
@@ -371,9 +376,15 @@ impl WriteModel {
         }
     }
 
-    /// Returns the operation-specific fields that should be included in this model's entry in the
-    /// ops array. Also returns an inserted ID if this is an insert operation.
-    pub(crate) fn get_ops_document_contents(&self) -> Result<(RawDocumentBuf, Option<Bson>)> {
+    /// Constructs the ops document for this write model given the nsInfo array index.
+    pub(crate) fn get_ops_document(
+        &self,
+        ns_info_index: usize,
+    ) -> Result<(RawDocumentBuf, Option<Bson>)> {
+        let index = i32::try_from(ns_info_index)
+            .map_err(|_| Error::internal("nsInfo index exceeds i32::MAX"))?;
+        let mut ops_document = rawdoc! { self.operation_name(): index };
+
         if let Self::UpdateOne(UpdateOneModel { update, .. })
         | Self::UpdateMany(UpdateManyModel { update, .. }) = self
         {
@@ -384,22 +395,19 @@ impl WriteModel {
             replacement_document_check(replacement)?;
         }
 
-        let (mut model_document, inserted_id) = match self {
-            Self::InsertOne(model) => {
-                let mut insert_document = RawDocumentBuf::try_from(&model.document)?;
-                let inserted_id = get_or_prepend_id_field(&mut insert_document)?;
-                (rawdoc! { "document": insert_document }, Some(inserted_id))
-            }
-            _ => {
-                let model_document = crate::bson_compat::serialize_to_raw_document_buf(&self)?;
-                (model_document, None)
-            }
-        };
-
         if let Some(multi) = self.multi() {
-            model_document.append(cstr!("multi"), multi);
+            ops_document.append(cstr!("multi"), multi);
         }
 
-        Ok((model_document, inserted_id))
+        if let Self::InsertOne(model) = self {
+            let mut insert_document = RawDocumentBuf::try_from(&model.document)?;
+            let inserted_id = get_or_prepend_id_field(&mut insert_document)?;
+            ops_document.append(cstr!("document"), insert_document);
+            Ok((ops_document, Some(inserted_id)))
+        } else {
+            let model = serialize_to_raw_document_buf(&self)?;
+            extend_raw_document_buf(&mut ops_document, model)?;
+            Ok((ops_document, None))
+        }
     }
 }
