@@ -5,11 +5,17 @@ use crate::{
     error::{Error, Result},
 };
 
+#[derive(Default)]
+enum CtxState {
+    #[default]
+    Empty,
+    Pending(PendingClientCtx),
+    Established(ClientCtx),
+}
+
 pub(super) struct GssapiAuthenticator {
-    pending_ctx: Option<PendingClientCtx>,
-    established_ctx: Option<ClientCtx>,
+    ctx: CtxState,
     user_principal: String,
-    is_complete: bool,
 }
 
 impl GssapiAuthenticator {
@@ -38,10 +44,8 @@ impl GssapiAuthenticator {
 
         Ok((
             Self {
-                pending_ctx: Some(pending_ctx),
-                established_ctx: None,
+                ctx: CtxState::Pending(pending_ctx),
                 user_principal,
-                is_complete: false,
             },
             initial_token.to_vec(),
         ))
@@ -57,17 +61,16 @@ impl GssapiAuthenticator {
                 GSSAPI_STR,
                 "Expected challenge data for GSSAPI continuation",
             ))
-        } else if let Some(pending_ctx) = self.pending_ctx.take() {
+        } else if let CtxState::Pending(pending_ctx) = std::mem::take(&mut self.ctx) {
             match pending_ctx.step(challenge).map_err(|e| {
                 Error::authentication_error(GSSAPI_STR, &format!("GSSAPI step failed: {e}"))
             })? {
                 Step::Finished((ctx, token)) => {
-                    self.is_complete = true;
-                    self.established_ctx = Some(ctx);
+                    self.ctx = CtxState::Established(ctx);
                     Ok(token.map(|t| t.to_vec()))
                 }
                 Step::Continue((ctx, token)) => {
-                    self.pending_ctx = Some(ctx);
+                    self.ctx = CtxState::Pending(ctx);
                     Ok(Some(token.to_vec()))
                 }
             }
@@ -83,7 +86,7 @@ impl GssapiAuthenticator {
     // final server challenge, then wrapping the protocol bytes + user principal.
     // The resulting token must be sent to the server.
     pub(super) fn do_unwrap_wrap(&mut self, payload: &[u8]) -> Result<Vec<u8>> {
-        if let Some(mut established_ctx) = self.established_ctx.take() {
+        if let CtxState::Established(ref mut established_ctx) = self.ctx {
             let _ = established_ctx.unwrap(payload).map_err(|e| {
                 Error::authentication_error(GSSAPI_STR, &format!("GSSAPI unwrap failed: {e}"))
             })?;
@@ -103,6 +106,6 @@ impl GssapiAuthenticator {
     }
 
     pub(super) fn is_complete(&self) -> bool {
-        self.is_complete
+        matches!(self.ctx, CtxState::Established(_))
     }
 }
