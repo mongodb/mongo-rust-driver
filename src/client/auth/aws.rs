@@ -227,7 +227,7 @@ pub async fn compute_aws_sigv4_payload(
         parts.get(1).copied().unwrap_or("us-east-1")
     };
 
-    let url = format!("https://{}", host);
+    let url = format!("https://{host}");
     let date_str = date.format("%Y%m%dT%H%M%SZ").to_string();
     let body_str = "Action=GetCallerIdentity&Version=2011-06-15";
     let body_bytes = body_str.as_bytes();
