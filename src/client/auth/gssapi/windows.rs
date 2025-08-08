@@ -73,40 +73,42 @@ impl SspiAuthenticator {
     }
 
     fn acquire_credentials_and_init(&mut self, password: Option<String>) -> Result<Vec<u8>> {
-        unsafe {
-            let mut cred_handle = SecHandle::default();
-            let mut expiry: i64 = 0;
+        let mut cred_handle = SecHandle::default();
+        let mut expiry: i64 = 0;
 
-            let mut auth_identity = SEC_WINNT_AUTH_IDENTITY_W::default();
-            auth_identity.Flags = SEC_WINNT_AUTH_IDENTITY_UNICODE;
+        let mut auth_identity = SEC_WINNT_AUTH_IDENTITY_W::default();
+        auth_identity.Flags = SEC_WINNT_AUTH_IDENTITY_UNICODE;
 
-            // Note that SSPI uses the term "domain" instead of
-            // "realm" in this context.
-            let username_wide: Vec<u16>;
-            let domain_wide: Vec<u16>;
-            let password_wide: Vec<u16>;
+        // Note that SSPI uses the term "domain" instead of
+        // "realm" in this context.
+        let username_wide: Vec<u16>;
+        let domain_wide: Vec<u16>;
+        let password_wide: Vec<u16>;
 
-            if let Some(at_pos) = self.user_principal.find('@') {
-                let username = &self.user_principal[..at_pos];
-                let domain = &self.user_principal[at_pos + 1..];
+        if let Some(at_pos) = self.user_principal.find('@') {
+            let username = &self.user_principal[..at_pos];
+            let domain = &self.user_principal[at_pos + 1..];
 
-                username_wide = username.encode_utf16().chain(std::iter::once(0)).collect();
-                domain_wide = domain.encode_utf16().chain(std::iter::once(0)).collect();
+            username_wide = username.encode_utf16().chain(std::iter::once(0)).collect();
+            domain_wide = domain.encode_utf16().chain(std::iter::once(0)).collect();
 
-                auth_identity.User = username_wide.as_ptr() as *mut u16;
-                auth_identity.UserLength = username.len() as u32;
-                auth_identity.Domain = domain_wide.as_ptr() as *mut u16;
-                auth_identity.DomainLength = domain.len() as u32;
+            auth_identity.User = username_wide.as_ptr() as *mut u16;
+            auth_identity.UserLength = username.len() as u32;
+            auth_identity.Domain = domain_wide.as_ptr() as *mut u16;
+            auth_identity.DomainLength = domain.len() as u32;
 
-                if let Some(password) = &password {
-                    password_wide = password.encode_utf16().chain(std::iter::once(0)).collect();
-                    auth_identity.Password = password_wide.as_ptr() as *mut u16;
-                    auth_identity.PasswordLength = password.len() as u32;
-                }
+            if let Some(password) = &password {
+                password_wide = password.encode_utf16().chain(std::iter::once(0)).collect();
+                auth_identity.Password = password_wide.as_ptr() as *mut u16;
+                auth_identity.PasswordLength = password.len() as u32;
             }
+        }
 
-            // Security package name
-            let package_name: Vec<u16> = "kerberos\0".encode_utf16().collect();
+        // Security package name
+        let package_name: Vec<u16> = "kerberos\0".encode_utf16().collect();
+
+        // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
+        unsafe {
             let result = AcquireCredentialsHandleW(
                 std::ptr::null(),
                 package_name.as_ptr(),
@@ -129,12 +131,12 @@ impl SspiAuthenticator {
                     &format!("Failed to acquire credentials handle: {:?}", result),
                 ));
             }
-
-            self.cred_handle = Some(cred_handle);
-
-            let initial_token = self.initialize_security_context(&[])?;
-            Ok(initial_token)
         }
+
+        self.cred_handle = Some(cred_handle);
+
+        let initial_token = self.initialize_security_context(&[])?;
+        Ok(initial_token)
     }
 
     // Issue the server provided token to the context handle. If auth is complete,
@@ -149,39 +151,40 @@ impl SspiAuthenticator {
     }
 
     fn initialize_security_context(&mut self, input_token: &[u8]) -> Result<Vec<u8>> {
+        let mut ctx_handle = self.ctx_handle.unwrap_or_default();
+
+        let mut input_buffer = SecBuffer {
+            cbBuffer: input_token.len() as u32,
+            BufferType: SECBUFFER_TOKEN,
+            pvBuffer: if input_token.is_empty() {
+                ptr::null_mut()
+            } else {
+                input_token.as_ptr() as *mut _
+            },
+        };
+
+        let input_buffer_desc = SecBufferDesc {
+            ulVersion: SECBUFFER_VERSION,
+            cBuffers: 1,
+            pBuffers: &mut input_buffer,
+        };
+
+        let mut output_buffer = SecBuffer {
+            cbBuffer: 0,
+            BufferType: SECBUFFER_TOKEN,
+            pvBuffer: ptr::null_mut(),
+        };
+
+        let mut output_buffer_desc = SecBufferDesc {
+            ulVersion: SECBUFFER_VERSION,
+            cBuffers: 1,
+            pBuffers: &mut output_buffer,
+        };
+
+        let mut context_attr = 0u32;
+
+        // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
         unsafe {
-            let mut ctx_handle = self.ctx_handle.unwrap_or_default();
-
-            let mut input_buffer = SecBuffer {
-                cbBuffer: input_token.len() as u32,
-                BufferType: SECBUFFER_TOKEN,
-                pvBuffer: if input_token.is_empty() {
-                    ptr::null_mut()
-                } else {
-                    input_token.as_ptr() as *mut _
-                },
-            };
-
-            let input_buffer_desc = SecBufferDesc {
-                ulVersion: SECBUFFER_VERSION,
-                cBuffers: 1,
-                pBuffers: &mut input_buffer,
-            };
-
-            let mut output_buffer = SecBuffer {
-                cbBuffer: 0,
-                BufferType: SECBUFFER_TOKEN,
-                pvBuffer: ptr::null_mut(),
-            };
-
-            let mut output_buffer_desc = SecBufferDesc {
-                ulVersion: SECBUFFER_VERSION,
-                cBuffers: 1,
-                pBuffers: &mut output_buffer,
-            };
-
-            let mut context_attr = 0u32;
-
             let result = InitializeSecurityContextW(
                 &self.cred_handle.unwrap(),
                 if self.ctx_handle.is_some() {
@@ -241,28 +244,29 @@ impl SspiAuthenticator {
     // "wrap" here, even though in the context of SSPI it is "decrypt" and
     // "encrypt" (as seen in the implementation of this method).
     pub(super) fn do_unwrap_wrap(&mut self, payload: &[u8]) -> Result<Vec<u8>> {
+        let mut message = payload.to_vec();
+
+        let mut wrap_bufs = [
+            SecBuffer {
+                cbBuffer: message.len() as u32,
+                BufferType: SECBUFFER_STREAM,
+                pvBuffer: message.as_mut_ptr() as *mut _,
+            },
+            SecBuffer {
+                cbBuffer: 0,
+                BufferType: SECBUFFER_DATA,
+                pvBuffer: ptr::null_mut(),
+            },
+        ];
+
+        let mut wrap_buf_desc = SecBufferDesc {
+            ulVersion: SECBUFFER_VERSION,
+            cBuffers: 2,
+            pBuffers: wrap_bufs.as_mut_ptr(),
+        };
+
+        // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
         unsafe {
-            let mut message = payload.to_vec();
-
-            let mut wrap_bufs = [
-                SecBuffer {
-                    cbBuffer: message.len() as u32,
-                    BufferType: SECBUFFER_STREAM,
-                    pvBuffer: message.as_mut_ptr() as *mut _,
-                },
-                SecBuffer {
-                    cbBuffer: 0,
-                    BufferType: SECBUFFER_DATA,
-                    pvBuffer: ptr::null_mut(),
-                },
-            ];
-
-            let mut wrap_buf_desc = SecBufferDesc {
-                ulVersion: SECBUFFER_VERSION,
-                cBuffers: 2,
-                pBuffers: wrap_bufs.as_mut_ptr(),
-            };
-
             let result = DecryptMessage(
                 &self.ctx_handle.unwrap(),
                 &mut wrap_buf_desc,
@@ -275,15 +279,19 @@ impl SspiAuthenticator {
                     &format!("DecryptMessage failed: {:?}", result),
                 ));
             }
+        }
 
-            if wrap_bufs[1].cbBuffer < 4 {
-                return Err(Error::authentication_error(
-                    GSSAPI_STR,
-                    "Server message is too short",
-                ));
-            }
+        if wrap_bufs[1].cbBuffer < 4 {
+            return Err(Error::authentication_error(
+                GSSAPI_STR,
+                "Server message is too short",
+            ));
+        }
 
-            let data_ptr = wrap_bufs[1].pvBuffer as *const u8;
+        let data_ptr = wrap_bufs[1].pvBuffer as *const u8;
+
+        // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
+        unsafe {
             let first_byte = *data_ptr;
             if (first_byte & 1) == 0 {
                 return Err(Error::authentication_error(
@@ -291,8 +299,12 @@ impl SspiAuthenticator {
                     "Server does not support the required security layer",
                 ));
             }
+        }
 
-            let mut sizes = SecPkgContext_Sizes::default();
+        let mut sizes = SecPkgContext_Sizes::default();
+
+        // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
+        unsafe {
             let result = QueryContextAttributesW(
                 &self.ctx_handle.unwrap(),
                 SECPKG_ATTR_SIZES,
@@ -304,22 +316,24 @@ impl SspiAuthenticator {
                     &format!("QueryContextAttributes failed: {:?}", result),
                 ));
             }
+        }
 
-            let user_principal = &self.user_principal;
-            let plaintext_message_size = 4 + user_principal.len();
-            let total_size = sizes.cbSecurityTrailer as usize
-                + plaintext_message_size
-                + sizes.cbBlockSize as usize;
-            let mut message_buf = vec![0u8; total_size];
+        let user_principal = &self.user_principal;
+        let plaintext_message_size = 4 + user_principal.len();
+        let total_size =
+            sizes.cbSecurityTrailer as usize + plaintext_message_size + sizes.cbBlockSize as usize;
+        let mut message_buf = vec![0u8; total_size];
 
-            let plaintext_start = sizes.cbSecurityTrailer as usize;
-            message_buf[plaintext_start] = 1;
-            message_buf[plaintext_start + 1] = 0;
-            message_buf[plaintext_start + 2] = 0;
-            message_buf[plaintext_start + 3] = 0;
-            message_buf[plaintext_start + 4..plaintext_start + 4 + user_principal.len()]
-                .copy_from_slice(user_principal.as_bytes());
+        let plaintext_start = sizes.cbSecurityTrailer as usize;
+        message_buf[plaintext_start] = 1;
+        message_buf[plaintext_start + 1] = 0;
+        message_buf[plaintext_start + 2] = 0;
+        message_buf[plaintext_start + 3] = 0;
+        message_buf[plaintext_start + 4..plaintext_start + 4 + user_principal.len()]
+            .copy_from_slice(user_principal.as_bytes());
 
+        // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
+        unsafe {
             let mut encrypt_bufs = [
                 SecBuffer {
                     cbBuffer: sizes.cbSecurityTrailer,
@@ -396,6 +410,7 @@ impl SspiAuthenticator {
 
 impl Drop for SspiAuthenticator {
     fn drop(&mut self) {
+        // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
         unsafe {
             if let Some(ctx) = &self.ctx_handle {
                 let _ = DeleteSecurityContext(ctx);
