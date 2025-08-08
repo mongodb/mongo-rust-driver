@@ -223,7 +223,7 @@ buildvariants:
 
   - name: aws-auth
     display_name: "AWS Authentication"
-    patchable: false
+    # patchable: false
     run_on:
       - ubuntu2004-small
     expansions:
