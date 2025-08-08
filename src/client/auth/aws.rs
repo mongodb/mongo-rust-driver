@@ -150,8 +150,7 @@ async fn authenticate_stream_inner(
         date,
         &server_first.sts_host,
         &server_first.server_nonce,
-    )
-    .await?;
+    )?;
 
     let mut client_second_payload_bytes = vec![];
     client_second_payload.to_writer(&mut client_second_payload_bytes)?;
@@ -214,7 +213,7 @@ pub(crate) async fn get_aws_credentials(credential: &Credential) -> Result<Crede
     }
 }
 
-pub async fn compute_aws_sigv4_payload(
+pub fn compute_aws_sigv4_payload(
     creds: Credentials,
     date: DateTime<Utc>,
     host: &str,
