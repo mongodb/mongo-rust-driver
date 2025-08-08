@@ -53,8 +53,7 @@ async fn tailable_cursor() {
         Either::Left((_, next_doc)) => next_doc,
         Either::Right((next_doc, _)) => panic!(
             "should have timed out before getting next document, but instead immediately got
-        {:?}",
-            next_doc
+        {next_doc:?}"
         ),
     };
 

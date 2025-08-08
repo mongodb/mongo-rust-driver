@@ -25,7 +25,7 @@ async fn azure_imds() -> Result<()> {
     {
         azure_exec.test_param = Some("case=empty-json");
         let result = azure_exec.get_token().await;
-        assert!(result.is_err(), "expected err got {:?}", result);
+        assert!(result.is_err(), "expected err got {result:?}");
         assert!(result.unwrap_err().is_auth_error());
     }
 
@@ -33,7 +33,7 @@ async fn azure_imds() -> Result<()> {
     {
         azure_exec.test_param = Some("case=bad-json");
         let result = azure_exec.get_token().await;
-        assert!(result.is_err(), "expected err got {:?}", result);
+        assert!(result.is_err(), "expected err got {result:?}");
         assert!(result.unwrap_err().is_auth_error());
     }
 
@@ -41,7 +41,7 @@ async fn azure_imds() -> Result<()> {
     {
         azure_exec.test_param = Some("case=404");
         let result = azure_exec.get_token().await;
-        assert!(result.is_err(), "expected err got {:?}", result);
+        assert!(result.is_err(), "expected err got {result:?}");
         assert!(result.unwrap_err().is_auth_error());
     }
 
@@ -49,7 +49,7 @@ async fn azure_imds() -> Result<()> {
     {
         azure_exec.test_param = Some("case=500");
         let result = azure_exec.get_token().await;
-        assert!(result.is_err(), "expected err got {:?}", result);
+        assert!(result.is_err(), "expected err got {result:?}");
         assert!(result.unwrap_err().is_auth_error());
     }
 
@@ -57,7 +57,7 @@ async fn azure_imds() -> Result<()> {
     {
         azure_exec.test_param = Some("case=slow");
         let result = azure_exec.get_token().await;
-        assert!(result.is_err(), "expected err got {:?}", result);
+        assert!(result.is_err(), "expected err got {result:?}");
         assert!(result.unwrap_err().is_auth_error());
     }
 

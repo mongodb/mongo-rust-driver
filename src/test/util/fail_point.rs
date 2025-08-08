@@ -168,7 +168,7 @@ impl Drop for FailPointGuard {
         });
 
         if let Err(error) = result {
-            log_uncaptured(format!("failed disabling failpoint: {:?}", error));
+            log_uncaptured(format!("failed disabling failpoint: {error:?}"));
         }
     }
 }

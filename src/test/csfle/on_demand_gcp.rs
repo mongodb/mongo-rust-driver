@@ -45,6 +45,6 @@ async fn failure() {
             assert!(matches!(e.kind, mongocrypt::error::ErrorKind::Kms));
             assert!(e.message.unwrap().contains("GCP credentials"));
         }
-        other => panic!("Expected encryption error, got {:?}", other),
+        other => panic!("Expected encryption error, got {other:?}"),
     }
 }

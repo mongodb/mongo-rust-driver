@@ -156,7 +156,7 @@ async fn write_concern_error_batches() {
     let error = client.bulk_write(models).ordered(false).await.unwrap_err();
 
     let ErrorKind::BulkWrite(bulk_write_error) = *error.kind else {
-        panic!("Expected bulk write error, got {:?}", error);
+        panic!("Expected bulk write error, got {error:?}");
     };
 
     assert_eq!(bulk_write_error.write_concern_errors.len(), 2);
@@ -203,7 +203,7 @@ async fn write_error_batches() {
         .unwrap_err();
 
     let ErrorKind::BulkWrite(bulk_write_error) = *error.kind else {
-        panic!("Expected bulk write error, got {:?}", error);
+        panic!("Expected bulk write error, got {error:?}");
     };
 
     assert_eq!(
@@ -219,7 +219,7 @@ async fn write_error_batches() {
     let error = client.bulk_write(models).ordered(true).await.unwrap_err();
 
     let ErrorKind::BulkWrite(bulk_write_error) = *error.kind else {
-        panic!("Expected bulk write error, got {:?}", error);
+        panic!("Expected bulk write error, got {error:?}");
     };
 
     assert_eq!(bulk_write_error.write_errors.len(), 1);
@@ -368,10 +368,7 @@ async fn failed_cursor_iteration() {
         ..
     }) = *error.kind
     else {
-        panic!(
-            "Expected bulk write error with partial result, got {:?}",
-            error
-        );
+        panic!("Expected bulk write error with partial result, got {error:?}");
     };
     assert_eq!(partial_result.upserted_count(), 2);
     assert_eq!(partial_result.update_results().unwrap().len(), 1);
@@ -553,7 +550,7 @@ async fn encryption_error() {
     let error = encrypted_client.bulk_write(vec![model]).await.unwrap_err();
 
     let ErrorKind::Encryption(encryption_error) = *error.kind else {
-        panic!("expected encryption error, got {:?}", error);
+        panic!("expected encryption error, got {error:?}");
     };
 
     assert_eq!(

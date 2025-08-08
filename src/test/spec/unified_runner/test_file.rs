@@ -73,7 +73,7 @@ where
     } else if count == 2 {
         schema_version.push_str(".0");
     }
-    Version::parse(&schema_version).map_err(|e| serde::de::Error::custom(format!("{}", e)))
+    Version::parse(&schema_version).map_err(|e| serde::de::Error::custom(format!("{e}")))
 }
 
 #[derive(Debug, Deserialize)]
@@ -117,8 +117,7 @@ impl RunOnRequirement {
             let client_topology = get_topology().await;
             if !topologies.contains(client_topology) {
                 return Err(format!(
-                    "allowed topologies {:?}, actual: {:?}",
-                    topologies, client_topology
+                    "allowed topologies {topologies:?}, actual: {client_topology:?}"
                 ));
             }
         }
@@ -133,8 +132,8 @@ impl RunOnRequirement {
             .is_err()
             {
                 return Err(format!(
-                    "required server parameters {:?}, actual {:?}",
-                    required_server_parameters, actual_server_parameters
+                    "required server parameters {required_server_parameters:?}, actual \
+                     {actual_server_parameters:?}"
                 ));
             }
         }
@@ -159,7 +158,7 @@ impl RunOnRequirement {
                 .and_then(|c| c.mechanism.as_ref());
             if !actual_mechanism.is_some_and(|actual_mechanism| actual_mechanism == auth_mechanism)
             {
-                return Err(format!("requires {:?} auth mechanism", auth_mechanism));
+                return Err(format!("requires {auth_mechanism:?} auth mechanism"));
             }
         }
         Ok(())
@@ -252,7 +251,7 @@ pub(crate) fn merge_uri_options(
             .next()
             .expect("expected URI to contain at least one host, but it had none");
         hosts_regex
-            .replace(given_uri, format!("mongodb://{}", single_host))
+            .replace(given_uri, format!("mongodb://{single_host}"))
             .to_string()
     } else {
         given_uri.to_string()
@@ -555,7 +554,7 @@ impl ExpectError {
 
         if let Some(expected_code_name) = &self.error_code_name {
             let Some(actual_code_name) = error.code_name() else {
-                panic!("{}: expected error to have code name", context);
+                panic!("{context}: expected error to have code name");
             };
             assert_eq!(actual_code_name, expected_code_name, "{}", context);
         }
@@ -675,10 +674,7 @@ fn deserialize_selection_criteria() {
                     Some(HedgedReadOptions::builder().enabled(true).build())
                 );
             }
-            other => panic!(
-                "Expected mode SecondaryPreferred with options, got {:?}",
-                other
-            ),
+            other => panic!("Expected mode SecondaryPreferred with options, got {other:?}"),
         },
         SelectionCriteria::Predicate(_) => panic!("Expected read preference, got predicate"),
     }
@@ -700,7 +696,7 @@ fn deserialize_read_concern() {
     let read_concern = ReadConcern::deserialize(d).unwrap();
     match read_concern.level {
         ReadConcernLevel::Custom(level) => assert_eq!(level.as_str(), "customlevel"),
-        other => panic!("Expected custom read concern, got {:?}", other),
+        other => panic!("Expected custom read concern, got {other:?}"),
     };
 }
 
@@ -717,7 +713,7 @@ where
         let key = log_component_as_tracing_target(key);
         let level = val
             .parse::<tracing::Level>()
-            .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
+            .map_err(|e| serde::de::Error::custom(format!("{e}")))?;
         level_map.insert(key, level);
     }
     Ok(Some(level_map))
@@ -740,7 +736,7 @@ fn log_component_as_tracing_target(component: &String) -> String {
         "connection" => trace::CONNECTION_TRACING_EVENT_TARGET.to_string(),
         "serverSelection" => trace::SERVER_SELECTION_TRACING_EVENT_TARGET.to_string(),
         "topology" => trace::TOPOLOGY_TRACING_EVENT_TARGET.to_string(),
-        _ => panic!("Unknown tracing target: {}", component),
+        _ => panic!("Unknown tracing target: {component}"),
     }
 }
 
@@ -754,5 +750,5 @@ where
     String::deserialize(deserializer)?
         .parse::<tracing::Level>()
         .map(Some)
-        .map_err(|e| serde::de::Error::custom(format!("{}", e)))
+        .map_err(|e| serde::de::Error::custom(format!("{e}")))
 }

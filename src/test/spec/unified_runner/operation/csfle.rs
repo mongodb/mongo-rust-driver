@@ -236,7 +236,7 @@ struct EncryptOptions {
 fn algorithm_from_string(algorithm: &str) -> Algorithm {
     match algorithm {
         "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic" => Algorithm::Deterministic,
-        other => panic!("unsupported encrypt algorithm: {}", other),
+        other => panic!("unsupported encrypt algorithm: {other}"),
     }
 }
 

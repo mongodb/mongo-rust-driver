@@ -40,8 +40,8 @@ impl TracingEvent {
     pub fn get_value_as_string(&self, field: &'static str) -> String {
         match self.fields.get(field) {
             Some(TracingEventValue::String(s)) => s.to_string(),
-            Some(v) => panic!("field {} was unexpectedly not a string: got {:?}", field, v),
-            None => panic!("field {} was unexpectedly None", field),
+            Some(v) => panic!("field {field} was unexpectedly not a string: got {v:?}"),
+            None => panic!("field {field} was unexpectedly None"),
         }
     }
 }
@@ -72,15 +72,13 @@ impl Serialize for TracingEventValue {
             TracingEventValue::I128(v) => match (*v).try_into() {
                 Ok(i) => serializer.serialize_i64(i),
                 Err(e) => Err(serde::ser::Error::custom(format!(
-                    "Failed to serialize i128 as i64: {}",
-                    e
+                    "Failed to serialize i128 as i64: {e}"
                 ))),
             },
             TracingEventValue::U128(v) => match (*v).try_into() {
                 Ok(i) => serializer.serialize_u64(i),
                 Err(e) => Err(serde::ser::Error::custom(format!(
-                    "Failed to serialize u128 as u64: {}",
-                    e
+                    "Failed to serialize u128 as u64: {e}"
                 ))),
             },
             TracingEventValue::Bool(v) => serializer.serialize_bool(*v),
@@ -313,7 +311,7 @@ impl tracing::field::Visit for TracingEventVisitor<'_> {
     fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
         self.event.fields.insert(
             field.name().to_string(),
-            TracingEventValue::String(format!("{:?}", value)),
+            TracingEventValue::String(format!("{value:?}")),
         );
     }
 }

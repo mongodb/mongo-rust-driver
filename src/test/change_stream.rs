@@ -502,8 +502,7 @@ async fn resume_uses_start_after() -> Result<()> {
         command,
         ..
     } if has_start_after(command)?),
-        "resume mismatch: {:#?}",
-        last,
+        "resume mismatch: {last:#?}",
     );
 
     Ok(())
@@ -552,8 +551,7 @@ async fn resume_uses_resume_after() -> Result<()> {
         command,
         ..
     } if has_resume_after(command)?),
-        "resume mismatch: {:#?}",
-        last,
+        "resume mismatch: {last:#?}",
     );
 
     Ok(())

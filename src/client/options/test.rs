@@ -276,8 +276,7 @@ async fn parse_uri_with_uuid_representation(
     uuid_repr: &str,
 ) -> std::result::Result<UuidRepresentation, String> {
     match ConnectionString::parse(format!(
-        "mongodb://localhost:27017/?uuidRepresentation={}",
-        uuid_repr
+        "mongodb://localhost:27017/?uuidRepresentation={uuid_repr}"
     ))
     .map_err(|e| e.message().unwrap())
     {
@@ -289,17 +288,17 @@ async fn parse_uri_with_uuid_representation(
 #[test]
 fn parse_unknown_options() {
     fn parse_uri(option: &str, suggestion: Option<&str>) {
-        match ConnectionString::parse(format!("mongodb://host:27017/?{}=test", option))
+        match ConnectionString::parse(format!("mongodb://host:27017/?{option}=test"))
             .map_err(|e| *e.kind)
         {
-            Ok(_) => panic!("expected error for option {}", option),
+            Ok(_) => panic!("expected error for option {option}"),
             Err(ErrorKind::InvalidArgument { message, .. }) => {
                 match suggestion {
                     Some(s) => assert!(message.contains(s)),
                     None => assert!(!message.contains("similar")),
                 };
             }
-            Err(e) => panic!("expected InvalidArgument, but got {:?}", e),
+            Err(e) => panic!("expected InvalidArgument, but got {e:?}"),
         }
     }
 
@@ -336,7 +335,7 @@ async fn options_debug_omits_uri() {
     let uri = "mongodb://username:password@localhost/";
     let options = ClientOptions::parse(uri).await.unwrap();
 
-    let debug_output = format!("{:?}", options);
+    let debug_output = format!("{options:?}");
     assert!(!debug_output.contains("username"));
     assert!(!debug_output.contains("password"));
     assert!(!debug_output.contains("uri"));

@@ -86,7 +86,7 @@ async fn streaming_min_heartbeat_frequency() {
                     })
                     .await;
                 if event.is_none() {
-                    return Err(format!("timed out waiting for heartbeat from {}", address));
+                    return Err(format!("timed out waiting for heartbeat from {address}"));
                 }
             }
             Ok(())

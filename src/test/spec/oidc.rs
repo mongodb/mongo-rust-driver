@@ -28,7 +28,7 @@ async fn get_access_token_test_user(once_cell: &'static OnceCell<String>, user_n
     once_cell
         .get_or_init(|| async {
             let mut path = OIDC_TOKEN_DIR.clone();
-            let user = format!("test_user{}", user_n);
+            let user = format!("test_user{user_n}");
             path.push(user);
             tokio::fs::read_to_string(path).await.unwrap()
         })

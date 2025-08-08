@@ -83,9 +83,8 @@ impl OperationWithDefaults for Insert<'_> {
             if doc_size > max_doc_size {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
-                        "insert document must be within {} bytes, but document provided is {} \
-                         bytes",
-                        max_doc_size, doc_size
+                        "insert document must be within {max_doc_size} bytes, but document \
+                         provided is {doc_size} bytes"
                     ),
                 }
                 .into());

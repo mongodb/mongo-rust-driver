@@ -349,7 +349,6 @@ async fn search_index_requires_explicit_vector() {
         result
             .as_ref()
             .is_err_and(|e| e.to_string().contains("Attribute mappings missing")),
-        "invalid result: {:?}",
-        result
+        "invalid result: {result:?}"
     );
 }
