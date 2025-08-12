@@ -278,7 +278,7 @@ buildvariants:
     display_name: "GSSAPI Authentication - Windows"
     patchable: true
     run_on:
-      - windows-64-vs2017-small
+      - windows-vsCurrent-small
     tasks:
       - test-gssapi-auth
 

@@ -115,6 +115,7 @@ impl SspiAuthenticator {
                 SECPKG_CRED_OUTBOUND,
                 ptr::null_mut(),
                 if password.is_some() {
+                    // Only pass credentials if a password is present. See DRIVERS-2180.
                     &auth_identity as *const _ as *const _
                 } else {
                     ptr::null()

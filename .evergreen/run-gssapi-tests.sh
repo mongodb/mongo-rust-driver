@@ -20,7 +20,7 @@ set +o errexit
 # not available, nor are they required steps. Windows uses SSPI which
 # is similar to but distinct from (KRB5) GSSAPI. Therefore, we only
 # run the following steps if we are not on Windows.
-if [[ "Windows_NT" != "$OSTYPE" ]]; then
+if [[ "cygwin" != "$OSTYPE" ]]; then
   # Create a krb5 config file with relevant
   touch krb5.conf
   echo "[realms]
@@ -51,7 +51,7 @@ fi
 TEST_OPTIONS+=("--skip with_service_realm_and_host_options")
 cargo_test test::auth::gssapi_skip_local
 
-if [[ "Windows_NT" != "$OSTYPE" ]]; then
+if [[ "cygwin" != "$OSTYPE" ]]; then
   # Unauthenticate
   echo "Unauthenticating $PRINCIPAL"
   kdestroy
@@ -65,7 +65,7 @@ fi
 TEST_OPTIONS=()
 cargo_test test::auth::gssapi_skip_local::with_service_realm_and_host_options
 
-if [[ "Windows_NT" != "$OSTYPE" ]]; then
+if [[ "cygwin" != "$OSTYPE" ]]; then
   # Unauthenticate
   echo "Unauthenticating $PRINCIPAL_CROSS"
   kdestroy

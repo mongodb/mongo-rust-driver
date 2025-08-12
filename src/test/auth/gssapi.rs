@@ -5,6 +5,8 @@ use crate::{
 
 /// Run a GSSAPI e2e test.
 ///   - user_principal_var is the name of the environment variable that stores the user principal
+///   - password_var is the name of the environment variable that stores the Windows password. Only
+///     applies to Windows since GSSAPI on non-Windows obtains credentials through `kinit`.
 ///   - gssapi_db_var is the name tof the environment variable that stores the db name to query
 ///   - auth_mechanism_properties is an optional set of authMechanismProperties to append to the uri
 async fn run_gssapi_auth_test(
