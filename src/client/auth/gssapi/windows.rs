@@ -289,19 +289,6 @@ impl SspiAuthenticator {
             ));
         }
 
-        let data_ptr = wrap_bufs[1].pvBuffer as *const u8;
-
-        // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
-        unsafe {
-            let first_byte = *data_ptr;
-            if (first_byte & 1) == 0 {
-                return Err(Error::authentication_error(
-                    GSSAPI_STR,
-                    "Server does not support the required security layer",
-                ));
-            }
-        }
-
         let mut sizes = SecPkgContext_Sizes::default();
 
         // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
