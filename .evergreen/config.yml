@@ -393,6 +393,7 @@ buildvariants:
 
   - name: happy-eyeballs-macos
     display_name: "Happy Eyeballs (MacOS)"
+    patchable: false
     run_on:
       - macos-14
     tasks:
