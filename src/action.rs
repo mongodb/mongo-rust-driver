@@ -23,6 +23,7 @@ mod list_indexes;
 mod perf;
 mod replace_one;
 mod run_command;
+mod search;
 mod search_index;
 mod session;
 mod shutdown;
