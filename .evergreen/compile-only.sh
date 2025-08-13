@@ -21,15 +21,7 @@ fi
 cargo $TOOLCHAIN build
 
 # Test with all features.
-if [ "$RUST_VERSION" != "" ]; then
-  cargo $TOOLCHAIN build --features openssl-tls,sync,aws-auth,gssapi-auth,zlib-compression,zstd-compression,snappy-compression,in-use-encryption,tracing-unstable
-else
-  cargo $TOOLCHAIN build --all-features
-fi
+cargo $TOOLCHAIN build --all-features
 
 # Test with no default features.
-if [ "$RUST_VERSION" != "" ]; then
-  cargo $TOOLCHAIN build --no-default-features --features compat-3-0-0,rustls-tls
-else
-  cargo $TOOLCHAIN build --no-default-features --features compat-3-3-0,bson-3,rustls-tls
-fi
+cargo $TOOLCHAIN build --no-default-features --features compat-3-3-0,bson-3,rustls-tls
