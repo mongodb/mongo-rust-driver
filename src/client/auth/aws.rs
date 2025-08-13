@@ -31,6 +31,15 @@ use aws_config::BehaviorVersion;
 #[cfg(feature = "aws-auth")]
 use aws_credential_types::{provider::ProvideCredentials, Credentials};
 
+#[cfg(feature = "aws-auth")]
+use aws_sigv4::{
+    http_request::{sign, SignableBody, SignableRequest, SigningSettings},
+    sign::v4::SigningParams,
+};
+
+#[cfg(feature = "aws-auth")]
+use http::Request;
+
 const AWS_ECS_IP: &str = "169.254.170.2";
 const AWS_EC2_IP: &str = "169.254.169.254";
 const AWS_LONG_DATE_FMT: &str = "%Y%m%dT%H%M%SZ";
@@ -117,24 +126,31 @@ async fn authenticate_stream_inner(
     let creds = get_aws_credentials(credential).await.map_err(|e| {
         Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
     })?;
-    let aws_credential = AwsCredential::from_sdk_creds(creds);
 
     let date = Utc::now();
 
-    let authorization_header = aws_credential.compute_authorization_header(
+    // Generate authorization header using original implementation without AWS SDK
+    // let authorization_header = aws_credential.compute_authorization_header(
+    //     date,
+    //     &server_first.sts_host,
+    //     &server_first.server_nonce,
+    // )?;
+
+    // let mut client_second_payload = doc! {
+    //     "a": authorization_header,
+    //     "d": date.format(AWS_LONG_DATE_FMT).to_string(),
+    // };
+
+    // if let Some(security_token) = aws_credential.session_token {
+    //     client_second_payload.insert("t", security_token);
+    // }
+
+    let client_second_payload = compute_aws_sigv4_payload(
+        creds,
         date,
         &server_first.sts_host,
         &server_first.server_nonce,
     )?;
-
-    let mut client_second_payload = doc! {
-        "a": authorization_header,
-        "d": date.format(AWS_LONG_DATE_FMT).to_string(),
-    };
-
-    if let Some(security_token) = aws_credential.session_token {
-        client_second_payload.insert("t", security_token);
-    }
 
     let mut client_second_payload_bytes = vec![];
     client_second_payload.to_writer(&mut client_second_payload_bytes)?;
@@ -195,6 +211,119 @@ pub(crate) async fn get_aws_credentials(credential: &Credential) -> Result<Crede
             })?;
         Ok(creds)
     }
+}
+
+pub fn compute_aws_sigv4_payload(
+    creds: Credentials,
+    date: DateTime<Utc>,
+    host: &str,
+    server_nonce: &[u8],
+) -> Result<Document> {
+    let region = if host == "sts.amazonaws.com" {
+        "us-east-1"
+    } else {
+        let parts: Vec<_> = host.split('.').collect();
+        parts.get(1).copied().unwrap_or("us-east-1")
+    };
+
+    let url = format!("https://{host}");
+    let date_str = date.format("%Y%m%dT%H%M%SZ").to_string();
+    let body_str = "Action=GetCallerIdentity&Version=2011-06-15";
+    let body_bytes = body_str.as_bytes();
+    let nonce_b64 = base64::encode(server_nonce);
+
+    // Create the HTTP request
+    let mut builder = Request::builder()
+        .method("POST")
+        .uri(&url)
+        .header("host", host)
+        .header("content-type", "application/x-www-form-urlencoded")
+        .header("content-length", body_bytes.len())
+        .header("x-amz-date", &date_str)
+        .header("x-mongodb-gs2-cb-flag", "n")
+        .header("x-mongodb-server-nonce", &nonce_b64);
+
+    if let Some(token) = creds.session_token() {
+        builder = builder.header("x-amz-security-token", token);
+    }
+
+    let mut request = builder.body(body_str.to_string()).map_err(|e| {
+        Error::authentication_error(MECH_NAME, &format!("Failed to build request: {e}"))
+    })?;
+
+    let service = "sts";
+    let identity = creds.into();
+
+    // Set up signing parameters
+    let signing_settings = SigningSettings::default();
+    let signing_params = SigningParams::builder()
+        .identity(&identity)
+        .region(region)
+        .name(service)
+        .time(date.into())
+        .settings(signing_settings)
+        .build()
+        .map_err(|e| {
+            Error::authentication_error(MECH_NAME, &format!("Failed to build signing params: {e}"))
+        })?
+        .into();
+    let headers: Result<Vec<_>> = request
+        .headers()
+        .iter()
+        .map(|(k, v)| {
+            let v = v.to_str().map_err(|_| {
+                Error::authentication_error(
+                    MECH_NAME,
+                    "Failed to convert header value to valid UTF-8",
+                )
+            })?;
+            Ok((k.as_str(), v))
+        })
+        .collect();
+
+    let signable_request = SignableRequest::new(
+        request.method().as_str(),
+        request.uri().to_string(),
+        headers?.into_iter(),
+        SignableBody::Bytes(request.body().as_bytes()),
+    )
+    .map_err(|e| {
+        Error::authentication_error(MECH_NAME, &format!("Failed to create SignableRequest: {e}"))
+    })?;
+
+    let (signing_instructions, _signature) = sign(signable_request, &signing_params)
+        .map_err(|e| Error::authentication_error(MECH_NAME, &format!("Signing failed: {e}")))?
+        .into_parts();
+    signing_instructions.apply_to_request_http1x(&mut request);
+
+    let headers = request.headers();
+    let authorization_header = headers
+        .get("authorization")
+        .ok_or_else(|| Error::authentication_error(MECH_NAME, "Missing authorization header"))?
+        .to_str()
+        .map_err(|e| {
+            Error::authentication_error(MECH_NAME, &format!("Invalid header value: {e}"))
+        })?;
+
+    let token_header = headers
+        .get("x-amz-security-token")
+        .map(|v| {
+            v.to_str().map_err(|e| {
+                Error::authentication_error(MECH_NAME, &format!("Invalid token header: {e}"))
+            })
+        })
+        .transpose()?;
+
+    let mut payload = doc! {
+        "a": authorization_header,
+        "d": date_str,
+    };
+
+    if let Some(token) = token_header {
+        payload.insert("t", token);
+    }
+
+    Ok(payload)
 }
 
 /// Contains the credentials for MONGODB-AWS authentication.
