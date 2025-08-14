@@ -1,6 +1,5 @@
 mod acknowledged_message;
 #[cfg(any(
-    feature = "aws-auth",
     feature = "azure-kms",
     feature = "gcp-kms",
     feature = "azure-oidc",
@@ -36,7 +35,6 @@ pub(crate) use self::{
 };
 use crate::{error::Result, options::ServerAddress};
 #[cfg(any(
-    feature = "aws-auth",
     feature = "azure-kms",
     feature = "gcp-kms",
     feature = "azure-oidc",
