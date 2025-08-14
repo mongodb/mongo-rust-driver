@@ -320,7 +320,7 @@ impl AuthMechanism {
             }
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => {
-                aws::authenticate_stream(stream, credential, server_api, &opts.http_client).await
+                aws::authenticate_stream(stream, credential, server_api).await
             }
             AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
                 message: "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM \
@@ -414,8 +414,6 @@ impl FromStr for AuthMechanism {
 // Auxiliary information needed by authentication mechanisms.
 pub(crate) struct AuthOptions {
     server_api: Option<ServerApi>,
-    #[cfg(feature = "aws-auth")]
-    http_client: crate::runtime::HttpClient,
     #[cfg(feature = "gssapi-auth")]
     resolver_config: Option<ResolverConfig>,
 }
@@ -424,8 +422,6 @@ impl From<&ClientOptions> for AuthOptions {
     fn from(opts: &ClientOptions) -> Self {
         Self {
             server_api: opts.server_api.clone(),
-            #[cfg(feature = "aws-auth")]
-            http_client: crate::runtime::HttpClient::default(),
             #[cfg(feature = "gssapi-auth")]
             resolver_config: opts.resolver_config.clone(),
         }
