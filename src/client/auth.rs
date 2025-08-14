@@ -86,8 +86,15 @@ pub enum AuthMechanism {
     /// Assume Role request, or temporary AWS IAM credentials assigned to an EC2 instance or ECS
     /// task.
     ///
-    /// Note: Only server versions 4.4+ support AWS authentication. Additionally, the driver only
-    /// supports AWS authentication with the tokio runtime.
+    /// The driver uses the [AWS SDK](https://github.com/awslabs/aws-sdk-rust) to retrieve AWS
+    /// credentials. If you have a shared AWS credentials or config file, then those credentials
+    /// will be used by default if AWS authentication environment variables are not set. To
+    /// override this behavior, set `AWS_SHARED_CREDENTIALS_FILE=""` in your shell or set the
+    /// equivalent environment variable value in your script or application. Alternatively, you
+    /// can create an AWS profile specifically for your MongoDB credentials and set the
+    /// `AWS_PROFILE` environment variable to that profile name.
+    ///
+    /// Note: Only server versions 4.4+ support AWS authentication.
     #[cfg(feature = "aws-auth")]
     MongoDbAws,
 
