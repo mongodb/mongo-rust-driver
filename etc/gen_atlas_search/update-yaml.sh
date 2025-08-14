@@ -14,4 +14,4 @@ cd "${basedir}"
 mkdir -p "yaml/search"
 rsync -ah "${tmpdir}/generator/config/search/" "yaml/search" --delete
 
-#rm -rf "${tmpdir}"
+rm -rf "${tmpdir}"

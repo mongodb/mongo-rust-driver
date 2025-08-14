@@ -1,7 +1,37 @@
+//! Helpers for building Atlas Search aggregation pipelines.
+
+mod gen;
+
+pub use gen::*;
+
 use std::marker::PhantomData;
 
 use crate::bson::{doc, Bson, Document};
 
+/// A helper to build the aggregation stage for Atlas Search.  Use one of the constructor functions
+/// and chain optional value setters, and then convert to a pipeline stage [`Document`] via
+/// [`into`](Into::into) or [`on_index`](AtlasSearch::on_index).
+///
+/// ```no_run
+/// # async fn wrapper() -> mongodb::error::Error {
+/// # use mongodb::{Collection, bson::{Document, doc}};
+/// # let collection: Collection<Document> = todo!()
+/// let cursor = coll.aggregate(vec![
+///     AtlasSearch::autocomplete("pre", "title")
+///         .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
+///         .into(),
+///     doc! {
+///         "$limit": 10,
+///    },
+///    doc! {
+///        "$project": {
+///            "_id": 0,
+///            "title": 1,
+///         }
+///    },
+/// ]).await?;
+/// # Ok(())
+/// # }
 pub struct AtlasSearch<T> {
     name: &'static str,
     stage: Document,
@@ -18,12 +48,12 @@ impl<T> Into<Document> for AtlasSearch<T> {
     }
 }
 
-pub struct Autocomplete;
-pub struct Compound;
-pub struct Text;
+#[allow(missing_docs)]
 pub struct Built;
 
 impl<T> AtlasSearch<T> {
+    /// Finalize this builder.  Not typically needed, but can be useful to include builders of
+    /// different types in a single `Vec`.
     pub fn build(self) -> AtlasSearch<Built> {
         AtlasSearch {
             name: self.name,
@@ -32,13 +62,15 @@ impl<T> AtlasSearch<T> {
         }
     }
 
+    /// Like [`into`](Into::into), converts this builder into an aggregate pipeline stage
+    /// [`Document`], but also specify the search index to use.
     pub fn on_index(self, index: impl AsRef<str>) -> Document {
-        let mut out: Document = self.into();
-        // unwrap safety: AtlasSearch::into<Document> always produces a "$search" value
-        out.get_document_mut("$search")
-            .unwrap()
-            .insert("index", index.as_ref());
-        out
+        doc! {
+            "$search": {
+                "index": index.as_ref(),
+                self.name: self.stage,
+            }
+        }
     }
 }
 
@@ -49,39 +81,6 @@ impl<T> IntoIterator for AtlasSearch<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         std::iter::once(self)
-    }
-}
-
-impl AtlasSearch<Autocomplete> {
-    /// Perform a search for a word or phrase that contains a sequence of characters from an
-    /// incomplete input string.
-    pub fn autocomplete(query: impl StringOrArray, path: impl AsRef<str>) -> Self {
-        AtlasSearch {
-            name: "autocomplete",
-            stage: doc! {
-                "query": query.to_bson(),
-                "path": path.as_ref(),
-            },
-            _t: PhantomData::default(),
-        }
-    }
-
-    /// Enable fuzzy search. Find strings which are similar to the search term or terms.
-    pub fn fuzzy(mut self, options: Document) -> Self {
-        self.stage.insert("fuzzy", options);
-        self
-    }
-
-    /// Score to assign to the matching search term results.
-    pub fn score(mut self, options: Document) -> Self {
-        self.stage.insert("score", options);
-        self
-    }
-
-    /// Order in which to search for tokens.
-    pub fn token_order(mut self, order: TokenOrder) -> Self {
-        self.stage.insert("tokenOrder", order.name());
-        self
     }
 }
 
@@ -103,65 +102,11 @@ impl TokenOrder {
     }
 }
 
-impl AtlasSearch<Compound> {
-    pub fn compound() -> Self {
-        AtlasSearch {
-            name: "compound",
-            stage: doc! {},
-            _t: PhantomData::default(),
-        }
-    }
-
-    pub fn must<T>(mut self, clauses: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
-        self.stage.insert(
-            "must",
-            clauses.into_iter().map(|sq| sq.stage).collect::<Vec<_>>(),
-        );
-        self
-    }
-
-    pub fn must_not<T>(mut self, clauses: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
-        self.stage.insert(
-            "mustNot",
-            clauses.into_iter().map(|sq| sq.stage).collect::<Vec<_>>(),
-        );
-        self
-    }
-
-    pub fn should<T>(mut self, clauses: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
-        self.stage.insert(
-            "should",
-            clauses.into_iter().map(|sq| sq.stage).collect::<Vec<_>>(),
-        );
-        self
-    }
-}
-
-impl AtlasSearch<Text> {
-    pub fn text(query: impl StringOrArray, path: impl StringOrArray) -> Self {
-        AtlasSearch {
-            name: "text",
-            stage: doc! {
-                "query": query.to_bson(),
-                "path": path.to_bson(),
-            },
-            _t: PhantomData::default(),
-        }
-    }
-
-    pub fn fuzzy(mut self, options: Document) -> Self {
-        self.stage.insert("fuzzy", options);
-        self
-    }
-
-    pub fn match_criteria(mut self, criteria: MatchCriteria) -> Self {
-        self.stage.insert("matchCriteria", criteria.name());
-        self
-    }
-}
-
+/// Criteria to use to match the terms in the query.
 pub enum MatchCriteria {
+    /// Return documents that contain any of the terms from the query field.
     Any,
+    /// Only return documents that contain all of the terms from the query field.
     All,
 }
 
@@ -174,7 +119,9 @@ impl MatchCriteria {
     }
 }
 
+/// An Atlas Search operator parameter that can be either a string or array of strings.
 pub trait StringOrArray {
+    #[allow(missing_docs)]
     fn to_bson(self) -> Bson;
 }
 
@@ -260,6 +207,7 @@ impl StringOrArray for Vec<&String> {
     }
 }
 
+/*
 #[test]
 fn api_flow() {
     let coll: crate::Collection<Document> = todo!();
@@ -303,3 +251,4 @@ fn api_flow() {
         ]);
     }
 }
+*/

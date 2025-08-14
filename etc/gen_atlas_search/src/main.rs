@@ -101,6 +101,7 @@ fn gen_from_yaml(p: impl AsRef<std::path::Path>) -> String {
 
     let name_text = parsed.name;
     let name_ident = format_ident!("{}", name_text.to_case(Case::Pascal));
+    let constr_ident = format_ident!("{}", name_text.to_case(Case::Snake));
 
     let mut required_args = TokenStream::new();
     let mut init_doc = TokenStream::new();
@@ -114,6 +115,7 @@ fn gen_from_yaml(p: impl AsRef<std::path::Path>) -> String {
 
         if arg.optional.unwrap_or(false) {
             setters.push(parse_quote! {
+                #[allow(missing_docs)]
                 pub fn #ident(mut self, #ident: #type_) -> Self {
                     self.stage.insert(#arg_name, #init_expr);
                     self
@@ -127,12 +129,15 @@ fn gen_from_yaml(p: impl AsRef<std::path::Path>) -> String {
 
     let desc = parsed.description;
     let output: syn::File = parse_quote! {
+        use super::*;
+
+        #[allow(missing_docs)]
         pub struct #name_ident;
 
         impl AtlasSearch<#name_ident> {
             #[doc = #desc]
-            pub fn #name_ident(#required_args) -> Self {
-                Autocomplete {
+            pub fn #constr_ident(#required_args) -> Self {
+                AtlasSearch {
                     name: #name_text,
                     stage: doc! { #init_doc },
                     _t: PhantomData::default(),
