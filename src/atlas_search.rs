@@ -217,10 +217,13 @@ impl StringOrArray for Vec<&String> {
 
 #[tokio::test]
 async fn api_flow() {
-    #[allow(unused_variables)]
-    let coll: crate::Collection<Document> = todo!();
+    // This is currently intended as a testbed for how the API works, not as an actual test.
+    return;
+
     #[allow(unreachable_code)]
     {
+        #[allow(unused_variables)]
+        let coll: crate::Collection<Document> = todo!();
         let _ = coll
             .aggregate(vec![
                 AtlasSearch::autocomplete("pre", "title")
