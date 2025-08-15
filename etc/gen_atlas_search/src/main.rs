@@ -93,7 +93,7 @@ impl TokenStreamExt for TokenStream {
     }
 }
 
-fn gen_from_yaml(p: impl AsRef<std::path::Path>) -> String {
+fn gen_from_yaml(p: impl AsRef<std::path::Path>) -> TokenStream {
     let contents = std::fs::read_to_string(p).unwrap();
     let parsed = serde_yaml::from_str::<Operator>(&contents)
         .unwrap()
@@ -128,9 +128,7 @@ fn gen_from_yaml(p: impl AsRef<std::path::Path>) -> String {
     }
 
     let desc = parsed.description;
-    let output: syn::File = parse_quote! {
-        use super::*;
-
+    parse_quote! {
         #[allow(missing_docs)]
         pub struct #name_ident;
 
@@ -145,12 +143,20 @@ fn gen_from_yaml(p: impl AsRef<std::path::Path>) -> String {
             }
             #setters
         }
-    };
-
-    prettyplease::unparse(&output)
+    }
 }
 
 fn main() {
-    let text = gen_from_yaml("yaml/search/autocomplete.yaml");
+    let mut operators = TokenStream::new();
+    for path in ["yaml/search/autocomplete.yaml"] {
+        operators.push(gen_from_yaml(path));
+    }
+
+    let file = parse_quote! {
+        use super::*;
+
+        #operators
+    };
+    let text = prettyplease::unparse(&file);
     println!("{text}");
 }
