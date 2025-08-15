@@ -38,11 +38,11 @@ pub struct AtlasSearch<T> {
     _t: PhantomData<T>,
 }
 
-impl<T> Into<Document> for AtlasSearch<T> {
-    fn into(self) -> Document {
+impl<T> From<AtlasSearch<T>> for Document {
+    fn from(value: AtlasSearch<T>) -> Self {
         doc! {
             "$search": {
-                self.name: self.stage
+                value.name: value.stage
             }
         }
     }

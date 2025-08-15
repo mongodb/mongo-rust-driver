@@ -125,7 +125,7 @@ impl ArgumentRustType {
             Self::TokenOrder | Self::MatchCriteria => parse_quote! { #ident.name() },
             Self::Document | Self::I32 => parse_quote! { #ident },
             Self::Operator => {
-                parse_quote! { #ident.into_iter().map(|s| s.into()).collect::<Vec<Document>>() }
+                parse_quote! { #ident.into_iter().map(Document::from).collect::<Vec<_>>() }
             }
         }
     }
@@ -190,7 +190,7 @@ fn gen_from_yaml(p: impl AsRef<std::path::Path>) -> TokenStream {
                 AtlasSearch {
                     name: #name_text,
                     stage: doc! { #init_doc },
-                    _t: PhantomData::default(),
+                    _t: PhantomData,
                 }
             }
             #setters

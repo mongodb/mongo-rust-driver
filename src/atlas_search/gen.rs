@@ -14,7 +14,7 @@ impl AtlasSearch<Autocomplete> {
             stage: doc! {
                 "path" : path.to_bson(), "query" : query.to_bson(),
             },
-            _t: PhantomData::default(),
+            _t: PhantomData,
         }
     }
     #[allow(missing_docs)]
@@ -45,7 +45,7 @@ impl AtlasSearch<Text> {
             stage: doc! {
                 "path" : path.to_bson(), "query" : query.to_bson(),
             },
-            _t: PhantomData::default(),
+            _t: PhantomData,
         }
     }
     #[allow(missing_docs)]
@@ -80,16 +80,14 @@ impl AtlasSearch<Compound> {
         AtlasSearch {
             name: "compound",
             stage: doc! {},
-            _t: PhantomData::default(),
+            _t: PhantomData,
         }
     }
     #[allow(missing_docs)]
     pub fn must<T>(mut self, must: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
         self.stage.insert(
             "must",
-            must.into_iter()
-                .map(|s| s.into())
-                .collect::<Vec<Document>>(),
+            must.into_iter().map(Document::from).collect::<Vec<_>>(),
         );
         self
     }
@@ -97,10 +95,7 @@ impl AtlasSearch<Compound> {
     pub fn must_not<T>(mut self, must_not: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
         self.stage.insert(
             "mustNot",
-            must_not
-                .into_iter()
-                .map(|s| s.into())
-                .collect::<Vec<Document>>(),
+            must_not.into_iter().map(Document::from).collect::<Vec<_>>(),
         );
         self
     }
@@ -108,10 +103,7 @@ impl AtlasSearch<Compound> {
     pub fn should<T>(mut self, should: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
         self.stage.insert(
             "should",
-            should
-                .into_iter()
-                .map(|s| s.into())
-                .collect::<Vec<Document>>(),
+            should.into_iter().map(Document::from).collect::<Vec<_>>(),
         );
         self
     }
@@ -119,10 +111,7 @@ impl AtlasSearch<Compound> {
     pub fn filter<T>(mut self, filter: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
         self.stage.insert(
             "filter",
-            filter
-                .into_iter()
-                .map(|s| s.into())
-                .collect::<Vec<Document>>(),
+            filter.into_iter().map(Document::from).collect::<Vec<_>>(),
         );
         self
     }
