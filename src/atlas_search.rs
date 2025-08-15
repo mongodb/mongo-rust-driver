@@ -49,8 +49,8 @@ impl<T> From<AtlasSearch<T>> for Document {
 }
 
 impl<T> AtlasSearch<T> {
-    /// Erase the type this builder.  Not typically needed, but can be useful to include builders of
-    /// different types in a single `Vec`.
+    /// Erase the type of this builder.  Not typically needed, but can be useful to include builders
+    /// of different types in a single `Vec`.
     pub fn unit(self) -> AtlasSearch<()> {
         AtlasSearch {
             name: self.name,
