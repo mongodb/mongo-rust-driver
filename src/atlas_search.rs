@@ -13,11 +13,11 @@ use crate::bson::{doc, Bson, Document};
 /// [`into`](Into::into) or [`on_index`](AtlasSearch::on_index).
 ///
 /// ```no_run
-/// # async fn wrapper() -> mongodb::error::Error {
-/// # use mongodb::{Collection, bson::{Document, doc}};
-/// # let collection: Collection<Document> = todo!()
-/// let cursor = coll.aggregate(vec![
-///     AtlasSearch::autocomplete("pre", "title")
+/// # async fn wrapper() -> mongodb::error::Result<()> {
+/// # use mongodb::{Collection, atlas_search::AtlasSearch, bson::{Document, doc}};
+/// # let collection: Collection<Document> = todo!();
+/// let cursor = collection.aggregate(vec![
+///     AtlasSearch::autocomplete("title", "pre")
 ///         .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
 ///         .into(),
 ///     doc! {
@@ -226,7 +226,7 @@ async fn api_flow() {
         let coll: crate::Collection<Document> = todo!();
         let _ = coll
             .aggregate(vec![
-                AtlasSearch::autocomplete("pre", "title")
+                AtlasSearch::autocomplete("title", "pre")
                     .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
                     .into(),
                 doc! {
@@ -242,7 +242,7 @@ async fn api_flow() {
             .await;
         let _ = coll
             .aggregate(vec![
-                AtlasSearch::text("baseball", "plot").into(),
+                AtlasSearch::text("plot", "baseball").into(),
                 doc! { "$limit": 3 },
                 doc! {
                     "$project": {
@@ -256,8 +256,8 @@ async fn api_flow() {
         let _ = coll
             .aggregate(vec![
                 AtlasSearch::compound()
-                    .must(AtlasSearch::text("varieties", "description"))
-                    .should(AtlasSearch::text("Fuji", "description"))
+                    .must(AtlasSearch::text("description", "varieties"))
+                    .should(AtlasSearch::text("description", "Fuji"))
                     .into(),
                 doc! {
                     "$project": {
