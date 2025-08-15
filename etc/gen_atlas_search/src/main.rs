@@ -58,35 +58,58 @@ enum ArgumentType {
     SearchPath,
 }
 
+enum ArgumentRustType {
+    String,
+    Document,
+    StringOrArray,
+    TokenOrder,
+    MatchCriteria,
+}
+
+static QUERY: &str = "query";
 static TOKEN_ORDER: &str = "tokenOrder";
+static MATCH_CRITERIA: &str = "matchCriteria";
 
 impl Argument {
-    fn type_(&self) -> syn::Type {
+    fn rust_type(&self) -> ArgumentRustType {
+        if self.name == QUERY {
+            return ArgumentRustType::StringOrArray;
+        }
         if self.name == TOKEN_ORDER {
-            return parse_quote! { TokenOrder };
+            return ArgumentRustType::TokenOrder;
+        }
+        if self.name == MATCH_CRITERIA {
+            return ArgumentRustType::MatchCriteria;
         }
         if self.type_.len() != 1 {
             panic!("Unexpected argument types: {:?}", self.type_);
         }
         match &self.type_[0] {
-            ArgumentType::String => parse_quote! { impl AsRef<str> },
-            ArgumentType::Object => parse_quote! { Document },
-            ArgumentType::SearchScore => parse_quote! { Document },
-            ArgumentType::SearchPath => parse_quote! { impl StringOrArray },
+            ArgumentType::String => ArgumentRustType::String,
+            ArgumentType::Object => ArgumentRustType::Document,
+            ArgumentType::SearchScore => ArgumentRustType::Document,
+            ArgumentType::SearchPath => ArgumentRustType::StringOrArray,
+        }
+    }
+}
+
+impl ArgumentRustType {
+    fn tokens(&self) -> syn::Type {
+        match self {
+            Self::String => parse_quote! { impl AsRef<str> },
+            Self::Document => parse_quote! { Document },
+            Self::StringOrArray => parse_quote! { impl StringOrArray },
+            Self::TokenOrder => parse_quote! { TokenOrder },
+            Self::MatchCriteria => parse_quote! { MatchCriteria },
         }
     }
 
     fn bson_expr(&self, ident: &syn::Ident) -> syn::Expr {
-        if self.name == TOKEN_ORDER {
-            return parse_quote! { #ident.name() };
-        }
-        if self.type_.len() != 1 {
-            panic!("Unexpected argument types: {:?}", self.type_);
-        }
-        match &self.type_[0] {
-            ArgumentType::String => parse_quote! { #ident.as_ref() },
-            ArgumentType::SearchPath => parse_quote! { #ident.to_bson() },
-            _ => parse_quote! { #ident },
+        match self {
+            Self::String => parse_quote! { #ident.as_ref() },
+            Self::StringOrArray => parse_quote! { #ident.to_bson() },
+            Self::TokenOrder | Self::MatchCriteria => parse_quote! { #ident.name() },
+            Self::Document => parse_quote! { #ident },
         }
     }
 }
@@ -119,9 +142,10 @@ fn gen_from_yaml(p: impl AsRef<std::path::Path>) -> TokenStream {
 
     for arg in parsed.arguments {
         let ident = format_ident!("{}", arg.name.to_case(Case::Snake));
-        let type_ = arg.type_();
+        let rust_type = arg.rust_type();
+        let type_ = rust_type.tokens();
         let arg_name = &arg.name;
-        let init_expr = arg.bson_expr(&ident);
+        let init_expr = rust_type.bson_expr(&ident);
 
         if arg.optional.unwrap_or(false) {
             setters.push(parse_quote! {
@@ -158,7 +182,7 @@ fn gen_from_yaml(p: impl AsRef<std::path::Path>) -> TokenStream {
 
 fn main() {
     let mut operators = TokenStream::new();
-    for path in ["yaml/search/autocomplete.yaml"] {
+    for path in ["yaml/search/autocomplete.yaml", "yaml/search/text.yaml"] {
         operators.push(gen_from_yaml(path));
     }
 

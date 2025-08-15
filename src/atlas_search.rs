@@ -85,7 +85,7 @@ impl<T> IntoIterator for AtlasSearch<T> {
 }
 
 /// Order in which to search for tokens.
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenOrder {
     /// Indicates tokens in the query can appear in any order in the documents.
     Any,
@@ -107,18 +107,22 @@ impl TokenOrder {
 }
 
 /// Criteria to use to match the terms in the query.
+#[derive(Debug, Clone, PartialEq)]
 pub enum MatchCriteria {
     /// Return documents that contain any of the terms from the query field.
     Any,
     /// Only return documents that contain all of the terms from the query field.
     All,
+    /// Fallback for future compatibility.
+    Other(String),
 }
 
 impl MatchCriteria {
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         match self {
             Self::Any => "any",
             Self::All => "all",
+            Self::Other(s) => s.as_str(),
         }
     }
 }

@@ -8,11 +8,11 @@ impl AtlasSearch<Autocomplete> {
     fields that you intend to query with the autocomplete operator must be
     indexed with the autocomplete data type in the collection's index definition.
     */
-    pub fn autocomplete(path: impl StringOrArray, query: impl AsRef<str>) -> Self {
+    pub fn autocomplete(path: impl StringOrArray, query: impl StringOrArray) -> Self {
         AtlasSearch {
             name: "autocomplete",
             stage: doc! {
-                "path" : path.to_bson(), "query" : query.as_ref(),
+                "path" : path.to_bson(), "query" : query.to_bson(),
             },
             _t: PhantomData::default(),
         }
@@ -25,6 +25,42 @@ impl AtlasSearch<Autocomplete> {
     #[allow(missing_docs)]
     pub fn fuzzy(mut self, fuzzy: Document) -> Self {
         self.stage.insert("fuzzy", fuzzy);
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
+pub struct Text;
+impl AtlasSearch<Text> {
+    /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
+    If you omit an analyzer, the text operator uses the default standard analyzer.
+    */
+    pub fn text(path: impl StringOrArray, query: impl StringOrArray) -> Self {
+        AtlasSearch {
+            name: "text",
+            stage: doc! {
+                "path" : path.to_bson(), "query" : query.to_bson(),
+            },
+            _t: PhantomData::default(),
+        }
+    }
+    #[allow(missing_docs)]
+    pub fn fuzzy(mut self, fuzzy: Document) -> Self {
+        self.stage.insert("fuzzy", fuzzy);
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn match_criteria(mut self, match_criteria: MatchCriteria) -> Self {
+        self.stage.insert("matchCriteria", match_criteria.name());
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn synonyms(mut self, synonyms: impl AsRef<str>) -> Self {
+        self.stage.insert("synonyms", synonyms.as_ref());
         self
     }
     #[allow(missing_docs)]
