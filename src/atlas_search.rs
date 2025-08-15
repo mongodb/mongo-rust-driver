@@ -48,17 +48,14 @@ impl<T> From<AtlasSearch<T>> for Document {
     }
 }
 
-#[allow(missing_docs)]
-pub struct Built;
-
 impl<T> AtlasSearch<T> {
-    /// Finalize this builder.  Not typically needed, but can be useful to include builders of
+    /// Erase the type this builder.  Not typically needed, but can be useful to include builders of
     /// different types in a single `Vec`.
-    pub fn build(self) -> AtlasSearch<Built> {
+    pub fn unit(self) -> AtlasSearch<()> {
         AtlasSearch {
             name: self.name,
             stage: self.stage,
-            _t: PhantomData::default(),
+            _t: PhantomData,
         }
     }
 
