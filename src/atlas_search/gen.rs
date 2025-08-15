@@ -69,3 +69,72 @@ impl AtlasSearch<Text> {
         self
     }
 }
+#[allow(missing_docs)]
+pub struct Compound;
+impl AtlasSearch<Compound> {
+    /**The compound operator combines two or more operators into a single query.
+    Each element of a compound query is called a clause, and each clause
+    consists of one or more sub-queries.
+    */
+    pub fn compound() -> Self {
+        AtlasSearch {
+            name: "compound",
+            stage: doc! {},
+            _t: PhantomData::default(),
+        }
+    }
+    #[allow(missing_docs)]
+    pub fn must<T>(mut self, must: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
+        self.stage.insert(
+            "must",
+            must.into_iter()
+                .map(|s| s.into())
+                .collect::<Vec<Document>>(),
+        );
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn must_not<T>(mut self, must_not: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
+        self.stage.insert(
+            "mustNot",
+            must_not
+                .into_iter()
+                .map(|s| s.into())
+                .collect::<Vec<Document>>(),
+        );
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn should<T>(mut self, should: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
+        self.stage.insert(
+            "should",
+            should
+                .into_iter()
+                .map(|s| s.into())
+                .collect::<Vec<Document>>(),
+        );
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn filter<T>(mut self, filter: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
+        self.stage.insert(
+            "filter",
+            filter
+                .into_iter()
+                .map(|s| s.into())
+                .collect::<Vec<Document>>(),
+        );
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn minimum_should_match(mut self, minimum_should_match: i32) -> Self {
+        self.stage
+            .insert("minimumShouldMatch", minimum_should_match);
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}

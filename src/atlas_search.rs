@@ -215,48 +215,53 @@ impl StringOrArray for Vec<&String> {
     }
 }
 
-/*
-#[test]
-fn api_flow() {
+#[tokio::test]
+async fn api_flow() {
+    #[allow(unused_variables)]
     let coll: crate::Collection<Document> = todo!();
     #[allow(unreachable_code)]
     {
-        let _ = coll.aggregate(vec![
-            AtlasSearch::autocomplete("pre", "title")
-                .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
-                .into(),
-            doc! {
-                "$limit": 10,
-            },
-            doc! {
-                "$project": {
-                    "_id": 0,
-                    "title": 1,
-                }
-            },
-        ]);
-        let _ = coll.aggregate(vec![
-            AtlasSearch::text("baseball", "plot").into(),
-            doc! { "$limit": 3 },
-            doc! {
-                "$project": {
-                    "_id": 0,
-                    "title": 1,
-                    "plot": 1,
-                }
-            },
-        ]);
-        let _ = coll.aggregate(vec![
-            AtlasSearch::compound()
-                .must(AtlasSearch::text("varieties", "description"))
-                .should(AtlasSearch::text("Fuji", "description"))
-                .into(),
-            doc! {
-                "$project": {
-                    "score": { "$meta": "searchScore" }
-                }
-            },
-        ]);
+        let _ = coll
+            .aggregate(vec![
+                AtlasSearch::autocomplete("pre", "title")
+                    .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
+                    .into(),
+                doc! {
+                    "$limit": 10,
+                },
+                doc! {
+                    "$project": {
+                        "_id": 0,
+                        "title": 1,
+                    }
+                },
+            ])
+            .await;
+        let _ = coll
+            .aggregate(vec![
+                AtlasSearch::text("baseball", "plot").into(),
+                doc! { "$limit": 3 },
+                doc! {
+                    "$project": {
+                        "_id": 0,
+                        "title": 1,
+                        "plot": 1,
+                    }
+                },
+            ])
+            .await;
+        let _ = coll
+            .aggregate(vec![
+                AtlasSearch::compound()
+                    .must(AtlasSearch::text("varieties", "description"))
+                    .should(AtlasSearch::text("Fuji", "description"))
+                    .into(),
+                doc! {
+                    "$project": {
+                        "score": { "$meta": "searchScore" }
+                    }
+                },
+            ])
+            .await;
     }
 }
-*/
