@@ -85,19 +85,23 @@ impl<T> IntoIterator for AtlasSearch<T> {
 }
 
 /// Order in which to search for tokens.
+#[derive(Clone, PartialEq)]
 pub enum TokenOrder {
     /// Indicates tokens in the query can appear in any order in the documents.
     Any,
     /// Indicates tokens in the query must appear adjacent to each other or in the order specified
     /// in the query in the documents.
     Sequential,
+    /// Fallback for future compatibility.
+    Other(String),
 }
 
 impl TokenOrder {
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         match self {
             Self::Any => "any",
             Self::Sequential => "sequential",
+            Self::Other(s) => s.as_str(),
         }
     }
 }
