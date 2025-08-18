@@ -83,6 +83,7 @@ impl<T> IntoIterator for AtlasSearch<T> {
 
 /// Order in which to search for tokens.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum TokenOrder {
     /// Indicates tokens in the query can appear in any order in the documents.
     Any,
@@ -105,6 +106,7 @@ impl TokenOrder {
 
 /// Criteria to use to match the terms in the query.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum MatchCriteria {
     /// Return documents that contain any of the terms from the query field.
     Any,

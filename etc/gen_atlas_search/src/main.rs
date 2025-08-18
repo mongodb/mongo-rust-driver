@@ -20,13 +20,6 @@ struct Operator {
     tests: Vec<serde_yaml::Value>,
 }
 
-impl Operator {
-    fn clear_tests(mut self) -> Self {
-        self.tests.clear();
-        self
-    }
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 enum OperatorType {
@@ -37,6 +30,63 @@ enum OperatorType {
 #[serde(rename_all = "camelCase")]
 enum EncodeType {
     Object,
+}
+
+impl Operator {
+    fn clear_tests(mut self) -> Self {
+        self.tests.clear();
+        self
+    }
+
+    fn gen_helper(&self) -> TokenStream {
+        let name_text = &self.name;
+        let name_ident = format_ident!("{}", name_text.to_case(Case::Pascal));
+        let constr_ident = format_ident!("{}", name_text.to_case(Case::Snake));
+
+        let mut required_args = TokenStream::new();
+        let mut init_doc = TokenStream::new();
+        let mut setters = TokenStream::new();
+
+        for arg in &self.arguments {
+            let ident = format_ident!("{}", arg.name.to_case(Case::Snake));
+            let rust_type = arg.rust_type();
+            let type_ = rust_type.tokens();
+            let arg_name = &arg.name;
+            let init_expr = rust_type.bson_expr(&ident);
+
+            if arg.optional.unwrap_or(false) {
+                let tvars = rust_type.variables();
+                setters.push(parse_quote! {
+                    #[allow(missing_docs)]
+                    pub fn #ident<#tvars>(mut self, #ident: #type_) -> Self {
+                        self.stage.insert(#arg_name, #init_expr);
+                        self
+                    }
+                });
+            } else {
+                required_args.push(parse_quote! { #ident : #type_, });
+                init_doc.push(parse_quote! { #arg_name : #init_expr, });
+            }
+        }
+
+        let desc = &self.description;
+        parse_quote! {
+            #[allow(missing_docs)]
+            pub struct #name_ident;
+
+            impl AtlasSearch<#name_ident> {
+                #[doc = #desc]
+                pub fn #constr_ident(#required_args) -> Self {
+                    AtlasSearch {
+                        name: #name_text,
+                        stage: doc! { #init_doc },
+                        _t: PhantomData,
+                    }
+                }
+                #setters
+            }
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -59,16 +109,6 @@ enum ArgumentType {
     SearchOperator,
     Array,
     Int,
-}
-
-enum ArgumentRustType {
-    String,
-    Document,
-    StringOrArray,
-    TokenOrder,
-    MatchCriteria,
-    Operator,
-    I32,
 }
 
 static QUERY: &str = "query";
@@ -96,6 +136,16 @@ impl Argument {
             _ => panic!("Unexpected argument types: {:?}", self.type_),
         }
     }
+}
+
+enum ArgumentRustType {
+    String,
+    Document,
+    StringOrArray,
+    TokenOrder,
+    MatchCriteria,
+    Operator,
+    I32,
 }
 
 impl ArgumentRustType {
@@ -143,61 +193,6 @@ impl TokenStreamExt for TokenStream {
     }
 }
 
-fn gen_from_yaml(p: impl AsRef<std::path::Path>) -> TokenStream {
-    let contents = std::fs::read_to_string(p).unwrap();
-    let parsed = serde_yaml::from_str::<Operator>(&contents)
-        .unwrap()
-        .clear_tests();
-
-    let name_text = parsed.name;
-    let name_ident = format_ident!("{}", name_text.to_case(Case::Pascal));
-    let constr_ident = format_ident!("{}", name_text.to_case(Case::Snake));
-
-    let mut required_args = TokenStream::new();
-    let mut init_doc = TokenStream::new();
-    let mut setters = TokenStream::new();
-
-    for arg in parsed.arguments {
-        let ident = format_ident!("{}", arg.name.to_case(Case::Snake));
-        let rust_type = arg.rust_type();
-        let type_ = rust_type.tokens();
-        let arg_name = &arg.name;
-        let init_expr = rust_type.bson_expr(&ident);
-
-        if arg.optional.unwrap_or(false) {
-            let tvars = rust_type.variables();
-            setters.push(parse_quote! {
-                #[allow(missing_docs)]
-                pub fn #ident<#tvars>(mut self, #ident: #type_) -> Self {
-                    self.stage.insert(#arg_name, #init_expr);
-                    self
-                }
-            });
-        } else {
-            required_args.push(parse_quote! { #ident : #type_, });
-            init_doc.push(parse_quote! { #arg_name : #init_expr, });
-        }
-    }
-
-    let desc = parsed.description;
-    parse_quote! {
-        #[allow(missing_docs)]
-        pub struct #name_ident;
-
-        impl AtlasSearch<#name_ident> {
-            #[doc = #desc]
-            pub fn #constr_ident(#required_args) -> Self {
-                AtlasSearch {
-                    name: #name_text,
-                    stage: doc! { #init_doc },
-                    _t: PhantomData,
-                }
-            }
-            #setters
-        }
-    }
-}
-
 fn main() {
     let mut operators = TokenStream::new();
     for path in [
@@ -205,7 +200,11 @@ fn main() {
         "yaml/search/text.yaml",
         "yaml/search/compound.yaml",
     ] {
-        operators.push(gen_from_yaml(path));
+        let contents = std::fs::read_to_string(path).unwrap();
+        let parsed = serde_yaml::from_str::<Operator>(&contents)
+            .unwrap()
+            .clear_tests();
+        operators.push(parsed.gen_helper());
     }
 
     let file = parse_quote! {
