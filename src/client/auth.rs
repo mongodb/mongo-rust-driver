@@ -86,8 +86,15 @@ pub enum AuthMechanism {
     /// Assume Role request, or temporary AWS IAM credentials assigned to an EC2 instance or ECS
     /// task.
     ///
-    /// Note: Only server versions 4.4+ support AWS authentication. Additionally, the driver only
-    /// supports AWS authentication with the tokio runtime.
+    /// The driver uses the [AWS SDK](https://github.com/awslabs/aws-sdk-rust) to retrieve AWS
+    /// credentials. If you have a shared AWS credentials or config file, then those credentials
+    /// will be used by default if AWS authentication environment variables are not set. To
+    /// override this behavior, set `AWS_SHARED_CREDENTIALS_FILE=""` in your shell or set the
+    /// equivalent environment variable value in your script or application. Alternatively, you
+    /// can create an AWS profile specifically for your MongoDB credentials and set the
+    /// `AWS_PROFILE` environment variable to that profile name.
+    ///
+    /// Note: Only server versions 4.4+ support AWS authentication.
     #[cfg(feature = "aws-auth")]
     MongoDbAws,
 
@@ -320,7 +327,7 @@ impl AuthMechanism {
             }
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => {
-                aws::authenticate_stream(stream, credential, server_api, &opts.http_client).await
+                aws::authenticate_stream(stream, credential, server_api).await
             }
             AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
                 message: "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM \
@@ -414,8 +421,6 @@ impl FromStr for AuthMechanism {
 // Auxiliary information needed by authentication mechanisms.
 pub(crate) struct AuthOptions {
     server_api: Option<ServerApi>,
-    #[cfg(feature = "aws-auth")]
-    http_client: crate::runtime::HttpClient,
     #[cfg(feature = "gssapi-auth")]
     resolver_config: Option<ResolverConfig>,
 }
@@ -424,8 +429,6 @@ impl From<&ClientOptions> for AuthOptions {
     fn from(opts: &ClientOptions) -> Self {
         Self {
             server_api: opts.server_api.clone(),
-            #[cfg(feature = "aws-auth")]
-            http_client: crate::runtime::HttpClient::default(),
             #[cfg(feature = "gssapi-auth")]
             resolver_config: opts.resolver_config.clone(),
         }
