@@ -55,6 +55,10 @@ pub(crate) use resolver_config::ResolverConfig;
 
 pub(crate) const DEFAULT_PORT: u16 = 27017;
 
+const TLS_INSECURE: &str = "tlsinsecure";
+const TLS_ALLOW_INVALID_CERTIFICATES: &str = "tlsallowinvalidcertificates";
+#[cfg(feature = "openssl-tls")]
+const TLS_ALLOW_INVALID_HOSTNAMES: &str = "tlsallowinvalidhostnames";
 const URI_OPTIONS: &[&str] = &[
     "appname",
     "authmechanism",
@@ -82,8 +86,8 @@ const URI_OPTIONS: &[&str] = &[
     "sockettimeoutms",
     "tls",
     "ssl",
-    "tlsinsecure",
-    "tlsallowinvalidcertificates",
+    TLS_INSECURE,
+    TLS_ALLOW_INVALID_CERTIFICATES,
     "tlscafile",
     "tlscertificatekeyfile",
     "uuidRepresentation",
@@ -1647,7 +1651,9 @@ impl ConnectionString {
     }
 
     /// Relax TLS constraints as much as possible (e.g. allowing invalid certificates or hostname
-    /// mismatches).  Not supported by the Rust driver.
+    /// mismatches). This option can only be set in a URI. If it is set in a URI provided to
+    /// [`ConnectionString::parse`], [`TlsOptions::allow_invalid_certificates`] and
+    /// [`TlsOptions::allow_invalid_hostnames`] are set to its value.
     pub fn tls_insecure(&self) -> Option<bool> {
         self.tls_insecure
     }
@@ -1662,39 +1668,45 @@ impl ConnectionString {
             return Ok(parts);
         }
 
-        let mut keys: Vec<&str> = Vec::new();
+        let mut keys = HashSet::new();
 
         for option_pair in options.split('&') {
-            let (key, value) = match option_pair.find('=') {
-                Some(index) => option_pair.split_at(index),
+            let (key, value) = match option_pair.split_once('=') {
+                Some((key, value)) => (key.to_lowercase(), value),
                 None => {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: format!(
-                            "connection string options is not a `key=value` pair: {option_pair}",
-                        ),
-                    }
-                    .into())
+                    return Err(Error::invalid_argument(format!(
+                        "connection string option is not a 'key=value' pair: {option_pair}"
+                    )))
                 }
             };
 
-            if key.to_lowercase() != "readpreferencetags" && keys.contains(&key) {
-                return Err(ErrorKind::InvalidArgument {
-                    message: "repeated options are not allowed in the connection string"
-                        .to_string(),
-                }
-                .into());
-            } else {
-                keys.push(key);
+            if !keys.insert(key.clone()) && key != "readpreferencetags" {
+                return Err(Error::invalid_argument(
+                    "repeated options are not allowed in the connection string",
+                ));
             }
 
-            // Skip leading '=' in value.
             self.parse_option_pair(
                 &mut parts,
-                &key.to_lowercase(),
-                percent_encoding::percent_decode(&value.as_bytes()[1..])
+                &key,
+                percent_encoding::percent_decode(value.as_bytes())
                     .decode_utf8_lossy()
                     .as_ref(),
             )?;
+        }
+
+        if keys.contains(TLS_INSECURE) {
+            #[cfg(feature = "openssl-tls")]
+            let disallowed = [TLS_ALLOW_INVALID_CERTIFICATES, TLS_ALLOW_INVALID_HOSTNAMES];
+            #[cfg(not(feature = "openssl-tls"))]
+            let disallowed = [TLS_ALLOW_INVALID_CERTIFICATES];
+            for option in disallowed {
+                if keys.contains(option) {
+                    return Err(Error::invalid_argument(format!(
+                        "cannot set both {TLS_INSECURE} and {option} in the connection string"
+                    )));
+                }
+            }
         }
 
         if let Some(tags) = parts.read_preference_tags.take() {
@@ -2017,63 +2029,63 @@ impl ConnectionString {
             k @ "tls" | k @ "ssl" => {
                 let tls = get_bool!(value, k);
 
-                match (self.tls.as_ref(), tls) {
-                    (Some(Tls::Disabled), true) | (Some(Tls::Enabled(..)), false) => {
-                        return Err(ErrorKind::InvalidArgument {
-                            message: "All instances of `tls` and `ssl` must have the same
- value"
-                                .to_string(),
-                        }
-                        .into());
-                    }
-                    _ => {}
-                };
-
-                if self.tls.is_none() {
-                    let tls = if tls {
-                        Tls::Enabled(Default::default())
-                    } else {
-                        Tls::Disabled
-                    };
-
-                    self.tls = Some(tls);
-                }
-            }
-            k @ "tlsinsecure" | k @ "tlsallowinvalidcertificates" => {
-                let val = get_bool!(value, k);
-
-                let allow_invalid_certificates = if k == "tlsinsecure" { !val } else { val };
-
                 match self.tls {
-                    Some(Tls::Disabled) => {
-                        return Err(ErrorKind::InvalidArgument {
-                            message: "'tlsInsecure' can't be set if tls=false".into(),
-                        }
-                        .into())
+                    Some(Tls::Enabled(_)) if !tls => {
+                        return Err(Error::invalid_argument(
+                            "cannot set {key}={tls} if other TLS options are set",
+                        ))
                     }
-                    Some(Tls::Enabled(ref options))
-                        if options.allow_invalid_certificates.is_some()
-                            && options.allow_invalid_certificates
-                                != Some(allow_invalid_certificates) =>
-                    {
-                        return Err(ErrorKind::InvalidArgument {
-                            message: "all instances of 'tlsInsecure' and \
-                                      'tlsAllowInvalidCertificates' must be consistent (e.g. \
-                                      'tlsInsecure' cannot be true when \
-                                      'tlsAllowInvalidCertificates' is false, or vice-versa)"
-                                .into(),
-                        }
-                        .into());
-                    }
-                    Some(Tls::Enabled(ref mut options)) => {
-                        options.allow_invalid_certificates = Some(allow_invalid_certificates);
+                    Some(Tls::Disabled) if tls => {
+                        return Err(Error::invalid_argument(
+                            "cannot set {key}={tls} if TLS is disabled",
+                        ))
                     }
                     None => {
-                        self.tls = Some(Tls::Enabled(
-                            TlsOptions::builder()
-                                .allow_invalid_certificates(allow_invalid_certificates)
-                                .build(),
-                        ))
+                        if tls {
+                            self.tls = Some(Tls::Enabled(Default::default()))
+                        } else {
+                            self.tls = Some(Tls::Disabled)
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            TLS_INSECURE => {
+                let val = get_bool!(value, key);
+                self.tls_insecure = Some(val);
+
+                match self
+                    .tls
+                    .get_or_insert_with(|| Tls::Enabled(Default::default()))
+                {
+                    Tls::Enabled(ref mut options) => {
+                        options.allow_invalid_certificates = Some(val);
+                        #[cfg(feature = "openssl-tls")]
+                        {
+                            options.allow_invalid_hostnames = Some(val);
+                        }
+                    }
+                    Tls::Disabled => {
+                        return Err(Error::invalid_argument(format!(
+                            "cannot set {key} when TLS is disabled"
+                        )));
+                    }
+                }
+            }
+            TLS_ALLOW_INVALID_CERTIFICATES => {
+                let val = get_bool!(value, key);
+
+                match self
+                    .tls
+                    .get_or_insert_with(|| Tls::Enabled(Default::default()))
+                {
+                    Tls::Enabled(ref mut options) => {
+                        options.allow_invalid_certificates = Some(val);
+                    }
+                    Tls::Disabled => {
+                        return Err(Error::invalid_argument(format!(
+                            "cannot set {key} when TLS is disabled"
+                        )))
                     }
                 }
             }
