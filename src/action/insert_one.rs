@@ -59,7 +59,7 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     }
 }
 
-/// Inserts a document into a collection.  Construct with ['Collection::insert_one`].
+/// Inserts a document into a collection.  Construct with [`Collection::insert_one`].
 #[must_use]
 pub struct InsertOne<'a> {
     coll: CollRef<'a>,
