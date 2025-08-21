@@ -96,6 +96,7 @@ enum Csfle {
     Bool(bool),
     #[serde(rename_all = "camelCase")]
     Version {
+        #[cfg(feature = "in-use-encryption")]
         min_libmongocrypt_version: String,
     },
 }
