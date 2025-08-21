@@ -141,13 +141,8 @@ async fn bson_size_limits() -> Result<()> {
             .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
             .build()
             .await?;
-    let coll = client_encrypted
-        .database("db")
-        .collection::<Document>("coll");
-    let coll2 = client_encrypted
-        .database("db")
-        .collection::<Document>("coll2");
-    coll2.drop().await?;
+    let db = client_encrypted.database("db");
+    let coll = db.collection::<Document>("coll");
 
     // Tests
     // Test operation 1
@@ -229,6 +224,12 @@ async fn bson_size_limits() -> Result<()> {
     if server_version_lt(8, 0).await {
         return Ok(());
     }
+
+    let coll2 = db.collection::<Document>("coll2");
+    coll2.drop().await?;
+    db.create_collection("coll2")
+        .encrypted_fields(load_testdata("limits/limits-encryptedFields.json")?)
+        .await?;
 
     // Test operation 7
     let long_string = "a".repeat(STRING_LEN_2_MIB - 1_500);
