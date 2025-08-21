@@ -399,7 +399,7 @@ async fn tls_cert_key_password_connect() {
 
 #[tokio::test]
 async fn tls_insecure() {
-    let uri = "mongodb://localhost:27017?tls=true&tlsInsecure=true";
+    let uri = "mongodb://localhost:27017/?tls=true&tlsInsecure=true";
     let options = ClientOptions::parse(uri).await.unwrap();
     let Some(Tls::Enabled(tls_options)) = options.tls else {
         panic!("expected tls options to be set");
@@ -408,7 +408,7 @@ async fn tls_insecure() {
     #[cfg(feature = "openssl-tls")]
     assert_eq!(tls_options.allow_invalid_hostnames, Some(true));
 
-    let uri = "mongodb://localhost:27017?tls=true&tlsInsecure=false";
+    let uri = "mongodb://localhost:27017/?tls=true&tlsInsecure=false";
     let options = ClientOptions::parse(uri).await.unwrap();
     let Some(Tls::Enabled(tls_options)) = options.tls else {
         panic!("expected tls options to be set");
@@ -417,33 +417,33 @@ async fn tls_insecure() {
     #[cfg(feature = "openssl-tls")]
     assert_eq!(tls_options.allow_invalid_hostnames, Some(false));
 
-    let uri = "mongodb://localhost:27017?tls=false&tlsInsecure=true";
+    let uri = "mongodb://localhost:27017/?tls=false&tlsInsecure=true";
     let error = ClientOptions::parse(uri).await.unwrap_err();
     assert!(error.message().unwrap().contains("TLS is disabled"));
 
-    let uri = "mongodb://localhost:27017?tlsInsecure=true&tls=false";
+    let uri = "mongodb://localhost:27017/?tlsInsecure=true&tls=false";
     let error = ClientOptions::parse(uri).await.unwrap_err();
     assert!(error
         .message()
         .unwrap()
         .contains("other TLS options are set"));
 
-    let uri = "mongodb://localhost:27017?tlsInsecure=true&tlsAllowInvalidCertificates=true";
+    let uri = "mongodb://localhost:27017/?tlsInsecure=true&tlsAllowInvalidCertificates=true";
     let error = ClientOptions::parse(uri).await.unwrap_err();
     assert!(error.message().unwrap().contains("cannot set both"));
 
-    let uri = "mongodb://localhost:27017?tlsInsecure=true&tlsAllowInvalidCertificates=false";
+    let uri = "mongodb://localhost:27017/?tlsInsecure=true&tlsAllowInvalidCertificates=false";
     let error = ClientOptions::parse(uri).await.unwrap_err();
     assert!(error.message().unwrap().contains("cannot set both"));
 
     // TODO RUST-1896: uncomment these tests
     // #[cfg(feature = "openssl-tls")]
     // {
-    //     let uri = "mongodb://localhost:27017?tlsInsecure=true&tlsAllowInvalidHostnames=true";
+    //     let uri = "mongodb://localhost:27017/?tlsInsecure=true&tlsAllowInvalidHostnames=true";
     //     let error = ClientOptions::parse(uri).await.unwrap_err();
     //     assert!(error.message().unwrap().contains("cannot set both"));
 
-    //     let uri = "mongodb://localhost:27017?tlsInsecure=true&tlsAllowInvalidHostnames=false";
+    //     let uri = "mongodb://localhost:27017/?tlsInsecure=true&tlsAllowInvalidHostnames=false";
     //     let error = ClientOptions::parse(uri).await.unwrap_err();
     //     assert!(error.message().unwrap().contains("cannot set both"));
     // }
