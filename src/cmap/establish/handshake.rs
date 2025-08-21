@@ -285,9 +285,10 @@ pub(crate) static BASE_CLIENT_METADATA: Lazy<ClientMetadata> = Lazy::new(|| Clie
         version: None,
     },
     platform: format!(
-        "{} with {}",
+        "{} with {} / bson-{}",
         rustc_version_runtime::version_meta().short_version_string,
-        RUNTIME_NAME
+        RUNTIME_NAME,
+        if cfg!(feature = "bson-3") { "3" } else { "2" },
     ),
     env: None,
 });
