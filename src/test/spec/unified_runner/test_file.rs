@@ -174,7 +174,8 @@ impl RunOnRequirement {
                     let requirement =
                         semver::VersionReq::parse(&format!(">={min_libmongocrypt_version}"))
                             .unwrap();
-                    let version = semver::Version::parse(mongocrypt::version()).unwrap();
+                    let mut version = semver::Version::parse(mongocrypt::version()).unwrap();
+                    version.pre = semver::Prerelease::EMPTY;
                     if !requirement.matches(&version) {
                         return Err(format!(
                             "requires at least libmongocrypt version {min_libmongocrypt_version} \
