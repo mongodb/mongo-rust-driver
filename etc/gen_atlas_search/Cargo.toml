@@ -1,0 +1,13 @@
+[package]
+name = "gen_atlas_search"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+convert_case = "0.8.0"
+prettyplease = "0.2.36"
+proc-macro2 = "1.0.97"
+quote = "1.0.40"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_yaml = "0.9.34"
+syn = { version = "2.0.105", features = ["full", "printing"] }
