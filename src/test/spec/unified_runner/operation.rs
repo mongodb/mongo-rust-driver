@@ -217,7 +217,7 @@ impl Operation {
                         let opt_entity = result.unwrap_or_else(|e| {
                             panic!(
                                 "[{}] {} should succeed, but failed with the following error: {}",
-                                description, self.name, e
+                                description, self.name, e,
                             )
                         });
                         if expected_value.is_some() || save_as_entity.is_some() {

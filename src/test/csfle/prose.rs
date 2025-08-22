@@ -117,6 +117,8 @@ async fn custom_key_material() -> Result<()> {
 // Prose test 4. BSON Size Limits and Batch Splitting
 #[tokio::test]
 async fn bson_size_limits() -> Result<()> {
+    const STRING_LEN_2_MIB: usize = 2_097_152;
+
     // Setup: db initialization.
     let (client, datakeys) = init_client().await?;
     client
@@ -130,7 +132,7 @@ async fn bson_size_limits() -> Result<()> {
 
     // Setup: encrypted client.
     let mut opts = get_client_options().await.clone();
-    let buffer = EventBuffer::<Event>::new();
+    let mut buffer = EventBuffer::<Event>::new();
 
     opts.command_event_handler = Some(buffer.handler());
     let client_encrypted =
@@ -139,26 +141,25 @@ async fn bson_size_limits() -> Result<()> {
             .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
             .build()
             .await?;
-    let coll = client_encrypted
-        .database("db")
-        .collection::<Document>("coll");
+    let db = client_encrypted.database("db");
+    let coll = db.collection::<Document>("coll");
 
     // Tests
     // Test operation 1
     coll.insert_one(doc! {
         "_id": "over_2mib_under_16mib",
-        "unencrypted": "a".repeat(2097152),
+        "unencrypted": "a".repeat(STRING_LEN_2_MIB),
     })
     .await?;
 
     // Test operation 2
     let mut doc: Document = load_testdata("limits/limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_2mib");
-    doc.insert("unencrypted", "a".repeat(2_097_152 - 2_000));
+    doc.insert("unencrypted", "a".repeat(STRING_LEN_2_MIB - 2_000));
     coll.insert_one(doc).await?;
 
     // Test operation 3
-    let value = "a".repeat(2_097_152);
+    let value = "a".repeat(STRING_LEN_2_MIB);
     let mut events = buffer.stream();
     coll.insert_many(vec![
         doc! {
@@ -185,7 +186,7 @@ async fn bson_size_limits() -> Result<()> {
     // Test operation 4
     let mut doc = load_testdata("limits/limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_2mib_1");
-    doc.insert("unencrypted", "a".repeat(2_097_152 - 2_000));
+    doc.insert("unencrypted", "a".repeat(STRING_LEN_2_MIB - 2_000));
     let mut doc2 = doc.clone();
     doc2.insert("_id", "encryption_exceeds_2mib_2");
     let mut events = buffer.stream();
@@ -218,6 +219,48 @@ async fn bson_size_limits() -> Result<()> {
         matches!(*err.kind, ErrorKind::Write(_)),
         "unexpected error: {err}"
     );
+
+    // The remaining test operations use bulk_write.
+    if server_version_lt(8, 0).await {
+        return Ok(());
+    }
+
+    let coll2 = db.collection::<Document>("coll2");
+    coll2.drop().await?;
+    db.create_collection("coll2")
+        .encrypted_fields(load_testdata("limits/limits-encryptedFields.json")?)
+        .await?;
+
+    // Test operation 7
+    let long_string = "a".repeat(STRING_LEN_2_MIB - 1_500);
+    let write_models = vec![
+        coll2.insert_one_model(doc! { "_id": "over_2mib_3", "unencrypted": &long_string })?,
+        coll2.insert_one_model(doc! { "_id": "over_2mib_4", "unencrypted": &long_string })?,
+    ];
+    client_encrypted.bulk_write(write_models).await?;
+    let bulk_write_events = buffer.get_command_started_events(&["bulkWrite"]);
+    assert_eq!(bulk_write_events.len(), 2);
+
+    // Test operation 8
+    buffer.clear_cached_events();
+    let limits: Document = load_testdata("limits/limits-qe-doc.json")?;
+    let long_string = "a".repeat(STRING_LEN_2_MIB - 2_000 - 1_500);
+
+    let mut doc1 = limits.clone();
+    doc1.insert("_id", "encryption_exceeds_2mib_3");
+    doc1.insert("foo", &long_string);
+    let write_model1 = coll2.insert_one_model(doc1)?;
+
+    let mut doc2 = limits;
+    doc2.insert("_id", "encryption_exceeds_2mib_4");
+    doc2.insert("foo", &long_string);
+    let write_model2 = coll2.insert_one_model(doc2)?;
+
+    client_encrypted
+        .bulk_write(vec![write_model1, write_model2])
+        .await?;
+    let bulk_write_events = buffer.get_command_started_events(&["bulkWrite"]);
+    assert_eq!(bulk_write_events.len(), 2);
 
     Ok(())
 }
