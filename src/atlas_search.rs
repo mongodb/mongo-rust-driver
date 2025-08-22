@@ -50,7 +50,23 @@ impl<T> From<AtlasSearch<T>> for Document {
 
 impl<T> AtlasSearch<T> {
     /// Erase the type of this builder.  Not typically needed, but can be useful to include builders
-    /// of different types in a single `Vec`.
+    /// of different types in a single `Vec`:
+    /// ```no_run
+    /// # async fn wrapper() -> mongodb::error::Result<()> {
+    /// # use mongodb::{Collection, atlas_search::AtlasSearch, bson::{Document, doc}};
+    /// # let collection: Collection<Document> = todo!();
+    /// let cursor = collection.aggregate(vec![
+    ///     AtlasSearch::compound()
+    ///         .must(vec![
+    ///             AtlasSearch::text("description", "varieties").unit(),
+    ///             AtlasSearch::compound()
+    ///                 .should(AtlasSearch::text("description", "Fuji"))
+    ///                 .unit(),
+    ///         ])
+    ///         .into(),
+    /// ]).await?;
+    /// # }
+    /// ```
     pub fn unit(self) -> AtlasSearch<()> {
         AtlasSearch {
             name: self.name,

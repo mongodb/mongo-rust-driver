@@ -8,6 +8,8 @@ impl AtlasSearch<Autocomplete> {
     fields that you intend to query with the autocomplete operator must be
     indexed with the autocomplete data type in the collection's index definition.
     */
+    ///
+    ///For more details, see the [autocomplete operator reference](https://www.mongodb.com/docs/atlas/atlas-search/autocomplete/).
     pub fn autocomplete(path: impl StringOrArray, query: impl StringOrArray) -> Self {
         AtlasSearch {
             name: "autocomplete",
@@ -39,6 +41,8 @@ impl AtlasSearch<Text> {
     /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
     If you omit an analyzer, the text operator uses the default standard analyzer.
     */
+    ///
+    ///For more details, see the [text operator reference](https://www.mongodb.com/docs/atlas/atlas-search/text/).
     pub fn text(path: impl StringOrArray, query: impl StringOrArray) -> Self {
         AtlasSearch {
             name: "text",
@@ -76,6 +80,8 @@ impl AtlasSearch<Compound> {
     Each element of a compound query is called a clause, and each clause
     consists of one or more sub-queries.
     */
+    ///
+    ///For more details, see the [compound operator reference](https://www.mongodb.com/docs/atlas/atlas-search/compound/).
     pub fn compound() -> Self {
         AtlasSearch {
             name: "compound",

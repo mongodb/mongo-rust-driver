@@ -8,7 +8,6 @@ use syn::parse_quote;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Operator {
     name: String,
-    #[expect(dead_code)]
     link: String,
     #[serde(rename = "type")]
     #[expect(dead_code)]
@@ -70,12 +69,18 @@ impl Operator {
         }
 
         let desc = &self.description;
+        let link = format!(
+            "For more details, see the [{name_text} operator reference]({}).",
+            self.link
+        );
         parse_quote! {
             #[allow(missing_docs)]
             pub struct #name_ident;
 
             impl AtlasSearch<#name_ident> {
                 #[doc = #desc]
+                #[doc = ""]
+                #[doc = #link]
                 pub fn #constr_ident(#required_args) -> Self {
                     AtlasSearch {
                         name: #name_text,
