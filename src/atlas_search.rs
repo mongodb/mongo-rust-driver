@@ -281,5 +281,30 @@ async fn api_flow() {
                 },
             ])
             .await;
+        let _ = coll
+            .aggregate(vec![
+                AtlasSearch::embedded_document(
+                    "items",
+                    AtlasSearch::compound()
+                        .must(AtlasSearch::text("items.name", "school"))
+                        .should(AtlasSearch::text("items.name", "backpack")),
+                )
+                .score(doc! {
+                    "embedded": {
+                        "aggregate": "mean"
+                    }
+                })
+                .into(),
+                doc! { "$limit": 5 },
+                doc! {
+                    "$project": {
+                        "_id": 0,
+                        "items.name": 1,
+                        "items.tags": 1,
+                        "score": { "$meta": "searchScore" },
+                    }
+                },
+            ])
+            .await;
     }
 }
