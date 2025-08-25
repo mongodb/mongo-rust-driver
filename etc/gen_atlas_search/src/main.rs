@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use convert_case::{Case, Casing};
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -54,10 +56,9 @@ impl Operator {
             let init_expr = rust_type.bson_expr(&ident);
 
             if arg.optional.unwrap_or(false) {
-                let tvars = rust_type.variables();
                 setters.push(parse_quote! {
                     #[allow(missing_docs)]
-                    pub fn #ident<#tvars>(mut self, #ident: #type_) -> Self {
+                    pub fn #ident(mut self, #ident: #type_) -> Self {
                         self.stage.insert(#arg_name, #init_expr);
                         self
                     }
@@ -136,7 +137,8 @@ impl Argument {
             [ArgumentType::Object] => ArgumentRustType::Document,
             [ArgumentType::SearchScore] => ArgumentRustType::Document,
             [ArgumentType::SearchPath] => ArgumentRustType::StringOrArray,
-            [ArgumentType::SearchOperator, ArgumentType::Array] => ArgumentRustType::Operator,
+            [ArgumentType::SearchOperator] => ArgumentRustType::Operator,
+            [ArgumentType::SearchOperator, ArgumentType::Array] => ArgumentRustType::OperatorIter,
             [ArgumentType::Int] => ArgumentRustType::I32,
             _ => panic!("Unexpected argument types: {:?}", self.type_),
         }
@@ -150,6 +152,7 @@ enum ArgumentRustType {
     TokenOrder,
     MatchCriteria,
     Operator,
+    OperatorIter,
     I32,
 }
 
@@ -161,15 +164,9 @@ impl ArgumentRustType {
             Self::StringOrArray => parse_quote! { impl StringOrArray },
             Self::TokenOrder => parse_quote! { TokenOrder },
             Self::MatchCriteria => parse_quote! { MatchCriteria },
-            Self::Operator => parse_quote! { impl IntoIterator<Item = AtlasSearch<T>> },
+            Self::Operator => parse_quote! { impl Into<Document> },
+            Self::OperatorIter => parse_quote! { impl IntoIterator<Item = impl Into<Document>> },
             Self::I32 => parse_quote! { i32 },
-        }
-    }
-
-    fn variables(&self) -> TokenStream {
-        match self {
-            Self::Operator => parse_quote! { T },
-            _ => parse_quote! {},
         }
     }
 
@@ -179,8 +176,9 @@ impl ArgumentRustType {
             Self::StringOrArray => parse_quote! { #ident.to_bson() },
             Self::TokenOrder | Self::MatchCriteria => parse_quote! { #ident.name() },
             Self::Document | Self::I32 => parse_quote! { #ident },
-            Self::Operator => {
-                parse_quote! { #ident.into_iter().map(Document::from).collect::<Vec<_>>() }
+            Self::Operator => parse_quote! { #ident.into() },
+            Self::OperatorIter => {
+                parse_quote! { #ident.into_iter().map(Into::into).collect::<Vec<_>>() }
             }
         }
     }
@@ -200,11 +198,10 @@ impl TokenStreamExt for TokenStream {
 
 fn main() {
     let mut operators = TokenStream::new();
-    for path in [
-        "yaml/search/autocomplete.yaml",
-        "yaml/search/text.yaml",
-        "yaml/search/compound.yaml",
-    ] {
+    for name in ["autocomplete", "compound", "embeddedDocument", "text"] {
+        let mut path = PathBuf::from("yaml/search");
+        path.push(name);
+        path.set_extension("yaml");
         let contents = std::fs::read_to_string(path).unwrap();
         let parsed = serde_yaml::from_str::<Operator>(&contents)
             .unwrap()

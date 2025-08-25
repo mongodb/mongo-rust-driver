@@ -36,6 +36,89 @@ impl AtlasSearch<Autocomplete> {
     }
 }
 #[allow(missing_docs)]
+pub struct Compound;
+impl AtlasSearch<Compound> {
+    /**The compound operator combines two or more operators into a single query.
+    Each element of a compound query is called a clause, and each clause
+    consists of one or more sub-queries.
+    */
+    ///
+    ///For more details, see the [compound operator reference](https://www.mongodb.com/docs/atlas/atlas-search/compound/).
+    pub fn compound() -> Self {
+        AtlasSearch {
+            name: "compound",
+            stage: doc! {},
+            _t: PhantomData,
+        }
+    }
+    #[allow(missing_docs)]
+    pub fn must(mut self, must: impl IntoIterator<Item = impl Into<Document>>) -> Self {
+        self.stage
+            .insert("must", must.into_iter().map(Into::into).collect::<Vec<_>>());
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn must_not(mut self, must_not: impl IntoIterator<Item = impl Into<Document>>) -> Self {
+        self.stage.insert(
+            "mustNot",
+            must_not.into_iter().map(Into::into).collect::<Vec<_>>(),
+        );
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn should(mut self, should: impl IntoIterator<Item = impl Into<Document>>) -> Self {
+        self.stage.insert(
+            "should",
+            should.into_iter().map(Into::into).collect::<Vec<_>>(),
+        );
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn filter(mut self, filter: impl IntoIterator<Item = impl Into<Document>>) -> Self {
+        self.stage.insert(
+            "filter",
+            filter.into_iter().map(Into::into).collect::<Vec<_>>(),
+        );
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn minimum_should_match(mut self, minimum_should_match: i32) -> Self {
+        self.stage
+            .insert("minimumShouldMatch", minimum_should_match);
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
+pub struct EmbeddedDocument;
+impl AtlasSearch<EmbeddedDocument> {
+    /**The embeddedDocument operator is similar to $elemMatch operator.
+    It constrains multiple query predicates to be satisfied from a single
+    element of an array of embedded documents. embeddedDocument can be used only
+    for queries over fields of the embeddedDocuments
+    */
+    ///
+    ///For more details, see the [embeddedDocument operator reference](https://www.mongodb.com/docs/atlas/atlas-search/embedded-document/).
+    pub fn embedded_document(path: impl StringOrArray, operator: impl Into<Document>) -> Self {
+        AtlasSearch {
+            name: "embeddedDocument",
+            stage: doc! {
+                "path" : path.to_bson(), "operator" : operator.into(),
+            },
+            _t: PhantomData,
+        }
+    }
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
 pub struct Text;
 impl AtlasSearch<Text> {
     /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
@@ -65,66 +148,6 @@ impl AtlasSearch<Text> {
     #[allow(missing_docs)]
     pub fn synonyms(mut self, synonyms: impl AsRef<str>) -> Self {
         self.stage.insert("synonyms", synonyms.as_ref());
-        self
-    }
-    #[allow(missing_docs)]
-    pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
-        self
-    }
-}
-#[allow(missing_docs)]
-pub struct Compound;
-impl AtlasSearch<Compound> {
-    /**The compound operator combines two or more operators into a single query.
-    Each element of a compound query is called a clause, and each clause
-    consists of one or more sub-queries.
-    */
-    ///
-    ///For more details, see the [compound operator reference](https://www.mongodb.com/docs/atlas/atlas-search/compound/).
-    pub fn compound() -> Self {
-        AtlasSearch {
-            name: "compound",
-            stage: doc! {},
-            _t: PhantomData,
-        }
-    }
-    #[allow(missing_docs)]
-    pub fn must<T>(mut self, must: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
-        self.stage.insert(
-            "must",
-            must.into_iter().map(Document::from).collect::<Vec<_>>(),
-        );
-        self
-    }
-    #[allow(missing_docs)]
-    pub fn must_not<T>(mut self, must_not: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
-        self.stage.insert(
-            "mustNot",
-            must_not.into_iter().map(Document::from).collect::<Vec<_>>(),
-        );
-        self
-    }
-    #[allow(missing_docs)]
-    pub fn should<T>(mut self, should: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
-        self.stage.insert(
-            "should",
-            should.into_iter().map(Document::from).collect::<Vec<_>>(),
-        );
-        self
-    }
-    #[allow(missing_docs)]
-    pub fn filter<T>(mut self, filter: impl IntoIterator<Item = AtlasSearch<T>>) -> Self {
-        self.stage.insert(
-            "filter",
-            filter.into_iter().map(Document::from).collect::<Vec<_>>(),
-        );
-        self
-    }
-    #[allow(missing_docs)]
-    pub fn minimum_should_match(mut self, minimum_should_match: i32) -> Self {
-        self.stage
-            .insert("minimumShouldMatch", minimum_should_match);
         self
     }
     #[allow(missing_docs)]
