@@ -119,6 +119,28 @@ impl AtlasSearch<EmbeddedDocument> {
     }
 }
 #[allow(missing_docs)]
+pub struct Equals;
+impl AtlasSearch<Equals> {
+    /**The equals operator checks whether a field matches a value you specify.
+     * */
+    ///
+    ///For more details, see the [equals operator reference](https://www.mongodb.com/docs/atlas/atlas-search/equals/).
+    pub fn equals(path: impl StringOrArray, value: impl Into<Bson>) -> Self {
+        AtlasSearch {
+            name: "equals",
+            stage: doc! {
+                "path" : path.to_bson(), "value" : value.into(),
+            },
+            _t: PhantomData,
+        }
+    }
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
 pub struct Text;
 impl AtlasSearch<Text> {
     /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
@@ -194,6 +216,13 @@ pub mod short {
         operator: impl Into<Document>,
     ) -> AtlasSearch<EmbeddedDocument> {
         AtlasSearch::embedded_document(path, operator)
+    }
+    /**The equals operator checks whether a field matches a value you specify.
+     * */
+    ///
+    ///For more details, see the [equals operator reference](https://www.mongodb.com/docs/atlas/atlas-search/equals/).
+    pub fn equals(path: impl StringOrArray, value: impl Into<Bson>) -> AtlasSearch<Equals> {
+        AtlasSearch::equals(path, value)
     }
     /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
     If you omit an analyzer, the text operator uses the default standard analyzer.
