@@ -156,3 +156,51 @@ impl AtlasSearch<Text> {
         self
     }
 }
+/// Atlas Search constructor functions without the `AtlasSearch::` prefix; can be useful to
+/// improve readability when constructing deeply nested searches.
+pub mod short {
+    use super::*;
+    /**The autocomplete operator performs a search for a word or phrase that
+    contains a sequence of characters from an incomplete input string. The
+    fields that you intend to query with the autocomplete operator must be
+    indexed with the autocomplete data type in the collection's index definition.
+    */
+    ///
+    ///For more details, see the [autocomplete operator reference](https://www.mongodb.com/docs/atlas/atlas-search/autocomplete/).
+    pub fn autocomplete(
+        path: impl StringOrArray,
+        query: impl StringOrArray,
+    ) -> AtlasSearch<Autocomplete> {
+        AtlasSearch::autocomplete(path, query)
+    }
+    /**The compound operator combines two or more operators into a single query.
+    Each element of a compound query is called a clause, and each clause
+    consists of one or more sub-queries.
+    */
+    ///
+    ///For more details, see the [compound operator reference](https://www.mongodb.com/docs/atlas/atlas-search/compound/).
+    pub fn compound() -> AtlasSearch<Compound> {
+        AtlasSearch::compound()
+    }
+    /**The embeddedDocument operator is similar to $elemMatch operator.
+    It constrains multiple query predicates to be satisfied from a single
+    element of an array of embedded documents. embeddedDocument can be used only
+    for queries over fields of the embeddedDocuments
+    */
+    ///
+    ///For more details, see the [embeddedDocument operator reference](https://www.mongodb.com/docs/atlas/atlas-search/embedded-document/).
+    pub fn embedded_document(
+        path: impl StringOrArray,
+        operator: impl Into<Document>,
+    ) -> AtlasSearch<EmbeddedDocument> {
+        AtlasSearch::embedded_document(path, operator)
+    }
+    /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
+    If you omit an analyzer, the text operator uses the default standard analyzer.
+    */
+    ///
+    ///For more details, see the [text operator reference](https://www.mongodb.com/docs/atlas/atlas-search/text/).
+    pub fn text(path: impl StringOrArray, query: impl StringOrArray) -> AtlasSearch<Text> {
+        AtlasSearch::text(path, query)
+    }
+}

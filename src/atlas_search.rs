@@ -281,13 +281,14 @@ async fn api_flow() {
                 },
             ])
             .await;
+        use short::*;
         let _ = coll
             .aggregate(vec![
-                AtlasSearch::embedded_document(
+                embedded_document(
                     "items",
-                    AtlasSearch::compound()
-                        .must(AtlasSearch::text("items.name", "school"))
-                        .should(AtlasSearch::text("items.name", "backpack")),
+                    compound()
+                        .must(text("items.name", "school"))
+                        .should(text("items.name", "backpack")),
                 )
                 .score(doc! {
                     "embedded": {
