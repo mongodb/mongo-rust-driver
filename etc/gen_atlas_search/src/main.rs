@@ -39,12 +39,13 @@ impl Operator {
         self
     }
 
-    fn gen_helper(&self) -> TokenStream {
+    fn gen_helper(&self) -> Helper {
         let name_text = &self.name;
         let name_ident = format_ident!("{}", name_text.to_case(Case::Pascal));
         let constr_ident = format_ident!("{}", name_text.to_case(Case::Snake));
 
         let mut required_args = TokenStream::new();
+        let mut required_arg_names = TokenStream::new();
         let mut init_doc = TokenStream::new();
         let mut setters = TokenStream::new();
 
@@ -65,6 +66,7 @@ impl Operator {
                 });
             } else {
                 required_args.push(parse_quote! { #ident : #type_, });
+                required_arg_names.push(parse_quote! { #ident, });
                 init_doc.push(parse_quote! { #arg_name : #init_expr, });
             }
         }
@@ -74,7 +76,7 @@ impl Operator {
             "For more details, see the [{name_text} operator reference]({}).",
             self.link
         );
-        parse_quote! {
+        let toplevel = parse_quote! {
             #[allow(missing_docs)]
             pub struct #name_ident;
 
@@ -91,8 +93,22 @@ impl Operator {
                 }
                 #setters
             }
-        }
+        };
+        let short = parse_quote! {
+            #[doc = #desc]
+            #[doc = ""]
+            #[doc = #link]
+            pub fn #constr_ident(#required_args) -> AtlasSearch<#name_ident> {
+                AtlasSearch::#constr_ident(#required_arg_names)
+            }
+        };
+        Helper { toplevel, short }
     }
+}
+
+struct Helper {
+    toplevel: TokenStream,
+    short: TokenStream,
 }
 
 #[derive(Debug, Deserialize)]
@@ -198,6 +214,7 @@ impl TokenStreamExt for TokenStream {
 
 fn main() {
     let mut operators = TokenStream::new();
+    let mut short = TokenStream::new();
     for name in ["autocomplete", "compound", "embeddedDocument", "text"] {
         let mut path = PathBuf::from("yaml/search");
         path.push(name);
@@ -206,7 +223,9 @@ fn main() {
         let parsed = serde_yaml::from_str::<Operator>(&contents)
             .unwrap()
             .clear_tests();
-        operators.push(parsed.gen_helper());
+        let helper = parsed.gen_helper();
+        operators.push(helper.toplevel);
+        short.push(helper.short);
     }
 
     let file = parse_quote! {
@@ -214,6 +233,14 @@ fn main() {
         use super::*;
 
         #operators
+
+        /// Atlas Search constructor functions without the `AtlasSearch::` prefix; can be useful to
+        /// improve readability when constructing deeply nested searches.
+        pub mod short {
+            use super::*;
+
+            #short
+        }
     };
     let text = prettyplease::unparse(&file);
     println!("{text}");
