@@ -142,70 +142,86 @@ impl MatchCriteria {
     }
 }
 
+mod private {
+    pub struct Sealed;
+}
+
 /// An Atlas Search operator parameter that can be either a string or array of strings.
 pub trait StringOrArray {
     #[allow(missing_docs)]
     fn to_bson(self) -> Bson;
+    #[allow(missing_docs)]
+    fn sealed(_: private::Sealed);
 }
 
 impl StringOrArray for &str {
     fn to_bson(self) -> Bson {
         Bson::String(self.to_owned())
     }
+    fn sealed(_: private::Sealed) {}
 }
 
 impl StringOrArray for String {
     fn to_bson(self) -> Bson {
         Bson::String(self)
     }
+    fn sealed(_: private::Sealed) {}
 }
 
 impl StringOrArray for &String {
     fn to_bson(self) -> Bson {
         Bson::String(self.clone())
     }
+    fn sealed(_: private::Sealed) {}
 }
 
 impl StringOrArray for &[&str] {
     fn to_bson(self) -> Bson {
         Bson::Array(self.iter().map(|&s| Bson::String(s.to_owned())).collect())
     }
+    fn sealed(_: private::Sealed) {}
 }
 
 impl<const N: usize> StringOrArray for &[&str; N] {
     fn to_bson(self) -> Bson {
         Bson::Array(self.iter().map(|&s| Bson::String(s.to_owned())).collect())
     }
+    fn sealed(_: private::Sealed) {}
 }
 
 impl StringOrArray for &[String] {
     fn to_bson(self) -> Bson {
         Bson::Array(self.iter().map(|s| Bson::String(s.clone())).collect())
     }
+    fn sealed(_: private::Sealed) {}
 }
 
 impl<const N: usize> StringOrArray for &[String; N] {
     fn to_bson(self) -> Bson {
         Bson::Array(self.iter().map(|s| Bson::String(s.clone())).collect())
     }
+    fn sealed(_: private::Sealed) {}
 }
 
 impl<const N: usize> StringOrArray for [String; N] {
     fn to_bson(self) -> Bson {
         Bson::Array(self.into_iter().map(Bson::String).collect())
     }
+    fn sealed(_: private::Sealed) {}
 }
 
 impl StringOrArray for &[&String] {
     fn to_bson(self) -> Bson {
         Bson::Array(self.iter().map(|&s| Bson::String(s.clone())).collect())
     }
+    fn sealed(_: private::Sealed) {}
 }
 
 impl<const N: usize> StringOrArray for &[&String; N] {
     fn to_bson(self) -> Bson {
         Bson::Array(self.iter().map(|&s| Bson::String(s.clone())).collect())
     }
+    fn sealed(_: private::Sealed) {}
 }
 
 impl StringOrArray for Vec<&str> {
@@ -216,18 +232,21 @@ impl StringOrArray for Vec<&str> {
                 .collect(),
         )
     }
+    fn sealed(_: private::Sealed) {}
 }
 
 impl StringOrArray for Vec<String> {
     fn to_bson(self) -> Bson {
         Bson::Array(self.into_iter().map(Bson::String).collect())
     }
+    fn sealed(_: private::Sealed) {}
 }
 
 impl StringOrArray for Vec<&String> {
     fn to_bson(self) -> Bson {
         Bson::Array(self.into_iter().map(|s| Bson::String(s.clone())).collect())
     }
+    fn sealed(_: private::Sealed) {}
 }
 
 #[tokio::test]
@@ -302,6 +321,18 @@ async fn api_flow() {
                         "_id": 0,
                         "items.name": 1,
                         "items.tags": 1,
+                        "score": { "$meta": "searchScore" },
+                    }
+                },
+            ])
+            .await;
+        let _ = coll
+            .aggregate(vec![
+                AtlasSearch::equals("verified_user", true).into(),
+                doc! {
+                    "$project": {
+                        "name": 1,
+                        "_id": 0,
                         "score": { "$meta": "searchScore" },
                     }
                 },
