@@ -141,6 +141,29 @@ impl AtlasSearch<Equals> {
     }
 }
 #[allow(missing_docs)]
+pub struct Exists;
+impl AtlasSearch<Exists> {
+    /**The exists operator tests if a path to a specified indexed field name exists in a
+     * document.
+     * */
+    ///
+    ///For more details, see the [exists operator reference](https://www.mongodb.com/docs/atlas/atlas-search/exists/).
+    pub fn exists(path: impl StringOrArray) -> Self {
+        AtlasSearch {
+            name: "exists",
+            stage: doc! {
+                "path" : path.to_bson(),
+            },
+            _t: PhantomData,
+        }
+    }
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
 pub struct Text;
 impl AtlasSearch<Text> {
     /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
@@ -223,6 +246,14 @@ pub mod short {
     ///For more details, see the [equals operator reference](https://www.mongodb.com/docs/atlas/atlas-search/equals/).
     pub fn equals(path: impl StringOrArray, value: impl Into<Bson>) -> AtlasSearch<Equals> {
         AtlasSearch::equals(path, value)
+    }
+    /**The exists operator tests if a path to a specified indexed field name exists in a
+     * document.
+     * */
+    ///
+    ///For more details, see the [exists operator reference](https://www.mongodb.com/docs/atlas/atlas-search/exists/).
+    pub fn exists(path: impl StringOrArray) -> AtlasSearch<Exists> {
+        AtlasSearch::exists(path)
     }
     /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
     If you omit an analyzer, the text operator uses the default standard analyzer.

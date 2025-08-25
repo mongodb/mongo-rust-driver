@@ -225,6 +225,7 @@ fn main() {
         "compound",
         "embeddedDocument",
         "equals",
+        "exists",
         "text",
     ] {
         let mut path = PathBuf::from("yaml/search");
