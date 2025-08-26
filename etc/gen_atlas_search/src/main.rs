@@ -50,7 +50,14 @@ impl Operator {
         let mut setters = TokenStream::new();
 
         for arg in &self.arguments {
-            let ident = format_ident!("{}", arg.name.to_case(Case::Snake));
+            let ident = format_ident!(
+                "{}",
+                match arg.name.as_str() {
+                    // `box` is a reserved word
+                    "box" => "geo_box".to_owned(),
+                    _ => arg.name.to_case(Case::Snake),
+                }
+            );
             let rust_type = arg.rust_type(&self.name);
             let type_ = rust_type.tokens();
             let arg_name = &arg.name;
@@ -230,6 +237,7 @@ fn main() {
         "facet",
         "range",
         "geoShape",
+        "geoWithin",
         "text",
     ] {
         let mut path = PathBuf::from("yaml/search");

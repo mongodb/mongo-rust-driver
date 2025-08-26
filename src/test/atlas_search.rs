@@ -175,4 +175,35 @@ fn helper_output_doc() {
         )
         .into()
     );
+    assert_eq!(
+        doc! {
+            "$search": {
+                "geoWithin": {
+                    "path": "address.location",
+                    "box": {
+                        "bottomLeft": {
+                            "type": "Point",
+                            "coordinates": [112.467, -55.050]
+                        },
+                        "topRight": {
+                            "type": "Point",
+                            "coordinates": [168.000, -9.133]
+                        }
+                    }
+                }
+            }
+        },
+        geo_within("address.location")
+            .geo_box(doc! {
+                "bottomLeft": {
+                    "type": "Point",
+                    "coordinates": [112.467, -55.050]
+                },
+                "topRight": {
+                    "type": "Point",
+                    "coordinates": [168.000, -9.133]
+                }
+            })
+            .into()
+    )
 }
