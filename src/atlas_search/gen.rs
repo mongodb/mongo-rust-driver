@@ -16,6 +16,7 @@ impl AtlasSearch<Autocomplete> {
             stage: doc! {
                 "path" : path.to_bson(), "query" : query.to_bson(),
             },
+            meta: false,
             _t: PhantomData,
         }
     }
@@ -48,36 +49,39 @@ impl AtlasSearch<Compound> {
         AtlasSearch {
             name: "compound",
             stage: doc! {},
+            meta: false,
             _t: PhantomData,
         }
     }
     #[allow(missing_docs)]
-    pub fn must(mut self, must: impl IntoIterator<Item = impl Into<Document>>) -> Self {
-        self.stage
-            .insert("must", must.into_iter().map(Into::into).collect::<Vec<_>>());
+    pub fn must(mut self, must: impl IntoIterator<Item = impl SearchOperator>) -> Self {
+        self.stage.insert(
+            "must",
+            must.into_iter().map(|o| o.to_doc()).collect::<Vec<_>>(),
+        );
         self
     }
     #[allow(missing_docs)]
-    pub fn must_not(mut self, must_not: impl IntoIterator<Item = impl Into<Document>>) -> Self {
+    pub fn must_not(mut self, must_not: impl IntoIterator<Item = impl SearchOperator>) -> Self {
         self.stage.insert(
             "mustNot",
-            must_not.into_iter().map(Into::into).collect::<Vec<_>>(),
+            must_not.into_iter().map(|o| o.to_doc()).collect::<Vec<_>>(),
         );
         self
     }
     #[allow(missing_docs)]
-    pub fn should(mut self, should: impl IntoIterator<Item = impl Into<Document>>) -> Self {
+    pub fn should(mut self, should: impl IntoIterator<Item = impl SearchOperator>) -> Self {
         self.stage.insert(
             "should",
-            should.into_iter().map(Into::into).collect::<Vec<_>>(),
+            should.into_iter().map(|o| o.to_doc()).collect::<Vec<_>>(),
         );
         self
     }
     #[allow(missing_docs)]
-    pub fn filter(mut self, filter: impl IntoIterator<Item = impl Into<Document>>) -> Self {
+    pub fn filter(mut self, filter: impl IntoIterator<Item = impl SearchOperator>) -> Self {
         self.stage.insert(
             "filter",
-            filter.into_iter().map(Into::into).collect::<Vec<_>>(),
+            filter.into_iter().map(|o| o.to_doc()).collect::<Vec<_>>(),
         );
         self
     }
@@ -103,12 +107,13 @@ impl AtlasSearch<EmbeddedDocument> {
     */
     ///
     ///For more details, see the [embeddedDocument operator reference](https://www.mongodb.com/docs/atlas/atlas-search/embedded-document/).
-    pub fn embedded_document(path: impl StringOrArray, operator: impl Into<Document>) -> Self {
+    pub fn embedded_document(path: impl StringOrArray, operator: impl SearchOperator) -> Self {
         AtlasSearch {
             name: "embeddedDocument",
             stage: doc! {
-                "path" : path.to_bson(), "operator" : operator.into(),
+                "path" : path.to_bson(), "operator" : operator.to_doc(),
             },
+            meta: false,
             _t: PhantomData,
         }
     }
@@ -131,6 +136,7 @@ impl AtlasSearch<Equals> {
             stage: doc! {
                 "path" : path.to_bson(), "value" : value.into(),
             },
+            meta: false,
             _t: PhantomData,
         }
     }
@@ -154,12 +160,37 @@ impl AtlasSearch<Exists> {
             stage: doc! {
                 "path" : path.to_bson(),
             },
+            meta: false,
             _t: PhantomData,
         }
     }
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
         self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
+pub struct Facet;
+impl AtlasSearch<Facet> {
+    /**The facet collector groups results by values or ranges in the specified
+    faceted fields and returns the count for each of those groups.
+    */
+    ///
+    ///For more details, see the [facet operator reference](https://www.mongodb.com/docs/atlas/atlas-search/facet/).
+    pub fn facet(facets: Document) -> Self {
+        AtlasSearch {
+            name: "facet",
+            stage: doc! {
+                "facets" : facets,
+            },
+            meta: true,
+            _t: PhantomData,
+        }
+    }
+    #[allow(missing_docs)]
+    pub fn operator(mut self, operator: impl SearchOperator) -> Self {
+        self.stage.insert("operator", operator.to_doc());
         self
     }
 }
@@ -177,6 +208,7 @@ impl AtlasSearch<Text> {
             stage: doc! {
                 "path" : path.to_bson(), "query" : query.to_bson(),
             },
+            meta: false,
             _t: PhantomData,
         }
     }
@@ -236,7 +268,7 @@ pub mod short {
     ///For more details, see the [embeddedDocument operator reference](https://www.mongodb.com/docs/atlas/atlas-search/embedded-document/).
     pub fn embedded_document(
         path: impl StringOrArray,
-        operator: impl Into<Document>,
+        operator: impl SearchOperator,
     ) -> AtlasSearch<EmbeddedDocument> {
         AtlasSearch::embedded_document(path, operator)
     }
@@ -254,6 +286,14 @@ pub mod short {
     ///For more details, see the [exists operator reference](https://www.mongodb.com/docs/atlas/atlas-search/exists/).
     pub fn exists(path: impl StringOrArray) -> AtlasSearch<Exists> {
         AtlasSearch::exists(path)
+    }
+    /**The facet collector groups results by values or ranges in the specified
+    faceted fields and returns the count for each of those groups.
+    */
+    ///
+    ///For more details, see the [facet operator reference](https://www.mongodb.com/docs/atlas/atlas-search/facet/).
+    pub fn facet(facets: Document) -> AtlasSearch<Facet> {
+        AtlasSearch::facet(facets)
     }
     /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
     If you omit an analyzer, the text operator uses the default standard analyzer.

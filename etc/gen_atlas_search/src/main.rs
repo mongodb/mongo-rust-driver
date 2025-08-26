@@ -76,6 +76,10 @@ impl Operator {
             "For more details, see the [{name_text} operator reference]({}).",
             self.link
         );
+        let meta: TokenStream = match self.name.as_str() {
+            "facet" => parse_quote! { true },
+            _ => parse_quote! { false },
+        };
         let toplevel = parse_quote! {
             #[allow(missing_docs)]
             pub struct #name_ident;
@@ -88,6 +92,7 @@ impl Operator {
                     AtlasSearch {
                         name: #name_text,
                         stage: doc! { #init_doc },
+                        meta: #meta,
                         _t: PhantomData,
                     }
                 }
@@ -154,8 +159,8 @@ impl Argument {
             [Object] => ArgumentRustType::Document,
             [SearchScore] => ArgumentRustType::Document,
             [SearchPath] => ArgumentRustType::StringOrArray,
-            [SearchOperator] => ArgumentRustType::IntoDocument,
-            [SearchOperator, Array] => ArgumentRustType::IntoDocumentIter,
+            [SearchOperator] => ArgumentRustType::SearchOperator,
+            [SearchOperator, Array] => ArgumentRustType::SeachOperatorIter,
             [Int] => ArgumentRustType::I32,
             _ => panic!("Unexpected argument types: {:?}", self.type_),
         }
@@ -166,9 +171,9 @@ enum ArgumentRustType {
     Document,
     I32,
     IntoBson,
-    IntoDocument,
-    IntoDocumentIter,
     MatchCriteria,
+    SearchOperator,
+    SeachOperatorIter,
     String,
     StringOrArray,
     TokenOrder,
@@ -180,11 +185,11 @@ impl ArgumentRustType {
             Self::Document => parse_quote! { Document },
             Self::I32 => parse_quote! { i32 },
             Self::IntoBson => parse_quote! { impl Into<Bson> },
-            Self::IntoDocument => parse_quote! { impl Into<Document> },
-            Self::IntoDocumentIter => {
-                parse_quote! { impl IntoIterator<Item = impl Into<Document>> }
-            }
             Self::MatchCriteria => parse_quote! { MatchCriteria },
+            Self::SearchOperator => parse_quote! { impl SearchOperator },
+            Self::SeachOperatorIter => {
+                parse_quote! { impl IntoIterator<Item = impl SearchOperator> }
+            }
             Self::String => parse_quote! { impl AsRef<str> },
             Self::StringOrArray => parse_quote! { impl StringOrArray },
             Self::TokenOrder => parse_quote! { TokenOrder },
@@ -194,9 +199,10 @@ impl ArgumentRustType {
     fn bson_expr(&self, ident: &syn::Ident) -> syn::Expr {
         match self {
             Self::Document | Self::I32 => parse_quote! { #ident },
-            Self::IntoBson | Self::IntoDocument => parse_quote! { #ident.into() },
-            Self::IntoDocumentIter => {
-                parse_quote! { #ident.into_iter().map(Into::into).collect::<Vec<_>>() }
+            Self::IntoBson => parse_quote! { #ident.into() },
+            Self::SearchOperator => parse_quote! { #ident.to_doc() },
+            Self::SeachOperatorIter => {
+                parse_quote! { #ident.into_iter().map(|o| o.to_doc()).collect::<Vec<_>>() }
             }
             Self::String => parse_quote! { #ident.as_ref() },
             Self::StringOrArray => parse_quote! { #ident.to_bson() },
@@ -226,6 +232,7 @@ fn main() {
         "embeddedDocument",
         "equals",
         "exists",
+        "facet",
         "text",
     ] {
         let mut path = PathBuf::from("yaml/search");
