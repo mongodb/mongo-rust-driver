@@ -244,6 +244,34 @@ impl AtlasSearch<Range> {
     }
 }
 #[allow(missing_docs)]
+pub struct GeoShape;
+/**The geoShape operator supports querying shapes with a relation to a given
+geometry if indexShapes is set to true in the index definition.
+*/
+///
+///For more details, see the [geoShape operator reference](https://www.mongodb.com/docs/atlas/atlas-search/geoShape/).
+pub fn geo_shape(
+    path: impl StringOrArray,
+    relation: Relation,
+    geometry: Document,
+) -> AtlasSearch<GeoShape> {
+    AtlasSearch {
+        name: "geoShape",
+        stage: doc! {
+            "path" : path.to_bson(), "relation" : relation.name(), "geometry" : geometry,
+        },
+        meta: false,
+        _t: PhantomData,
+    }
+}
+impl AtlasSearch<GeoShape> {
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
 pub struct Text;
 /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
 If you omit an analyzer, the text operator uses the default standard analyzer.
