@@ -138,6 +138,7 @@ impl Argument {
             ("autocomplete", "tokenOrder") => return ArgumentRustType::TokenOrder,
             ("text", "matchCriteria") => return ArgumentRustType::MatchCriteria,
             ("equals", "value") => return ArgumentRustType::IntoBson,
+            ("range", "gt" | "gte" | "lt" | "lte") => return ArgumentRustType::IntoBson,
             _ => (),
         }
         use ArgumentType::*;
@@ -219,6 +220,7 @@ fn main() {
         "equals",
         "exists",
         "facet",
+        "range",
         "text",
     ] {
         let mut path = PathBuf::from("yaml/search");

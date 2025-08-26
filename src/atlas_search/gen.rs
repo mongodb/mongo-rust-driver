@@ -200,6 +200,50 @@ impl AtlasSearch<Facet> {
     }
 }
 #[allow(missing_docs)]
+pub struct Range;
+/**The range operator supports querying and scoring numeric, date, and string values.
+You can use this operator to find results that are within a given numeric, date, objectId, or letter (from the English alphabet) range.
+*/
+///
+///For more details, see the [range operator reference](https://www.mongodb.com/docs/atlas/atlas-search/range/).
+pub fn range(path: impl StringOrArray) -> AtlasSearch<Range> {
+    AtlasSearch {
+        name: "range",
+        stage: doc! {
+            "path" : path.to_bson(),
+        },
+        meta: false,
+        _t: PhantomData,
+    }
+}
+impl AtlasSearch<Range> {
+    #[allow(missing_docs)]
+    pub fn gt(mut self, gt: impl Into<Bson>) -> Self {
+        self.stage.insert("gt", gt.into());
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn gte(mut self, gte: impl Into<Bson>) -> Self {
+        self.stage.insert("gte", gte.into());
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn lt(mut self, lt: impl Into<Bson>) -> Self {
+        self.stage.insert("lt", lt.into());
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn lte(mut self, lte: impl Into<Bson>) -> Self {
+        self.stage.insert("lte", lte.into());
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
 pub struct Text;
 /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
 If you omit an analyzer, the text operator uses the default standard analyzer.

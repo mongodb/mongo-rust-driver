@@ -283,3 +283,98 @@ impl AtlasSearch<Facet> {
         self
     }
 }
+
+/// Facet definitions.  These can be used when constructing a facet definition doc:
+/// ```
+/// use mongodb::atlas_search;
+/// let search = atlas_search::facet(doc! {
+///   "directorsFacet": atlas_search::facet::string("directors").num_buckets(7),
+///   "yearFacet": atlas_search::facet::number("year", [2000, 2005, 2010, 2015]),
+/// });
+/// ```
+pub mod facet {
+    use crate::bson::{doc, Bson, Document};
+    use std::marker::PhantomData;
+
+    /// A facet definition.
+    pub struct Facet<T> {
+        inner: Document,
+        _t: PhantomData<T>,
+    }
+
+    impl<T> From<Facet<T>> for Bson {
+        fn from(value: Facet<T>) -> Self {
+            Bson::Document(value.inner)
+        }
+    }
+
+    #[allow(missing_docs)]
+    pub struct String;
+    /// String facets allow you to narrow down Atlas Search results based on the most frequent
+    /// string values in the specified string field.
+    pub fn string(path: impl AsRef<str>) -> Facet<String> {
+        Facet {
+            inner: doc! {
+                "type": "string",
+                "path": path.as_ref(),
+            },
+            _t: PhantomData,
+        }
+    }
+    impl Facet<String> {
+        #[allow(missing_docs)]
+        pub fn num_buckets(mut self, num: i32) -> Self {
+            self.inner.insert("numBuckets", num);
+            self
+        }
+    }
+
+    #[allow(missing_docs)]
+    pub struct Number;
+    /// Numeric facets allow you to determine the frequency of numeric values in your search results
+    /// by breaking the results into separate ranges of numbers.
+    pub fn number(
+        path: impl AsRef<str>,
+        boundaries: impl IntoIterator<Item = impl Into<Bson>>,
+    ) -> Facet<Number> {
+        Facet {
+            inner: doc! {
+                "type": "number",
+                "path": path.as_ref(),
+                "boundaries": boundaries.into_iter().map(Into::into).collect::<Vec<_>>(),
+            },
+            _t: PhantomData,
+        }
+    }
+    impl Facet<Number> {
+        #[allow(missing_docs)]
+        pub fn default(mut self, bucket: impl AsRef<str>) -> Self {
+            self.inner.insert("default", bucket.as_ref());
+            self
+        }
+    }
+
+    #[allow(missing_docs)]
+    pub struct Date;
+    /// Date facets allow you to narrow down search results based on a date.
+    pub fn date(
+        path: impl AsRef<str>,
+        boundaries: impl IntoIterator<Item = crate::bson::DateTime>,
+    ) -> Facet<Date> {
+        Facet {
+            inner: doc! {
+                "type": "date",
+                "path": path.as_ref(),
+                "boundaries": boundaries.into_iter().collect::<Vec<_>>(),
+            },
+            _t: PhantomData,
+        }
+    }
+    impl Facet<Date> {
+        #[allow(missing_docs)]
+        pub fn default(mut self, bucket: impl AsRef<str>) -> Self {
+            self.inner.insert("default", bucket.as_ref());
+            self
+        }
+    }
+}
