@@ -2,24 +2,27 @@
 use super::*;
 #[allow(missing_docs)]
 pub struct Autocomplete;
-impl AtlasSearch<Autocomplete> {
-    /**The autocomplete operator performs a search for a word or phrase that
-    contains a sequence of characters from an incomplete input string. The
-    fields that you intend to query with the autocomplete operator must be
-    indexed with the autocomplete data type in the collection's index definition.
-    */
-    ///
-    ///For more details, see the [autocomplete operator reference](https://www.mongodb.com/docs/atlas/atlas-search/autocomplete/).
-    pub fn autocomplete(path: impl StringOrArray, query: impl StringOrArray) -> Self {
-        AtlasSearch {
-            name: "autocomplete",
-            stage: doc! {
-                "path" : path.to_bson(), "query" : query.to_bson(),
-            },
-            meta: false,
-            _t: PhantomData,
-        }
+/**The autocomplete operator performs a search for a word or phrase that
+contains a sequence of characters from an incomplete input string. The
+fields that you intend to query with the autocomplete operator must be
+indexed with the autocomplete data type in the collection's index definition.
+*/
+///
+///For more details, see the [autocomplete operator reference](https://www.mongodb.com/docs/atlas/atlas-search/autocomplete/).
+pub fn autocomplete(
+    path: impl StringOrArray,
+    query: impl StringOrArray,
+) -> AtlasSearch<Autocomplete> {
+    AtlasSearch {
+        name: "autocomplete",
+        stage: doc! {
+            "path" : path.to_bson(), "query" : query.to_bson(),
+        },
+        meta: false,
+        _t: PhantomData,
     }
+}
+impl AtlasSearch<Autocomplete> {
     #[allow(missing_docs)]
     pub fn token_order(mut self, token_order: TokenOrder) -> Self {
         self.stage.insert("tokenOrder", token_order.name());
@@ -38,21 +41,21 @@ impl AtlasSearch<Autocomplete> {
 }
 #[allow(missing_docs)]
 pub struct Compound;
-impl AtlasSearch<Compound> {
-    /**The compound operator combines two or more operators into a single query.
-    Each element of a compound query is called a clause, and each clause
-    consists of one or more sub-queries.
-    */
-    ///
-    ///For more details, see the [compound operator reference](https://www.mongodb.com/docs/atlas/atlas-search/compound/).
-    pub fn compound() -> Self {
-        AtlasSearch {
-            name: "compound",
-            stage: doc! {},
-            meta: false,
-            _t: PhantomData,
-        }
+/**The compound operator combines two or more operators into a single query.
+Each element of a compound query is called a clause, and each clause
+consists of one or more sub-queries.
+*/
+///
+///For more details, see the [compound operator reference](https://www.mongodb.com/docs/atlas/atlas-search/compound/).
+pub fn compound() -> AtlasSearch<Compound> {
+    AtlasSearch {
+        name: "compound",
+        stage: doc! {},
+        meta: false,
+        _t: PhantomData,
     }
+}
+impl AtlasSearch<Compound> {
     #[allow(missing_docs)]
     pub fn must(mut self, must: impl IntoIterator<Item = impl SearchOperator>) -> Self {
         self.stage.insert(
@@ -99,24 +102,27 @@ impl AtlasSearch<Compound> {
 }
 #[allow(missing_docs)]
 pub struct EmbeddedDocument;
-impl AtlasSearch<EmbeddedDocument> {
-    /**The embeddedDocument operator is similar to $elemMatch operator.
-    It constrains multiple query predicates to be satisfied from a single
-    element of an array of embedded documents. embeddedDocument can be used only
-    for queries over fields of the embeddedDocuments
-    */
-    ///
-    ///For more details, see the [embeddedDocument operator reference](https://www.mongodb.com/docs/atlas/atlas-search/embedded-document/).
-    pub fn embedded_document(path: impl StringOrArray, operator: impl SearchOperator) -> Self {
-        AtlasSearch {
-            name: "embeddedDocument",
-            stage: doc! {
-                "path" : path.to_bson(), "operator" : operator.to_doc(),
-            },
-            meta: false,
-            _t: PhantomData,
-        }
+/**The embeddedDocument operator is similar to $elemMatch operator.
+It constrains multiple query predicates to be satisfied from a single
+element of an array of embedded documents. embeddedDocument can be used only
+for queries over fields of the embeddedDocuments
+*/
+///
+///For more details, see the [embeddedDocument operator reference](https://www.mongodb.com/docs/atlas/atlas-search/embedded-document/).
+pub fn embedded_document(
+    path: impl StringOrArray,
+    operator: impl SearchOperator,
+) -> AtlasSearch<EmbeddedDocument> {
+    AtlasSearch {
+        name: "embeddedDocument",
+        stage: doc! {
+            "path" : path.to_bson(), "operator" : operator.to_doc(),
+        },
+        meta: false,
+        _t: PhantomData,
     }
+}
+impl AtlasSearch<EmbeddedDocument> {
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
         self.stage.insert("score", score);
@@ -125,21 +131,21 @@ impl AtlasSearch<EmbeddedDocument> {
 }
 #[allow(missing_docs)]
 pub struct Equals;
-impl AtlasSearch<Equals> {
-    /**The equals operator checks whether a field matches a value you specify.
-     * */
-    ///
-    ///For more details, see the [equals operator reference](https://www.mongodb.com/docs/atlas/atlas-search/equals/).
-    pub fn equals(path: impl StringOrArray, value: impl Into<Bson>) -> Self {
-        AtlasSearch {
-            name: "equals",
-            stage: doc! {
-                "path" : path.to_bson(), "value" : value.into(),
-            },
-            meta: false,
-            _t: PhantomData,
-        }
+/**The equals operator checks whether a field matches a value you specify.
+ * */
+///
+///For more details, see the [equals operator reference](https://www.mongodb.com/docs/atlas/atlas-search/equals/).
+pub fn equals(path: impl StringOrArray, value: impl Into<Bson>) -> AtlasSearch<Equals> {
+    AtlasSearch {
+        name: "equals",
+        stage: doc! {
+            "path" : path.to_bson(), "value" : value.into(),
+        },
+        meta: false,
+        _t: PhantomData,
     }
+}
+impl AtlasSearch<Equals> {
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
         self.stage.insert("score", score);
@@ -148,22 +154,21 @@ impl AtlasSearch<Equals> {
 }
 #[allow(missing_docs)]
 pub struct Exists;
-impl AtlasSearch<Exists> {
-    /**The exists operator tests if a path to a specified indexed field name exists in a
-     * document.
-     * */
-    ///
-    ///For more details, see the [exists operator reference](https://www.mongodb.com/docs/atlas/atlas-search/exists/).
-    pub fn exists(path: impl StringOrArray) -> Self {
-        AtlasSearch {
-            name: "exists",
-            stage: doc! {
-                "path" : path.to_bson(),
-            },
-            meta: false,
-            _t: PhantomData,
-        }
+/**The exists operator tests if a path to a specified indexed field name exists in a document.
+ * */
+///
+///For more details, see the [exists operator reference](https://www.mongodb.com/docs/atlas/atlas-search/exists/).
+pub fn exists(path: impl StringOrArray) -> AtlasSearch<Exists> {
+    AtlasSearch {
+        name: "exists",
+        stage: doc! {
+            "path" : path.to_bson(),
+        },
+        meta: false,
+        _t: PhantomData,
     }
+}
+impl AtlasSearch<Exists> {
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
         self.stage.insert("score", score);
@@ -172,22 +177,22 @@ impl AtlasSearch<Exists> {
 }
 #[allow(missing_docs)]
 pub struct Facet;
-impl AtlasSearch<Facet> {
-    /**The facet collector groups results by values or ranges in the specified
-    faceted fields and returns the count for each of those groups.
-    */
-    ///
-    ///For more details, see the [facet operator reference](https://www.mongodb.com/docs/atlas/atlas-search/facet/).
-    pub fn facet(facets: Document) -> Self {
-        AtlasSearch {
-            name: "facet",
-            stage: doc! {
-                "facets" : facets,
-            },
-            meta: true,
-            _t: PhantomData,
-        }
+/**The facet collector groups results by values or ranges in the specified
+faceted fields and returns the count for each of those groups.
+*/
+///
+///For more details, see the [facet operator reference](https://www.mongodb.com/docs/atlas/atlas-search/facet/).
+pub fn facet(facets: Document) -> AtlasSearch<Facet> {
+    AtlasSearch {
+        name: "facet",
+        stage: doc! {
+            "facets" : facets,
+        },
+        meta: true,
+        _t: PhantomData,
     }
+}
+impl AtlasSearch<Facet> {
     #[allow(missing_docs)]
     pub fn operator(mut self, operator: impl SearchOperator) -> Self {
         self.stage.insert("operator", operator.to_doc());
@@ -196,22 +201,22 @@ impl AtlasSearch<Facet> {
 }
 #[allow(missing_docs)]
 pub struct Text;
-impl AtlasSearch<Text> {
-    /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
-    If you omit an analyzer, the text operator uses the default standard analyzer.
-    */
-    ///
-    ///For more details, see the [text operator reference](https://www.mongodb.com/docs/atlas/atlas-search/text/).
-    pub fn text(path: impl StringOrArray, query: impl StringOrArray) -> Self {
-        AtlasSearch {
-            name: "text",
-            stage: doc! {
-                "path" : path.to_bson(), "query" : query.to_bson(),
-            },
-            meta: false,
-            _t: PhantomData,
-        }
+/**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
+If you omit an analyzer, the text operator uses the default standard analyzer.
+*/
+///
+///For more details, see the [text operator reference](https://www.mongodb.com/docs/atlas/atlas-search/text/).
+pub fn text(path: impl StringOrArray, query: impl StringOrArray) -> AtlasSearch<Text> {
+    AtlasSearch {
+        name: "text",
+        stage: doc! {
+            "path" : path.to_bson(), "query" : query.to_bson(),
+        },
+        meta: false,
+        _t: PhantomData,
     }
+}
+impl AtlasSearch<Text> {
     #[allow(missing_docs)]
     pub fn fuzzy(mut self, fuzzy: Document) -> Self {
         self.stage.insert("fuzzy", fuzzy);
@@ -231,76 +236,5 @@ impl AtlasSearch<Text> {
     pub fn score(mut self, score: Document) -> Self {
         self.stage.insert("score", score);
         self
-    }
-}
-/// Atlas Search constructor functions without the `AtlasSearch::` prefix; can be useful to
-/// improve readability when constructing deeply nested searches.
-pub mod short {
-    use super::*;
-    /**The autocomplete operator performs a search for a word or phrase that
-    contains a sequence of characters from an incomplete input string. The
-    fields that you intend to query with the autocomplete operator must be
-    indexed with the autocomplete data type in the collection's index definition.
-    */
-    ///
-    ///For more details, see the [autocomplete operator reference](https://www.mongodb.com/docs/atlas/atlas-search/autocomplete/).
-    pub fn autocomplete(
-        path: impl StringOrArray,
-        query: impl StringOrArray,
-    ) -> AtlasSearch<Autocomplete> {
-        AtlasSearch::autocomplete(path, query)
-    }
-    /**The compound operator combines two or more operators into a single query.
-    Each element of a compound query is called a clause, and each clause
-    consists of one or more sub-queries.
-    */
-    ///
-    ///For more details, see the [compound operator reference](https://www.mongodb.com/docs/atlas/atlas-search/compound/).
-    pub fn compound() -> AtlasSearch<Compound> {
-        AtlasSearch::compound()
-    }
-    /**The embeddedDocument operator is similar to $elemMatch operator.
-    It constrains multiple query predicates to be satisfied from a single
-    element of an array of embedded documents. embeddedDocument can be used only
-    for queries over fields of the embeddedDocuments
-    */
-    ///
-    ///For more details, see the [embeddedDocument operator reference](https://www.mongodb.com/docs/atlas/atlas-search/embedded-document/).
-    pub fn embedded_document(
-        path: impl StringOrArray,
-        operator: impl SearchOperator,
-    ) -> AtlasSearch<EmbeddedDocument> {
-        AtlasSearch::embedded_document(path, operator)
-    }
-    /**The equals operator checks whether a field matches a value you specify.
-     * */
-    ///
-    ///For more details, see the [equals operator reference](https://www.mongodb.com/docs/atlas/atlas-search/equals/).
-    pub fn equals(path: impl StringOrArray, value: impl Into<Bson>) -> AtlasSearch<Equals> {
-        AtlasSearch::equals(path, value)
-    }
-    /**The exists operator tests if a path to a specified indexed field name exists in a
-     * document.
-     * */
-    ///
-    ///For more details, see the [exists operator reference](https://www.mongodb.com/docs/atlas/atlas-search/exists/).
-    pub fn exists(path: impl StringOrArray) -> AtlasSearch<Exists> {
-        AtlasSearch::exists(path)
-    }
-    /**The facet collector groups results by values or ranges in the specified
-    faceted fields and returns the count for each of those groups.
-    */
-    ///
-    ///For more details, see the [facet operator reference](https://www.mongodb.com/docs/atlas/atlas-search/facet/).
-    pub fn facet(facets: Document) -> AtlasSearch<Facet> {
-        AtlasSearch::facet(facets)
-    }
-    /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
-    If you omit an analyzer, the text operator uses the default standard analyzer.
-    */
-    ///
-    ///For more details, see the [text operator reference](https://www.mongodb.com/docs/atlas/atlas-search/text/).
-    pub fn text(path: impl StringOrArray, query: impl StringOrArray) -> AtlasSearch<Text> {
-        AtlasSearch::text(path, query)
     }
 }
