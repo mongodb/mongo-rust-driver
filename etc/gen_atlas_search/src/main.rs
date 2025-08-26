@@ -120,6 +120,7 @@ enum ArgumentType {
     BinData,
     Bool,
     Date,
+    Geometry,
     Int,
     Null,
     Number,
@@ -138,7 +139,9 @@ impl Argument {
             ("autocomplete", "tokenOrder") => return ArgumentRustType::TokenOrder,
             ("text", "matchCriteria") => return ArgumentRustType::MatchCriteria,
             ("equals", "value") => return ArgumentRustType::IntoBson,
+            ("geoShape", "relation") => return ArgumentRustType::Relation,
             ("range", "gt" | "gte" | "lt" | "lte") => return ArgumentRustType::IntoBson,
+
             _ => (),
         }
         use ArgumentType::*;
@@ -150,6 +153,7 @@ impl Argument {
             [SearchOperator] => ArgumentRustType::SearchOperator,
             [SearchOperator, Array] => ArgumentRustType::SeachOperatorIter,
             [Int] => ArgumentRustType::I32,
+            [Geometry] => ArgumentRustType::Document,
             _ => panic!("Unexpected argument types: {:?}", self.type_),
         }
     }
@@ -160,6 +164,7 @@ enum ArgumentRustType {
     I32,
     IntoBson,
     MatchCriteria,
+    Relation,
     SearchOperator,
     SeachOperatorIter,
     String,
@@ -174,6 +179,7 @@ impl ArgumentRustType {
             Self::I32 => parse_quote! { i32 },
             Self::IntoBson => parse_quote! { impl Into<Bson> },
             Self::MatchCriteria => parse_quote! { MatchCriteria },
+            Self::Relation => parse_quote! { Relation },
             Self::SearchOperator => parse_quote! { impl SearchOperator },
             Self::SeachOperatorIter => {
                 parse_quote! { impl IntoIterator<Item = impl SearchOperator> }
@@ -194,7 +200,9 @@ impl ArgumentRustType {
             }
             Self::String => parse_quote! { #ident.as_ref() },
             Self::StringOrArray => parse_quote! { #ident.to_bson() },
-            Self::TokenOrder | Self::MatchCriteria => parse_quote! { #ident.name() },
+            Self::TokenOrder | Self::MatchCriteria | Self::Relation => {
+                parse_quote! { #ident.name() }
+            }
         }
     }
 }
@@ -221,6 +229,7 @@ fn main() {
         "exists",
         "facet",
         "range",
+        "geoShape",
         "text",
     ] {
         let mut path = PathBuf::from("yaml/search");

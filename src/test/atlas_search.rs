@@ -146,4 +146,33 @@ fn helper_output_doc() {
         .operator(range("released").gte(gte_dt).lte(lte_dt))
         .into()
     );
+    assert_eq!(
+        doc! {
+            "$search": {
+                "geoShape": {
+                    "relation": "disjoint",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[-161.323242,22.512557],
+                                        [-152.446289,22.065278],
+                                        [-156.09375,17.811456],
+                                        [-161.323242,22.512557]]]
+                    },
+                    "path": "address.location"
+                }
+            }
+        },
+        geo_shape(
+            "address.location",
+            Relation::Disjoint,
+            doc! {
+                "type": "Polygon",
+                "coordinates": [[[-161.323242,22.512557],
+                                [-152.446289,22.065278],
+                                [-156.09375,17.811456],
+                                [-161.323242,22.512557]]]
+            }
+        )
+        .into()
+    );
 }

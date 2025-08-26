@@ -378,3 +378,32 @@ pub mod facet {
         }
     }
 }
+
+/// Relation of the query shape geometry to the indexed field geometry.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum Relation {
+    /// Indicates that the indexed geometry contains the query geometry.
+    Contains,
+    /// Indicates that both the query and indexed geometries have nothing in common.
+    Disjoint,
+    /// Indicates that both the query and indexed geometries intersect.
+    Intersects,
+    /// Indicates that the indexed geometry is within the query geometry. You can't use within with
+    /// LineString or Point.
+    Within,
+    /// Fallback for future compatibility.
+    Other(String),
+}
+
+impl Relation {
+    fn name(&self) -> &str {
+        match self {
+            Self::Contains => "contains",
+            Self::Disjoint => "disjoint",
+            Self::Intersects => "intersects",
+            Self::Within => "within",
+            Self::Other(s) => &s,
+        }
+    }
+}
