@@ -35,13 +35,15 @@ use crate::bson::{doc, Bson, Document};
 pub struct AtlasSearch<T> {
     name: &'static str,
     stage: Document,
+    meta: bool,
     _t: PhantomData<T>,
 }
 
 impl<T> From<AtlasSearch<T>> for Document {
     fn from(value: AtlasSearch<T>) -> Self {
+        let key = if value.meta { "$searchMeta" } else { "$search" };
         doc! {
-            "$search": {
+            key: {
                 value.name: value.stage
             }
         }
@@ -71,6 +73,7 @@ impl<T> AtlasSearch<T> {
         AtlasSearch {
             name: self.name,
             stage: self.stage,
+            meta: self.meta,
             _t: PhantomData,
         }
     }
@@ -249,94 +252,194 @@ impl StringOrArray for Vec<&String> {
     fn sealed(_: private::Sealed) {}
 }
 
-#[tokio::test]
-async fn api_flow() {
-    // This is currently intended as a testbed for how the API works, not as an actual test.
-    return;
+/// An Atlas Search operator parameter that is itself a search operator.
+pub trait SearchOperator {
+    #[allow(missing_docs)]
+    fn to_doc(self) -> Document;
+    #[allow(missing_docs)]
+    fn sealed(_: private::Sealed) {}
+}
 
-    #[allow(unreachable_code)]
-    {
-        #[allow(unused_variables)]
-        let coll: crate::Collection<Document> = todo!();
-        let _ = coll
-            .aggregate(vec![
-                AtlasSearch::autocomplete("title", "pre")
-                    .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
-                    .into(),
-                doc! {
-                    "$limit": 10,
-                },
-                doc! {
-                    "$project": {
-                        "_id": 0,
-                        "title": 1,
-                    }
-                },
-            ])
-            .await;
-        let _ = coll
-            .aggregate(vec![
-                AtlasSearch::text("plot", "baseball").into(),
-                doc! { "$limit": 3 },
-                doc! {
-                    "$project": {
-                        "_id": 0,
-                        "title": 1,
-                        "plot": 1,
-                    }
-                },
-            ])
-            .await;
-        let _ = coll
-            .aggregate(vec![
-                AtlasSearch::compound()
-                    .must(AtlasSearch::text("description", "varieties"))
-                    .should(AtlasSearch::text("description", "Fuji"))
-                    .into(),
-                doc! {
-                    "$project": {
-                        "score": { "$meta": "searchScore" }
-                    }
-                },
-            ])
-            .await;
-        use short::*;
-        let _ = coll
-            .aggregate(vec![
-                embedded_document(
-                    "items",
-                    compound()
-                        .must(text("items.name", "school"))
-                        .should(text("items.name", "backpack")),
-                )
-                .score(doc! {
-                    "embedded": {
-                        "aggregate": "mean"
-                    }
-                })
-                .into(),
-                doc! { "$limit": 5 },
-                doc! {
-                    "$project": {
-                        "_id": 0,
-                        "items.name": 1,
-                        "items.tags": 1,
-                        "score": { "$meta": "searchScore" },
-                    }
-                },
-            ])
-            .await;
-        let _ = coll
-            .aggregate(vec![
-                AtlasSearch::equals("verified_user", true).into(),
-                doc! {
-                    "$project": {
-                        "name": 1,
-                        "_id": 0,
-                        "score": { "$meta": "searchScore" },
-                    }
-                },
-            ])
-            .await;
+impl<T> SearchOperator for AtlasSearch<T> {
+    fn to_doc(self) -> Document {
+        doc! { self.name: self.stage }
     }
+    fn sealed(_: private::Sealed) {}
+}
+
+impl SearchOperator for Document {
+    fn to_doc(self) -> Document {
+        self
+    }
+    fn sealed(_: private::Sealed) {}
+}
+
+impl AtlasSearch<Facet> {
+    /// Use the `$search` stage instead of the default `$searchMeta` stage.
+    pub fn search(mut self) -> Self {
+        self.meta = false;
+        self
+    }
+}
+
+#[test]
+fn api_flow() {
+    assert_eq!(
+        doc! {
+            "$search": {
+                "autocomplete": {
+                    "query": "pre",
+                    "path": "title",
+                    "fuzzy": {
+                        "maxEdits": 1,
+                        "prefixLength": 1,
+                        "maxExpansions": 256,
+                    },
+                }
+            }
+        },
+        AtlasSearch::autocomplete("title", "pre")
+            .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
+            .into()
+    );
+    assert_eq!(
+        doc! {
+            "$search": {
+                "text": {
+                    "path": "plot",
+                    "query": "baseball",
+                }
+            }
+        },
+        AtlasSearch::text("plot", "baseball").into()
+    );
+    assert_eq!(
+        doc! {
+            "$search": {
+                "compound": {
+                    "must": [{
+                        "text": {
+                            "path": "description",
+                            "query": "varieties",
+                        }
+                    }],
+                    "should": [{
+                        "text": {
+                            "path": "description",
+                            "query": "Fuji",
+                        }
+                    }],
+                }
+            }
+        },
+        AtlasSearch::compound()
+            .must(AtlasSearch::text("description", "varieties"))
+            .should(AtlasSearch::text("description", "Fuji"))
+            .into()
+    );
+    {
+        use short::*;
+        assert_eq!(
+            doc! {
+                "$search": {
+                    "embeddedDocument": {
+                        "path": "items",
+                        "operator": {
+                            "compound": {
+                                "must": [{
+                                    "text": {
+                                        "path": "items.tags",
+                                        "query": "school",
+                                    }
+                                }],
+                                "should": [{
+                                    "text": {
+                                        "path": "items.name",
+                                        "query": "backpack",
+                                    }
+                                }]
+                            }
+                        },
+                        "score": {
+                            "embedded": {
+                                "aggregate": "mean"
+                            }
+                        },
+                    }
+                }
+            },
+            embedded_document(
+                "items",
+                compound()
+                    .must(text("items.tags", "school"))
+                    .should(text("items.name", "backpack")),
+            )
+            .score(doc! {
+                "embedded": {
+                    "aggregate": "mean"
+                }
+            })
+            .into()
+        );
+    }
+    assert_eq!(
+        doc! {
+            "$search": {
+                "equals": {
+                    "path": "verified_user",
+                    "value": true,
+                }
+            }
+        },
+        AtlasSearch::equals("verified_user", true).into()
+    );
+    let gte_dt = crate::bson::DateTime::parse_rfc3339_str("2000-01-01T00:00:00.000Z").unwrap();
+    let lte_dt = crate::bson::DateTime::parse_rfc3339_str("2015-01-31T00:00:00.000Z").unwrap();
+    assert_eq!(
+        doc! {
+            "$searchMeta": {
+                "facet": {
+                    "operator": {
+                        "range": {
+                            "path": "released",
+                            "gte": gte_dt,
+                            "lte": lte_dt,
+                        }
+                    },
+                    "facets": {
+                        "directorsFacet": {
+                            "type": "string",
+                            "path": "directors",
+                            "numBuckets": 7,
+                        },
+                        "yearFacet": {
+                            "type": "number",
+                            "path": "year",
+                            "boundaries": [2000, 2005, 2010, 2015]
+                        },
+                    }
+                }
+            }
+        },
+        AtlasSearch::facet(doc! {
+            "directorsFacet": {
+                "type": "string",
+                "path": "directors",
+                "numBuckets": 7,
+            },
+            "yearFacet": {
+                "type": "number",
+                "path": "year",
+                "boundaries": [2000, 2005, 2010, 2015]
+            },
+        })
+        .operator(doc! {
+            "range": {
+                "path": "released",
+                "gte": gte_dt,
+                "lte": lte_dt,
+            }
+        })
+        .into()
+    );
 }
