@@ -272,6 +272,46 @@ impl AtlasSearch<GeoShape> {
     }
 }
 #[allow(missing_docs)]
+pub struct GeoWithin;
+/**The geoWithin operator supports querying geographic points within a given
+geometry. Only points are returned, even if indexShapes value is true in
+the index definition.
+*/
+///
+///For more details, see the [geoWithin operator reference](https://www.mongodb.com/docs/atlas/atlas-search/geoWithin/).
+pub fn geo_within(path: impl StringOrArray) -> AtlasSearch<GeoWithin> {
+    AtlasSearch {
+        name: "geoWithin",
+        stage: doc! {
+            "path" : path.to_bson(),
+        },
+        meta: false,
+        _t: PhantomData,
+    }
+}
+impl AtlasSearch<GeoWithin> {
+    #[allow(missing_docs)]
+    pub fn geo_box(mut self, geo_box: Document) -> Self {
+        self.stage.insert("box", geo_box);
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn circle(mut self, circle: Document) -> Self {
+        self.stage.insert("circle", circle);
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn geometry(mut self, geometry: Document) -> Self {
+        self.stage.insert("geometry", geometry);
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
 pub struct Text;
 /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
 If you omit an analyzer, the text operator uses the default standard analyzer.
