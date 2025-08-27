@@ -312,6 +312,29 @@ impl AtlasSearch<GeoWithin> {
     }
 }
 #[allow(missing_docs)]
+pub struct SearchIn;
+/**The in operator performs a search for an array of BSON values in a field.
+ * */
+///
+///For more details, see the [in operator reference](https://www.mongodb.com/docs/atlas/atlas-search/in/).
+pub fn search_in(path: impl StringOrArray, value: impl Into<Bson>) -> AtlasSearch<SearchIn> {
+    AtlasSearch {
+        name: "in",
+        stage: doc! {
+            "path" : path.to_bson(), "value" : value.into(),
+        },
+        meta: false,
+        _t: PhantomData,
+    }
+}
+impl AtlasSearch<SearchIn> {
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
 pub struct Text;
 /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
 If you omit an analyzer, the text operator uses the default standard analyzer.
