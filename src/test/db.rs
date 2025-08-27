@@ -476,5 +476,5 @@ fn create_collection_options_deserialize() {
         "size": 5253511168.0,
         "autoIndexId": false,
     };
-    let _: CreateCollectionOptions = crate::bson::deserialize_from_document(source).unwrap();
+    let _: CreateCollectionOptions = crate::bson_compat::deserialize_from_document(source).unwrap();
 }
