@@ -468,3 +468,13 @@ async fn test_run_command() {
         assert_eq!(v[0].as_ref().unwrap().get_str("foo").unwrap(), "bar");
     }
 }
+
+#[test]
+fn create_collection_options_deserialize() {
+    let source = doc! {
+        "capped": true,
+        "size": 5253511168.0,
+        "autoIndexId": false,
+    };
+    let _: CreateCollectionOptions = crate::bson::deserialize_from_document(source).unwrap();
+}

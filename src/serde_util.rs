@@ -118,6 +118,21 @@ where
         .ok_or_else(|| serde::de::Error::custom(format!("could not deserialize u64 from {bson:?}")))
 }
 
+pub(crate) fn deserialize_option_u64_from_bson_number<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<Bson>::deserialize(deserializer)?
+        .map(|bson| {
+            get_u64(&bson).ok_or_else(|| {
+                serde::de::Error::custom(format!("could not deserialize u64 from {bson:?}"))
+            })
+        })
+        .transpose()
+}
+
 pub(crate) fn serialize_error_as_string<S: Serializer>(
     val: &Error,
     serializer: S,
