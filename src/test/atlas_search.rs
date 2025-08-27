@@ -217,6 +217,23 @@ fn helper_output_doc() {
         },
         search_in("accounts", [371138, 371139, 371140].as_ref()).into()
     );
+    assert_eq!(
+        doc! {
+            "$search": {
+                "moreLikeThis": {
+                    "like": {
+                        "title": "The Godfather",
+                        "genres": "action"
+                    }
+                }
+            }
+        },
+        more_like_this(doc! {
+            "title": "The Godfather",
+            "genres": "action"
+        })
+        .into()
+    );
 }
 
 #[test]

@@ -167,6 +167,7 @@ impl Argument {
             [Int] => ArgumentRustType::I32,
             [Geometry] => ArgumentRustType::Document,
             [Any, Array] => ArgumentRustType::IntoBson,
+            [Object, Array] => ArgumentRustType::DocumentOrArray,
             _ => panic!("Unexpected argument types: {:?}", self.type_),
         }
     }
@@ -174,6 +175,7 @@ impl Argument {
 
 enum ArgumentRustType {
     Document,
+    DocumentOrArray,
     I32,
     IntoBson,
     MatchCriteria,
@@ -189,6 +191,7 @@ impl ArgumentRustType {
     fn tokens(&self) -> syn::Type {
         match self {
             Self::Document => parse_quote! { Document },
+            Self::DocumentOrArray => parse_quote! { impl DocumentOrArray },
             Self::I32 => parse_quote! { i32 },
             Self::IntoBson => parse_quote! { impl Into<Bson> },
             Self::MatchCriteria => parse_quote! { MatchCriteria },
@@ -212,7 +215,7 @@ impl ArgumentRustType {
                 parse_quote! { #ident.into_iter().map(|o| o.to_doc()).collect::<Vec<_>>() }
             }
             Self::String => parse_quote! { #ident.as_ref() },
-            Self::StringOrArray => parse_quote! { #ident.to_bson() },
+            Self::StringOrArray | Self::DocumentOrArray => parse_quote! { #ident.to_bson() },
             Self::TokenOrder | Self::MatchCriteria | Self::Relation => {
                 parse_quote! { #ident.name() }
             }
@@ -245,6 +248,7 @@ fn main() {
         "geoShape",
         "geoWithin",
         "in",
+        "moreLikeThis",
         "text",
     ] {
         let mut path = PathBuf::from("yaml/search");
