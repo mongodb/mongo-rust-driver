@@ -477,4 +477,9 @@ fn create_collection_options_deserialize() {
         "autoIndexId": false,
     };
     let _: CreateCollectionOptions = crate::bson_compat::deserialize_from_document(source).unwrap();
+    let source = doc! {
+        "capped": true,
+        "autoIndexId": false,
+    };
+    let _: CreateCollectionOptions = crate::bson_compat::deserialize_from_document(source).unwrap();
 }

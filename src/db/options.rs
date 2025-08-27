@@ -46,7 +46,8 @@ pub struct CreateCollectionOptions {
     /// not set to true.
     #[serde(
         serialize_with = "serde_util::serialize_u64_option_as_i64",
-        deserialize_with = "serde_util::deserialize_option_u64_from_bson_number"
+        deserialize_with = "serde_util::deserialize_option_u64_from_bson_number",
+        default
     )]
     pub size: Option<u64>,
 
