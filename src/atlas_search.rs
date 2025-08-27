@@ -173,9 +173,9 @@ impl StringOrArray for String {
     fn sealed(_: private::Sealed) {}
 }
 
-impl StringOrArray for &String {
+impl<const N: usize> StringOrArray for [&str; N] {
     fn to_bson(self) -> Bson {
-        Bson::String(self.clone())
+        Bson::Array(self.iter().map(|&s| Bson::String(s.to_owned())).collect())
     }
     fn sealed(_: private::Sealed) {}
 }
@@ -187,69 +187,9 @@ impl StringOrArray for &[&str] {
     fn sealed(_: private::Sealed) {}
 }
 
-impl<const N: usize> StringOrArray for &[&str; N] {
-    fn to_bson(self) -> Bson {
-        Bson::Array(self.iter().map(|&s| Bson::String(s.to_owned())).collect())
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
 impl StringOrArray for &[String] {
     fn to_bson(self) -> Bson {
         Bson::Array(self.iter().map(|s| Bson::String(s.clone())).collect())
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl<const N: usize> StringOrArray for &[String; N] {
-    fn to_bson(self) -> Bson {
-        Bson::Array(self.iter().map(|s| Bson::String(s.clone())).collect())
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl<const N: usize> StringOrArray for [String; N] {
-    fn to_bson(self) -> Bson {
-        Bson::Array(self.into_iter().map(Bson::String).collect())
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl StringOrArray for &[&String] {
-    fn to_bson(self) -> Bson {
-        Bson::Array(self.iter().map(|&s| Bson::String(s.clone())).collect())
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl<const N: usize> StringOrArray for &[&String; N] {
-    fn to_bson(self) -> Bson {
-        Bson::Array(self.iter().map(|&s| Bson::String(s.clone())).collect())
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl StringOrArray for Vec<&str> {
-    fn to_bson(self) -> Bson {
-        Bson::Array(
-            self.into_iter()
-                .map(|s| Bson::String(s.to_owned()))
-                .collect(),
-        )
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl StringOrArray for Vec<String> {
-    fn to_bson(self) -> Bson {
-        Bson::Array(self.into_iter().map(Bson::String).collect())
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl StringOrArray for Vec<&String> {
-    fn to_bson(self) -> Bson {
-        Bson::Array(self.into_iter().map(|s| Bson::String(s.clone())).collect())
     }
     fn sealed(_: private::Sealed) {}
 }

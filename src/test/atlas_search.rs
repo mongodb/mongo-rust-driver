@@ -207,3 +207,12 @@ fn helper_output_doc() {
             .into()
     )
 }
+
+#[test]
+fn string_or_array_forms() {
+    exists("hello");
+    exists("hello".to_owned());
+    exists(["hello", "world"]);
+    exists(&["hello", "world"] as &[&str]);
+    exists(&["hello".to_owned()] as &[String]);
+}
