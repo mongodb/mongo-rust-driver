@@ -335,6 +335,31 @@ impl AtlasSearch<SearchIn> {
     }
 }
 #[allow(missing_docs)]
+pub struct MoreLikeThis;
+/**The moreLikeThis operator returns documents similar to input documents.
+The moreLikeThis operator allows you to build features for your applications
+that display similar or alternative results based on one or more given documents.
+*/
+///
+///For more details, see the [moreLikeThis operator reference](https://www.mongodb.com/docs/atlas/atlas-search/moreLikeThis/).
+pub fn more_like_this(like: impl DocumentOrArray) -> AtlasSearch<MoreLikeThis> {
+    AtlasSearch {
+        name: "moreLikeThis",
+        stage: doc! {
+            "like" : like.to_bson(),
+        },
+        meta: false,
+        _t: PhantomData,
+    }
+}
+impl AtlasSearch<MoreLikeThis> {
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
 pub struct Text;
 /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
 If you omit an analyzer, the text operator uses the default standard analyzer.

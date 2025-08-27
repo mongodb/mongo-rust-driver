@@ -153,9 +153,9 @@ mod private {
 
 /// An Atlas Search operator parameter that can be either a string or array of strings.
 pub trait StringOrArray {
-    #[allow(missing_docs)]
+    #[doc(hidden)]
     fn to_bson(self) -> Bson;
-    #[allow(missing_docs)]
+    #[doc(hidden)]
     fn sealed(_: private::Sealed);
 }
 
@@ -196,9 +196,9 @@ impl StringOrArray for &[String] {
 
 /// An Atlas Search operator parameter that is itself a search operator.
 pub trait SearchOperator {
-    #[allow(missing_docs)]
+    #[doc(hidden)]
     fn to_doc(self) -> Document;
-    #[allow(missing_docs)]
+    #[doc(hidden)]
     fn sealed(_: private::Sealed) {}
 }
 
@@ -226,10 +226,10 @@ impl AtlasSearch<Facet> {
 
 /// Facet definitions.  These can be used when constructing a facet definition doc:
 /// ```
-/// use mongodb::atlas_search;
-/// let search = atlas_search::facet(doc! {
-///   "directorsFacet": atlas_search::facet::string("directors").num_buckets(7),
-///   "yearFacet": atlas_search::facet::number("year", [2000, 2005, 2010, 2015]),
+/// use mongodb::atlas_search::facet;
+/// let search = facet(doc! {
+///   "directorsFacet": facet::string("directors").num_buckets(7),
+///   "yearFacet": facet::number("year", [2000, 2005, 2010, 2015]),
 /// });
 /// ```
 pub mod facet {
@@ -346,4 +346,33 @@ impl Relation {
             Self::Other(s) => &s,
         }
     }
+}
+
+/// An Atlas Search operator parameter that can be either a document or array of documents.
+pub trait DocumentOrArray {
+    #[doc(hidden)]
+    fn to_bson(self) -> Bson;
+    #[doc(hidden)]
+    fn sealed(_: private::Sealed);
+}
+
+impl DocumentOrArray for Document {
+    fn to_bson(self) -> Bson {
+        Bson::Document(self)
+    }
+    fn sealed(_: private::Sealed) {}
+}
+
+impl<const N: usize> DocumentOrArray for [Document; N] {
+    fn to_bson(self) -> Bson {
+        Bson::Array(self.into_iter().map(Bson::Document).collect())
+    }
+    fn sealed(_: private::Sealed) {}
+}
+
+impl DocumentOrArray for &[Document] {
+    fn to_bson(self) -> Bson {
+        Bson::from(self)
+    }
+    fn sealed(_: private::Sealed) {}
 }
