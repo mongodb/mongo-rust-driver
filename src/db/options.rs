@@ -44,7 +44,11 @@ pub struct CreateCollectionOptions {
 
     /// The maximum size (in bytes) for a capped collection. This option is ignored if `capped` is
     /// not set to true.
-    #[serde(serialize_with = "serde_util::serialize_u64_option_as_i64")]
+    #[serde(
+        serialize_with = "serde_util::serialize_u64_option_as_i64",
+        deserialize_with = "serde_util::deserialize_option_u64_from_bson_number",
+        default
+    )]
     pub size: Option<u64>,
 
     /// The maximum number of documents in a capped collection. The `size` limit takes precedence
