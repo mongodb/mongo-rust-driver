@@ -205,7 +205,18 @@ fn helper_output_doc() {
                 }
             })
             .into()
-    )
+    );
+    assert_eq!(
+        doc! {
+            "$search": {
+                "in": {
+                    "path": "accounts",
+                    "value": [371138, 371139, 371140]
+                }
+            }
+        },
+        search_in("accounts", [371138, 371139, 371140].as_ref()).into()
+    );
 }
 
 #[test]

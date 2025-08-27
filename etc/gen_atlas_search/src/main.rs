@@ -41,8 +41,12 @@ impl Operator {
 
     fn gen_helper(&self) -> TokenStream {
         let name_text = &self.name;
-        let name_ident = format_ident!("{}", name_text.to_case(Case::Pascal));
-        let constr_ident = format_ident!("{}", name_text.to_case(Case::Snake));
+        let ident_base = match name_text.as_str() {
+            "in" => "searchIn",
+            _ => name_text,
+        };
+        let name_ident = format_ident!("{}", ident_base.to_case(Case::Pascal));
+        let constr_ident = format_ident!("{}", ident_base.to_case(Case::Snake));
 
         let mut required_args = TokenStream::new();
         let mut required_arg_names = TokenStream::new();
@@ -123,6 +127,7 @@ struct Argument {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 enum ArgumentType {
+    Any,
     Array,
     BinData,
     Bool,
@@ -161,6 +166,7 @@ impl Argument {
             [SearchOperator, Array] => ArgumentRustType::SeachOperatorIter,
             [Int] => ArgumentRustType::I32,
             [Geometry] => ArgumentRustType::Document,
+            [Any, Array] => ArgumentRustType::IntoBson,
             _ => panic!("Unexpected argument types: {:?}", self.type_),
         }
     }
@@ -238,6 +244,7 @@ fn main() {
         "range",
         "geoShape",
         "geoWithin",
+        "in",
         "text",
     ] {
         let mut path = PathBuf::from("yaml/search");
