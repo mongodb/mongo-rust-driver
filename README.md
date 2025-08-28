@@ -11,7 +11,7 @@ For more details, including features, runnable examples, troubleshooting resourc
 ### Requirements
 
 - Rust 1.83.0+ (See the [MSRV policy](#minimum-supported-rust-version-msrv-policy) for more information)
-- MongoDB 4.0+
+- MongoDB 4.2+
 
 #### Supported Platforms
 
