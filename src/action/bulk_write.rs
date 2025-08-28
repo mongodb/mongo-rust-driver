@@ -117,20 +117,6 @@ where
     }
 
     async fn execute_inner(mut self) -> Result<R> {
-        #[cfg(feature = "in-use-encryption")]
-        if self.client.should_auto_encrypt().await {
-            use mongocrypt::error::{Error as EncryptionError, ErrorKind as EncryptionErrorKind};
-
-            let error = EncryptionError {
-                kind: EncryptionErrorKind::Client,
-                code: None,
-                message: Some(
-                    "bulkWrite does not currently support automatic encryption".to_string(),
-                ),
-            };
-            return Err(ErrorKind::Encryption(error).into());
-        }
-
         resolve_write_concern_with_session!(
             self.client,
             self.options,
@@ -148,7 +134,8 @@ where
                 &self.models[total_attempted..],
                 total_attempted,
                 self.options.as_ref(),
-            );
+            )
+            .await;
             let result = self
                 .client
                 .execute_operation::<BulkWriteOperation<R>>(

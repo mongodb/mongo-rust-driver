@@ -5,10 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    bson::{rawdoc, Document, RawDocument, RawDocumentBuf},
-    bson_compat::{cstr, CString},
-};
+use crate::bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
 use mongocrypt::ctx::{Ctx, KmsCtx, KmsProviderType, State};
 use rayon::ThreadPool;
@@ -95,6 +92,13 @@ impl CryptExecutor {
         self.mongocryptd_client.is_some()
     }
 
+    fn metadata_client(&self, state: &State) -> Result<Client> {
+        self.metadata_client
+            .as_ref()
+            .and_then(|w| w.upgrade())
+            .ok_or_else(|| Error::internal(format!("metadata client required for {state:?}")))
+    }
+
     pub(crate) async fn run_ctx(&self, ctx: Ctx, db: Option<&str>) -> Result<RawDocumentBuf> {
         let mut result = None;
         // This needs to be a `Result` so that the `Ctx` can be temporarily owned by the processing
@@ -104,16 +108,10 @@ impl CryptExecutor {
         loop {
             let state = result_ref(&ctx)?.state()?;
             match state {
-                State::NeedMongoCollinfo => {
+                State::NeedMongoCollinfo | State::NeedMongoCollinfoWithDb => {
                     let ctx = result_mut(&mut ctx)?;
                     let filter = raw_to_doc(ctx.mongo_op()?)?;
-                    let metadata_client = self
-                        .metadata_client
-                        .as_ref()
-                        .and_then(|w| w.upgrade())
-                        .ok_or_else(|| {
-                        Error::internal("metadata_client required for NeedMongoCollinfo state")
-                    })?;
+                    let metadata_client = self.metadata_client(&state)?;
                     let db = metadata_client.database(db.as_ref().ok_or_else(|| {
                         Error::internal("db required for NeedMongoCollinfo state")
                     })?);
@@ -245,7 +243,9 @@ impl CryptExecutor {
                             continue;
                         }
 
-                        let prov_name: CString = provider.as_string().try_into()?;
+                        #[cfg(any(feature = "aws-auth", feature = "azure-kms"))]
+                        let prov_name: crate::bson_compat::CString =
+                            provider.as_string().try_into()?;
                         match provider.provider_type() {
                             KmsProviderType::Aws => {
                                 #[cfg(feature = "aws-auth")]
@@ -263,7 +263,10 @@ impl CryptExecutor {
                                         "secretAccessKey": aws_creds.secret_access_key().to_string(),
                                     };
                                     if let Some(token) = aws_creds.session_token() {
-                                        creds.append(cstr!("sessionToken"), token);
+                                        creds.append(
+                                            crate::bson_compat::cstr!("sessionToken"),
+                                            token,
+                                        );
                                     }
                                     kms_providers.append(prov_name, creds);
                                 }
@@ -326,7 +329,7 @@ impl CryptExecutor {
                                         .await
                                         .map_err(|e| kms_error(e.to_string()))?;
                                     kms_providers.append(
-                                        cstr!("gcp"),
+                                        crate::bson_compat::cstr!("gcp"),
                                         rawdoc! { "accessToken": response.access_token },
                                     );
                                 }

@@ -563,10 +563,13 @@ First, perform the setup.
 2. Using `client`, drop and create the collection `db.coll` configured with the included JSON schema
     [limits/limits-schema.json](../limits/limits-schema.json).
 
-3. Using `client`, drop the collection `keyvault.datakeys`. Insert the document
+3. If using MongoDB 8.0+, use `client` to drop and create the collection `db.coll2` configured with the included
+    encryptedFields [limits/limits-encryptedFields.json](../limits/limits-encryptedFields.json).
+
+4. Using `client`, drop the collection `keyvault.datakeys`. Insert the document
     [limits/limits-key.json](../limits/limits-key.json)
 
-4. Create a MongoClient configured with auto encryption (referred to as `client_encrypted`)
+5. Create a MongoClient configured with auto encryption (referred to as `client_encrypted`)
 
     Configure with the `local` KMS provider as follows:
 
@@ -578,19 +581,19 @@ First, perform the setup.
 
 Using `client_encrypted` perform the following operations:
 
-1. Insert `{ "_id": "over_2mib_under_16mib", "unencrypted": <the string "a" repeated 2097152 times> }`.
+1. Insert `{ "_id": "over_2mib_under_16mib", "unencrypted": <the string "a" repeated 2097152 times> }` into `coll`.
 
     Expect this to succeed since this is still under the `maxBsonObjectSize` limit.
 
 2. Insert the document [limits/limits-doc.json](../limits/limits-doc.json) concatenated with
-    `{ "_id": "encryption_exceeds_2mib", "unencrypted": < the string "a" repeated (2097152 - 2000) times > }` Note:
-    limits-doc.json is a 1005 byte BSON document that encrypts to a ~10,000 byte document.
+    `{ "_id": "encryption_exceeds_2mib", "unencrypted": < the string "a" repeated (2097152 - 2000) times > }` into
+    `coll`. Note: limits-doc.json is a 1005 byte BSON document that encrypts to a ~10,000 byte document.
 
     Expect this to succeed since after encryption this still is below the normal maximum BSON document size. Note, before
     auto encryption this document is under the 2 MiB limit. After encryption it exceeds the 2 MiB limit, but does NOT
     exceed the 16 MiB limit.
 
-3. Bulk insert the following:
+3. Use MongoCollection.bulkWrite to insert the following into `coll`:
 
     - `{ "_id": "over_2mib_1", "unencrypted": <the string "a" repeated (2097152) times> }`
     - `{ "_id": "over_2mib_2", "unencrypted": <the string "a" repeated (2097152) times> }`
@@ -598,7 +601,7 @@ Using `client_encrypted` perform the following operations:
     Expect the bulk write to succeed and split after first doc (i.e. two inserts occur). This may be verified using
     [command monitoring](../../command-logging-and-monitoring/command-logging-and-monitoring.md).
 
-4. Bulk insert the following:
+4. Use MongoCollection.bulkWrite insert the following into `coll`:
 
     - The document [limits/limits-doc.json](../limits/limits-doc.json) concatenated with
         `{ "_id": "encryption_exceeds_2mib_1", "unencrypted": < the string "a" repeated (2097152 - 2000) times > }`
@@ -608,14 +611,33 @@ Using `client_encrypted` perform the following operations:
     Expect the bulk write to succeed and split after first doc (i.e. two inserts occur). This may be verified using
     [command logging and monitoring](../../command-logging-and-monitoring/command-logging-and-monitoring.md).
 
-5. Insert `{ "_id": "under_16mib", "unencrypted": <the string "a" repeated 16777216 - 2000 times>`.
+5. Insert `{ "_id": "under_16mib", "unencrypted": <the string "a" repeated 16777216 - 2000 times>` into `coll`.
 
     Expect this to succeed since this is still (just) under the `maxBsonObjectSize` limit.
 
 6. Insert the document [limits/limits-doc.json](../limits/limits-doc.json) concatenated with
-    `{ "_id": "encryption_exceeds_16mib", "unencrypted": < the string "a" repeated (16777216 - 2000) times > }`
+    `{ "_id": "encryption_exceeds_16mib", "unencrypted": < the string "a" repeated (16777216 - 2000) times > }` into
+    `coll`.
 
     Expect this to fail since encryption results in a document exceeding the `maxBsonObjectSize` limit.
+
+7. If using MongoDB 8.0+, use MongoClient.bulkWrite to insert the following into `coll2`:
+
+    - `{ "_id": "over_2mib_3", "unencrypted": <the string "a" repeated (2097152 - 1500) times> }`
+    - `{ "_id": "over_2mib_4", "unencrypted": <the string "a" repeated (2097152 - 1500) times> }`
+
+    Expect the bulk write to succeed and split after first doc (i.e. two inserts occur). This may be verified using
+    [command logging and monitoring](../../command-logging-and-monitoring/command-logging-and-monitoring.md).
+
+8. If using MongoDB 8.0+, use MongoClient.bulkWrite to insert the following into `coll2`:
+
+    - The document [limits/limits-qe-doc.json](../limits/limits-qe-doc.json) concatenated with
+        `{ "_id": "encryption_exceeds_2mib_3", "foo": < the string "a" repeated (2097152 - 2000 - 1500) times > }`
+    - The document [limits/limits-qe-doc.json](../limits/limits-qe-doc.json) concatenated with
+        `{ "_id": "encryption_exceeds_2mib_4", "foo": < the string "a" repeated (2097152 - 2000 - 1500) times > }`
+
+    Expect the bulk write to succeed and split after first doc (i.e. two inserts occur). This may be verified using
+    [command logging and monitoring](../../command-logging-and-monitoring/command-logging-and-monitoring.md).
 
 Optionally, if it is possible to mock the maxWriteBatchSize (i.e. the maximum number of documents in a batch) test that
 setting maxWriteBatchSize=1 and inserting the two documents `{ "_id": "a" }, { "_id": "b" }` with `client_encrypted`
@@ -3764,3 +3786,316 @@ class AutoEncryptionOpts {
 ```
 
 Assert that an error is thrown.
+
+### 27. Text Explicit Encryption
+
+The Text Explicit Encryption tests utilize Queryable Encryption (QE) range protocol V2 and require MongoDB server 8.2.0+
+and libmongocrypt 1.15.1+. The tests must not run against a standalone.
+
+Before running each of the following test cases, perform the following Test Setup.
+
+#### Test Setup
+
+Using [QE CreateCollection() and Collection.Drop()](../client-side-encryption.md#create-collection-helper), drop and
+create the following collections with majority write concern:
+
+- `db.prefix-suffix` using the `encryptedFields` option set to the contents of
+    [encryptedFields-prefix-suffix.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/encryptedFields-prefix-suffix.json)
+- `db.substring` using the `encryptedFields` option set to the contents of
+    [encryptedFields-substring.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/encryptedFields-substring.json)
+
+Load the file
+[key1-document.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/keys/key1-document.json)
+as `key1Document`.
+
+Read the `"_id"` field of `key1Document` as `key1ID`.
+
+Drop and create the collection `keyvault.datakeys`.
+
+Insert `key1Document` in `keyvault.datakeys` with majority write concern.
+
+Create a MongoClient named `keyVaultClient`.
+
+Create a ClientEncryption object named `clientEncryption` with these options:
+
+```typescript
+class ClientEncryptionOpts {
+   keyVaultClient: <keyVaultClient>,
+   keyVaultNamespace: "keyvault.datakeys",
+   kmsProviders: { "local": { "key": <base64 decoding of LOCAL_MASTERKEY> } },
+}
+```
+
+Create a MongoClient named `encryptedClient` with these `AutoEncryptionOpts`:
+
+```typescript
+class AutoEncryptionOpts {
+   keyVaultNamespace: "keyvault.datakeys",
+   kmsProviders: { "local": { "key": <base64 decoding of LOCAL_MASTERKEY> } },
+   bypassQueryAnalysis: true,
+}
+```
+
+Use `clientEncryption` to encrypt the string `"foobarbaz"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "TextPreview",
+   contentionFactor: 0,
+   textOpts: TextOpts {
+      caseSensitive: true,
+      diacriticSensitive: true,
+      prefix: PrefixOpts {
+        strMaxQueryLength: 10,
+        strMinQueryLength: 2,
+      },
+      suffix: SuffixOpts {
+        strMaxQueryLength: 10,
+        strMinQueryLength: 2,
+      },
+   },
+}
+```
+
+Use `encryptedClient` to insert the following document into `db.prefix-suffix` with majority write concern:
+
+```javascript
+{ "_id": 0, "encryptedText": <encrypted 'foobarbaz'> }
+```
+
+Use `clientEncryption` to encrypt the string `"foobarbaz"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "TextPreview",
+   contentionFactor: 0,
+   textOpts: TextOpts {
+      caseSensitive: true,
+      diacriticSensitive: true,
+      substring: SubstringOpts {
+       strMaxLength: 10,
+       strMaxQueryLength: 10,
+       strMinQueryLength: 2,
+      }
+   },
+}
+```
+
+Use `encryptedClient` to insert the following document into `db.substring` with majority write concern:
+
+```javascript
+{ "_id": 0, "encryptedText": <encrypted 'foobarbaz'> }
+```
+
+#### Case 1: can find a document by prefix
+
+Use `clientEncryption.encrypt()` to encrypt the string `"foo"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "TextPreview",
+   queryType: "prefixPreview",
+   contentionFactor: 0,
+   textOpts: TextOpts {
+      caseSensitive: true,
+      diacriticSensitive: true,
+      prefix: PrefixOpts {
+        strMaxQueryLength: 10,
+        strMinQueryLength: 2,
+     }
+   },
+}
+```
+
+Use `encryptedClient` to run a "find" operation on the `db.prefix-suffix` collection with the following filter:
+
+```javascript
+{ $expr: { $encStrStartsWith: {input: '$encryptedText', prefix: <encrypted 'foo'>} } }
+```
+
+Assert the following document is returned:
+
+```javascript
+{ "_id": 0, "encryptedText": "foobarbaz" }
+```
+
+#### Case 2: can find a document by suffix
+
+Use `clientEncryption.encrypt()` to encrypt the string `"baz"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "TextPreview",
+   queryType: "suffixPreview",
+   contentionFactor: 0,
+   textOpts: TextOpts {
+      caseSensitive: true,
+      diacriticSensitive: true,
+      suffix: SuffixOpts {
+        strMaxQueryLength: 10,
+        strMinQueryLength: 2,
+     }
+   },
+}
+```
+
+Use `encryptedClient` to run a "find" operation on the `db.prefix-suffix` collection with the following filter:
+
+```javascript
+{ $expr: { $encStrEndsWith: {input: '$encryptedText', suffix: <encrypted 'baz'>} } }
+```
+
+Assert the following document is returned:
+
+```javascript
+{ "_id": 0, "encryptedText": "foobarbaz" }
+```
+
+#### Case 3: assert no document found by prefix
+
+Use `clientEncryption.encrypt()` to encrypt the string `"baz"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "TextPreview",
+   queryType: "prefixPreview",
+   contentionFactor: 0,
+   textOpts: TextOpts {
+      caseSensitive: true,
+      diacriticSensitive: true,
+      prefix: PrefixOpts {
+        strMaxQueryLength: 10,
+        strMinQueryLength: 2,
+     }
+   },
+}
+```
+
+Use `encryptedClient` to run a "find" operation on the `db.prefix-suffix` collection with the following filter:
+
+```javascript
+{ $expr: { $encStrStartsWith: {input: '$encryptedText', prefix: <encrypted 'baz'>} } }
+```
+
+Assert that no documents are returned.
+
+#### Case 4: assert no document found by suffix
+
+Use `clientEncryption.encrypt()` to encrypt the string `"foo"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "TextPreview",
+   queryType: "suffixPreview",
+   contentionFactor: 0,
+   textOpts: TextOpts {
+      caseSensitive: true,
+      diacriticSensitive: true,
+      suffix: SuffixOpts {
+        strMaxQueryLength: 10,
+        strMinQueryLength: 2,
+     }
+   },
+}
+```
+
+Use `encryptedClient` to run a "find" operation on the `db.prefix-suffix` collection with the following filter:
+
+```javascript
+{ $expr: { $encStrEndsWith: {input: '$encryptedText', suffix: <encrypted 'foo'>} } }
+```
+
+Assert that no documents are returned.
+
+#### Case 5: can find a document by substring
+
+Use `clientEncryption.encrypt()` to encrypt the string `"bar"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "TextPreview",
+   queryType: "substringPreview",
+   contentionFactor: 0,
+   textOpts: TextOpts {
+      caseSensitive: true,
+      diacriticSensitive: true,
+      substring: SubstringOpts {
+       strMaxLength: 10,
+       strMaxQueryLength: 10,
+       strMinQueryLength: 2,
+      }
+   },
+}
+```
+
+Use `encryptedClient` to run a "find" operation on the `db.substring` collection with the following filter:
+
+```javascript
+{ $expr: { $encStrContains: {input: '$encryptedText', substring: <encrypted 'bar'>} } }
+```
+
+Assert the following document is returned:
+
+```javascript
+{ "_id": 0, "encryptedText": "foobarbaz" }
+```
+
+#### Case 6: assert no document found by substring
+
+Use `clientEncryption.encrypt()` to encrypt the string `"qux"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "TextPreview",
+   queryType: "substringPreview",
+   contentionFactor: 0,
+   textOpts: TextOpts {
+      caseSensitive: true,
+      diacriticSensitive: true,
+      substring: SubstringOpts {
+       strMaxLength: 10,
+       strMaxQueryLength: 10,
+       strMinQueryLength: 2,
+      }
+   },
+}
+```
+
+Use `encryptedClient` to run a "find" operation on the `db.substring` collection with the following filter:
+
+```javascript
+{ $expr: { $encStrContains: {input: '$encryptedText', substring: <encrypted 'qux'>} } }
+```
+
+Assert that no documents are returned.
+
+#### Case 7: assert `contentionFactor` is required
+
+Use `clientEncryption.encrypt()` to encrypt the string `"foo"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "TextPreview",
+   queryType: "prefixPreview",
+   textOpts: TextOpts {
+      caseSensitive: true,
+      diacriticSensitive: true,
+      prefix: PrefixOpts {
+        strMaxQueryLength: 10,
+        strMinQueryLength: 2,
+     }
+   },
+}
+```
+
+Expect an error from libmongocrypt with a message containing the string: "contention factor is required for textPreview
+algorithm".

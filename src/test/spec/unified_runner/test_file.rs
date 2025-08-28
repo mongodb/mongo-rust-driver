@@ -86,8 +86,19 @@ pub(crate) struct RunOnRequirement {
     server_parameters: Option<Document>,
     serverless: Option<Serverless>,
     auth: Option<bool>,
-    csfle: Option<bool>,
+    csfle: Option<Csfle>,
     auth_mechanism: Option<AuthMechanism>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum Csfle {
+    Bool(bool),
+    #[serde(rename_all = "camelCase")]
+    Version {
+        #[cfg(feature = "in-use-encryption")]
+        min_libmongocrypt_version: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
@@ -147,8 +158,33 @@ impl RunOnRequirement {
                 return Err("requires auth".to_string());
             }
         }
-        if self.csfle == Some(true) && !cfg!(feature = "in-use-encryption") {
-            return Err("requires csfle but in-use-encryption feature not enabled".to_string());
+        if let Some(ref csfle) = self.csfle {
+            match csfle {
+                Csfle::Bool(true) | Csfle::Version { .. }
+                    if cfg!(not(feature = "in-use-encryption")) =>
+                {
+                    return Err(
+                        "requires csfle but in-use-encryption feature not enabled".to_string()
+                    );
+                }
+                #[cfg(feature = "in-use-encryption")]
+                Csfle::Version {
+                    min_libmongocrypt_version,
+                } => {
+                    let requirement =
+                        semver::VersionReq::parse(&format!(">={min_libmongocrypt_version}"))
+                            .unwrap();
+                    let mut version = semver::Version::parse(mongocrypt::version()).unwrap();
+                    version.pre = semver::Prerelease::EMPTY;
+                    if !requirement.matches(&version) {
+                        return Err(format!(
+                            "requires at least libmongocrypt version {min_libmongocrypt_version} \
+                             but using version {version}"
+                        ));
+                    }
+                }
+                _ => {}
+            }
         }
         if let Some(ref auth_mechanism) = self.auth_mechanism {
             let actual_mechanism = get_client_options()
