@@ -260,7 +260,7 @@ pub(crate) trait RawDocumentCollection: Default {
     fn push(&mut self, doc: RawDocumentBuf);
 
     /// Adds the collection of raw documents to the provided command.
-    fn add_to_command(self, identifier: &'static CStr, command: &mut Command);
+    fn add_to_command(self, identifier: &CStr, command: &mut Command);
 }
 
 impl RawDocumentCollection for Vec<RawDocumentBuf> {
@@ -272,7 +272,7 @@ impl RawDocumentCollection for Vec<RawDocumentBuf> {
         self.push(doc);
     }
 
-    fn add_to_command(self, identifier: &'static CStr, command: &mut Command) {
+    fn add_to_command(self, identifier: &CStr, command: &mut Command) {
         command.add_document_sequence(identifier, self);
     }
 }
@@ -286,7 +286,7 @@ impl RawDocumentCollection for RawArrayBuf {
         self.push(doc);
     }
 
-    fn add_to_command(self, identifier: &'static CStr, command: &mut Command) {
+    fn add_to_command(self, identifier: &CStr, command: &mut Command) {
         command.body.append(identifier, self);
     }
 }

@@ -291,7 +291,7 @@ where
 /// A helper struct for tracking namespace information.
 struct NamespaceInfo<'a, T: RawDocumentCollection> {
     namespaces: T,
-    pending_namespace: Option<RawDocumentBuf>,
+    pending_namespace: Option<(&'a Namespace, RawDocumentBuf)>,
     // Cache the namespaces and their indexes to avoid traversing the namespaces array each time a
     // namespace is looked up or added.
     cache: HashMap<&'a Namespace, usize>,
@@ -316,19 +316,19 @@ where
             Some(index) => Ok((*index, 0)),
             None => {
                 let namespace_doc = rawdoc! { "ns": namespace.to_string() };
-                let index = self.cache.len();
-                let bytes_added = T::bytes_added(index, &namespace_doc)?;
-                self.pending_namespace = Some(namespace_doc);
-                self.cache.insert(namespace, index);
-                Ok((index, bytes_added))
+                let next_index = self.cache.len();
+                let bytes_added = T::bytes_added(next_index, &namespace_doc)?;
+                self.pending_namespace = Some((namespace, namespace_doc));
+                Ok((next_index, bytes_added))
             }
         }
     }
 
     /// Adds the pending namespace to the list, if any.
     fn add_pending(&mut self) {
-        if let Some(pending) = self.pending_namespace.take() {
-            self.namespaces.push(pending);
+        if let Some((namespace, namespace_doc)) = self.pending_namespace.take() {
+            self.cache.insert(namespace, self.cache.len());
+            self.namespaces.push(namespace_doc);
         }
     }
 }
