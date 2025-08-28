@@ -19,9 +19,6 @@ impl ClientSession {
     /// [`crate::error::TRANSIENT_TRANSACTION_ERROR`] label. This label indicates that the entire
     /// transaction can be retried with a reasonable expectation that it will succeed.
     ///
-    /// Transactions on replica sets are supported on MongoDB 4.0+. Transactions on sharded
-    /// clusters are supported on MongoDB 4.2+.
-    ///
     /// ```rust
     /// # use mongodb::{bson::{doc, Document}, error::Result, Client, ClientSession};
     /// #

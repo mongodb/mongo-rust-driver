@@ -20,8 +20,7 @@ where
     /// Updates all documents matching `query` in the collection.
     ///
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
+    /// passed in place of constructing the enum case. See the official MongoDB
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     ///
     /// `await` will return d[`Result<UpdateResult>`].
@@ -41,8 +40,7 @@ where
     /// Updates up to one document matching `query` in the collection.
     ///
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
+    /// passed in place of constructing the enum case. See the official MongoDB
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
@@ -73,8 +71,7 @@ where
     /// Updates all documents matching `query` in the collection.
     ///
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
+    /// passed in place of constructing the enum case. See the official MongoDB
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     ///
     /// [`run`](Update::run) will return d[`Result<UpdateResult>`].
@@ -87,8 +84,7 @@ where
     /// Updates up to one document matching `query` in the collection.
     ///
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
+    /// passed in place of constructing the enum case. See the official MongoDB
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#behavior) for more information on specifying updates.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support

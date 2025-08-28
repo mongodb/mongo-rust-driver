@@ -61,8 +61,7 @@ impl<T: DeserializeOwned + Send + Sync> Collection<T> {
 
     /// Atomically finds up to one document in the collection matching `filter` and updates it.
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+.
+    /// passed in place of constructing the enum case.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
@@ -133,8 +132,7 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
 
     /// Atomically finds up to one document in the collection matching `filter` and updates it.
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+.
+    /// passed in place of constructing the enum case.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation

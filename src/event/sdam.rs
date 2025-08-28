@@ -125,9 +125,9 @@ pub struct ServerHeartbeatStartedEvent {
     /// The driver-generated ID for the connection used for the heartbeat.
     pub driver_connection_id: u32,
 
-    /// The server-generated ID for the connection used for the heartbeat. This value is only
-    /// present on server versions 4.2+. If this event corresponds to the first heartbeat on a
-    /// new monitoring connection, this value will not be present.
+    /// The server-generated ID for the connection used for the heartbeat. If this event
+    /// corresponds to the first heartbeat on a new monitoring connection, this value will not
+    /// be present.
     pub server_connection_id: Option<i64>,
 }
 
@@ -151,8 +151,7 @@ pub struct ServerHeartbeatSucceededEvent {
     /// The driver-generated ID for the connection used for the heartbeat.
     pub driver_connection_id: u32,
 
-    /// The server-generated ID for the connection used for the heartbeat. This value is only
-    /// present for server versions 4.2+.
+    /// The server-generated ID for the connection used for the heartbeat.
     pub server_connection_id: Option<i64>,
 }
 
@@ -177,9 +176,9 @@ pub struct ServerHeartbeatFailedEvent {
     /// The driver-generated ID for the connection used for the heartbeat.
     pub driver_connection_id: u32,
 
-    /// The server-generated ID for the connection used for the heartbeat. This value is only
-    /// present on server versions 4.2+. If this event corresponds to the first heartbeat on a
-    /// new monitoring connection, this value will not be present.
+    /// The server-generated ID for the connection used for the heartbeat. If this event
+    /// corresponds to the first heartbeat on a new monitoring connection, this value will not
+    /// be present.
     pub server_connection_id: Option<i64>,
 }
 

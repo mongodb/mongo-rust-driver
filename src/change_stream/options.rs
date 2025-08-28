@@ -51,8 +51,6 @@ pub struct ChangeStreamOptions {
     /// the token. This will allow users to watch collections that have been dropped and
     /// recreated or newly renamed collections without missing any notifications.
     ///
-    /// This feature is only available on MongoDB 4.2+.
-    ///
     /// See the documentation [here](https://www.mongodb.com/docs/master/changeStreams/#change-stream-start-after) for more
     /// information.
     pub start_after: Option<ResumeToken>,

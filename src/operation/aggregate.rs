@@ -17,7 +17,6 @@ use super::{
     ExecutionContext,
     OperationWithDefaults,
     WriteConcernOnlyBody,
-    SERVER_4_2_0_WIRE_VERSION,
     SERVER_4_4_0_WIRE_VERSION,
 };
 
@@ -115,10 +114,9 @@ impl OperationWithDefaults for Aggregate {
             .and_then(|opts| opts.selection_criteria.as_ref())
     }
 
-    fn supports_read_concern(&self, description: &StreamDescription) -> bool {
-        // for aggregates that write, read concern is only supported in MongoDB 4.2+.
-        !self.is_out_or_merge()
-            || description.max_wire_version.unwrap_or(0) >= SERVER_4_2_0_WIRE_VERSION
+    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
+        // for aggregates that write, read concern is supported in MongoDB 4.2+.
+        true
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

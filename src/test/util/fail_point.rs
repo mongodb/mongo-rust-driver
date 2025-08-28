@@ -73,7 +73,7 @@ impl FailPoint {
         self
     }
 
-    /// How long the server should block the affected commands. Only available on 4.2.9+ servers.
+    /// How long the server should block the affected commands.
     pub(crate) fn block_connection(mut self, block_connection_duration: Duration) -> Self {
         self.data.insert("blockConnection", true);
         self.data

@@ -94,9 +94,9 @@ buildvariants:
       SSL: ssl
     tasks:
       # Ubuntu 22.04 does not support MongoDB versions below 6.0.
-      - name: .standalone !.4.0 !.4.2 !.4.4 !.5.0
-      - name: .replicaset !.4.0 !.4.2 !.4.4 !.5.0
-      - name: .sharded !.4.0 !.4.2 !.4.4 !.5.0
+      - name: .standalone !.4.2 !.4.4 !.5.0
+      - name: .replicaset !.4.2 !.4.4 !.5.0
+      - name: .sharded !.4.2 !.4.4 !.5.0
 
   - name: macos-14.00
     display_name: "MacOS 14.00"
@@ -200,8 +200,8 @@ buildvariants:
     tasks:
       # The Stable API was introduced in MongoDB version 5.0. Drivers Evergreen Tools only supports
       # setting REQUIRE_API_VERSION on standalones and sharded clusters.
-      - .standalone !.4.0 !.4.2 !.4.4
-      - .sharded !.4.0 !.4.2 !.4.4
+      - .standalone !.4.2 !.4.4
+      - .sharded !.4.2 !.4.4
 
   - name: sync-api
     display_name: "Sync API"
