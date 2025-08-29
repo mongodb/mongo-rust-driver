@@ -262,6 +262,7 @@ fn main() {
         "moreLikeThis",
         "near",
         "phrase",
+        "queryString",
         "text",
     ] {
         let mut path = PathBuf::from("yaml/search");

@@ -307,6 +307,17 @@ fn helper_output_doc() {
         },
         phrase("title", ["the man", "the moon"]).stage()
     );
+    assert_eq!(
+        doc! {
+            "$search": {
+                "queryString": {
+                    "defaultPath": "title",
+                    "query": "Rocky AND (IV OR 4 OR Four)"
+                }
+            }
+        },
+        query_string("title", "Rocky AND (IV OR 4 OR Four)").stage()
+    );
 }
 
 #[test]
