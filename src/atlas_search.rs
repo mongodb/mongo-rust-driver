@@ -10,7 +10,7 @@ use crate::bson::{doc, Bson, DateTime, Document};
 
 /// A helper to build the aggregation stage for Atlas Search.  Use one of the constructor functions
 /// and chain optional value setters, and then convert to a pipeline stage [`Document`] via
-/// [`into`](Into::into) or [`on_index`](AtlasSearch::on_index).
+/// [`stage`](AtlasSearch::stage) or [`on_index`](AtlasSearch::on_index).
 ///
 /// ```no_run
 /// # async fn wrapper() -> mongodb::error::Result<()> {
@@ -20,7 +20,7 @@ use crate::bson::{doc, Bson, DateTime, Document};
 /// let cursor = collection.aggregate(vec![
 ///     atlas_search::autocomplete("title", "pre")
 ///         .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
-///         .into(),
+///         .stage(),
 ///     doc! {
 ///         "$limit": 10,
 ///    },
@@ -56,7 +56,7 @@ impl<T> AtlasSearch<T> {
     ///                 .should(atlas_search::text("description", "Fuji"))
     ///                 .unit(),
     ///         ])
-    ///         .into(),
+    ///         .stage(),
     /// ]).await?;
     /// # }
     /// ```
@@ -191,6 +191,7 @@ impl AtlasSearch<Facet> {
 
 /// Facet definitions.  These can be used when constructing a facet definition doc:
 /// ```
+/// # use mongodb::bson::doc;
 /// use mongodb::atlas_search::facet;
 /// let search = facet(doc! {
 ///   "directorsFacet": facet::string("directors").num_buckets(7),
