@@ -316,7 +316,8 @@ impl Relation {
 /// An Atlas Search operator parameter that can be either a document or array of documents.
 pub trait DocumentOrArray: private::Parameter {}
 impl DocumentOrArray for Document {}
-//impl<const N: usize> DocumentOrArray for [Document; N] {}
+#[cfg(feature = "bson-3")]
+impl<const N: usize> DocumentOrArray for [Document; N] {}
 impl DocumentOrArray for &[Document] {}
 
 macro_rules! numeric {
