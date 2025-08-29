@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use convert_case::{Case, Casing};
 use proc_macro2::TokenStream;
@@ -254,28 +254,14 @@ impl TokenStreamExt for TokenStream {
 
 fn main() {
     let mut operators = TokenStream::new();
-    for name in [
-        "autocomplete",
-        "compound",
-        "embeddedDocument",
-        "equals",
-        "exists",
-        "facet",
-        "geoShape",
-        "geoWithin",
-        "in",
-        "moreLikeThis",
-        "near",
-        "phrase",
-        "queryString",
-        "range",
-        "regex",
-        "text",
-        "wildcard",
-    ] {
-        let mut path = PathBuf::from("yaml/search");
-        path.push(name);
-        path.set_extension("yaml");
+    let mut paths = Path::new("yaml/search")
+        .read_dir()
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|e| e == "yaml"))
+        .collect::<Vec<_>>();
+    paths.sort();
+    for path in paths {
         let contents = std::fs::read_to_string(path).unwrap();
         let parsed = serde_yaml::from_str::<Operator>(&contents)
             .unwrap()
