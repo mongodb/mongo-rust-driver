@@ -318,6 +318,17 @@ fn helper_output_doc() {
         },
         query_string("title", "Rocky AND (IV OR 4 OR Four)").stage()
     );
+    assert_eq!(
+        doc! {
+            "$search": {
+                "regex": {
+                    "path": "title",
+                    "query": "(.*) Seattle"
+                }
+            }
+        },
+        regex("title", "(.*) Seattle").stage()
+    );
 }
 
 #[test]

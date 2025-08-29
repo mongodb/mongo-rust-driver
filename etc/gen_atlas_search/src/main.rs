@@ -170,12 +170,14 @@ impl Argument {
             [Object, Array] => ArgumentRustType::DocumentOrArray,
             [Number] => ArgumentRustType::BsonNumber,
             [String, Array] => ArgumentRustType::StringOrArray,
+            [Bool] => ArgumentRustType::Bool,
             _ => panic!("Unexpected argument types: {:?}", self.type_),
         }
     }
 }
 
 enum ArgumentRustType {
+    Bool,
     BsonNumber,
     Document,
     DocumentOrArray,
@@ -195,6 +197,7 @@ enum ArgumentRustType {
 impl ArgumentRustType {
     fn tokens(&self) -> syn::Type {
         match self {
+            Self::Bool => parse_quote! { bool },
             Self::BsonNumber => parse_quote! { impl BsonNumber },
             Self::Document => parse_quote! { Document },
             Self::DocumentOrArray => parse_quote! { impl DocumentOrArray },
@@ -216,7 +219,7 @@ impl ArgumentRustType {
 
     fn bson_expr(&self, ident: &syn::Ident) -> syn::Expr {
         match self {
-            Self::Document | Self::I32 => parse_quote! { #ident },
+            Self::Document | Self::I32 | Self::Bool => parse_quote! { #ident },
             Self::IntoBson => parse_quote! { #ident.into() },
             Self::SeachOperatorIter => {
                 parse_quote! { #ident.into_iter().map(|o| o.to_bson()).collect::<Vec<_>>() }
@@ -266,6 +269,7 @@ fn main() {
         "phrase",
         "queryString",
         "range",
+        "regex",
         "text",
     ] {
         let mut path = PathBuf::from("yaml/search");
