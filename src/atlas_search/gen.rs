@@ -363,6 +363,34 @@ impl AtlasSearch<MoreLikeThis> {
     }
 }
 #[allow(missing_docs)]
+pub struct Near;
+/**The near operator supports querying and scoring numeric, date, and GeoJSON point values.
+ * */
+///
+///For more details, see the [near operator reference](https://www.mongodb.com/docs/atlas/atlas-search/near/).
+pub fn near(
+    path: impl StringOrArray,
+    origin: impl NearOrigin,
+    pivot: impl BsonNumber,
+) -> AtlasSearch<Near> {
+    AtlasSearch {
+        name: "near",
+        stage: doc! {
+            "path" : path.to_bson(), "origin" : origin.to_bson(), "pivot" : pivot
+            .to_bson(),
+        },
+        meta: false,
+        _t: PhantomData,
+    }
+}
+impl AtlasSearch<Near> {
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
 pub struct Text;
 /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
 If you omit an analyzer, the text operator uses the default standard analyzer.

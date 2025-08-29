@@ -319,5 +319,20 @@ impl DocumentOrArray for Document {}
 //impl<const N: usize> DocumentOrArray for [Document; N] {}
 impl DocumentOrArray for &[Document] {}
 
+/// An Atlas Search operator parameter that can be a date, number, or GeoJSON point.
+pub trait NearOrigin: private::Parameter {}
+impl NearOrigin for crate::bson::DateTime {}
+impl NearOrigin for i32 {}
+impl NearOrigin for i64 {}
+impl NearOrigin for u32 {}
+impl NearOrigin for f32 {}
+impl NearOrigin for f64 {}
+impl NearOrigin for Document {}
+
 /// An Atlas Search operator parameter that can be any BSON numeric type.
-pub trait BsonNumber {}
+pub trait BsonNumber: private::Parameter {}
+impl BsonNumber for i32 {}
+impl BsonNumber for i64 {}
+impl BsonNumber for u32 {}
+impl BsonNumber for f32 {}
+impl BsonNumber for f64 {}
