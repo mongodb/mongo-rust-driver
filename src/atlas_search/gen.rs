@@ -444,6 +444,36 @@ impl AtlasSearch<Range> {
     }
 }
 #[allow(missing_docs)]
+pub struct Regex;
+/**regex interprets the query field as a regular expression.
+regex is a term-level operator, meaning that the query field isn't analyzed.
+*/
+///
+///For more details, see the [regex operator reference](https://www.mongodb.com/docs/atlas/atlas-search/regex/).
+pub fn regex(path: impl StringOrArray, query: impl AsRef<str>) -> AtlasSearch<Regex> {
+    AtlasSearch {
+        name: "regex",
+        stage: doc! {
+            "path" : path.to_bson(), "query" : query.as_ref(),
+        },
+        meta: false,
+        _t: PhantomData,
+    }
+}
+impl AtlasSearch<Regex> {
+    #[allow(missing_docs)]
+    pub fn allow_analyzed_field(mut self, allow_analyzed_field: bool) -> Self {
+        self.stage
+            .insert("allowAnalyzedField", allow_analyzed_field);
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
 pub struct Text;
 /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
 If you omit an analyzer, the text operator uses the default standard analyzer.
