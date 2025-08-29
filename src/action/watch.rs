@@ -33,8 +33,7 @@ use crate::{
 impl Client {
     /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
     /// stream does not observe changes from system collections or the "config", "local" or
-    /// "admin" databases. Note that this method (`watch` on a cluster) is only supported in
-    /// MongoDB 4.0 or greater.
+    /// "admin" databases.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
     /// streams.
@@ -121,8 +120,7 @@ where
 impl crate::sync::Client {
     /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
     /// stream does not observe changes from system collections or the "config", "local" or
-    /// "admin" databases. Note that this method (`watch` on a cluster) is only supported in
-    /// MongoDB 4.0 or greater.
+    /// "admin" databases.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
     /// streams.

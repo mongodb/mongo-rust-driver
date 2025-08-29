@@ -44,7 +44,7 @@ use crate::{
 #[tokio::test]
 #[function_name::named]
 async fn insert_err_details() {
-    if server_version_lt(4, 0).await || !topology_is_replica_set().await {
+    if !topology_is_replica_set().await {
         log_uncaptured("skipping insert_err_details due to test configuration");
         return;
     }
@@ -599,11 +599,6 @@ async fn delete_hint_not_specified() {
 }
 
 async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>, name: &str) {
-    if options.is_some() && server_version_lt(4, 2).await {
-        log_uncaptured("skipping find_one_and_delete_hint_test due to test configuration");
-        return;
-    }
-
     let client = Client::for_test().monitor_events().await;
 
     let coll = client.database(name).collection(name);
@@ -661,10 +656,7 @@ async fn find_one_and_delete_hint_server_version() {
         .hint(Hint::Name(String::new()))
         .await;
 
-    if server_version_lt(4, 2).await {
-        let error = res.expect_err("find one and delete should fail");
-        assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
-    } else if server_version_eq(4, 2).await {
+    if server_version_eq(4, 2).await {
         let error = res.expect_err("find one and delete should fail");
         assert!(matches!(*error.kind, ErrorKind::Command { .. }));
     } else {

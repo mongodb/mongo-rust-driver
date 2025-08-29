@@ -13,8 +13,8 @@ use crate::{
     serde_util,
 };
 
-const DRIVER_MIN_DB_VERSION: &str = "4.0";
-const DRIVER_MIN_WIRE_VERSION: i32 = 7;
+const DRIVER_MIN_DB_VERSION: &str = "4.2";
+const DRIVER_MIN_WIRE_VERSION: i32 = 8;
 const DRIVER_MAX_WIRE_VERSION: i32 = 25;
 
 /// Enum representing the possible types of servers that the driver can connect to.

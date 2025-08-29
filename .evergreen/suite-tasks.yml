@@ -3,15 +3,6 @@
 
 tasks:
 
-  - name: test-4.0-standalone
-    tags: [4.0, standalone]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          MONGODB_VERSION: 4.0
-          TOPOLOGY: server
-      - func: "run driver test suite"
-
   - name: test-4.2-standalone
     tags: [4.2, standalone]
     commands:
@@ -84,15 +75,6 @@ tasks:
           TOPOLOGY: server
       - func: "run driver test suite"
 
-  - name: test-4.0-replicaset
-    tags: [4.0, replicaset]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          MONGODB_VERSION: 4.0
-          TOPOLOGY: replica_set
-      - func: "run driver test suite"
-
   - name: test-4.2-replicaset
     tags: [4.2, replicaset]
     commands:
@@ -163,15 +145,6 @@ tasks:
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: replica_set
-      - func: "run driver test suite"
-
-  - name: test-4.0-sharded
-    tags: [4.0, sharded]
-    commands:
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          MONGODB_VERSION: 4.0
-          TOPOLOGY: sharded_cluster
       - func: "run driver test suite"
 
   - name: test-4.2-sharded

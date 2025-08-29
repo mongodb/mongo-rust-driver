@@ -44,8 +44,8 @@ pub struct ConnectionInfo {
     /// A driver-generated identifier that uniquely identifies the connection.
     pub id: u32,
 
-    /// A server-generated identifier that uniquely identifies the connection. Available on server
-    /// versions 4.2+. This may be used to correlate driver connections with server logs.
+    /// A server-generated identifier that uniquely identifies the connection. This may be used to
+    /// correlate driver connections with server logs.
     pub server_id: Option<i64>,
 
     /// The address that the connection is connected to.
@@ -64,7 +64,7 @@ pub(crate) struct Connection {
     /// Driver-generated ID for the connection.
     pub(crate) id: u32,
 
-    /// The server-side ID for this connection. Only set on server versions 4.2+.
+    /// The server-side ID for this connection.
     pub(crate) server_id: Option<i64>,
 
     /// The address of the server to which this connection connects.

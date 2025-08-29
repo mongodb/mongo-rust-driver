@@ -75,7 +75,6 @@ pub(crate) use raw_output::RawOutput;
 pub(crate) use search_index::{CreateSearchIndexes, DropSearchIndex, UpdateSearchIndex};
 pub(crate) use update::{Update, UpdateOrReplace};
 
-const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
 const SERVER_4_4_0_WIRE_VERSION: i32 = 9;
 const SERVER_5_0_0_WIRE_VERSION: i32 = 13;
 const SERVER_8_0_0_WIRE_VERSION: i32 = 25;

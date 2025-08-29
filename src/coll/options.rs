@@ -177,7 +177,6 @@ pub enum UpdateModifications {
     Document(Document),
 
     /// An aggregation pipeline.
-    /// Only available in MongoDB 4.2+.
     Pipeline(Vec<Document>),
 }
 
@@ -223,7 +222,7 @@ pub struct UpdateOptions {
 
     /// A document or string that specifies the index to use to support the query predicate.
     ///
-    /// Only available in MongoDB 4.2+. See the official MongoDB
+    /// See the official MongoDB
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#ex-update-command-hint) for examples.
     pub hint: Option<Hint>,
 
@@ -290,7 +289,7 @@ pub struct ReplaceOptions {
 
     /// A document or string that specifies the index to use to support the query predicate.
     ///
-    /// Only available in MongoDB 4.2+. See the official MongoDB
+    /// See the official MongoDB
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#ex-update-command-hint) for examples.
     pub hint: Option<Hint>,
 

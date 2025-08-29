@@ -134,11 +134,6 @@ async fn unacknowledged_write_concern_rejected() {
 #[tokio::test]
 #[function_name::named]
 async fn snapshot_read_concern() {
-    // snapshot read concern was introduced in 4.0
-    if server_version_lt(4, 0).await {
-        return;
-    }
-
     let client = Client::for_test().monitor_events().await;
 
     let coll = client

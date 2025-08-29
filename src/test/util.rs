@@ -17,7 +17,7 @@ use crate::{
     error::Result,
     hello::{hello_command, HelloCommandResponse},
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
-    test::{get_client_options, server_version_gte, topology_is_sharded},
+    test::{get_client_options, topology_is_sharded},
     BoxFuture,
     Client,
     Collection,
@@ -155,7 +155,7 @@ impl TestClient {
             cmd.insert("pwd", pwd);
         }
 
-        if server_version_gte(4, 0).await && !mechanisms.is_empty() {
+        if !mechanisms.is_empty() {
             let ms: crate::bson::Array =
                 mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();
             cmd.insert("mechanisms", ms);

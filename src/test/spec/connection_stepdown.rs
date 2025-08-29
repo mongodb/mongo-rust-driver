@@ -7,14 +7,7 @@ use crate::{
     error::{CommandError, ErrorKind},
     options::{Acknowledgment, WriteConcern},
     selection_criteria::SelectionCriteria,
-    test::{
-        get_client_options,
-        log_uncaptured,
-        server_version_eq,
-        server_version_lt,
-        topology_is_replica_set,
-        EventClient,
-    },
+    test::{get_client_options, log_uncaptured, topology_is_replica_set, EventClient},
     Collection,
     Database,
 };
@@ -58,12 +51,6 @@ async fn run_test<F: Future>(
 #[tokio::test]
 async fn get_more() {
     async fn get_more_test(client: EventClient, _db: Database, coll: Collection<Document>) {
-        // This test requires server version 4.2 or higher.
-        if server_version_lt(4, 2).await {
-            log_uncaptured("skipping get_more due to server version < 4.2");
-            return;
-        }
-
         let docs = vec![doc! { "x": 1 }; 5];
         coll.insert_many(docs)
             .write_concern(WriteConcern::majority())
@@ -111,12 +98,6 @@ async fn notwritableprimary_keep_pool() {
         _db: Database,
         coll: Collection<Document>,
     ) {
-        // This test requires server version 4.2 or higher.
-        if server_version_lt(4, 2).await {
-            log_uncaptured("skipping notwritableprimary_keep_pool due to server version < 4.2");
-            return;
-        }
-
         client
             .database("admin")
             .run_command(doc! {
@@ -150,58 +131,6 @@ async fn notwritableprimary_keep_pool() {
     run_test(
         "notwritableprimary_keep_pool",
         notwritableprimary_keep_pool_test,
-    )
-    .await;
-}
-
-#[tokio::test]
-async fn notwritableprimary_reset_pool() {
-    async fn notwritableprimary_reset_pool_test(
-        client: EventClient,
-        _db: Database,
-        coll: Collection<Document>,
-    ) {
-        // This test must only run on 4.0 servers.
-        if !server_version_eq(4, 0).await {
-            log_uncaptured(
-                "skipping notwritableprimary_reset_pool due to unsupported server version",
-            );
-            return;
-        }
-
-        client
-            .database("admin")
-            .run_command(doc! {
-                "configureFailPoint": "failCommand",
-                "mode": { "times": 1 },
-                "data": {
-                    "failCommands": ["insert"],
-                    "errorCode": 10107
-                }
-            })
-            .await
-            .unwrap();
-
-        let result = coll.insert_one(doc! { "test": 1 }).await;
-        assert!(
-            matches!(
-                result.map_err(|e| *e.kind),
-                Err(ErrorKind::Command(CommandError { code: 10107, .. }))
-            ),
-            "insert should have failed"
-        );
-
-        tokio::time::sleep(Duration::from_millis(250)).await;
-        assert_eq!(client.events.count_pool_cleared_events(), 1);
-
-        coll.insert_one(doc! { "test": 1 })
-            .await
-            .expect("insert should have succeeded");
-    }
-
-    run_test(
-        "notwritableprimary_reset_pool",
-        notwritableprimary_reset_pool_test,
     )
     .await;
 }

@@ -9,7 +9,6 @@ use crate::{
     options::{FindOneOptions, GridFsBucketOptions, GridFsUploadOptions},
     runtime,
     test::{
-        fail_command_supported,
         get_client_options,
         spec::unified_runner::run_unified_tests,
         topology_is_sharded,
@@ -215,10 +214,6 @@ async fn upload_stream_errors() {
         .unwrap();
     upload_stream.abort().await.unwrap();
     assert_closed(&bucket, upload_stream).await;
-
-    if !fail_command_supported().await {
-        return;
-    }
 
     // Error attempting to write to stream after write failure.
     let mut upload_stream = bucket
