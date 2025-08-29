@@ -169,6 +169,7 @@ impl Argument {
             [Any, Array] => ArgumentRustType::IntoBson,
             [Object, Array] => ArgumentRustType::DocumentOrArray,
             [Number] => ArgumentRustType::BsonNumber,
+            [String, Array] => ArgumentRustType::StringOrArray,
             _ => panic!("Unexpected argument types: {:?}", self.type_),
         }
     }
@@ -260,6 +261,7 @@ fn main() {
         "in",
         "moreLikeThis",
         "near",
+        "phrase",
         "text",
     ] {
         let mut path = PathBuf::from("yaml/search");
