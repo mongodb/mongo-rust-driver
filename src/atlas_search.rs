@@ -6,7 +6,7 @@ pub use gen::*;
 
 use std::marker::PhantomData;
 
-use crate::bson::{doc, Bson, Document};
+use crate::bson::{doc, Bson, DateTime, Document};
 
 /// A helper to build the aggregation stage for Atlas Search.  Use one of the constructor functions
 /// and chain optional value setters, and then convert to a pipeline stage [`Document`] via
@@ -319,20 +319,31 @@ impl DocumentOrArray for Document {}
 //impl<const N: usize> DocumentOrArray for [Document; N] {}
 impl DocumentOrArray for &[Document] {}
 
+macro_rules! numeric {
+    ($trait:ty) => {
+        impl $trait for i32 {}
+        impl $trait for i64 {}
+        impl $trait for u32 {}
+        impl $trait for f32 {}
+        impl $trait for f64 {}
+    };
+}
+
 /// An Atlas Search operator parameter that can be a date, number, or GeoJSON point.
 pub trait NearOrigin: private::Parameter {}
-impl NearOrigin for crate::bson::DateTime {}
-impl NearOrigin for i32 {}
-impl NearOrigin for i64 {}
-impl NearOrigin for u32 {}
-impl NearOrigin for f32 {}
-impl NearOrigin for f64 {}
+impl NearOrigin for DateTime {}
 impl NearOrigin for Document {}
+numeric! { NearOrigin }
 
 /// An Atlas Search operator parameter that can be any BSON numeric type.
 pub trait BsonNumber: private::Parameter {}
-impl BsonNumber for i32 {}
-impl BsonNumber for i64 {}
-impl BsonNumber for u32 {}
-impl BsonNumber for f32 {}
-impl BsonNumber for f64 {}
+numeric! { BsonNumber }
+
+/// At Atlas Search operator parameter that can be compared using [`range`].
+pub trait RangeValue: private::Parameter {}
+numeric! { RangeValue }
+impl RangeValue for DateTime {}
+impl RangeValue for &str {}
+impl RangeValue for &String {}
+impl RangeValue for String {}
+impl RangeValue for crate::bson::oid::ObjectId {}

@@ -152,7 +152,7 @@ impl Argument {
             ("text", "matchCriteria") => return ArgumentRustType::MatchCriteria,
             ("equals", "value") => return ArgumentRustType::IntoBson,
             ("geoShape", "relation") => return ArgumentRustType::Relation,
-            ("range", "gt" | "gte" | "lt" | "lte") => return ArgumentRustType::IntoBson,
+            ("range", "gt" | "gte" | "lt" | "lte") => return ArgumentRustType::RangeValue,
             ("near", "origin") => return ArgumentRustType::NearOrigin,
             _ => (),
         }
@@ -183,6 +183,7 @@ enum ArgumentRustType {
     IntoBson,
     MatchCriteria,
     NearOrigin,
+    RangeValue,
     Relation,
     SearchOperator,
     SeachOperatorIter,
@@ -201,6 +202,7 @@ impl ArgumentRustType {
             Self::IntoBson => parse_quote! { impl Into<Bson> },
             Self::MatchCriteria => parse_quote! { MatchCriteria },
             Self::NearOrigin => parse_quote! { impl NearOrigin },
+            Self::RangeValue => parse_quote! { impl RangeValue },
             Self::Relation => parse_quote! { Relation },
             Self::SearchOperator => parse_quote! { impl SearchOperator },
             Self::SeachOperatorIter => {
@@ -224,6 +226,7 @@ impl ArgumentRustType {
             | Self::DocumentOrArray
             | Self::SearchOperator
             | Self::NearOrigin
+            | Self::RangeValue
             | Self::BsonNumber => {
                 parse_quote! { #ident.to_bson() }
             }
@@ -255,7 +258,6 @@ fn main() {
         "equals",
         "exists",
         "facet",
-        "range",
         "geoShape",
         "geoWithin",
         "in",
@@ -263,6 +265,7 @@ fn main() {
         "near",
         "phrase",
         "queryString",
+        "range",
         "text",
     ] {
         let mut path = PathBuf::from("yaml/search");
