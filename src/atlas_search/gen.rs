@@ -425,6 +425,25 @@ impl AtlasSearch<Phrase> {
     }
 }
 #[allow(missing_docs)]
+pub struct QueryString;
+///
+///
+///For more details, see the [queryString operator reference](https://www.mongodb.com/docs/atlas/atlas-search/queryString/).
+pub fn query_string(
+    default_path: impl StringOrArray,
+    query: impl AsRef<str>,
+) -> AtlasSearch<QueryString> {
+    AtlasSearch {
+        name: "queryString",
+        stage: doc! {
+            "defaultPath" : default_path.to_bson(), "query" : query.as_ref(),
+        },
+        meta: false,
+        _t: PhantomData,
+    }
+}
+impl AtlasSearch<QueryString> {}
+#[allow(missing_docs)]
 pub struct Text;
 /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
 If you omit an analyzer, the text operator uses the default standard analyzer.
