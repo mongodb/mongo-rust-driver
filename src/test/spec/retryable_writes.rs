@@ -5,18 +5,15 @@ use tokio::sync::Mutex;
 
 use crate::{
     bson::{doc, Document},
-    error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
+    error::{Result, RETRYABLE_WRITE_ERROR},
     event::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
     runtime::{self, spawn, AcknowledgedMessage, AsyncJoinHandle},
     test::{
-        block_connection_supported,
-        fail_command_supported,
         get_client_options,
         log_uncaptured,
-        server_version_gt,
         server_version_lt,
         spec::unified_runner::run_unified_tests,
         topology_is_load_balanced,
@@ -42,45 +39,6 @@ async fn run_unified() {
 }
 
 #[tokio::test]
-#[function_name::named]
-async fn mmapv1_error_raised() {
-    if server_version_gt(4, 0).await || !topology_is_replica_set().await {
-        log_uncaptured("skipping mmapv1_error_raised due to test topology");
-        return;
-    }
-
-    let client = Client::for_test().await;
-    let coll = client.init_db_and_coll(function_name!(), "coll").await;
-
-    let server_status = client
-        .database(function_name!())
-        .run_command(doc! { "serverStatus": 1 })
-        .await
-        .unwrap();
-    let name = server_status
-        .get_document("storageEngine")
-        .unwrap()
-        .get_str("name")
-        .unwrap();
-    if name != "mmapv1" {
-        log_uncaptured("skipping mmapv1_error_raised due to unsupported storage engine");
-        return;
-    }
-
-    let err = coll.insert_one(doc! { "x": 1 }).await.unwrap_err();
-    match *err.kind {
-        ErrorKind::Command(err) => {
-            assert_eq!(
-                err.message,
-                "This MongoDB deployment does not support retryable writes. Please add \
-                 retryWrites=false to your connection string."
-            );
-        }
-        e => panic!("expected command error, got: {e:?}"),
-    }
-}
-
-#[tokio::test]
 async fn label_not_added_first_read_error() {
     label_not_added(false).await;
 }
@@ -92,11 +50,6 @@ async fn label_not_added_second_read_error() {
 
 #[function_name::named]
 async fn label_not_added(retry_reads: bool) {
-    if !fail_command_supported().await {
-        log_uncaptured("skipping label_not_added due to fail command unsupported");
-        return;
-    }
-
     let mut options = get_client_options().await.clone();
     options.retry_reads = Some(retry_reads);
     let client = Client::for_test()
@@ -136,12 +89,6 @@ async fn retry_write_pool_cleared() {
     }
     if topology_is_load_balanced().await {
         log_uncaptured("skipping retry_write_pool_cleared due to load-balanced topology");
-        return;
-    }
-    if !block_connection_supported().await {
-        log_uncaptured(
-            "skipping retry_write_pool_cleared due to blockConnection not being supported",
-        );
         return;
     }
 
@@ -304,10 +251,6 @@ async fn retry_write_retryable_write_error() {
 // Test that in a sharded cluster writes are retried on a different mongos if one available
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_different_mongos() {
-    if !fail_command_supported().await {
-        log_uncaptured("skipping retry_write_different_mongos: requires failCommand");
-        return;
-    }
     let mut client_options = get_client_options().await.clone();
     if !(topology_is_sharded().await && client_options.hosts.len() >= 2) {
         log_uncaptured(
@@ -388,10 +331,6 @@ async fn retry_write_different_mongos() {
 // Retryable Reads Are Retried on the Same mongos if No Others are Available
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_same_mongos() {
-    if !fail_command_supported().await {
-        log_uncaptured("skipping retry_write_same_mongos: requires failCommand");
-        return;
-    }
     if !topology_is_sharded().await {
         log_uncaptured("skipping retry_write_same_mongos: requires sharded cluster");
         return;

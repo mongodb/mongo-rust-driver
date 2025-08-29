@@ -143,6 +143,7 @@ pub(crate) async fn server_version_eq(major: u64, minor: u64) -> bool {
     let server_version = &get_test_client_metadata().await.server_version;
     server_version.major == major && server_version.minor == minor
 }
+#[expect(dead_code)]
 pub(crate) async fn server_version_gt(major: u64, minor: u64) -> bool {
     let server_version = &get_test_client_metadata().await.server_version;
     server_version.major > major || server_version.major == major && server_version.minor > minor
@@ -238,17 +239,7 @@ pub(crate) async fn topology_is_load_balanced() -> bool {
 }
 
 pub(crate) async fn transactions_supported() -> bool {
-    topology_is_replica_set().await || topology_is_sharded().await && server_version_gte(4, 2).await
-}
-pub(crate) async fn block_connection_supported() -> bool {
-    server_version_matches(">=4.2.9").await
-}
-pub(crate) async fn fail_command_supported() -> bool {
-    if topology_is_sharded().await {
-        server_version_matches(">=4.1.5").await
-    } else {
-        true
-    }
+    topology_is_replica_set().await || topology_is_sharded().await
 }
 pub(crate) async fn fail_command_appname_initial_handshake_supported() -> bool {
     let requirements = [">= 4.2.15, < 4.3.0", ">= 4.4.7, < 4.5.0", ">= 4.9.0"];

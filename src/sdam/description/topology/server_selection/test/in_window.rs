@@ -14,7 +14,6 @@ use crate::{
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{
         auth_enabled,
-        block_connection_supported,
         get_client_options,
         log_uncaptured,
         run_spec_test,
@@ -124,12 +123,6 @@ async fn load_balancing_test() {
     }
     if auth_enabled().await {
         log_uncaptured("skipping load_balancing_test test due to auth being enabled");
-        return;
-    }
-    if !block_connection_supported().await {
-        log_uncaptured(
-            "skipping load_balancing_test test due to server not supporting blockConnection option",
-        );
         return;
     }
 

@@ -7,7 +7,6 @@ use crate::{
     hello::LEGACY_HELLO_COMMAND_NAME,
     runtime,
     test::{
-        block_connection_supported,
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
@@ -159,10 +158,6 @@ async fn rtt_is_updated() {
     }
     if topology_is_load_balanced().await {
         log_uncaptured("skipping rtt_is_updated due to load balanced topology");
-        return;
-    }
-    if !block_connection_supported().await {
-        log_uncaptured("skipping rtt_is_updated due to not supporting block_connection");
         return;
     }
 

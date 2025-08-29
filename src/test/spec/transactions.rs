@@ -9,7 +9,6 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        server_version_lt,
         spec::unified_runner::run_unified_tests,
         topology_is_sharded,
         transactions_supported,
@@ -39,7 +38,7 @@ async fn run_unified_convenient_api() {
 #[tokio::test(flavor = "multi_thread")]
 #[function_name::named]
 async fn deserialize_recovery_token() {
-    if !topology_is_sharded().await || server_version_lt(4, 2).await {
+    if !topology_is_sharded().await {
         log_uncaptured("skipping deserialize_recovery_token due to test topology");
         return;
     }

@@ -17,7 +17,6 @@ use crate::{
 };
 
 use super::{
-    fail_command_supported,
     get_client_options,
     log_uncaptured,
     server_version_gte,
@@ -43,10 +42,6 @@ async fn init_stream(
 > {
     if !(topology_is_replica_set().await || topology_is_sharded().await) {
         log_uncaptured("skipping change stream test on unsupported topology");
-        return Ok(None);
-    }
-    if !fail_command_supported().await {
-        log_uncaptured("skipping change stream test on version without fail commands");
         return Ok(None);
     }
 
@@ -290,15 +285,10 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
 
 // Prose test 10: removed.
 
-/// Prose test 11: Running against a server >=4.0.7, resume token at the end of a batch must return
-/// the postBatchResumeToken from the current command response
+/// Prose test 11: Resume token at the end of a batch must return the postBatchResumeToken from the
+/// current command response
 #[tokio::test]
 async fn batch_end_resume_token() -> Result<()> {
-    if !server_version_matches(">=4.0.7").await {
-        log_uncaptured("skipping change stream test due to server version");
-        return Ok(());
-    }
-
     let (client, _, mut stream) = match init_stream("batch_end_resume_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -393,11 +383,6 @@ async fn aggregate_batch() -> Result<()> {
 /// Prose test 17: Resuming a change stream with no results uses `startAfter`.
 #[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_uses_start_after() -> Result<()> {
-    if !server_version_matches(">=4.1.1").await {
-        log_uncaptured("skipping change stream test on unsupported version");
-        return Ok(());
-    }
-
     let (client, coll, mut stream) = match init_stream("resume_uses_start_after", true).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -438,11 +423,6 @@ async fn resume_uses_start_after() -> Result<()> {
 /// Prose test 18: Resuming a change stream after results uses `resumeAfter`.
 #[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_uses_resume_after() -> Result<()> {
-    if !server_version_matches(">=4.1.1").await {
-        log_uncaptured("skipping change stream test on unsupported version");
-        return Ok(());
-    }
-
     let (client, coll, mut stream) = match init_stream("resume_uses_resume_after", true).await? {
         Some(t) => t,
         None => return Ok(()),
