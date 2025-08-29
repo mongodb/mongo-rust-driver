@@ -329,6 +329,17 @@ fn helper_output_doc() {
         },
         regex("title", "(.*) Seattle").stage()
     );
+    assert_eq!(
+        doc! {
+            "$search": {
+                "wildcard": {
+                    "query": "Green D*",
+                    "path": "title"
+                }
+            }
+        },
+        wildcard("title", "Green D*").stage()
+    );
 }
 
 #[test]

@@ -512,3 +512,33 @@ impl AtlasSearch<Text> {
         self
     }
 }
+#[allow(missing_docs)]
+pub struct Wildcard;
+/**The wildcard operator enables queries which use special characters in the search string that
+ * can match any character.
+ * */
+///
+///For more details, see the [wildcard operator reference](https://www.mongodb.com/docs/atlas/atlas-search/wildcard/).
+pub fn wildcard(path: impl StringOrArray, query: impl AsRef<str>) -> AtlasSearch<Wildcard> {
+    AtlasSearch {
+        name: "wildcard",
+        stage: doc! {
+            "path" : path.to_bson(), "query" : query.as_ref(),
+        },
+        meta: false,
+        _t: PhantomData,
+    }
+}
+impl AtlasSearch<Wildcard> {
+    #[allow(missing_docs)]
+    pub fn allow_analyzed_field(mut self, allow_analyzed_field: bool) -> Self {
+        self.stage
+            .insert("allowAnalyzedField", allow_analyzed_field);
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
