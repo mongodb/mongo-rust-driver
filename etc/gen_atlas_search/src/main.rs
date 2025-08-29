@@ -210,12 +210,13 @@ impl ArgumentRustType {
         match self {
             Self::Document | Self::I32 => parse_quote! { #ident },
             Self::IntoBson => parse_quote! { #ident.into() },
-            Self::SearchOperator => parse_quote! { #ident.to_doc() },
             Self::SeachOperatorIter => {
-                parse_quote! { #ident.into_iter().map(|o| o.to_doc()).collect::<Vec<_>>() }
+                parse_quote! { #ident.into_iter().map(|o| o.to_bson()).collect::<Vec<_>>() }
             }
             Self::String => parse_quote! { #ident.as_ref() },
-            Self::StringOrArray | Self::DocumentOrArray => parse_quote! { #ident.to_bson() },
+            Self::StringOrArray | Self::DocumentOrArray | Self::SearchOperator => {
+                parse_quote! { #ident.to_bson() }
+            }
             Self::TokenOrder | Self::MatchCriteria | Self::Relation => {
                 parse_quote! { #ident.name() }
             }

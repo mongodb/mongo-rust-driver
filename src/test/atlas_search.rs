@@ -21,7 +21,7 @@ fn helper_output_doc() {
         },
         autocomplete("title", "pre")
             .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
-            .into()
+            .stage()
     );
     assert_eq!(
         doc! {
@@ -32,7 +32,7 @@ fn helper_output_doc() {
                 }
             }
         },
-        text("plot", "baseball").into()
+        text("plot", "baseball").stage()
     );
     assert_eq!(
         doc! {
@@ -56,7 +56,7 @@ fn helper_output_doc() {
         compound()
             .must(text("description", "varieties"))
             .should(text("description", "Fuji"))
-            .into()
+            .stage()
     );
     assert_eq!(
         doc! {
@@ -98,7 +98,7 @@ fn helper_output_doc() {
                 "aggregate": "mean"
             }
         })
-        .into()
+        .stage()
     );
     assert_eq!(
         doc! {
@@ -109,7 +109,7 @@ fn helper_output_doc() {
                 }
             }
         },
-        equals("verified_user", true).into()
+        equals("verified_user", true).stage()
     );
     let gte_dt = DateTime::parse_rfc3339_str("2000-01-01T00:00:00.000Z").unwrap();
     let lte_dt = DateTime::parse_rfc3339_str("2015-01-31T00:00:00.000Z").unwrap();
@@ -144,7 +144,7 @@ fn helper_output_doc() {
             "yearFacet": facet::number("year", [2000, 2005, 2010, 2015]),
         })
         .operator(range("released").gte(gte_dt).lte(lte_dt))
-        .into()
+        .stage()
     );
     assert_eq!(
         doc! {
@@ -173,7 +173,7 @@ fn helper_output_doc() {
                                 [-161.323242,22.512557]]]
             }
         )
-        .into()
+        .stage()
     );
     assert_eq!(
         doc! {
@@ -204,7 +204,7 @@ fn helper_output_doc() {
                     "coordinates": [168.000, -9.133]
                 }
             })
-            .into()
+            .stage()
     );
     assert_eq!(
         doc! {
@@ -215,7 +215,7 @@ fn helper_output_doc() {
                 }
             }
         },
-        search_in("accounts", [371138, 371139, 371140].as_ref()).into()
+        search_in("accounts", [371138, 371139, 371140].as_ref()).stage()
     );
     assert_eq!(
         doc! {
@@ -232,7 +232,7 @@ fn helper_output_doc() {
             "title": "The Godfather",
             "genres": "action"
         })
-        .into()
+        .stage()
     );
 }
 
@@ -240,6 +240,7 @@ fn helper_output_doc() {
 fn string_or_array_forms() {
     exists("hello");
     exists("hello".to_owned());
+    #[cfg(feature = "bson-3")]
     exists(["hello", "world"]);
     exists(&["hello", "world"] as &[&str]);
     exists(&["hello".to_owned()] as &[String]);

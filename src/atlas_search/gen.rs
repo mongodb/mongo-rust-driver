@@ -60,7 +60,7 @@ impl AtlasSearch<Compound> {
     pub fn must(mut self, must: impl IntoIterator<Item = impl SearchOperator>) -> Self {
         self.stage.insert(
             "must",
-            must.into_iter().map(|o| o.to_doc()).collect::<Vec<_>>(),
+            must.into_iter().map(|o| o.to_bson()).collect::<Vec<_>>(),
         );
         self
     }
@@ -68,7 +68,10 @@ impl AtlasSearch<Compound> {
     pub fn must_not(mut self, must_not: impl IntoIterator<Item = impl SearchOperator>) -> Self {
         self.stage.insert(
             "mustNot",
-            must_not.into_iter().map(|o| o.to_doc()).collect::<Vec<_>>(),
+            must_not
+                .into_iter()
+                .map(|o| o.to_bson())
+                .collect::<Vec<_>>(),
         );
         self
     }
@@ -76,7 +79,7 @@ impl AtlasSearch<Compound> {
     pub fn should(mut self, should: impl IntoIterator<Item = impl SearchOperator>) -> Self {
         self.stage.insert(
             "should",
-            should.into_iter().map(|o| o.to_doc()).collect::<Vec<_>>(),
+            should.into_iter().map(|o| o.to_bson()).collect::<Vec<_>>(),
         );
         self
     }
@@ -84,7 +87,7 @@ impl AtlasSearch<Compound> {
     pub fn filter(mut self, filter: impl IntoIterator<Item = impl SearchOperator>) -> Self {
         self.stage.insert(
             "filter",
-            filter.into_iter().map(|o| o.to_doc()).collect::<Vec<_>>(),
+            filter.into_iter().map(|o| o.to_bson()).collect::<Vec<_>>(),
         );
         self
     }
@@ -116,7 +119,7 @@ pub fn embedded_document(
     AtlasSearch {
         name: "embeddedDocument",
         stage: doc! {
-            "path" : path.to_bson(), "operator" : operator.to_doc(),
+            "path" : path.to_bson(), "operator" : operator.to_bson(),
         },
         meta: false,
         _t: PhantomData,
@@ -195,7 +198,7 @@ pub fn facet(facets: Document) -> AtlasSearch<Facet> {
 impl AtlasSearch<Facet> {
     #[allow(missing_docs)]
     pub fn operator(mut self, operator: impl SearchOperator) -> Self {
-        self.stage.insert("operator", operator.to_doc());
+        self.stage.insert("operator", operator.to_bson());
         self
     }
 }
