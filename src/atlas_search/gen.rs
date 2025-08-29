@@ -391,6 +391,40 @@ impl AtlasSearch<Near> {
     }
 }
 #[allow(missing_docs)]
+pub struct Phrase;
+/**The phrase operator performs search for documents containing an ordered sequence of terms
+ * using the analyzer specified in the index configuration.
+ * */
+///
+///For more details, see the [phrase operator reference](https://www.mongodb.com/docs/atlas/atlas-search/phrase/).
+pub fn phrase(path: impl StringOrArray, query: impl StringOrArray) -> AtlasSearch<Phrase> {
+    AtlasSearch {
+        name: "phrase",
+        stage: doc! {
+            "path" : path.to_bson(), "query" : query.to_bson(),
+        },
+        meta: false,
+        _t: PhantomData,
+    }
+}
+impl AtlasSearch<Phrase> {
+    #[allow(missing_docs)]
+    pub fn slop(mut self, slop: i32) -> Self {
+        self.stage.insert("slop", slop);
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn synonyms(mut self, synonyms: impl AsRef<str>) -> Self {
+        self.stage.insert("synonyms", synonyms.as_ref());
+        self
+    }
+    #[allow(missing_docs)]
+    pub fn score(mut self, score: Document) -> Self {
+        self.stage.insert("score", score);
+        self
+    }
+}
+#[allow(missing_docs)]
 pub struct Text;
 /**The text operator performs a full-text search using the analyzer that you specify in the index configuration.
 If you omit an analyzer, the text operator uses the default standard analyzer.

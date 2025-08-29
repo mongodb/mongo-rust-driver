@@ -284,6 +284,29 @@ fn helper_output_doc() {
         )
         .stage()
     );
+    assert_eq!(
+        doc! {
+            "$search": {
+                "phrase": {
+                    "path": "title",
+                    "query": "new york"
+                }
+            }
+        },
+        phrase("title", "new york").stage()
+    );
+    #[cfg(feature = "bson-3")]
+    assert_eq!(
+        doc! {
+            "$search": {
+                "phrase": {
+                    "path": "title",
+                    "query": ["the man", "the moon"]
+                }
+            }
+        },
+        phrase("title", ["the man", "the moon"]).stage()
+    );
 }
 
 #[test]
