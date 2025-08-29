@@ -40,17 +40,6 @@ pub struct AtlasSearch<T> {
     _t: PhantomData<T>,
 }
 
-impl<T> From<AtlasSearch<T>> for Document {
-    fn from(value: AtlasSearch<T>) -> Self {
-        let key = if value.meta { "$searchMeta" } else { "$search" };
-        doc! {
-            key: {
-                value.name: value.stage
-            }
-        }
-    }
-}
-
 impl<T> AtlasSearch<T> {
     /// Erase the type of this builder.  Not typically needed, but can be useful to include builders
     /// of different types in a single `Vec`:
@@ -80,7 +69,17 @@ impl<T> AtlasSearch<T> {
         }
     }
 
-    /// Like [`into`](Into::into), converts this builder into an aggregate pipeline stage
+    /// Converts this builder into an aggregate pipeline stage [`Document`].
+    pub fn stage(self) -> Document {
+        let key = if self.meta { "$searchMeta" } else { "$search" };
+        doc! {
+            key: {
+                self.name: self.stage
+            }
+        }
+    }
+
+    /// Like [`stage`](AtlasSearch::stage), converts this builder into an aggregate pipeline stage
     /// [`Document`], but also specify the search index to use.
     pub fn on_index(self, index: impl AsRef<str>) -> Document {
         doc! {
@@ -148,73 +147,39 @@ impl MatchCriteria {
 }
 
 mod private {
-    pub struct Sealed;
+    use crate::bson::{doc, Bson};
+
+    /// An Atlas Search operator parameter that can accept multiple types.
+    pub trait Parameter {
+        fn to_bson(self) -> Bson;
+    }
+
+    impl<T: Into<Bson>> Parameter for T {
+        fn to_bson(self) -> Bson {
+            self.into()
+        }
+    }
+
+    impl<T> Parameter for super::AtlasSearch<T> {
+        fn to_bson(self) -> Bson {
+            Bson::Document(doc! { self.name: self.stage })
+        }
+    }
 }
 
 /// An Atlas Search operator parameter that can be either a string or array of strings.
-pub trait StringOrArray {
-    #[doc(hidden)]
-    fn to_bson(self) -> Bson;
-    #[doc(hidden)]
-    fn sealed(_: private::Sealed);
-}
-
-impl StringOrArray for &str {
-    fn to_bson(self) -> Bson {
-        Bson::String(self.to_owned())
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl StringOrArray for String {
-    fn to_bson(self) -> Bson {
-        Bson::String(self)
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl<const N: usize> StringOrArray for [&str; N] {
-    fn to_bson(self) -> Bson {
-        Bson::Array(self.iter().map(|&s| Bson::String(s.to_owned())).collect())
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl StringOrArray for &[&str] {
-    fn to_bson(self) -> Bson {
-        Bson::Array(self.iter().map(|&s| Bson::String(s.to_owned())).collect())
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl StringOrArray for &[String] {
-    fn to_bson(self) -> Bson {
-        Bson::Array(self.iter().map(|s| Bson::String(s.clone())).collect())
-    }
-    fn sealed(_: private::Sealed) {}
-}
+pub trait StringOrArray: private::Parameter {}
+impl StringOrArray for &str {}
+impl StringOrArray for String {}
+#[cfg(feature = "bson-3")]
+impl<const N: usize> StringOrArray for [&str; N] {}
+impl StringOrArray for &[&str] {}
+impl StringOrArray for &[String] {}
 
 /// An Atlas Search operator parameter that is itself a search operator.
-pub trait SearchOperator {
-    #[doc(hidden)]
-    fn to_doc(self) -> Document;
-    #[doc(hidden)]
-    fn sealed(_: private::Sealed) {}
-}
-
-impl<T> SearchOperator for AtlasSearch<T> {
-    fn to_doc(self) -> Document {
-        doc! { self.name: self.stage }
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl SearchOperator for Document {
-    fn to_doc(self) -> Document {
-        self
-    }
-    fn sealed(_: private::Sealed) {}
-}
+pub trait SearchOperator: private::Parameter {}
+impl<T> SearchOperator for AtlasSearch<T> {}
+impl SearchOperator for Document {}
 
 impl AtlasSearch<Facet> {
     /// Use the `$search` stage instead of the default `$searchMeta` stage.
@@ -349,30 +314,10 @@ impl Relation {
 }
 
 /// An Atlas Search operator parameter that can be either a document or array of documents.
-pub trait DocumentOrArray {
-    #[doc(hidden)]
-    fn to_bson(self) -> Bson;
-    #[doc(hidden)]
-    fn sealed(_: private::Sealed);
-}
+pub trait DocumentOrArray: private::Parameter {}
+impl DocumentOrArray for Document {}
+//impl<const N: usize> DocumentOrArray for [Document; N] {}
+impl DocumentOrArray for &[Document] {}
 
-impl DocumentOrArray for Document {
-    fn to_bson(self) -> Bson {
-        Bson::Document(self)
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl<const N: usize> DocumentOrArray for [Document; N] {
-    fn to_bson(self) -> Bson {
-        Bson::Array(self.into_iter().map(Bson::Document).collect())
-    }
-    fn sealed(_: private::Sealed) {}
-}
-
-impl DocumentOrArray for &[Document] {
-    fn to_bson(self) -> Bson {
-        Bson::from(self)
-    }
-    fn sealed(_: private::Sealed) {}
-}
+/// An Atlas Search operator parameter that can be any BSON numeric type.
+pub trait BsonNumber {}
