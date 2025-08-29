@@ -271,6 +271,7 @@ fn main() {
         "range",
         "regex",
         "text",
+        "wildcard",
     ] {
         let mut path = PathBuf::from("yaml/search");
         path.push(name);
