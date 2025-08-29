@@ -234,6 +234,56 @@ fn helper_output_doc() {
         })
         .stage()
     );
+    assert_eq!(
+        doc! {
+            "$search": {
+                "index": "runtimes",
+                "near": {
+                    "path": "year",
+                    "origin": 2000,
+                    "pivot": 2
+                }
+            }
+        },
+        near("year", 2000, 2).on_index("runtimes")
+    );
+    let dt = DateTime::parse_rfc3339_str("1915-09-13T00:00:00.000+00:00").unwrap();
+    assert_eq!(
+        doc! {
+            "$search": {
+                "index": "releaseddate",
+                "near": {
+                    "path": "released",
+                    "origin": dt,
+                    "pivot": 7776000000i64
+                }
+            }
+        },
+        near("released", dt, 7776000000i64).on_index("releaseddate")
+    );
+    assert_eq!(
+        doc! {
+            "$search": {
+                "near": {
+                    "origin": {
+                        "type": "Point",
+                        "coordinates": [-8.61308, 41.1413]
+                    },
+                    "pivot": 1000,
+                    "path": "address.location"
+                }
+            }
+        },
+        near(
+            "address.location",
+            doc! {
+                "type": "Point",
+                "coordinates": [-8.61308, 41.1413]
+            },
+            1000,
+        )
+        .stage()
+    );
 }
 
 #[test]

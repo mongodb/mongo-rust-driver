@@ -153,7 +153,7 @@ impl Argument {
             ("equals", "value") => return ArgumentRustType::IntoBson,
             ("geoShape", "relation") => return ArgumentRustType::Relation,
             ("range", "gt" | "gte" | "lt" | "lte") => return ArgumentRustType::IntoBson,
-
+            ("near", "origin") => return ArgumentRustType::NearOrigin,
             _ => (),
         }
         use ArgumentType::*;
@@ -168,17 +168,20 @@ impl Argument {
             [Geometry] => ArgumentRustType::Document,
             [Any, Array] => ArgumentRustType::IntoBson,
             [Object, Array] => ArgumentRustType::DocumentOrArray,
+            [Number] => ArgumentRustType::BsonNumber,
             _ => panic!("Unexpected argument types: {:?}", self.type_),
         }
     }
 }
 
 enum ArgumentRustType {
+    BsonNumber,
     Document,
     DocumentOrArray,
     I32,
     IntoBson,
     MatchCriteria,
+    NearOrigin,
     Relation,
     SearchOperator,
     SeachOperatorIter,
@@ -190,11 +193,13 @@ enum ArgumentRustType {
 impl ArgumentRustType {
     fn tokens(&self) -> syn::Type {
         match self {
+            Self::BsonNumber => parse_quote! { impl BsonNumber },
             Self::Document => parse_quote! { Document },
             Self::DocumentOrArray => parse_quote! { impl DocumentOrArray },
             Self::I32 => parse_quote! { i32 },
             Self::IntoBson => parse_quote! { impl Into<Bson> },
             Self::MatchCriteria => parse_quote! { MatchCriteria },
+            Self::NearOrigin => parse_quote! { impl NearOrigin },
             Self::Relation => parse_quote! { Relation },
             Self::SearchOperator => parse_quote! { impl SearchOperator },
             Self::SeachOperatorIter => {
@@ -214,7 +219,11 @@ impl ArgumentRustType {
                 parse_quote! { #ident.into_iter().map(|o| o.to_bson()).collect::<Vec<_>>() }
             }
             Self::String => parse_quote! { #ident.as_ref() },
-            Self::StringOrArray | Self::DocumentOrArray | Self::SearchOperator => {
+            Self::StringOrArray
+            | Self::DocumentOrArray
+            | Self::SearchOperator
+            | Self::NearOrigin
+            | Self::BsonNumber => {
                 parse_quote! { #ident.to_bson() }
             }
             Self::TokenOrder | Self::MatchCriteria | Self::Relation => {
@@ -250,6 +259,7 @@ fn main() {
         "geoWithin",
         "in",
         "moreLikeThis",
+        "near",
         "text",
     ] {
         let mut path = PathBuf::from("yaml/search");
