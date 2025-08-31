@@ -415,10 +415,10 @@ impl Handshaker {
         credential: Option<&Credential>,
     ) -> Result<(Command, Option<ClientFirst>)> {
         let mut command = self.command.clone();
+        command.target_db = "admin".to_string();
 
         if let Some(cred) = credential {
             cred.append_needed_mechanism_negotiation(&mut command.body);
-            command.target_db = cred.resolved_source().to_string();
         }
 
         let client_first = set_speculative_auth_info(&mut command.body, credential).await?;
