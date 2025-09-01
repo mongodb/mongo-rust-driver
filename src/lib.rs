@@ -21,7 +21,6 @@ pub mod options;
 pub use ::mongocrypt;
 
 pub mod action;
-pub mod atlas_search;
 pub(crate) mod bson_compat;
 mod bson_util;
 pub mod change_stream;
