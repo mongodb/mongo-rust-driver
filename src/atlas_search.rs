@@ -413,7 +413,7 @@ impl Relation {
             Self::Disjoint => "disjoint",
             Self::Intersects => "intersects",
             Self::Within => "within",
-            Self::Other(s) => &s,
+            Self::Other(s) => s,
         }
     }
 }
