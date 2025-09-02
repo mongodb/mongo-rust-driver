@@ -133,7 +133,7 @@ fn main() {
     if let Some(mongocrypt) = args.mongocrypt {
         let mongocrypt_version_loc = Location::new(
             "Cargo.toml",
-            r#"mongocrypt =.*version = "(?<target>.*?)".*"#,
+            r#"\[dependencies.mongocrypt\]\nversion = "(?<target>.*?)".*"#,
         );
         pending.apply(&mongocrypt_version_loc, &mongocrypt);
     }
