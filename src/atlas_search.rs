@@ -48,30 +48,14 @@ impl<T> SearchOperator<T> {
         }
     }
 
-    /// Finalize this search operator as a pending `$search` aggregation stage, allowing
-    /// options to be set.
-    pub fn search(self) -> AtlasSearch {
-        AtlasSearch {
-            stage: doc! { self.name: self.spec },
-        }
-    }
-
     /// Finalize this search operator as a `$search` aggregation stage document.
     pub fn stage(self) -> Document {
-        self.search().stage()
-    }
-
-    /// Finalize this search operator as a pending `$searchMeta` aggregation stage, allowing
-    /// options to be set.
-    pub fn search_meta(self) -> AtlasSearchMeta {
-        AtlasSearchMeta {
-            stage: doc! { self.name: self.spec },
-        }
+        search(self).stage()
     }
 
     /// Finalize this search operator as a `$searchMeta` aggregation stage document.
     pub fn stage_meta(self) -> Document {
-        self.search_meta().stage()
+        search_meta(self).stage()
     }
 
     /// Erase the type of this builder.  Not typically needed, but can be useful to include builders
@@ -99,6 +83,14 @@ impl<T> SearchOperator<T> {
             spec: self.spec,
             _t: PhantomData,
         }
+    }
+}
+
+/// Finalize a search operator as a pending `$search` aggregation stage, allowing
+/// options to be set.
+pub fn search<T>(op: SearchOperator<T>) -> AtlasSearch {
+    AtlasSearch {
+        stage: doc! { op.name: op.spec },
     }
 }
 
@@ -176,6 +168,14 @@ impl AtlasSearch {
     /// Convert to an aggregation stage document.
     pub fn stage(self) -> Document {
         doc! { "$search": self.stage }
+    }
+}
+
+/// Finalize a search operator as a pending `$searchMeta` aggregation stage, allowing
+/// options to be set.
+pub fn search_meta<T>(op: SearchOperator<T>) -> AtlasSearchMeta {
+    AtlasSearchMeta {
+        stage: doc! { op.name: op.spec },
     }
 }
 
