@@ -245,7 +245,7 @@ fn helper_output_doc() {
                 }
             }
         },
-        near("year", 2000, 2).index("runtimes").stage()
+        near("year", 2000, 2).search().index("runtimes").stage()
     );
     let dt = DateTime::parse_rfc3339_str("1915-09-13T00:00:00.000+00:00").unwrap();
     assert_eq!(
@@ -260,6 +260,7 @@ fn helper_output_doc() {
             }
         },
         near("released", dt, 7776000000i64)
+            .search()
             .index("releaseddate")
             .stage()
     );

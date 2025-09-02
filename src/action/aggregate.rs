@@ -40,13 +40,10 @@ impl Database {
     #[deeplink]
     #[options_doc(aggregate)]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
-        Aggregate {
-            target: AggregateTargetRef::Database(self),
-            pipeline: pipeline.into_iter().collect(),
-            options: None,
-            session: ImplicitSession,
-            _phantom: PhantomData,
-        }
+        Aggregate::new(
+            AggregateTargetRef::Database(self),
+            pipeline.into_iter().collect(),
+        )
     }
 }
 
@@ -65,13 +62,10 @@ where
     #[deeplink]
     #[options_doc(aggregate)]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
-        Aggregate {
-            target: AggregateTargetRef::Collection(CollRef::new(self)),
-            pipeline: pipeline.into_iter().collect(),
-            options: None,
-            session: ImplicitSession,
-            _phantom: PhantomData,
-        }
+        Aggregate::new(
+            AggregateTargetRef::Collection(CollRef::new(self)),
+            pipeline.into_iter().collect(),
+        )
     }
 }
 
@@ -123,6 +117,18 @@ pub struct Aggregate<'a, Session = ImplicitSession, T = Document> {
     options: Option<AggregateOptions>,
     session: Session,
     _phantom: PhantomData<T>,
+}
+
+impl<'a> Aggregate<'a> {
+    fn new(target: AggregateTargetRef<'a>, pipeline: Vec<Document>) -> Self {
+        Self {
+            target,
+            pipeline,
+            options: None,
+            session: ImplicitSession,
+            _phantom: PhantomData,
+        }
+    }
 }
 
 #[option_setters(crate::coll::options::AggregateOptions)]

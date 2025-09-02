@@ -71,7 +71,7 @@ impl Operator {
                 setters.push(parse_quote! {
                     #[allow(missing_docs)]
                     pub fn #ident(mut self, #ident: #type_) -> Self {
-                        self.stage.insert(#arg_name, #init_expr);
+                        self.spec.insert(#arg_name, #init_expr);
                         self
                     }
                 });
@@ -94,14 +94,14 @@ impl Operator {
             #[doc = #desc]
             #[doc = ""]
             #[doc = #link]
-            pub fn #constr_ident(#required_args) -> AtlasSearch<#name_ident> {
-                AtlasSearch::new(
+            pub fn #constr_ident(#required_args) -> SearchOperator<#name_ident> {
+                SearchOperator::new(
                     #name_text,
                     doc! { #init_doc },
                 )
             }
 
-            impl AtlasSearch<#name_ident> {
+            impl SearchOperator<#name_ident> {
                 #setters
             }
         }
@@ -201,9 +201,9 @@ impl ArgumentRustType {
             Self::NearOrigin => parse_quote! { impl NearOrigin },
             Self::RangeValue => parse_quote! { impl RangeValue },
             Self::Relation => parse_quote! { Relation },
-            Self::SearchOperator => parse_quote! { impl SearchOperator },
+            Self::SearchOperator => parse_quote! { impl SearchOperatorParam },
             Self::SeachOperatorIter => {
-                parse_quote! { impl IntoIterator<Item = impl SearchOperator> }
+                parse_quote! { impl IntoIterator<Item = impl SearchOperatorParam> }
             }
             Self::String => parse_quote! { impl AsRef<str> },
             Self::StringOrArray => parse_quote! { impl StringOrArray },

@@ -10,7 +10,7 @@ use crate::bson::{doc, Bson, DateTime, Document};
 
 /// A helper to build the aggregation stage for Atlas Search.  Use one of the constructor functions
 /// and chain optional value setters, and then convert to a pipeline stage [`Document`] via
-/// [`stage`](AtlasSearch::stage) or [`on_index`](AtlasSearch::on_index).
+/// [`stage`](SearchOperator::stage).
 ///
 /// ```no_run
 /// # async fn wrapper() -> mongodb::error::Result<()> {
@@ -33,105 +33,45 @@ use crate::bson::{doc, Bson, DateTime, Document};
 /// ]).await?;
 /// # Ok(())
 /// # }
-pub struct AtlasSearch<T> {
-    name: &'static str,
-    stage: Document,
-    meta: bool,
-    options: Document,
+pub struct SearchOperator<T> {
+    pub(crate) name: &'static str,
+    pub(crate) spec: Document,
     _t: PhantomData<T>,
 }
 
-impl<T> AtlasSearch<T> {
-    fn new(name: &'static str, stage: Document) -> Self {
+impl<T> SearchOperator<T> {
+    fn new(name: &'static str, spec: Document) -> Self {
         Self {
             name,
-            stage,
-            meta: false,
-            options: doc! {},
+            spec,
             _t: PhantomData,
         }
     }
 
-    /// Whether to use the `$searchMeta` stage instead of the default `$search` stage.
-    ///
-    /// Note that only the [`count`](AtlasSearch::count) and [`index`](AtlasSearch::index) options
-    /// are valid for `$searchMeta`.
-    pub fn meta(mut self, value: bool) -> Self {
-        self.meta = value;
-        self
+    /// Finalize this search operator as a pending `$search` aggregation stage, allowing
+    /// options to be set.
+    pub fn search(self) -> AtlasSearch {
+        AtlasSearch {
+            stage: doc! { self.name: self.spec },
+        }
     }
 
-    /// Parallelize search across segments on dedicated search nodes.
-    pub fn concurrent(mut self, value: bool) -> Self {
-        self.options.insert("concurrent", value);
-        self
-    }
-
-    /// Document that specifies the count options for retrieving a count of the results.
-    pub fn count(mut self, value: Document) -> Self {
-        self.options.insert("count", value);
-        self
-    }
-
-    /// Document that specifies the highlighting options for displaying search terms in their
-    /// original context.
-    pub fn highlight(mut self, value: Document) -> Self {
-        self.options.insert("highlight", value);
-        self
-    }
-
-    /// Name of the Atlas Search index to use.
-    pub fn index(mut self, value: impl Into<String>) -> Self {
-        self.options.insert("index", value.into());
-        self
-    }
-
-    /// Flag that specifies whether to perform a full document lookup on the backend database or
-    /// return only stored source fields directly from Atlas Search.
-    pub fn return_stored_source(mut self, value: bool) -> Self {
-        self.options.insert("returnStoredSource", value);
-        self
-    }
-
-    /// Reference point for retrieving results.
-    pub fn search_after(mut self, value: impl Into<String>) -> Self {
-        self.options.insert("searchAfter", value.into());
-        self
-    }
-
-    /// Reference point for retrieving results.
-    pub fn search_before(mut self, value: impl Into<String>) -> Self {
-        self.options.insert("searchBefore", value.into());
-        self
-    }
-
-    /// Flag that specifies whether to retrieve a detailed breakdown of the score for the documents
-    /// in the results.
-    pub fn score_details(mut self, value: bool) -> Self {
-        self.options.insert("scoreDetails", value);
-        self
-    }
-
-    /// Document that specifies the fields to sort the Atlas Search results by in ascending or
-    /// descending order.
-    pub fn sort(mut self, value: Document) -> Self {
-        self.options.insert("sort", value);
-        self
-    }
-
-    /// Document that specifies the tracking option to retrieve analytics information on the search
-    /// terms.
-    pub fn tracking(mut self, value: Document) -> Self {
-        self.options.insert("tracking", value);
-        self
-    }
-
-    /// Converts this builder into an aggregate pipeline stage [`Document`].
+    /// Finalize this search operator as a `$search` aggregation stage document.
     pub fn stage(self) -> Document {
-        let mut inner = self.options;
-        inner.insert(self.name, self.stage);
-        let key = if self.meta { "$searchMeta" } else { "$search" };
-        doc! { key: inner }
+        self.search().stage()
+    }
+
+    /// Finalize this search operator as a pending `$searchMeta` aggregation stage, allowing
+    /// options to be set.
+    pub fn search_meta(self) -> AtlasSearchMeta {
+        AtlasSearchMeta {
+            stage: doc! { self.name: self.spec },
+        }
+    }
+
+    /// Finalize this search operator as a `$searchMeta` aggregation stage document.
+    pub fn stage_meta(self) -> Document {
+        self.search_meta().stage()
     }
 
     /// Erase the type of this builder.  Not typically needed, but can be useful to include builders
@@ -153,21 +93,120 @@ impl<T> AtlasSearch<T> {
     /// ]).await?;
     /// # }
     /// ```
-    pub fn unit(self) -> AtlasSearch<()> {
-        AtlasSearch {
+    pub fn unit(self) -> SearchOperator<()> {
+        SearchOperator {
             name: self.name,
-            stage: self.stage,
-            meta: self.meta,
-            options: self.options,
+            spec: self.spec,
             _t: PhantomData,
         }
     }
 }
 
-impl<T> IntoIterator for AtlasSearch<T> {
-    type Item = AtlasSearch<T>;
+/// A pending `$search` aggregation stage.
+pub struct AtlasSearch {
+    stage: Document,
+}
 
-    type IntoIter = std::iter::Once<AtlasSearch<T>>;
+impl AtlasSearch {
+    /// Parallelize search across segments on dedicated search nodes.
+    pub fn concurrent(mut self, value: bool) -> Self {
+        self.stage.insert("concurrent", value);
+        self
+    }
+
+    /// Document that specifies the count options for retrieving a count of the results.
+    pub fn count(mut self, value: Document) -> Self {
+        self.stage.insert("count", value);
+        self
+    }
+
+    /// Document that specifies the highlighting options for displaying search terms in their
+    /// original context.
+    pub fn highlight(mut self, value: Document) -> Self {
+        self.stage.insert("highlight", value);
+        self
+    }
+
+    /// Name of the Atlas Search index to use.
+    pub fn index(mut self, value: impl Into<String>) -> Self {
+        self.stage.insert("index", value.into());
+        self
+    }
+
+    /// Flag that specifies whether to perform a full document lookup on the backend database or
+    /// return only stored source fields directly from Atlas Search.
+    pub fn return_stored_source(mut self, value: bool) -> Self {
+        self.stage.insert("returnStoredSource", value);
+        self
+    }
+
+    /// Reference point for retrieving results.
+    pub fn search_after(mut self, value: impl Into<String>) -> Self {
+        self.stage.insert("searchAfter", value.into());
+        self
+    }
+
+    /// Reference point for retrieving results.
+    pub fn search_before(mut self, value: impl Into<String>) -> Self {
+        self.stage.insert("searchBefore", value.into());
+        self
+    }
+
+    /// Flag that specifies whether to retrieve a detailed breakdown of the score for the documents
+    /// in the results.
+    pub fn score_details(mut self, value: bool) -> Self {
+        self.stage.insert("scoreDetails", value);
+        self
+    }
+
+    /// Document that specifies the fields to sort the Atlas Search results by in ascending or
+    /// descending order.
+    pub fn sort(mut self, value: Document) -> Self {
+        self.stage.insert("sort", value);
+        self
+    }
+
+    /// Document that specifies the tracking option to retrieve analytics information on the search
+    /// terms.
+    pub fn tracking(mut self, value: Document) -> Self {
+        self.stage.insert("tracking", value);
+        self
+    }
+
+    /// Convert to an aggregation stage document.
+    pub fn stage(self) -> Document {
+        doc! { "$search": self.stage }
+    }
+}
+
+/// A pending `$searchMeta` aggregation stage.
+pub struct AtlasSearchMeta {
+    stage: Document,
+}
+
+impl AtlasSearchMeta {
+    /// Document that specifies the count options for retrieving a count of the results.
+    pub fn count(mut self, value: Document) -> Self {
+        self.stage.insert("count", value);
+        self
+    }
+
+    /// Name of the Atlas Search index to use.
+    pub fn index(mut self, value: impl Into<String>) -> Self {
+        self.stage.insert("index", value.into());
+        self
+    }
+
+    /// Convert to an aggregation stage document.
+    pub fn stage(self) -> Document {
+        doc! { "$searchMeta": self.stage }
+    }
+}
+
+impl<T> IntoIterator for SearchOperator<T> {
+    type Item = SearchOperator<T>;
+
+    type IntoIter = std::iter::Once<SearchOperator<T>>;
 
     fn into_iter(self) -> Self::IntoIter {
         std::iter::once(self)
@@ -233,9 +272,9 @@ mod private {
         }
     }
 
-    impl<T> Parameter for super::AtlasSearch<T> {
+    impl<T> Parameter for super::SearchOperator<T> {
         fn to_bson(self) -> Bson {
-            Bson::Document(doc! { self.name: self.stage })
+            Bson::Document(doc! { self.name: self.spec })
         }
     }
 }
@@ -250,17 +289,9 @@ impl StringOrArray for &[&str] {}
 impl StringOrArray for &[String] {}
 
 /// An Atlas Search operator parameter that is itself a search operator.
-pub trait SearchOperator: private::Parameter {}
-impl<T> SearchOperator for AtlasSearch<T> {}
-impl SearchOperator for Document {}
-
-impl AtlasSearch<Facet> {
-    /// Use the `$search` stage instead of the default `$searchMeta` stage.
-    pub fn search(mut self) -> Self {
-        self.meta = false;
-        self
-    }
-}
+pub trait SearchOperatorParam: private::Parameter {}
+impl<T> SearchOperatorParam for SearchOperator<T> {}
+impl SearchOperatorParam for Document {}
 
 /// Facet definitions.  These can be used when constructing a facet definition doc:
 /// ```

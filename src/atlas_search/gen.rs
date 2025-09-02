@@ -12,28 +12,28 @@ indexed with the autocomplete data type in the collection's index definition.
 pub fn autocomplete(
     path: impl StringOrArray,
     query: impl StringOrArray,
-) -> AtlasSearch<Autocomplete> {
-    AtlasSearch::new(
+) -> SearchOperator<Autocomplete> {
+    SearchOperator::new(
         "autocomplete",
         doc! {
             "path" : path.to_bson(), "query" : query.to_bson(),
         },
     )
 }
-impl AtlasSearch<Autocomplete> {
+impl SearchOperator<Autocomplete> {
     #[allow(missing_docs)]
     pub fn token_order(mut self, token_order: TokenOrder) -> Self {
-        self.stage.insert("tokenOrder", token_order.name());
+        self.spec.insert("tokenOrder", token_order.name());
         self
     }
     #[allow(missing_docs)]
     pub fn fuzzy(mut self, fuzzy: Document) -> Self {
-        self.stage.insert("fuzzy", fuzzy);
+        self.spec.insert("fuzzy", fuzzy);
         self
     }
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -45,21 +45,24 @@ consists of one or more sub-queries.
 */
 ///
 ///For more details, see the [compound operator reference](https://www.mongodb.com/docs/atlas/atlas-search/compound/).
-pub fn compound() -> AtlasSearch<Compound> {
-    AtlasSearch::new("compound", doc! {})
+pub fn compound() -> SearchOperator<Compound> {
+    SearchOperator::new("compound", doc! {})
 }
-impl AtlasSearch<Compound> {
+impl SearchOperator<Compound> {
     #[allow(missing_docs)]
-    pub fn must(mut self, must: impl IntoIterator<Item = impl SearchOperator>) -> Self {
-        self.stage.insert(
+    pub fn must(mut self, must: impl IntoIterator<Item = impl SearchOperatorParam>) -> Self {
+        self.spec.insert(
             "must",
             must.into_iter().map(|o| o.to_bson()).collect::<Vec<_>>(),
         );
         self
     }
     #[allow(missing_docs)]
-    pub fn must_not(mut self, must_not: impl IntoIterator<Item = impl SearchOperator>) -> Self {
-        self.stage.insert(
+    pub fn must_not(
+        mut self,
+        must_not: impl IntoIterator<Item = impl SearchOperatorParam>,
+    ) -> Self {
+        self.spec.insert(
             "mustNot",
             must_not
                 .into_iter()
@@ -69,16 +72,16 @@ impl AtlasSearch<Compound> {
         self
     }
     #[allow(missing_docs)]
-    pub fn should(mut self, should: impl IntoIterator<Item = impl SearchOperator>) -> Self {
-        self.stage.insert(
+    pub fn should(mut self, should: impl IntoIterator<Item = impl SearchOperatorParam>) -> Self {
+        self.spec.insert(
             "should",
             should.into_iter().map(|o| o.to_bson()).collect::<Vec<_>>(),
         );
         self
     }
     #[allow(missing_docs)]
-    pub fn filter(mut self, filter: impl IntoIterator<Item = impl SearchOperator>) -> Self {
-        self.stage.insert(
+    pub fn filter(mut self, filter: impl IntoIterator<Item = impl SearchOperatorParam>) -> Self {
+        self.spec.insert(
             "filter",
             filter.into_iter().map(|o| o.to_bson()).collect::<Vec<_>>(),
         );
@@ -86,13 +89,12 @@ impl AtlasSearch<Compound> {
     }
     #[allow(missing_docs)]
     pub fn minimum_should_match(mut self, minimum_should_match: i32) -> Self {
-        self.stage
-            .insert("minimumShouldMatch", minimum_should_match);
+        self.spec.insert("minimumShouldMatch", minimum_should_match);
         self
     }
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -107,19 +109,19 @@ for queries over fields of the embeddedDocuments
 ///For more details, see the [embeddedDocument operator reference](https://www.mongodb.com/docs/atlas/atlas-search/embedded-document/).
 pub fn embedded_document(
     path: impl StringOrArray,
-    operator: impl SearchOperator,
-) -> AtlasSearch<EmbeddedDocument> {
-    AtlasSearch::new(
+    operator: impl SearchOperatorParam,
+) -> SearchOperator<EmbeddedDocument> {
+    SearchOperator::new(
         "embeddedDocument",
         doc! {
             "path" : path.to_bson(), "operator" : operator.to_bson(),
         },
     )
 }
-impl AtlasSearch<EmbeddedDocument> {
+impl SearchOperator<EmbeddedDocument> {
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -129,18 +131,18 @@ pub struct Equals;
  * */
 ///
 ///For more details, see the [equals operator reference](https://www.mongodb.com/docs/atlas/atlas-search/equals/).
-pub fn equals(path: impl StringOrArray, value: impl Into<Bson>) -> AtlasSearch<Equals> {
-    AtlasSearch::new(
+pub fn equals(path: impl StringOrArray, value: impl Into<Bson>) -> SearchOperator<Equals> {
+    SearchOperator::new(
         "equals",
         doc! {
             "path" : path.to_bson(), "value" : value.into(),
         },
     )
 }
-impl AtlasSearch<Equals> {
+impl SearchOperator<Equals> {
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -150,18 +152,18 @@ pub struct Exists;
  * */
 ///
 ///For more details, see the [exists operator reference](https://www.mongodb.com/docs/atlas/atlas-search/exists/).
-pub fn exists(path: impl StringOrArray) -> AtlasSearch<Exists> {
-    AtlasSearch::new(
+pub fn exists(path: impl StringOrArray) -> SearchOperator<Exists> {
+    SearchOperator::new(
         "exists",
         doc! {
             "path" : path.to_bson(),
         },
     )
 }
-impl AtlasSearch<Exists> {
+impl SearchOperator<Exists> {
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -172,18 +174,18 @@ faceted fields and returns the count for each of those groups.
 */
 ///
 ///For more details, see the [facet operator reference](https://www.mongodb.com/docs/atlas/atlas-search/facet/).
-pub fn facet(facets: Document) -> AtlasSearch<Facet> {
-    AtlasSearch::new(
+pub fn facet(facets: Document) -> SearchOperator<Facet> {
+    SearchOperator::new(
         "facet",
         doc! {
             "facets" : facets,
         },
     )
 }
-impl AtlasSearch<Facet> {
+impl SearchOperator<Facet> {
     #[allow(missing_docs)]
-    pub fn operator(mut self, operator: impl SearchOperator) -> Self {
-        self.stage.insert("operator", operator.to_bson());
+    pub fn operator(mut self, operator: impl SearchOperatorParam) -> Self {
+        self.spec.insert("operator", operator.to_bson());
         self
     }
 }
@@ -198,18 +200,18 @@ pub fn geo_shape(
     path: impl StringOrArray,
     relation: Relation,
     geometry: Document,
-) -> AtlasSearch<GeoShape> {
-    AtlasSearch::new(
+) -> SearchOperator<GeoShape> {
+    SearchOperator::new(
         "geoShape",
         doc! {
             "path" : path.to_bson(), "relation" : relation.name(), "geometry" : geometry,
         },
     )
 }
-impl AtlasSearch<GeoShape> {
+impl SearchOperator<GeoShape> {
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -221,33 +223,33 @@ the index definition.
 */
 ///
 ///For more details, see the [geoWithin operator reference](https://www.mongodb.com/docs/atlas/atlas-search/geoWithin/).
-pub fn geo_within(path: impl StringOrArray) -> AtlasSearch<GeoWithin> {
-    AtlasSearch::new(
+pub fn geo_within(path: impl StringOrArray) -> SearchOperator<GeoWithin> {
+    SearchOperator::new(
         "geoWithin",
         doc! {
             "path" : path.to_bson(),
         },
     )
 }
-impl AtlasSearch<GeoWithin> {
+impl SearchOperator<GeoWithin> {
     #[allow(missing_docs)]
     pub fn geo_box(mut self, geo_box: Document) -> Self {
-        self.stage.insert("box", geo_box);
+        self.spec.insert("box", geo_box);
         self
     }
     #[allow(missing_docs)]
     pub fn circle(mut self, circle: Document) -> Self {
-        self.stage.insert("circle", circle);
+        self.spec.insert("circle", circle);
         self
     }
     #[allow(missing_docs)]
     pub fn geometry(mut self, geometry: Document) -> Self {
-        self.stage.insert("geometry", geometry);
+        self.spec.insert("geometry", geometry);
         self
     }
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -257,18 +259,18 @@ pub struct SearchIn;
  * */
 ///
 ///For more details, see the [in operator reference](https://www.mongodb.com/docs/atlas/atlas-search/in/).
-pub fn search_in(path: impl StringOrArray, value: impl Into<Bson>) -> AtlasSearch<SearchIn> {
-    AtlasSearch::new(
+pub fn search_in(path: impl StringOrArray, value: impl Into<Bson>) -> SearchOperator<SearchIn> {
+    SearchOperator::new(
         "in",
         doc! {
             "path" : path.to_bson(), "value" : value.into(),
         },
     )
 }
-impl AtlasSearch<SearchIn> {
+impl SearchOperator<SearchIn> {
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -280,18 +282,18 @@ that display similar or alternative results based on one or more given documents
 */
 ///
 ///For more details, see the [moreLikeThis operator reference](https://www.mongodb.com/docs/atlas/atlas-search/moreLikeThis/).
-pub fn more_like_this(like: impl DocumentOrArray) -> AtlasSearch<MoreLikeThis> {
-    AtlasSearch::new(
+pub fn more_like_this(like: impl DocumentOrArray) -> SearchOperator<MoreLikeThis> {
+    SearchOperator::new(
         "moreLikeThis",
         doc! {
             "like" : like.to_bson(),
         },
     )
 }
-impl AtlasSearch<MoreLikeThis> {
+impl SearchOperator<MoreLikeThis> {
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -305,8 +307,8 @@ pub fn near(
     path: impl StringOrArray,
     origin: impl NearOrigin,
     pivot: impl BsonNumber,
-) -> AtlasSearch<Near> {
-    AtlasSearch::new(
+) -> SearchOperator<Near> {
+    SearchOperator::new(
         "near",
         doc! {
             "path" : path.to_bson(), "origin" : origin.to_bson(), "pivot" : pivot
@@ -314,10 +316,10 @@ pub fn near(
         },
     )
 }
-impl AtlasSearch<Near> {
+impl SearchOperator<Near> {
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -328,28 +330,28 @@ pub struct Phrase;
  * */
 ///
 ///For more details, see the [phrase operator reference](https://www.mongodb.com/docs/atlas/atlas-search/phrase/).
-pub fn phrase(path: impl StringOrArray, query: impl StringOrArray) -> AtlasSearch<Phrase> {
-    AtlasSearch::new(
+pub fn phrase(path: impl StringOrArray, query: impl StringOrArray) -> SearchOperator<Phrase> {
+    SearchOperator::new(
         "phrase",
         doc! {
             "path" : path.to_bson(), "query" : query.to_bson(),
         },
     )
 }
-impl AtlasSearch<Phrase> {
+impl SearchOperator<Phrase> {
     #[allow(missing_docs)]
     pub fn slop(mut self, slop: i32) -> Self {
-        self.stage.insert("slop", slop);
+        self.spec.insert("slop", slop);
         self
     }
     #[allow(missing_docs)]
     pub fn synonyms(mut self, synonyms: impl AsRef<str>) -> Self {
-        self.stage.insert("synonyms", synonyms.as_ref());
+        self.spec.insert("synonyms", synonyms.as_ref());
         self
     }
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -361,15 +363,15 @@ pub struct QueryString;
 pub fn query_string(
     default_path: impl StringOrArray,
     query: impl AsRef<str>,
-) -> AtlasSearch<QueryString> {
-    AtlasSearch::new(
+) -> SearchOperator<QueryString> {
+    SearchOperator::new(
         "queryString",
         doc! {
             "defaultPath" : default_path.to_bson(), "query" : query.as_ref(),
         },
     )
 }
-impl AtlasSearch<QueryString> {}
+impl SearchOperator<QueryString> {}
 #[allow(missing_docs)]
 pub struct Range;
 /**The range operator supports querying and scoring numeric, date, and string values.
@@ -377,38 +379,38 @@ You can use this operator to find results that are within a given numeric, date,
 */
 ///
 ///For more details, see the [range operator reference](https://www.mongodb.com/docs/atlas/atlas-search/range/).
-pub fn range(path: impl StringOrArray) -> AtlasSearch<Range> {
-    AtlasSearch::new(
+pub fn range(path: impl StringOrArray) -> SearchOperator<Range> {
+    SearchOperator::new(
         "range",
         doc! {
             "path" : path.to_bson(),
         },
     )
 }
-impl AtlasSearch<Range> {
+impl SearchOperator<Range> {
     #[allow(missing_docs)]
     pub fn gt(mut self, gt: impl RangeValue) -> Self {
-        self.stage.insert("gt", gt.to_bson());
+        self.spec.insert("gt", gt.to_bson());
         self
     }
     #[allow(missing_docs)]
     pub fn gte(mut self, gte: impl RangeValue) -> Self {
-        self.stage.insert("gte", gte.to_bson());
+        self.spec.insert("gte", gte.to_bson());
         self
     }
     #[allow(missing_docs)]
     pub fn lt(mut self, lt: impl RangeValue) -> Self {
-        self.stage.insert("lt", lt.to_bson());
+        self.spec.insert("lt", lt.to_bson());
         self
     }
     #[allow(missing_docs)]
     pub fn lte(mut self, lte: impl RangeValue) -> Self {
-        self.stage.insert("lte", lte.to_bson());
+        self.spec.insert("lte", lte.to_bson());
         self
     }
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -419,24 +421,23 @@ regex is a term-level operator, meaning that the query field isn't analyzed.
 */
 ///
 ///For more details, see the [regex operator reference](https://www.mongodb.com/docs/atlas/atlas-search/regex/).
-pub fn regex(path: impl StringOrArray, query: impl AsRef<str>) -> AtlasSearch<Regex> {
-    AtlasSearch::new(
+pub fn regex(path: impl StringOrArray, query: impl AsRef<str>) -> SearchOperator<Regex> {
+    SearchOperator::new(
         "regex",
         doc! {
             "path" : path.to_bson(), "query" : query.as_ref(),
         },
     )
 }
-impl AtlasSearch<Regex> {
+impl SearchOperator<Regex> {
     #[allow(missing_docs)]
     pub fn allow_analyzed_field(mut self, allow_analyzed_field: bool) -> Self {
-        self.stage
-            .insert("allowAnalyzedField", allow_analyzed_field);
+        self.spec.insert("allowAnalyzedField", allow_analyzed_field);
         self
     }
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -447,33 +448,33 @@ If you omit an analyzer, the text operator uses the default standard analyzer.
 */
 ///
 ///For more details, see the [text operator reference](https://www.mongodb.com/docs/atlas/atlas-search/text/).
-pub fn text(path: impl StringOrArray, query: impl StringOrArray) -> AtlasSearch<Text> {
-    AtlasSearch::new(
+pub fn text(path: impl StringOrArray, query: impl StringOrArray) -> SearchOperator<Text> {
+    SearchOperator::new(
         "text",
         doc! {
             "path" : path.to_bson(), "query" : query.to_bson(),
         },
     )
 }
-impl AtlasSearch<Text> {
+impl SearchOperator<Text> {
     #[allow(missing_docs)]
     pub fn fuzzy(mut self, fuzzy: Document) -> Self {
-        self.stage.insert("fuzzy", fuzzy);
+        self.spec.insert("fuzzy", fuzzy);
         self
     }
     #[allow(missing_docs)]
     pub fn match_criteria(mut self, match_criteria: MatchCriteria) -> Self {
-        self.stage.insert("matchCriteria", match_criteria.name());
+        self.spec.insert("matchCriteria", match_criteria.name());
         self
     }
     #[allow(missing_docs)]
     pub fn synonyms(mut self, synonyms: impl AsRef<str>) -> Self {
-        self.stage.insert("synonyms", synonyms.as_ref());
+        self.spec.insert("synonyms", synonyms.as_ref());
         self
     }
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
@@ -484,24 +485,23 @@ pub struct Wildcard;
  * */
 ///
 ///For more details, see the [wildcard operator reference](https://www.mongodb.com/docs/atlas/atlas-search/wildcard/).
-pub fn wildcard(path: impl StringOrArray, query: impl AsRef<str>) -> AtlasSearch<Wildcard> {
-    AtlasSearch::new(
+pub fn wildcard(path: impl StringOrArray, query: impl AsRef<str>) -> SearchOperator<Wildcard> {
+    SearchOperator::new(
         "wildcard",
         doc! {
             "path" : path.to_bson(), "query" : query.as_ref(),
         },
     )
 }
-impl AtlasSearch<Wildcard> {
+impl SearchOperator<Wildcard> {
     #[allow(missing_docs)]
     pub fn allow_analyzed_field(mut self, allow_analyzed_field: bool) -> Self {
-        self.stage
-            .insert("allowAnalyzedField", allow_analyzed_field);
+        self.spec.insert("allowAnalyzedField", allow_analyzed_field);
         self
     }
     #[allow(missing_docs)]
     pub fn score(mut self, score: Document) -> Self {
-        self.stage.insert("score", score);
+        self.spec.insert("score", score);
         self
     }
 }
