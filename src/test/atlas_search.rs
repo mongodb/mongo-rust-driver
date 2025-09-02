@@ -144,7 +144,7 @@ fn helper_output_doc() {
             "yearFacet": facet::number("year", [2000, 2005, 2010, 2015]),
         })
         .operator(range("released").gte(gte_dt).lte(lte_dt))
-        .stage()
+        .stage_meta()
     );
     assert_eq!(
         doc! {
