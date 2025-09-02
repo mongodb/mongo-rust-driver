@@ -13,14 +13,12 @@ pub fn autocomplete(
     path: impl StringOrArray,
     query: impl StringOrArray,
 ) -> AtlasSearch<Autocomplete> {
-    AtlasSearch {
-        name: "autocomplete",
-        stage: doc! {
+    AtlasSearch::new(
+        "autocomplete",
+        doc! {
             "path" : path.to_bson(), "query" : query.to_bson(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<Autocomplete> {
     #[allow(missing_docs)]
@@ -48,12 +46,7 @@ consists of one or more sub-queries.
 ///
 ///For more details, see the [compound operator reference](https://www.mongodb.com/docs/atlas/atlas-search/compound/).
 pub fn compound() -> AtlasSearch<Compound> {
-    AtlasSearch {
-        name: "compound",
-        stage: doc! {},
-        meta: false,
-        _t: PhantomData,
-    }
+    AtlasSearch::new("compound", doc! {})
 }
 impl AtlasSearch<Compound> {
     #[allow(missing_docs)]
@@ -116,14 +109,12 @@ pub fn embedded_document(
     path: impl StringOrArray,
     operator: impl SearchOperator,
 ) -> AtlasSearch<EmbeddedDocument> {
-    AtlasSearch {
-        name: "embeddedDocument",
-        stage: doc! {
+    AtlasSearch::new(
+        "embeddedDocument",
+        doc! {
             "path" : path.to_bson(), "operator" : operator.to_bson(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<EmbeddedDocument> {
     #[allow(missing_docs)]
@@ -139,14 +130,12 @@ pub struct Equals;
 ///
 ///For more details, see the [equals operator reference](https://www.mongodb.com/docs/atlas/atlas-search/equals/).
 pub fn equals(path: impl StringOrArray, value: impl Into<Bson>) -> AtlasSearch<Equals> {
-    AtlasSearch {
-        name: "equals",
-        stage: doc! {
+    AtlasSearch::new(
+        "equals",
+        doc! {
             "path" : path.to_bson(), "value" : value.into(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<Equals> {
     #[allow(missing_docs)]
@@ -162,14 +151,12 @@ pub struct Exists;
 ///
 ///For more details, see the [exists operator reference](https://www.mongodb.com/docs/atlas/atlas-search/exists/).
 pub fn exists(path: impl StringOrArray) -> AtlasSearch<Exists> {
-    AtlasSearch {
-        name: "exists",
-        stage: doc! {
+    AtlasSearch::new(
+        "exists",
+        doc! {
             "path" : path.to_bson(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<Exists> {
     #[allow(missing_docs)]
@@ -186,14 +173,12 @@ faceted fields and returns the count for each of those groups.
 ///
 ///For more details, see the [facet operator reference](https://www.mongodb.com/docs/atlas/atlas-search/facet/).
 pub fn facet(facets: Document) -> AtlasSearch<Facet> {
-    AtlasSearch {
-        name: "facet",
-        stage: doc! {
+    AtlasSearch::new(
+        "facet",
+        doc! {
             "facets" : facets,
         },
-        meta: true,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<Facet> {
     #[allow(missing_docs)]
@@ -214,14 +199,12 @@ pub fn geo_shape(
     relation: Relation,
     geometry: Document,
 ) -> AtlasSearch<GeoShape> {
-    AtlasSearch {
-        name: "geoShape",
-        stage: doc! {
+    AtlasSearch::new(
+        "geoShape",
+        doc! {
             "path" : path.to_bson(), "relation" : relation.name(), "geometry" : geometry,
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<GeoShape> {
     #[allow(missing_docs)]
@@ -239,14 +222,12 @@ the index definition.
 ///
 ///For more details, see the [geoWithin operator reference](https://www.mongodb.com/docs/atlas/atlas-search/geoWithin/).
 pub fn geo_within(path: impl StringOrArray) -> AtlasSearch<GeoWithin> {
-    AtlasSearch {
-        name: "geoWithin",
-        stage: doc! {
+    AtlasSearch::new(
+        "geoWithin",
+        doc! {
             "path" : path.to_bson(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<GeoWithin> {
     #[allow(missing_docs)]
@@ -277,14 +258,12 @@ pub struct SearchIn;
 ///
 ///For more details, see the [in operator reference](https://www.mongodb.com/docs/atlas/atlas-search/in/).
 pub fn search_in(path: impl StringOrArray, value: impl Into<Bson>) -> AtlasSearch<SearchIn> {
-    AtlasSearch {
-        name: "in",
-        stage: doc! {
+    AtlasSearch::new(
+        "in",
+        doc! {
             "path" : path.to_bson(), "value" : value.into(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<SearchIn> {
     #[allow(missing_docs)]
@@ -302,14 +281,12 @@ that display similar or alternative results based on one or more given documents
 ///
 ///For more details, see the [moreLikeThis operator reference](https://www.mongodb.com/docs/atlas/atlas-search/moreLikeThis/).
 pub fn more_like_this(like: impl DocumentOrArray) -> AtlasSearch<MoreLikeThis> {
-    AtlasSearch {
-        name: "moreLikeThis",
-        stage: doc! {
+    AtlasSearch::new(
+        "moreLikeThis",
+        doc! {
             "like" : like.to_bson(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<MoreLikeThis> {
     #[allow(missing_docs)]
@@ -329,15 +306,13 @@ pub fn near(
     origin: impl NearOrigin,
     pivot: impl BsonNumber,
 ) -> AtlasSearch<Near> {
-    AtlasSearch {
-        name: "near",
-        stage: doc! {
+    AtlasSearch::new(
+        "near",
+        doc! {
             "path" : path.to_bson(), "origin" : origin.to_bson(), "pivot" : pivot
             .to_bson(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<Near> {
     #[allow(missing_docs)]
@@ -354,14 +329,12 @@ pub struct Phrase;
 ///
 ///For more details, see the [phrase operator reference](https://www.mongodb.com/docs/atlas/atlas-search/phrase/).
 pub fn phrase(path: impl StringOrArray, query: impl StringOrArray) -> AtlasSearch<Phrase> {
-    AtlasSearch {
-        name: "phrase",
-        stage: doc! {
+    AtlasSearch::new(
+        "phrase",
+        doc! {
             "path" : path.to_bson(), "query" : query.to_bson(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<Phrase> {
     #[allow(missing_docs)]
@@ -389,14 +362,12 @@ pub fn query_string(
     default_path: impl StringOrArray,
     query: impl AsRef<str>,
 ) -> AtlasSearch<QueryString> {
-    AtlasSearch {
-        name: "queryString",
-        stage: doc! {
+    AtlasSearch::new(
+        "queryString",
+        doc! {
             "defaultPath" : default_path.to_bson(), "query" : query.as_ref(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<QueryString> {}
 #[allow(missing_docs)]
@@ -407,14 +378,12 @@ You can use this operator to find results that are within a given numeric, date,
 ///
 ///For more details, see the [range operator reference](https://www.mongodb.com/docs/atlas/atlas-search/range/).
 pub fn range(path: impl StringOrArray) -> AtlasSearch<Range> {
-    AtlasSearch {
-        name: "range",
-        stage: doc! {
+    AtlasSearch::new(
+        "range",
+        doc! {
             "path" : path.to_bson(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<Range> {
     #[allow(missing_docs)]
@@ -451,14 +420,12 @@ regex is a term-level operator, meaning that the query field isn't analyzed.
 ///
 ///For more details, see the [regex operator reference](https://www.mongodb.com/docs/atlas/atlas-search/regex/).
 pub fn regex(path: impl StringOrArray, query: impl AsRef<str>) -> AtlasSearch<Regex> {
-    AtlasSearch {
-        name: "regex",
-        stage: doc! {
+    AtlasSearch::new(
+        "regex",
+        doc! {
             "path" : path.to_bson(), "query" : query.as_ref(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<Regex> {
     #[allow(missing_docs)]
@@ -481,14 +448,12 @@ If you omit an analyzer, the text operator uses the default standard analyzer.
 ///
 ///For more details, see the [text operator reference](https://www.mongodb.com/docs/atlas/atlas-search/text/).
 pub fn text(path: impl StringOrArray, query: impl StringOrArray) -> AtlasSearch<Text> {
-    AtlasSearch {
-        name: "text",
-        stage: doc! {
+    AtlasSearch::new(
+        "text",
+        doc! {
             "path" : path.to_bson(), "query" : query.to_bson(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<Text> {
     #[allow(missing_docs)]
@@ -520,14 +485,12 @@ pub struct Wildcard;
 ///
 ///For more details, see the [wildcard operator reference](https://www.mongodb.com/docs/atlas/atlas-search/wildcard/).
 pub fn wildcard(path: impl StringOrArray, query: impl AsRef<str>) -> AtlasSearch<Wildcard> {
-    AtlasSearch {
-        name: "wildcard",
-        stage: doc! {
+    AtlasSearch::new(
+        "wildcard",
+        doc! {
             "path" : path.to_bson(), "query" : query.as_ref(),
         },
-        meta: false,
-        _t: PhantomData,
-    }
+    )
 }
 impl AtlasSearch<Wildcard> {
     #[allow(missing_docs)]

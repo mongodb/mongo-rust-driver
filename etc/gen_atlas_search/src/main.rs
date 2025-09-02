@@ -87,10 +87,6 @@ impl Operator {
             "For more details, see the [{name_text} operator reference]({}).",
             self.link
         );
-        let meta: TokenStream = match self.name.as_str() {
-            "facet" => parse_quote! { true },
-            _ => parse_quote! { false },
-        };
         parse_quote! {
             #[allow(missing_docs)]
             pub struct #name_ident;
@@ -99,12 +95,10 @@ impl Operator {
             #[doc = ""]
             #[doc = #link]
             pub fn #constr_ident(#required_args) -> AtlasSearch<#name_ident> {
-                AtlasSearch {
-                    name: #name_text,
-                    stage: doc! { #init_doc },
-                    meta: #meta,
-                    _t: PhantomData,
-                }
+                AtlasSearch::new(
+                    #name_text,
+                    doc! { #init_doc },
+                )
             }
 
             impl AtlasSearch<#name_ident> {

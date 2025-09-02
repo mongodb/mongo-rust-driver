@@ -37,10 +37,103 @@ pub struct AtlasSearch<T> {
     name: &'static str,
     stage: Document,
     meta: bool,
+    options: Document,
     _t: PhantomData<T>,
 }
 
 impl<T> AtlasSearch<T> {
+    fn new(name: &'static str, stage: Document) -> Self {
+        Self {
+            name,
+            stage,
+            meta: false,
+            options: doc! {},
+            _t: PhantomData,
+        }
+    }
+
+    /// Whether to use the `$searchMeta` stage instead of the default `$search` stage.
+    ///
+    /// Note that only the [`count`](AtlasSearch::count) and [`index`](AtlasSearch::index) options
+    /// are valid for `$searchMeta`.
+    pub fn meta(mut self, value: bool) -> Self {
+        self.meta = value;
+        self
+    }
+
+    /// Parallelize search across segments on dedicated search nodes.
+    pub fn concurrent(mut self, value: bool) -> Self {
+        self.options.insert("concurrent", value);
+        self
+    }
+
+    /// Document that specifies the count options for retrieving a count of the results.
+    pub fn count(mut self, value: Document) -> Self {
+        self.options.insert("count", value);
+        self
+    }
+
+    /// Document that specifies the highlighting options for displaying search terms in their
+    /// original context.
+    pub fn highlight(mut self, value: Document) -> Self {
+        self.options.insert("highlight", value);
+        self
+    }
+
+    /// Name of the Atlas Search index to use.
+    pub fn index(mut self, value: impl Into<String>) -> Self {
+        self.options.insert("index", value.into());
+        self
+    }
+
+    /// Flag that specifies whether to perform a full document lookup on the backend database or
+    /// return only stored source fields directly from Atlas Search.
+    pub fn return_stored_source(mut self, value: bool) -> Self {
+        self.options.insert("returnStoredSource", value);
+        self
+    }
+
+    /// Reference point for retrieving results.
+    pub fn search_after(mut self, value: impl Into<String>) -> Self {
+        self.options.insert("searchAfter", value.into());
+        self
+    }
+
+    /// Reference point for retrieving results.
+    pub fn search_before(mut self, value: impl Into<String>) -> Self {
+        self.options.insert("searchBefore", value.into());
+        self
+    }
+
+    /// Flag that specifies whether to retrieve a detailed breakdown of the score for the documents
+    /// in the results.
+    pub fn score_details(mut self, value: bool) -> Self {
+        self.options.insert("scoreDetails", value);
+        self
+    }
+
+    /// Document that specifies the fields to sort the Atlas Search results by in ascending or
+    /// descending order.
+    pub fn sort(mut self, value: Document) -> Self {
+        self.options.insert("sort", value);
+        self
+    }
+
+    /// Document that specifies the tracking option to retrieve analytics information on the search
+    /// terms.
+    pub fn tracking(mut self, value: Document) -> Self {
+        self.options.insert("tracking", value);
+        self
+    }
+
+    /// Converts this builder into an aggregate pipeline stage [`Document`].
+    pub fn stage(self) -> Document {
+        let mut inner = self.options;
+        inner.insert(self.name, self.stage);
+        let key = if self.meta { "$searchMeta" } else { "$search" };
+        doc! { key: inner }
+    }
+
     /// Erase the type of this builder.  Not typically needed, but can be useful to include builders
     /// of different types in a single `Vec`:
     /// ```no_run
@@ -65,28 +158,8 @@ impl<T> AtlasSearch<T> {
             name: self.name,
             stage: self.stage,
             meta: self.meta,
+            options: self.options,
             _t: PhantomData,
-        }
-    }
-
-    /// Converts this builder into an aggregate pipeline stage [`Document`].
-    pub fn stage(self) -> Document {
-        let key = if self.meta { "$searchMeta" } else { "$search" };
-        doc! {
-            key: {
-                self.name: self.stage
-            }
-        }
-    }
-
-    /// Like [`stage`](AtlasSearch::stage), converts this builder into an aggregate pipeline stage
-    /// [`Document`], but also specify the search index to use.
-    pub fn on_index(self, index: impl AsRef<str>) -> Document {
-        doc! {
-            "$search": {
-                "index": index.as_ref(),
-                self.name: self.stage,
-            }
         }
     }
 }
