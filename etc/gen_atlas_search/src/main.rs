@@ -87,8 +87,12 @@ impl Operator {
             "For more details, see the [{name_text} operator reference]({}).",
             self.link
         );
+        let struct_doc = format!(
+            "`{name_text}` Atlas Search operator.  Construct with \
+             [`{constr_ident}`]({constr_ident}())."
+        );
         parse_quote! {
-            #[allow(missing_docs)]
+            #[doc = #struct_doc]
             pub struct #name_ident;
 
             #[doc = #desc]

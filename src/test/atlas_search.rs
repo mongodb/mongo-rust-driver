@@ -21,7 +21,7 @@ fn helper_output_doc() {
         },
         autocomplete("title", "pre")
             .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
-            .stage()
+            .into_stage()
     );
     assert_eq!(
         doc! {
@@ -32,7 +32,7 @@ fn helper_output_doc() {
                 }
             }
         },
-        text("plot", "baseball").stage()
+        text("plot", "baseball").into_stage()
     );
     assert_eq!(
         doc! {
@@ -56,7 +56,7 @@ fn helper_output_doc() {
         compound()
             .must(text("description", "varieties"))
             .should(text("description", "Fuji"))
-            .stage()
+            .into_stage()
     );
     assert_eq!(
         doc! {
@@ -98,7 +98,7 @@ fn helper_output_doc() {
                 "aggregate": "mean"
             }
         })
-        .stage()
+        .into_stage()
     );
     assert_eq!(
         doc! {
@@ -109,7 +109,7 @@ fn helper_output_doc() {
                 }
             }
         },
-        equals("verified_user", true).stage()
+        equals("verified_user", true).into_stage()
     );
     let gte_dt = DateTime::parse_rfc3339_str("2000-01-01T00:00:00.000Z").unwrap();
     let lte_dt = DateTime::parse_rfc3339_str("2015-01-31T00:00:00.000Z").unwrap();
@@ -144,7 +144,7 @@ fn helper_output_doc() {
             "yearFacet": facet::number("year", [2000, 2005, 2010, 2015]),
         })
         .operator(range("released").gte(gte_dt).lte(lte_dt))
-        .stage_meta()
+        .into_stage_meta()
     );
     assert_eq!(
         doc! {
@@ -173,7 +173,7 @@ fn helper_output_doc() {
                                 [-161.323242,22.512557]]]
             }
         )
-        .stage()
+        .into_stage()
     );
     assert_eq!(
         doc! {
@@ -204,7 +204,7 @@ fn helper_output_doc() {
                     "coordinates": [168.000, -9.133]
                 }
             })
-            .stage()
+            .into_stage()
     );
     assert_eq!(
         doc! {
@@ -215,7 +215,7 @@ fn helper_output_doc() {
                 }
             }
         },
-        search_in("accounts", [371138, 371139, 371140].as_ref()).stage()
+        search_in("accounts", [371138, 371139, 371140].as_ref()).into_stage()
     );
     assert_eq!(
         doc! {
@@ -232,7 +232,7 @@ fn helper_output_doc() {
             "title": "The Godfather",
             "genres": "action"
         })
-        .stage()
+        .into_stage()
     );
     assert_eq!(
         doc! {
@@ -245,7 +245,7 @@ fn helper_output_doc() {
                 }
             }
         },
-        search(near("year", 2000, 2)).index("runtimes").stage()
+        search(near("year", 2000, 2)).index("runtimes").into_stage()
     );
     let dt = DateTime::parse_rfc3339_str("1915-09-13T00:00:00.000+00:00").unwrap();
     assert_eq!(
@@ -261,7 +261,7 @@ fn helper_output_doc() {
         },
         search(near("released", dt, 7776000000i64))
             .index("releaseddate")
-            .stage()
+            .into_stage()
     );
     assert_eq!(
         doc! {
@@ -284,7 +284,7 @@ fn helper_output_doc() {
             },
             1000,
         )
-        .stage()
+        .into_stage()
     );
     assert_eq!(
         doc! {
@@ -295,7 +295,7 @@ fn helper_output_doc() {
                 }
             }
         },
-        phrase("title", "new york").stage()
+        phrase("title", "new york").into_stage()
     );
     #[cfg(feature = "bson-3")]
     assert_eq!(
@@ -307,7 +307,7 @@ fn helper_output_doc() {
                 }
             }
         },
-        phrase("title", ["the man", "the moon"]).stage()
+        phrase("title", ["the man", "the moon"]).into_stage()
     );
     assert_eq!(
         doc! {
@@ -318,7 +318,7 @@ fn helper_output_doc() {
                 }
             }
         },
-        query_string("title", "Rocky AND (IV OR 4 OR Four)").stage()
+        query_string("title", "Rocky AND (IV OR 4 OR Four)").into_stage()
     );
     assert_eq!(
         doc! {
@@ -329,7 +329,7 @@ fn helper_output_doc() {
                 }
             }
         },
-        regex("title", "(.*) Seattle").stage()
+        regex("title", "(.*) Seattle").into_stage()
     );
     assert_eq!(
         doc! {
@@ -340,7 +340,7 @@ fn helper_output_doc() {
                 }
             }
         },
-        wildcard("title", "Green D*").stage()
+        wildcard("title", "Green D*").into_stage()
     );
 }
 

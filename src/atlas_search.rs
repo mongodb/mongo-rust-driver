@@ -10,7 +10,7 @@ use crate::bson::{doc, Bson, DateTime, Document};
 
 /// A helper to build the aggregation stage for Atlas Search.  Use one of the constructor functions
 /// and chain optional value setters, and then convert to a pipeline stage [`Document`] via
-/// [`stage`](SearchOperator::stage).
+/// [`into_stage`](SearchOperator::into_stage).
 ///
 /// ```no_run
 /// # async fn wrapper() -> mongodb::error::Result<()> {
@@ -20,7 +20,7 @@ use crate::bson::{doc, Bson, DateTime, Document};
 /// let cursor = collection.aggregate(vec![
 ///     atlas_search::autocomplete("title", "pre")
 ///         .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
-///         .stage(),
+///         .into_stage(),
 ///     doc! {
 ///         "$limit": 10,
 ///    },
@@ -49,13 +49,13 @@ impl<T> SearchOperator<T> {
     }
 
     /// Finalize this search operator as a `$search` aggregation stage document.
-    pub fn stage(self) -> Document {
-        search(self).stage()
+    pub fn into_stage(self) -> Document {
+        search(self).into_stage()
     }
 
     /// Finalize this search operator as a `$searchMeta` aggregation stage document.
-    pub fn stage_meta(self) -> Document {
-        search_meta(self).stage()
+    pub fn into_stage_meta(self) -> Document {
+        search_meta(self).into_stage()
     }
 
     /// Erase the type of this builder.  Not typically needed, but can be useful to include builders
@@ -73,7 +73,7 @@ impl<T> SearchOperator<T> {
     ///                 .should(atlas_search::text("description", "Fuji"))
     ///                 .unit(),
     ///         ])
-    ///         .stage(),
+    ///         .into_stage(),
     /// ]).await?;
     /// # }
     /// ```
@@ -158,15 +158,8 @@ impl AtlasSearch {
         self
     }
 
-    /// Document that specifies the tracking option to retrieve analytics information on the search
-    /// terms.
-    pub fn tracking(mut self, value: Document) -> Self {
-        self.stage.insert("tracking", value);
-        self
-    }
-
     /// Convert to an aggregation stage document.
-    pub fn stage(self) -> Document {
+    pub fn into_stage(self) -> Document {
         doc! { "$search": self.stage }
     }
 }
@@ -198,7 +191,7 @@ impl AtlasSearchMeta {
     }
 
     /// Convert to an aggregation stage document.
-    pub fn stage(self) -> Document {
+    pub fn into_stage(self) -> Document {
         doc! { "$searchMeta": self.stage }
     }
 }
@@ -306,7 +299,7 @@ pub mod facet {
     use crate::bson::{doc, Bson, Document};
     use std::marker::PhantomData;
 
-    /// A facet definition.
+    /// A facet definition; see the [facet docs](https://www.mongodb.com/docs/atlas/atlas-search/facet/) for more details.
     pub struct Facet<T> {
         inner: Document,
         _t: PhantomData<T>,
@@ -332,7 +325,8 @@ pub mod facet {
         }
     }
     impl Facet<String> {
-        #[allow(missing_docs)]
+        /// Maximum number of facet categories to return in the results. Value must be less than or
+        /// equal to 1000.
         pub fn num_buckets(mut self, num: i32) -> Self {
             self.inner.insert("numBuckets", num);
             self
@@ -357,8 +351,9 @@ pub mod facet {
         }
     }
     impl Facet<Number> {
-        #[allow(missing_docs)]
-        pub fn default(mut self, bucket: impl AsRef<str>) -> Self {
+        /// Name of an additional bucket that counts documents returned from the operator that do
+        /// not fall within the specified boundaries.
+        pub fn default_bucket(mut self, bucket: impl AsRef<str>) -> Self {
             self.inner.insert("default", bucket.as_ref());
             self
         }
@@ -381,7 +376,8 @@ pub mod facet {
         }
     }
     impl Facet<Date> {
-        #[allow(missing_docs)]
+        /// Name of an additional bucket that counts documents returned from the operator that do
+        /// not fall within the specified boundaries.
         pub fn default(mut self, bucket: impl AsRef<str>) -> Self {
             self.inner.insert("default", bucket.as_ref());
             self
