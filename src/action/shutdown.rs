@@ -120,7 +120,7 @@ impl crate::sync::Client {
     /// `GridFsUploadStream`.
     ///
     /// [`run`](Shutdown::run) will return `()`.
-    #[options_doc(shutdown, sync)]
+    #[options_doc(shutdown, "run")]
     pub fn shutdown(self) -> Shutdown {
         self.async_client.shutdown()
     }

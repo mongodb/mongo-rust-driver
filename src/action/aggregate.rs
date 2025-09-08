@@ -76,12 +76,12 @@ impl crate::sync::Database {
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     ///
-    /// [`run`](Aggregate::run) will return d[Result<crate::sync::Cursor<Document>>`]. If a
+    /// [`run`](Aggregate::run) will return d[`Result<crate::sync::Cursor<Document>>`]. If a
     /// [`crate::sync::ClientSession`] was provided, the returned cursor will be a
     /// [`crate::sync::SessionCursor`]. If [`with_type`](Aggregate::with_type) was called, the
     /// returned cursor will be generic over the `T` specified.
     #[deeplink]
-    #[options_doc(aggregate, sync)]
+    #[options_doc(aggregate, "run")]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_database.aggregate(pipeline)
     }
@@ -97,12 +97,12 @@ where
     /// See the documentation [here](https://www.mongodb.com/docs/manual/aggregation/) for more
     /// information on aggregations.
     ///
-    /// [`run`](Aggregate::run) will return d[Result<crate::sync::Cursor<Document>>`]. If a
+    /// [`run`](Aggregate::run) will return d[`Result<crate::sync::Cursor<Document>>`]. If a
     /// `crate::sync::ClientSession` was provided, the returned cursor will be a
     /// `crate::sync::SessionCursor`. If [`with_type`](Aggregate::with_type) was called, the
     /// returned cursor will be generic over the `T` specified.
     #[deeplink]
-    #[options_doc(aggregate, sync)]
+    #[options_doc(aggregate, "run")]
     pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
         self.async_collection.aggregate(pipeline)
     }

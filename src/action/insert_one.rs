@@ -54,7 +54,7 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](InsertOne::run) will return d[`Result<InsertOneResult>`].
     #[deeplink]
-    #[options_doc(insert_one, sync)]
+    #[options_doc(insert_one, "run")]
     pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
         self.async_collection.insert_one(doc)
     }

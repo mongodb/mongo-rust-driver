@@ -63,7 +63,7 @@ impl crate::sync::Database {
     /// [`run`](ListCollections::run) will return
     /// d[`Result<Cursor<CollectionSpecification>>`].
     #[deeplink]
-    #[options_doc(list_collections, sync)]
+    #[options_doc(list_collections, "run")]
     pub fn list_collections(&self) -> ListCollections {
         self.async_database.list_collections()
     }
@@ -72,7 +72,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](ListCollections::run) will return d[`Result<Vec<String>>`].
     #[deeplink]
-    #[options_doc(list_collections, sync)]
+    #[options_doc(list_collections, "run")]
     pub fn list_collection_names(&self) -> ListCollections<'_, ListNames> {
         self.async_database.list_collection_names()
     }

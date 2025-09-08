@@ -127,7 +127,7 @@ impl crate::sync::Client {
     ///
     /// Change streams require either a "majority" read concern or no read
     /// concern. Anything else will cause a server error.
-    #[options_doc(watch, sync)]
+    #[options_doc(watch, "run")]
     pub fn watch(&self) -> Watch {
         self.async_client.watch()
     }
@@ -144,7 +144,7 @@ impl crate::sync::Database {
     ///
     /// Change streams require either a "majority" read concern or no read
     /// concern. Anything else will cause a server error.
-    #[options_doc(watch, sync)]
+    #[options_doc(watch, "run")]
     pub fn watch(&self) -> Watch {
         self.async_database.watch()
     }
@@ -165,7 +165,7 @@ where
     ///
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
-    #[options_doc(watch, sync)]
+    #[options_doc(watch, "run")]
     pub fn watch(&self) -> Watch<T> {
         self.async_collection.watch()
     }

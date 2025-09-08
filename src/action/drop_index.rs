@@ -55,7 +55,7 @@ where
     ///
     /// [`run`](DropIndex::run) will return d[`Result<()>`].
     #[deeplink]
-    #[options_doc(drop_index, sync)]
+    #[options_doc(drop_index, "run")]
     pub fn drop_index(&self, name: impl AsRef<str>) -> DropIndex {
         self.async_collection.drop_index(name)
     }
@@ -64,7 +64,7 @@ where
     ///
     /// [`run`](DropIndex::run) will return d[`Result<()>`].
     #[deeplink]
-    #[options_doc(drop_index, sync)]
+    #[options_doc(drop_index, "run")]
     pub fn drop_indexes(&self) -> DropIndex {
         self.async_collection.drop_indexes()
     }

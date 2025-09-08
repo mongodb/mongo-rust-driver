@@ -118,7 +118,7 @@ where
     ///
     /// [`run`](CreateSearchIndex::run) will return d[`Result<Vec<String>>`].
     #[deeplink]
-    #[options_doc(create_search_index, sync)]
+    #[options_doc(create_search_index, "run")]
     pub fn create_search_indexes(
         &self,
         models: impl IntoIterator<Item = SearchIndexModel>,
@@ -130,7 +130,7 @@ where
     ///
     /// [`run`](CreateSearchIndex::run) will return d[`Result<String>`].
     #[deeplink]
-    #[options_doc(create_search_index, sync)]
+    #[options_doc(create_search_index, "run")]
     pub fn create_search_index(&self, model: SearchIndexModel) -> CreateSearchIndex<Single> {
         self.async_collection.create_search_index(model)
     }
@@ -138,7 +138,7 @@ where
     /// Updates the search index with the given name to use the provided definition.
     ///
     /// [`run`](UpdateSearchIndex::run) will return [`Result<()>`].
-    #[options_doc(update_search_index, sync)]
+    #[options_doc(update_search_index, "run")]
     pub fn update_search_index(
         &self,
         name: impl Into<String>,
@@ -150,7 +150,7 @@ where
     /// Drops the search index with the given name.
     ///
     /// [`run`](DropSearchIndex::run) will return [`Result<()>`].
-    #[options_doc(drop_search_index, sync)]
+    #[options_doc(drop_search_index, "run")]
     pub fn drop_search_index(&self, name: impl Into<String>) -> DropSearchIndex {
         self.async_collection.drop_search_index(name)
     }
@@ -162,7 +162,7 @@ where
     ///
     /// [`run`](ListSearchIndexes::run) will return d[`Result<crate::sync::Cursor<Document>>`].
     #[deeplink]
-    #[options_doc(list_search_indexes, sync)]
+    #[options_doc(list_search_indexes, "run")]
     pub fn list_search_indexes(&self) -> ListSearchIndexes {
         self.async_collection.list_search_indexes()
     }

@@ -27,7 +27,7 @@ impl crate::sync::Client {
     ///
     /// [run](StartSession::run) will return d[`Result<crate::sync::ClientSession>`].
     #[deeplink]
-    #[options_doc(start_session, sync)]
+    #[options_doc(start_session, "run")]
     pub fn start_session(&self) -> StartSession {
         self.async_client.start_session()
     }
