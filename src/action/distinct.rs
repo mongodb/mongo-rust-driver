@@ -44,7 +44,7 @@ where
     ///
     /// [`run`](Distinct::run) will return d[`Result<Vec<Bson>>`].
     #[deeplink]
-    #[options_doc(distinct, sync)]
+    #[options_doc(distinct, "run")]
     pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
         self.async_collection.distinct(field_name, filter)
     }

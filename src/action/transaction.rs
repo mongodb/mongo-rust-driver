@@ -132,7 +132,7 @@ impl crate::sync::ClientSession {
     /// ```
     ///
     /// [`run`](StartTransaction::run) will return [`Result<()>`].
-    #[options_doc(start_transaction, sync)]
+    #[options_doc(start_transaction, "run")]
     pub fn start_transaction(&mut self) -> StartTransaction<&mut Self> {
         StartTransaction {
             session: self,

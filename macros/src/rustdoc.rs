@@ -153,7 +153,10 @@ pub(crate) fn options_doc(
     });
     let preamble = format!(
         "These methods can be chained before `{}` to set options:",
-        if args.is_async() { ".await" } else { "run" }
+        args.term
+            .as_ref()
+            .map(|(_, b)| b.as_str())
+            .unwrap_or(".await")
     );
     impl_fn.attrs.push(parse_quote! {
         #[doc = #preamble]
@@ -169,34 +172,29 @@ pub(crate) fn options_doc(
 
 pub(crate) struct OptionsDocArgs {
     foreign_path: syn::Path,
-    sync: Option<(Token![,], Ident)>,
-}
-
-impl OptionsDocArgs {
-    fn is_async(&self) -> bool {
-        self.sync.is_none()
-    }
+    term: Option<(Token![,], String)>,
 }
 
 impl Parse for OptionsDocArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let foreign_path = input.parse()?;
-        let sync = if input.is_empty() {
+        let term = if input.is_empty() {
             None
         } else {
-            Some((input.parse()?, parse_name(input, "sync")?))
+            let (comma, lit) = (input.parse()?, input.parse::<syn::LitStr>()?);
+            Some((comma, lit.value()))
         };
 
-        Ok(Self { foreign_path, sync })
+        Ok(Self { foreign_path, term })
     }
 }
 
 impl ToTokens for OptionsDocArgs {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         tokens.extend(self.foreign_path.to_token_stream());
-        if let Some((comma, ident)) = &self.sync {
+        if let Some((comma, lit)) = &self.term {
             tokens.extend(comma.to_token_stream());
-            tokens.extend(ident.to_token_stream());
+            tokens.extend(lit.to_token_stream());
         }
     }
 }

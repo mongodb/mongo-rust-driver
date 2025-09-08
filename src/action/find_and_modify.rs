@@ -125,7 +125,7 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](FindOneAndDelete::run) will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_and_delete, sync)]
+    #[options_doc(find_one_and_delete, "run")]
     pub fn find_one_and_delete(&self, filter: Document) -> FindOneAndDelete<'_, T> {
         self.async_collection.find_one_and_delete(filter)
     }
@@ -141,7 +141,7 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](FindOneAndDelete::run) will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_and_update, sync)]
+    #[options_doc(find_one_and_update, "run")]
     pub fn find_one_and_update(
         &self,
         filter: Document,
@@ -163,7 +163,7 @@ impl<T: Serialize + DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](FindOneAndReplace::run) will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_and_replace, sync)]
+    #[options_doc(find_one_and_replace, "run")]
     pub fn find_one_and_replace(
         &self,
         filter: Document,

@@ -48,13 +48,13 @@ impl crate::sync::Client {
     /// [here](https://www.mongodb.com/docs/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     ///
-    /// [`run`](BulkWrite::run) will return d[`Result<SummaryBulkWriteResult`] or
-    /// d[`Result<VerboseBulkWriteResult`] if [`verbose_results`](BulkWrite::verbose_results) is
+    /// [`run`](BulkWrite::run) will return d[`Result<SummaryBulkWriteResult>`] or
+    /// d[`Result<VerboseBulkWriteResult>`] if [`verbose_results`](BulkWrite::verbose_results) is
     /// configured.
     ///
     /// Bulk write is only available on MongoDB 8.0+.
     #[deeplink]
-    #[options_doc(bulk_write, sync)]
+    #[options_doc(bulk_write, "run")]
     pub fn bulk_write(
         &self,
         models: impl IntoIterator<Item = impl Into<WriteModel>>,

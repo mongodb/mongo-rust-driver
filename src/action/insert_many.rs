@@ -59,7 +59,7 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](InsertMany::run) will return d[`Result<InsertManyResult>`].
     #[deeplink]
-    #[options_doc(insert_many, sync)]
+    #[options_doc(insert_many, "run")]
     pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
         self.async_collection.insert_many(docs)
     }

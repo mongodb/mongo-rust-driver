@@ -35,7 +35,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](DropDatabase::run) will return d[`Result<()>`].
     #[deeplink]
-    #[options_doc(drop_db, sync)]
+    #[options_doc(drop_db, "run")]
     pub fn drop(&self) -> DropDatabase {
         self.async_database.drop()
     }
@@ -98,7 +98,7 @@ where
     ///
     /// [`run`](DropCollection::run) will return d[`Result<()>`].
     #[deeplink]
-    #[options_doc(drop_coll, sync)]
+    #[options_doc(drop_coll, "run")]
     pub fn drop(&self) -> DropCollection {
         self.async_collection.drop()
     }

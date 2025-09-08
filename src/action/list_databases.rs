@@ -59,7 +59,7 @@ impl SyncClient {
     ///
     /// [run](ListDatabases::run) will return d[`Result<Vec<DatabaseSpecification>>`].
     #[deeplink]
-    #[options_doc(list_databases, sync)]
+    #[options_doc(list_databases, "run")]
     pub fn list_databases(&self) -> ListDatabases {
         self.async_client.list_databases()
     }
@@ -68,7 +68,7 @@ impl SyncClient {
     ///
     /// [run](ListDatabases::run) will return d[`Result<Vec<String>>`].
     #[deeplink]
-    #[options_doc(list_databases, sync)]
+    #[options_doc(list_databases, "run")]
     pub fn list_database_names(&self) -> ListDatabases<'_, ListNames> {
         self.async_client.list_database_names()
     }

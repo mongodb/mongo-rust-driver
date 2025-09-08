@@ -71,7 +71,7 @@ where
     ///
     /// [`run`](CreateIndex::run) will return d[`Result<CreateIndexResult>`].
     #[deeplink]
-    #[options_doc(create_index, sync)]
+    #[options_doc(create_index, "run")]
     pub fn create_index(&self, index: IndexModel) -> CreateIndex {
         self.async_collection.create_index(index)
     }
@@ -80,7 +80,7 @@ where
     ///
     /// [`run`](CreateIndex::run) will return d[`Result<CreateIndexesResult>`].
     #[deeplink]
-    #[options_doc(create_index, sync)]
+    #[options_doc(create_index, "run")]
     pub fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,

@@ -4,6 +4,7 @@
 #[cfg(feature = "dns-resolver")]
 #[path = "test/atlas_connectivity.rs"]
 mod atlas_connectivity_skip_ci; // requires Atlas URI environment variables set
+mod atlas_search;
 mod auth;
 mod bulk_write;
 mod change_stream;
