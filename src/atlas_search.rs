@@ -431,7 +431,7 @@ pub mod facet {
     impl Facet<Date> {
         /// Name of an additional bucket that counts documents returned from the operator that do
         /// not fall within the specified boundaries.
-        pub fn default(mut self, bucket: impl AsRef<str>) -> Self {
+        pub fn default_bucket(mut self, bucket: impl AsRef<str>) -> Self {
             self.inner.insert("default", bucket.as_ref());
             self
         }
