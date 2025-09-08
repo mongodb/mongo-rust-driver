@@ -1,5 +1,28 @@
-//! Helpers for building Atlas Search aggregation pipelines.
-
+//! Helpers for building Atlas Search aggregation pipelines.  Use one of the constructor functions
+//! and chain optional value setters, and then convert to a pipeline stage [`Document`] via
+//! [`into_stage`](SearchOperator::into_stage).
+//!
+//! ```no_run
+//! # async fn wrapper() -> mongodb::error::Result<()> {
+//! # use mongodb::{Collection, bson::{Document, doc}};
+//! # let collection: Collection<Document> = todo!();
+//! use mongodb::atlas_search;
+//! let cursor = collection.aggregate(vec![
+//!     atlas_search::autocomplete("title", "pre")
+//!         .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
+//!         .into_stage(),
+//!     doc! {
+//!         "$limit": 10,
+//!    },
+//!    doc! {
+//!        "$project": {
+//!            "_id": 0,
+//!            "title": 1,
+//!         }
+//!    },
+//! ]).await?;
+//! # Ok(())
+//! # }
 mod gen;
 
 pub use gen::*;
@@ -7,32 +30,9 @@ pub use gen::*;
 use std::marker::PhantomData;
 
 use crate::bson::{doc, Bson, DateTime, Document};
+use mongodb_internal_macros::{export_doc, options_doc};
 
-/// A helper to build the aggregation stage for Atlas Search.  Use one of the constructor functions
-/// and chain optional value setters, and then convert to a pipeline stage [`Document`] via
-/// [`into_stage`](SearchOperator::into_stage).
-///
-/// ```no_run
-/// # async fn wrapper() -> mongodb::error::Result<()> {
-/// # use mongodb::{Collection, bson::{Document, doc}};
-/// # let collection: Collection<Document> = todo!();
-/// use mongodb::atlas_search;
-/// let cursor = collection.aggregate(vec![
-///     atlas_search::autocomplete("title", "pre")
-///         .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
-///         .into_stage(),
-///     doc! {
-///         "$limit": 10,
-///    },
-///    doc! {
-///        "$project": {
-///            "_id": 0,
-///            "title": 1,
-///         }
-///    },
-/// ]).await?;
-/// # Ok(())
-/// # }
+/// A helper to build the aggregation stage for Atlas Search.
 pub struct SearchOperator<T> {
     pub(crate) name: &'static str,
     pub(crate) spec: Document,
@@ -88,17 +88,44 @@ impl<T> SearchOperator<T> {
 
 /// Finalize a search operator as a pending `$search` aggregation stage, allowing
 /// options to be set.
+/// ```no_run
+/// # async fn wrapper() -> mongodb::error::Result<()> {
+/// # use mongodb::{Collection, bson::{Document, doc}};
+/// # let collection: Collection<Document> = todo!();
+/// use mongodb::atlas_search::{autocomplete, search};
+/// let cursor = collection.aggregate(vec![
+///     search(
+///         autocomplete("title", "pre")
+///             .fuzzy(doc! { "maxEdits": 1, "prefixLength": 1, "maxExpansions": 256 })
+///     )
+///     .index("movies")
+///     .into_stage(),
+///     doc! {
+///         "$limit": 10,
+///     },
+///     doc! {
+///         "$project": {
+///             "_id": 0,
+///             "title": 1,
+///          }
+///     },
+/// ]).await?;
+/// # Ok(())
+/// # }
+/// ```
+#[options_doc(atlas_search, "into_stage")]
 pub fn search<T>(op: SearchOperator<T>) -> AtlasSearch {
     AtlasSearch {
         stage: doc! { op.name: op.spec },
     }
 }
 
-/// A pending `$search` aggregation stage.
+/// A pending `$search` aggregation stage.  Construct with [`search`].
 pub struct AtlasSearch {
     stage: Document,
 }
 
+#[export_doc(atlas_search)]
 impl AtlasSearch {
     /// Parallelize search across segments on dedicated search nodes.
     pub fn concurrent(mut self, value: bool) -> Self {
@@ -166,17 +193,43 @@ impl AtlasSearch {
 
 /// Finalize a search operator as a pending `$searchMeta` aggregation stage, allowing
 /// options to be set.
+/// ```no_run
+/// # async fn wrapper() -> mongodb::error::Result<()> {
+/// # use mongodb::{Collection, bson::{DateTime, Document, doc}};
+/// # let collection: Collection<Document> = todo!();
+/// # let start: DateTime = todo!();
+/// # let end: DateTime = todo!();
+/// use mongodb::atlas_search::{facet, range, search_meta};
+/// let cursor = collection.aggregate(vec![
+///     search_meta(
+///         facet(doc! {
+///             "directorsFacet": facet::string("directors").num_buckets(7),
+///             "yearFacet": facet::number("year", [2000, 2005, 2010, 2015]),
+///         })
+///        .operator(range("released").gte(start).lte(end))
+///     )
+///     .index("movies")
+///     .into_stage(),
+///     doc! {
+///         "$limit": 10,
+///     },
+/// ]).await?;
+/// # Ok(())
+/// # }
+/// ```
+#[options_doc(atlas_search_meta, "into_stage")]
 pub fn search_meta<T>(op: SearchOperator<T>) -> AtlasSearchMeta {
     AtlasSearchMeta {
         stage: doc! { op.name: op.spec },
     }
 }
 
-/// A pending `$searchMeta` aggregation stage.
+/// A pending `$searchMeta` aggregation stage.  Construct with [`search_meta`].
 pub struct AtlasSearchMeta {
     stage: Document,
 }
 
+#[export_doc(atlas_search_meta)]
 impl AtlasSearchMeta {
     /// Document that specifies the count options for retrieving a count of the results.
     pub fn count(mut self, value: Document) -> Self {
@@ -311,7 +364,7 @@ pub mod facet {
         }
     }
 
-    #[allow(missing_docs)]
+    /// A string facet.  Construct with [`facet::string`](string).
     pub struct String;
     /// String facets allow you to narrow down Atlas Search results based on the most frequent
     /// string values in the specified string field.
@@ -333,7 +386,7 @@ pub mod facet {
         }
     }
 
-    #[allow(missing_docs)]
+    /// A number facet.  Construct with [`facet::number`](number).
     pub struct Number;
     /// Numeric facets allow you to determine the frequency of numeric values in your search results
     /// by breaking the results into separate ranges of numbers.
@@ -359,7 +412,7 @@ pub mod facet {
         }
     }
 
-    #[allow(missing_docs)]
+    /// A date facet.  Construct with [`facet::date`](date).
     pub struct Date;
     /// Date facets allow you to narrow down search results based on a date.
     pub fn date(
@@ -441,7 +494,7 @@ numeric! { NearOrigin }
 pub trait BsonNumber: private::Parameter {}
 numeric! { BsonNumber }
 
-/// At Atlas Search operator parameter that can be compared using [`range`].
+/// An Atlas Search operator parameter that can be compared using [`range`].
 pub trait RangeValue: private::Parameter {}
 numeric! { RangeValue }
 impl RangeValue for DateTime {}
