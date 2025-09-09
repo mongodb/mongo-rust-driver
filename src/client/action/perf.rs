@@ -15,6 +15,6 @@ impl<'a> Action for crate::action::WarmConnectionPool<'a> {
             // No-op when min_pool_size is zero.
             return;
         }
-        self.client.inner.topology.warm_pool().await;
+        self.client.inner.topology.updater().fill_pool().await;
     }
 }

@@ -389,7 +389,11 @@ impl Client {
 
     /// Append new information to the metadata of the handshake with the server.
     pub async fn append_metadata(&self, driver_info: DriverInfo) {
-        self.inner.topology.append_metadata(driver_info).await;
+        self.inner
+            .topology
+            .updater()
+            .append_metadata(driver_info)
+            .await;
     }
 
     pub(crate) fn register_async_drop(&self) -> AsyncDropToken {
@@ -430,7 +434,7 @@ impl Client {
     /// Check in a server session to the server session pool. The session will be discarded if it is
     /// expired or dirty.
     pub(crate) async fn check_in_server_session(&self, session: ServerSession) {
-        let timeout = self.inner.topology.logical_session_timeout();
+        let timeout = self.inner.topology.watcher().logical_session_timeout();
         self.inner.session_pool.check_in(session, timeout).await;
     }
 
@@ -493,12 +497,20 @@ impl Client {
             timeout,
         );
         #[cfg(feature = "tracing-unstable")]
-        event_emitter.emit_started_event(self.inner.topology.watch().observe_latest().description);
+        event_emitter.emit_started_event(
+            self.inner
+                .topology
+                .watcher()
+                .clone_latest()
+                .peek_latest()
+                .description
+                .clone(),
+        );
         // We only want to emit this message once per operation at most.
         #[cfg(feature = "tracing-unstable")]
         let mut emitted_waiting_message = false;
 
-        let mut watcher = self.inner.topology.watch();
+        let mut watcher = self.inner.topology.watcher().clone();
         loop {
             let state = watcher.observe_latest();
             let override_slot;
@@ -562,7 +574,7 @@ impl Client {
 
     #[cfg(all(test, feature = "dns-resolver"))]
     pub(crate) fn get_hosts(&self) -> Vec<String> {
-        let watcher = self.inner.topology.watch();
+        let watcher = self.inner.topology.watcher().clone_latest();
         let state = watcher.peek_latest();
 
         state
@@ -574,14 +586,15 @@ impl Client {
 
     #[cfg(test)]
     pub(crate) async fn sync_workers(&self) {
-        self.inner.topology.sync_workers().await;
+        self.inner.topology.updater().sync_workers().await;
     }
 
     #[cfg(test)]
     pub(crate) fn topology_description(&self) -> crate::sdam::TopologyDescription {
         self.inner
             .topology
-            .watch()
+            .watcher()
+            .clone_latest()
             .peek_latest()
             .description
             .clone()
@@ -600,7 +613,7 @@ impl Client {
             .options
             .server_selection_timeout
             .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
-        let mut watcher = self.inner.topology.watch();
+        let mut watcher = self.inner.topology.watcher().clone();
         loop {
             let topology = watcher.observe_latest();
             if let Some(desc) = topology.description.primary() {
@@ -640,7 +653,7 @@ impl Client {
         // The maximum number of session IDs that should be sent in a single endSessions command.
         const MAX_END_SESSIONS_BATCH_SIZE: usize = 10_000;
 
-        let mut watcher = self.inner.topology.watch();
+        let mut watcher = self.inner.topology.watcher().clone();
         let selection_criteria =
             SelectionCriteria::from(ReadPreference::PrimaryPreferred { options: None });
 
