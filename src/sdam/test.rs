@@ -297,7 +297,7 @@ async fn removed_server_monitor_stops() -> crate::error::Result<()> {
         .unwrap();
 
     topology
-        .clone_updater()
+        .updater()
         .update(ServerDescription::new_from_hello_reply(
             hosts[0].clone(),
             hello_reply,

@@ -57,7 +57,7 @@ impl TestOperation for WaitForPrimaryChange {
             let timeout = Duration::from_millis(self.timeout_ms.unwrap_or(10_000));
 
             runtime::timeout(timeout, async {
-                let mut watcher = client.topology().watch();
+                let mut watcher = client.topology().watcher().clone();
 
                 loop {
                     let latest = watcher.observe_latest();
