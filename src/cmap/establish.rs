@@ -176,6 +176,10 @@ impl ConnectionEstablisher {
 
         Ok((connection, hello_reply))
     }
+
+    pub(crate) fn append_metadata(&mut self, driver_info: crate::options::DriverInfo) {
+        self.handshaker.append_metadata(driver_info);
+    }
 }
 
 #[derive(Debug, Clone)]

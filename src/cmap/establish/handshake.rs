@@ -364,21 +364,6 @@ impl Handshaker {
             metadata.application = Some(AppMetadata { name: app_name });
         }
 
-        if let Some(driver_info) = options.driver_info {
-            metadata.driver.name.push('|');
-            metadata.driver.name.push_str(&driver_info.name);
-
-            if let Some(ref version) = driver_info.version {
-                metadata.driver.version.push('|');
-                metadata.driver.version.push_str(version);
-            }
-
-            if let Some(ref driver_info_platform) = driver_info.platform {
-                metadata.platform.push('|');
-                metadata.platform.push_str(driver_info_platform);
-            }
-        }
-
         metadata.env = RuntimeEnvironment::new();
 
         if options.load_balanced {
@@ -399,7 +384,7 @@ impl Handshaker {
             );
         }
 
-        Ok(Self {
+        let mut handshaker = Self {
             command,
             #[cfg(any(
                 feature = "zstd-compression",
@@ -409,7 +394,27 @@ impl Handshaker {
             compressors: options.compressors,
             metadata,
             auth_options: options.auth_options,
-        })
+        };
+        if let Some(driver_info) = options.driver_info {
+            handshaker.append_metadata(driver_info);
+        }
+
+        Ok(handshaker)
+    }
+
+    pub(crate) fn append_metadata(&mut self, driver_info: DriverInfo) {
+        self.metadata.driver.name.push('|');
+        self.metadata.driver.name.push_str(&driver_info.name);
+
+        if let Some(ref version) = driver_info.version {
+            self.metadata.driver.version.push('|');
+            self.metadata.driver.version.push_str(version);
+        }
+
+        if let Some(ref driver_info_platform) = driver_info.platform {
+            self.metadata.platform.push('|');
+            self.metadata.platform.push_str(driver_info_platform);
+        }
     }
 
     async fn build_command(

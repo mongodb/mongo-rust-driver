@@ -36,7 +36,14 @@ use crate::{
     event::command::CommandEvent,
     id_set::IdSet,
     operation::OverrideCriteriaFn,
-    options::{ClientOptions, DatabaseOptions, ReadPreference, SelectionCriteria, ServerAddress},
+    options::{
+        ClientOptions,
+        DatabaseOptions,
+        DriverInfo,
+        ReadPreference,
+        SelectionCriteria,
+        ServerAddress,
+    },
     sdam::{
         server_selection::{self, attempt_to_select_server},
         SelectedServer,
@@ -378,6 +385,11 @@ impl Client {
             .default_database
             .as_ref()
             .map(|db_name| self.database(db_name))
+    }
+
+    /// Append new information to the metadata of the handshake with the server.
+    pub async fn append_metadata(&self, driver_info: DriverInfo) {
+        self.inner.topology.append_metadata(driver_info).await;
     }
 
     pub(crate) fn register_async_drop(&self) -> AsyncDropToken {

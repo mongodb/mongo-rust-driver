@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crate::bson::oid::ObjectId;
+use crate::{bson::oid::ObjectId, options::DriverInfo};
 use futures_util::{
     stream::{FuturesUnordered, StreamExt},
     FutureExt,
@@ -216,6 +216,10 @@ impl Topology {
         self.updater.fill_pool().await;
     }
 
+    pub(crate) async fn append_metadata(&self, driver_info: DriverInfo) {
+        self.updater.append_metadata(driver_info).await;
+    }
+
     /// Gets the addresses of the servers in the cluster.
     #[cfg(test)]
     pub(crate) fn server_addresses(&mut self) -> HashSet<ServerAddress> {
@@ -274,6 +278,7 @@ pub(crate) enum UpdateMessage {
         error: Error,
         phase: HandshakePhase,
     },
+    AppendMetadata(DriverInfo),
     Broadcast(BroadcastMessage),
 }
 
@@ -385,6 +390,10 @@ impl TopologyWorker {
                                 error,
                                 phase,
                             } => self.handle_application_error(address, error, phase).await,
+                            UpdateMessage::AppendMetadata(driver_info) => {
+                                self.connection_establisher.append_metadata(driver_info);
+                                false
+                            }
                             UpdateMessage::Broadcast(msg) => {
                                 let rxen: FuturesUnordered<_> = self
                                     .servers
@@ -872,6 +881,11 @@ impl TopologyUpdater {
     /// This will start server monitors for the newly added servers.
     pub(crate) async fn sync_hosts(&self, hosts: HashSet<ServerAddress>) {
         self.send_message(UpdateMessage::SyncHosts(hosts)).await;
+    }
+
+    pub(crate) async fn append_metadata(&self, driver_info: DriverInfo) {
+        self.send_message(UpdateMessage::AppendMetadata(driver_info))
+            .await;
     }
 
     pub(crate) async fn shutdown(&self) {
