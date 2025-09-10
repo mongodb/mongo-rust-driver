@@ -858,6 +858,7 @@ impl TopologyWatcher {
     }
 
     /// Return a clone that is up to date with the latest topology.
+    #[cfg(test)]
     pub(crate) fn clone_latest(&self) -> Self {
         let mut watcher = self.clone();
         // mark the latest topology as seen

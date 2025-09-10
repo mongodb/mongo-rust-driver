@@ -501,7 +501,6 @@ impl Client {
             self.inner
                 .topology
                 .watcher()
-                .clone_latest()
                 .peek_latest()
                 .description
                 .clone(),
