@@ -497,14 +497,7 @@ impl Client {
             timeout,
         );
         #[cfg(feature = "tracing-unstable")]
-        event_emitter.emit_started_event(
-            self.inner
-                .topology
-                .watcher()
-                .peek_latest()
-                .description
-                .clone(),
-        );
+        event_emitter.emit_started_event(self.inner.topology.latest().description.clone());
         // We only want to emit this message once per operation at most.
         #[cfg(feature = "tracing-unstable")]
         let mut emitted_waiting_message = false;
@@ -573,7 +566,7 @@ impl Client {
 
     #[cfg(all(test, feature = "dns-resolver"))]
     pub(crate) fn get_hosts(&self) -> Vec<String> {
-        let state = self.inner.topology.watcher().peek_latest();
+        let state = self.inner.topology.latest();
 
         state
             .servers()
@@ -589,12 +582,7 @@ impl Client {
 
     #[cfg(test)]
     pub(crate) fn topology_description(&self) -> crate::sdam::TopologyDescription {
-        self.inner
-            .topology
-            .watcher()
-            .peek_latest()
-            .description
-            .clone()
+        self.inner.topology.latest().description.clone()
     }
 
     #[cfg(test)]
