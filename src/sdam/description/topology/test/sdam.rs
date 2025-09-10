@@ -749,8 +749,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         .await;
     assert_eq!(
         topology
-            .watcher()
-            .peek_latest()
+            .latest()
             .description
             .server(&address)
             .unwrap()
@@ -772,8 +771,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         .await;
     assert_eq!(
         topology
-            .watcher()
-            .peek_latest()
+            .latest()
             .description
             .server(&address)
             .unwrap()

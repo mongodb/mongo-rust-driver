@@ -142,6 +142,10 @@ impl Topology {
     pub(crate) fn watcher(&self) -> &TopologyWatcher {
         &self.watcher
     }
+
+    pub(crate) fn latest(&self) -> Ref<TopologyState> {
+        self.watcher.peek_latest()
+    }
 }
 
 #[derive(Debug, Clone)]
