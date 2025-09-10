@@ -683,9 +683,7 @@ impl TopologyWorker {
 
     /// Get the server at the provided address if present in the topology.
     fn server_description(&self, address: &ServerAddress) -> Option<ServerDescription> {
-        self.topology_description
-            .get_server_description(address)
-            .cloned()
+        self.topology_description.server(address).cloned()
     }
 
     fn emit_event(&self, make_event: impl FnOnce() -> SdamEvent) {
@@ -857,15 +855,6 @@ impl TopologyWatcher {
         (watcher, publisher)
     }
 
-    /// Return a clone that is up to date with the latest topology.
-    #[cfg(test)]
-    pub(crate) fn clone_latest(&self) -> Self {
-        let mut watcher = self.clone();
-        // mark the latest topology as seen
-        watcher.receiver.borrow_and_update();
-        watcher
-    }
-
     /// Whether the topology is still active or if all `Client` instances using it have gone
     /// out of scope.
     pub(crate) fn is_alive(&self) -> bool {
@@ -874,11 +863,7 @@ impl TopologyWatcher {
 
     /// Get a server description for the server at the provided address.
     pub(crate) fn server_description(&self, address: &ServerAddress) -> Option<ServerDescription> {
-        self.receiver
-            .borrow()
-            .description
-            .get_server_description(address)
-            .cloned()
+        self.receiver.borrow().description.server(address).cloned()
     }
 
     /// Clone the latest state, marking it as seen.

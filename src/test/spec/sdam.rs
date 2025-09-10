@@ -207,7 +207,8 @@ async fn rtt_is_updated() {
     .app_name(app_name);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-    let mut watcher = client.topology().watcher().clone_latest();
+    let mut watcher = client.topology().watcher().clone();
+    watcher.observe_latest(); // start the monitor from most recent state
     runtime::timeout(Duration::from_secs(10), async move {
         loop {
             watcher.wait_for_update(None).await;

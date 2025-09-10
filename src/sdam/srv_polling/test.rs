@@ -47,10 +47,13 @@ async fn run_test_extra(
     options.test_options_mut().disable_monitoring_threads = true;
     options.srv_max_hosts = max_hosts;
     let topology = Topology::new(options.clone()).unwrap();
+    let mut topology_watcher = topology.watcher().clone();
+    topology_watcher.wait_until_initialized().await;
+    topology_watcher.observe_latest(); // start the monitor from most recent state
     topology.watcher().clone().wait_until_initialized().await;
     let mut monitor = SrvPollingMonitor::new(
         topology.updater().clone(),
-        topology.watcher().clone_latest(),
+        topology_watcher,
         options.clone(),
     )
     .unwrap();
