@@ -573,8 +573,7 @@ impl Client {
 
     #[cfg(all(test, feature = "dns-resolver"))]
     pub(crate) fn get_hosts(&self) -> Vec<String> {
-        let watcher = self.inner.topology.watcher().clone_latest();
-        let state = watcher.peek_latest();
+        let state = self.inner.topology.watcher().peek_latest();
 
         state
             .servers()
@@ -593,7 +592,6 @@ impl Client {
         self.inner
             .topology
             .watcher()
-            .clone_latest()
             .peek_latest()
             .description
             .clone()

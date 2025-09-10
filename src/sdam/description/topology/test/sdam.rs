@@ -750,8 +750,9 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     assert_eq!(
         topology
             .watcher()
-            .clone_latest()
-            .server_description(&address)
+            .peek_latest()
+            .description
+            .server(&address)
             .unwrap()
             .server_type,
         ServerType::Standalone
@@ -772,8 +773,9 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     assert_eq!(
         topology
             .watcher()
-            .clone_latest()
-            .server_description(&address)
+            .peek_latest()
+            .description
+            .server(&address)
             .unwrap()
             .server_type,
         ServerType::Standalone
