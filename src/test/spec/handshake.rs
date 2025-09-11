@@ -1,6 +1,9 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
-use crate::bson::oid::ObjectId;
+use crate::{
+    bson::{doc, oid::ObjectId, Bson, Document},
+    cmap::Command,
+};
 
 use crate::{
     cmap::{
@@ -8,7 +11,9 @@ use crate::{
         establish::{ConnectionEstablisher, EstablisherOptions},
     },
     event::cmap::CmapEventEmitter,
+    options::DriverInfo,
     test::get_client_options,
+    Client,
 };
 
 // Prose test 1: Test that the driver accepts an arbitrary auth mechanism
@@ -38,4 +43,93 @@ async fn arbitrary_auth_mechanism() {
         .establish_connection(pending, None)
         .await
         .unwrap();
+}
+
+// Client Metadata Update Prose Test 1: Test that the driver updates metadata
+#[tokio::test]
+async fn driver_updates_metadata() {
+    let test_info = [DriverInfo {
+        name: "framework".to_owned(),
+        version: Some("2.0".to_owned()),
+        platform: Some("Framework Platform".to_owned()),
+    }];
+    for addl_info in test_info {
+        let mut options = get_client_options().await.clone();
+        options.max_idle_time = Some(Duration::from_millis(1));
+        options.driver_info = Some(DriverInfo {
+            name: "library".to_owned(),
+            version: Some("1.2".to_owned()),
+            platform: Some("Library Platform".to_owned()),
+        });
+        let (hs_sender, mut hellos) = tokio::sync::mpsc::channel::<Command>(100);
+        let mut latest_hello = async move || {
+            let mut out = hellos.recv().await.unwrap();
+            while let Ok(hello) = hellos.try_recv() {
+                out = hello;
+            }
+            out
+        };
+        options.test_options_mut().hello_sender = Some(hs_sender);
+        let client = Client::with_options(options).unwrap();
+
+        client
+            .database("admin")
+            .run_command(doc! { "ping": 1 })
+            .await
+            .unwrap();
+        let initial_hello = latest_hello().await;
+        let mut initial_client_metadata: Document = initial_hello
+            .body
+            .get_document("client")
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let initial_driver_metadata = initial_client_metadata.remove("driver").unwrap();
+
+        tokio::time::sleep(Duration::from_millis(5)).await;
+
+        client.append_metadata(addl_info.clone()).await;
+        client.sync_workers().await;
+        client
+            .database("admin")
+            .run_command(doc! { "ping": 1 })
+            .await
+            .unwrap();
+        let test_hello = latest_hello().await;
+        let mut test_client_metadata: Document = test_hello
+            .body
+            .get_document("client")
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let test_driver_metadata = test_client_metadata.remove("driver").unwrap();
+
+        // Compare driver metadata
+        let expected_name = Bson::String(format!(
+            "{}|{}",
+            initial_driver_metadata["name"], addl_info.name
+        ));
+        assert_eq!(expected_name, test_driver_metadata["name"],);
+        let expected_version = if let Some(version) = &addl_info.version {
+            Bson::String(format!(
+                "{}|{}",
+                initial_driver_metadata["version"], version
+            ))
+        } else {
+            initial_driver_metadata["version"].clone()
+        };
+        assert_eq!(expected_version, test_driver_metadata["version"]);
+        let expected_platform = if let Some(platform) = &addl_info.platform {
+            Bson::String(format!(
+                "{}|{}",
+                initial_driver_metadata["platform"], platform
+            ))
+        } else {
+            initial_driver_metadata["platform"].clone()
+        };
+        assert_eq!(expected_platform, test_driver_metadata["platform"]);
+
+        // Everything else should be the same
+        assert_eq!(initial_client_metadata, test_client_metadata);
+    }
 }

@@ -342,6 +342,9 @@ pub(crate) struct Handshaker {
     metadata: ClientMetadata,
 
     auth_options: AuthOptions,
+
+    #[cfg(test)]
+    test_hello_sender: Option<tokio::sync::mpsc::Sender<crate::cmap::Command>>,
 }
 
 #[cfg(test)]
@@ -394,6 +397,8 @@ impl Handshaker {
             compressors: options.compressors,
             metadata,
             auth_options: options.auth_options,
+            #[cfg(test)]
+            test_hello_sender: options.test_hello_sender,
         };
         if let Some(driver_info) = options.driver_info {
             handshaker.append_metadata(driver_info);
@@ -458,6 +463,11 @@ impl Handshaker {
         cancellation_receiver: Option<broadcast::Receiver<()>>,
     ) -> Result<HelloReply> {
         let (command, client_first) = self.build_command(credential).await?;
+        #[cfg(test)]
+        if let Some(sender) = &self.test_hello_sender {
+            // Ignore channel closed errors.
+            let _ = sender.send(command.clone()).await;
+        }
         let mut hello_reply = run_hello(conn, command, cancellation_receiver).await?;
 
         conn.stream_description = Some(StreamDescription::from_hello_reply(&hello_reply));
@@ -532,6 +542,10 @@ pub(crate) struct HandshakerOptions {
 
     /// Auxiliary data for authentication mechanisms.
     pub(crate) auth_options: AuthOptions,
+
+    /// Channel to publish hello commands.
+    #[cfg(test)]
+    pub(crate) test_hello_sender: Option<tokio::sync::mpsc::Sender<crate::cmap::Command>>,
 }
 
 impl From<&ClientOptions> for HandshakerOptions {
@@ -548,6 +562,11 @@ impl From<&ClientOptions> for HandshakerOptions {
             server_api: opts.server_api.clone(),
             load_balanced: opts.load_balanced.unwrap_or(false),
             auth_options: AuthOptions::from(opts),
+            #[cfg(test)]
+            test_hello_sender: opts
+                .test_options
+                .as_ref()
+                .and_then(|to| to.hello_sender.clone()),
         }
     }
 }
