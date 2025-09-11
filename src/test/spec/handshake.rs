@@ -49,11 +49,28 @@ async fn arbitrary_auth_mechanism() {
 // Client Metadata Update Prose Test 1: Test that the driver updates metadata
 #[tokio::test]
 async fn driver_updates_metadata() {
-    let test_info = [DriverInfo {
-        name: "framework".to_owned(),
-        version: Some("2.0".to_owned()),
-        platform: Some("Framework Platform".to_owned()),
-    }];
+    let test_info = [
+        DriverInfo {
+            name: "framework".to_owned(),
+            version: Some("2.0".to_owned()),
+            platform: Some("Framework Platform".to_owned()),
+        },
+        DriverInfo {
+            name: "framework".to_owned(),
+            version: Some("2.0".to_owned()),
+            platform: None,
+        },
+        DriverInfo {
+            name: "framework".to_owned(),
+            version: None,
+            platform: Some("Framework Platform".to_owned()),
+        },
+        DriverInfo {
+            name: "framework".to_owned(),
+            version: None,
+            platform: None,
+        },
+    ];
     for addl_info in test_info {
         let mut options = get_client_options().await.clone();
         options.max_idle_time = Some(Duration::from_millis(1));
