@@ -280,7 +280,7 @@ async fn run_test(test_file: TestFile) {
     options.test_options_mut().disable_monitoring_threads = true;
 
     let mut event_stream = buffer.stream();
-    let topology = Topology::new(options.clone()).unwrap();
+    let topology = Topology::new(options).unwrap();
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
         for Response(address, command_response) in phase.responses {

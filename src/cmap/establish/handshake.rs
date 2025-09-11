@@ -1,12 +1,10 @@
-#[cfg(test)]
-mod test;
-
-use std::env;
+use std::{env, sync::Arc};
 
 use crate::{
     bson::{rawdoc, RawBson, RawDocumentBuf},
     bson_compat::cstr,
     options::{AuthOptions, ClientOptions},
+    sdam::topology::TopologySpec,
 };
 use std::sync::LazyLock;
 use tokio::sync::broadcast;
@@ -38,6 +36,36 @@ pub(crate) struct ClientMetadata {
     pub(crate) os: OsMetadata,
     pub(crate) platform: String,
     pub(crate) env: Option<RuntimeEnvironment>,
+}
+
+impl ClientMetadata {
+    pub(crate) fn append(&mut self, driver_info: &DriverInfo) {
+        self.driver.name.push('|');
+        self.driver.name.push_str(&driver_info.name);
+
+        if let Some(version) = &driver_info.version {
+            self.driver.version.push('|');
+            self.driver.version.push_str(version);
+        }
+
+        if let Some(driver_info_platform) = &driver_info.platform {
+            self.platform.push('|');
+            self.platform.push_str(driver_info_platform);
+        }
+    }
+}
+
+impl From<&ClientOptions> for ClientMetadata {
+    fn from(options: &ClientOptions) -> Self {
+        let mut out = BASE_CLIENT_METADATA.clone();
+        if let Some(name) = options.app_name.clone() {
+            out.application = Some(AppMetadata { name });
+        }
+        if let Some(driver_info) = &options.driver_info {
+            out.append(driver_info);
+        }
+        out
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -291,7 +319,7 @@ pub(crate) static BASE_CLIENT_METADATA: LazyLock<ClientMetadata> =
             RUNTIME_NAME,
             if cfg!(feature = "bson-3") { "3" } else { "2" },
         ),
-        env: None,
+        env: RuntimeEnvironment::new(),
     });
 
 type Truncation = fn(&mut ClientMetadata);
@@ -339,7 +367,7 @@ pub(crate) struct Handshaker {
     ))]
     compressors: Option<Vec<Compressor>>,
 
-    metadata: ClientMetadata,
+    metadata: Arc<std::sync::RwLock<ClientMetadata>>,
 
     auth_options: AuthOptions,
 
@@ -354,20 +382,12 @@ pub(crate) static TEST_METADATA: std::sync::OnceLock<ClientMetadata> = std::sync
 impl Handshaker {
     /// Creates a new Handshaker.
     pub(crate) fn new(options: HandshakerOptions) -> Result<Self> {
-        let mut metadata = BASE_CLIENT_METADATA.clone();
-
         let mut command = hello_command(
             options.server_api.as_ref(),
             options.load_balanced.into(),
             None,
             None,
         );
-
-        if let Some(app_name) = options.app_name {
-            metadata.application = Some(AppMetadata { name: app_name });
-        }
-
-        metadata.env = RuntimeEnvironment::new();
 
         if options.load_balanced {
             command.body.append(cstr!("loadBalanced"), true);
@@ -387,7 +407,7 @@ impl Handshaker {
             );
         }
 
-        let mut handshaker = Self {
+        Ok(Self {
             command,
             #[cfg(any(
                 feature = "zstd-compression",
@@ -395,31 +415,11 @@ impl Handshaker {
                 feature = "snappy-compression"
             ))]
             compressors: options.compressors,
-            metadata,
+            metadata: options.metadata,
             auth_options: options.auth_options,
             #[cfg(test)]
             test_hello_sender: options.test_hello_sender,
-        };
-        if let Some(driver_info) = options.driver_info {
-            handshaker.append_metadata(driver_info);
-        }
-
-        Ok(handshaker)
-    }
-
-    pub(crate) fn append_metadata(&mut self, driver_info: DriverInfo) {
-        self.metadata.driver.name.push('|');
-        self.metadata.driver.name.push_str(&driver_info.name);
-
-        if let Some(ref version) = driver_info.version {
-            self.metadata.driver.version.push('|');
-            self.metadata.driver.version.push_str(version);
-        }
-
-        if let Some(ref driver_info_platform) = driver_info.platform {
-            self.metadata.platform.push('|');
-            self.metadata.platform.push_str(driver_info_platform);
-        }
+        })
     }
 
     async fn build_command(
@@ -437,7 +437,7 @@ impl Handshaker {
 
         let body = &mut command.body;
         let body_size = body.as_bytes().len();
-        let mut metadata = self.metadata.clone();
+        let mut metadata = self.metadata.read().unwrap().clone();
         let mut meta_doc: RawDocumentBuf = (&metadata).into();
         const OVERHEAD: usize = 1 /* tag */ + 6 /* name */ + 1 /* null */;
         for trunc_fn in METADATA_TRUNCATIONS {
@@ -515,10 +515,6 @@ impl Handshaker {
 
 #[derive(Debug)]
 pub(crate) struct HandshakerOptions {
-    /// The application name specified by the user. This is sent to the server as part of the
-    /// handshake that each connection makes when it's created.
-    pub(crate) app_name: Option<String>,
-
     /// The compressors specified by the user. This list is sent to the server and the server
     /// replies with the subset of the compressors it supports.
     #[cfg(any(
@@ -527,10 +523,6 @@ pub(crate) struct HandshakerOptions {
         feature = "snappy-compression"
     ))]
     pub(crate) compressors: Option<Vec<Compressor>>,
-
-    /// Extra information to append to the driver version in the metadata of the handshake with the
-    /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
-    pub(crate) driver_info: Option<DriverInfo>,
 
     /// The declared API version.
     ///
@@ -543,27 +535,29 @@ pub(crate) struct HandshakerOptions {
     /// Auxiliary data for authentication mechanisms.
     pub(crate) auth_options: AuthOptions,
 
+    pub(crate) metadata: Arc<std::sync::RwLock<ClientMetadata>>,
+
     /// Channel to publish hello commands.
     #[cfg(test)]
     pub(crate) test_hello_sender: Option<tokio::sync::mpsc::Sender<crate::cmap::Command>>,
 }
 
-impl From<&ClientOptions> for HandshakerOptions {
-    fn from(opts: &ClientOptions) -> Self {
+impl From<&TopologySpec> for HandshakerOptions {
+    fn from(spec: &TopologySpec) -> Self {
         Self {
-            app_name: opts.app_name.clone(),
             #[cfg(any(
                 feature = "zstd-compression",
                 feature = "zlib-compression",
                 feature = "snappy-compression"
             ))]
-            compressors: opts.compressors.clone(),
-            driver_info: opts.driver_info.clone(),
-            server_api: opts.server_api.clone(),
-            load_balanced: opts.load_balanced.unwrap_or(false),
-            auth_options: AuthOptions::from(opts),
+            compressors: spec.options.compressors.clone(),
+            server_api: spec.options.server_api.clone(),
+            load_balanced: spec.options.load_balanced.unwrap_or(false),
+            auth_options: AuthOptions::from(&spec.options),
+            metadata: spec.metadata.clone(),
             #[cfg(test)]
-            test_hello_sender: opts
+            test_hello_sender: spec
+                .options
                 .test_options
                 .as_ref()
                 .and_then(|to| to.hello_sender.clone()),

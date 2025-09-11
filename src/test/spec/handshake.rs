@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 use crate::{
     bson::{doc, oid::ObjectId, Bson, Document},
     cmap::Command,
+    sdam::topology::TopologySpec,
 };
 
 use crate::{
@@ -20,7 +21,7 @@ use crate::{
 #[tokio::test]
 async fn arbitrary_auth_mechanism() {
     let client_options = get_client_options().await;
-    let mut options = EstablisherOptions::from(client_options);
+    let mut options = EstablisherOptions::from(&TopologySpec::from(client_options.clone()));
     options.test_patch_reply = Some(|reply| {
         reply
             .as_mut()
@@ -84,12 +85,10 @@ async fn driver_updates_metadata() {
             .unwrap()
             .try_into()
             .unwrap();
-        let initial_driver_metadata = initial_client_metadata.remove("driver").unwrap();
 
         tokio::time::sleep(Duration::from_millis(5)).await;
 
-        client.append_metadata(addl_info.clone()).await;
-        client.sync_workers().await;
+        client.append_metadata(addl_info.clone());
         client
             .database("admin")
             .run_command(doc! { "ping": 1 })
@@ -102,34 +101,40 @@ async fn driver_updates_metadata() {
             .unwrap()
             .try_into()
             .unwrap();
-        let test_driver_metadata = test_client_metadata.remove("driver").unwrap();
 
-        // Compare driver metadata
+        // Compare updated metadata
         let expected_name = Bson::String(format!(
             "{}|{}",
-            initial_driver_metadata["name"], addl_info.name
+            initial_client_metadata["driver"]["name"].as_str().unwrap(),
+            addl_info.name
         ));
-        assert_eq!(expected_name, test_driver_metadata["name"],);
+        assert_eq!(expected_name, test_client_metadata["driver"]["name"],);
+
+        let initial_version = &initial_client_metadata["driver"]["version"];
         let expected_version = if let Some(version) = &addl_info.version {
-            Bson::String(format!(
-                "{}|{}",
-                initial_driver_metadata["version"], version
-            ))
+            Bson::String(format!("{}|{}", initial_version.as_str().unwrap(), version))
         } else {
-            initial_driver_metadata["version"].clone()
+            initial_version.clone()
         };
-        assert_eq!(expected_version, test_driver_metadata["version"]);
+        assert_eq!(expected_version, test_client_metadata["driver"]["version"]);
+
+        let initial_platform = &initial_client_metadata["platform"];
         let expected_platform = if let Some(platform) = &addl_info.platform {
             Bson::String(format!(
                 "{}|{}",
-                initial_driver_metadata["platform"], platform
+                initial_platform.as_str().unwrap(),
+                platform
             ))
         } else {
-            initial_driver_metadata["platform"].clone()
+            initial_platform.clone()
         };
-        assert_eq!(expected_platform, test_driver_metadata["platform"]);
+        assert_eq!(expected_platform, test_client_metadata["platform"]);
 
         // Everything else should be the same
+        initial_client_metadata.remove("driver");
+        initial_client_metadata.remove("platform");
+        test_client_metadata.remove("driver");
+        test_client_metadata.remove("platform");
         assert_eq!(initial_client_metadata, test_client_metadata);
     }
 }
