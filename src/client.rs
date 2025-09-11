@@ -388,12 +388,13 @@ impl Client {
     }
 
     /// Append new information to the metadata of the handshake with the server.
-    pub async fn append_metadata(&self, driver_info: DriverInfo) {
+    pub fn append_metadata(&self, driver_info: DriverInfo) {
         self.inner
             .topology
-            .updater()
-            .append_metadata(driver_info)
-            .await;
+            .metadata
+            .write()
+            .unwrap()
+            .append(&driver_info);
     }
 
     pub(crate) fn register_async_drop(&self) -> AsyncDropToken {

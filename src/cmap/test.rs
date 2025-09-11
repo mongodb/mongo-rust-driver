@@ -23,7 +23,7 @@ use crate::{
     },
     options::TlsOptions,
     runtime::{self, AsyncJoinHandle},
-    sdam::{TopologyUpdater, UpdateMessage},
+    sdam::{topology::TopologySpec, TopologyUpdater, UpdateMessage},
     test::{
         assert_matches,
         eq_matches,
@@ -162,8 +162,10 @@ impl Executor {
 
         let pool = ConnectionPool::new(
             get_client_options().await.hosts[0].clone(),
-            ConnectionEstablisher::new(EstablisherOptions::from(get_client_options().await))
-                .unwrap(),
+            ConnectionEstablisher::new(EstablisherOptions::from(&TopologySpec::from(
+                get_client_options().await.clone(),
+            )))
+            .unwrap(),
             updater,
             crate::bson::oid::ObjectId::new(),
             Some(self.pool_options),

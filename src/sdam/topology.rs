@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{bson::oid::ObjectId, options::DriverInfo};
+use crate::{bson::oid::ObjectId, cmap::establish::handshake::ClientMetadata};
 use futures_util::{
     stream::{FuturesUnordered, StreamExt},
     FutureExt,
@@ -62,6 +62,7 @@ pub(crate) struct Topology {
     pub(crate) id: ObjectId,
     watcher: TopologyWatcher,
     updater: TopologyUpdater,
+    pub(crate) metadata: Arc<std::sync::RwLock<ClientMetadata>>,
     _worker_handle: WorkerHandle,
 }
 
@@ -107,8 +108,8 @@ impl Topology {
         };
         let (watcher, publisher) = TopologyWatcher::channel(state);
 
-        let connection_establisher =
-            ConnectionEstablisher::new(EstablisherOptions::from(&options))?;
+        let spec = TopologySpec::from(options);
+        let connection_establisher = ConnectionEstablisher::new(EstablisherOptions::from(&spec))?;
 
         let worker = TopologyWorker {
             id,
@@ -116,7 +117,7 @@ impl Topology {
             servers: Default::default(),
             update_receiver,
             publisher,
-            options,
+            options: spec.options,
             topology_watcher: watcher.clone(),
             topology_updater: updater.clone(),
             handle_listener,
@@ -131,6 +132,7 @@ impl Topology {
             id,
             watcher,
             updater,
+            metadata: spec.metadata,
             _worker_handle: worker_handle,
         })
     }
@@ -146,6 +148,18 @@ impl Topology {
     #[cfg(any(feature = "tracing-unstable", test))]
     pub(crate) fn latest(&self) -> Ref<TopologyState> {
         self.watcher.peek_latest()
+    }
+}
+
+pub(crate) struct TopologySpec {
+    pub(crate) options: ClientOptions,
+    pub(crate) metadata: Arc<std::sync::RwLock<ClientMetadata>>,
+}
+
+impl From<ClientOptions> for TopologySpec {
+    fn from(options: ClientOptions) -> Self {
+        let metadata = Arc::new(std::sync::RwLock::new(ClientMetadata::from(&options)));
+        Self { options, metadata }
     }
 }
 
@@ -183,7 +197,6 @@ pub(crate) enum UpdateMessage {
         error: Error,
         phase: HandshakePhase,
     },
-    AppendMetadata(DriverInfo),
     Broadcast(BroadcastMessage),
 }
 
@@ -295,10 +308,6 @@ impl TopologyWorker {
                                 error,
                                 phase,
                             } => self.handle_application_error(address, error, phase).await,
-                            UpdateMessage::AppendMetadata(driver_info) => {
-                                self.connection_establisher.append_metadata(driver_info);
-                                false
-                            }
                             UpdateMessage::Broadcast(msg) => {
                                 let rxen: FuturesUnordered<_> = self
                                     .servers
@@ -787,11 +796,6 @@ impl TopologyUpdater {
     /// This will start server monitors for the newly added servers.
     pub(crate) async fn sync_hosts(&self, hosts: HashSet<ServerAddress>) {
         self.send_message(UpdateMessage::SyncHosts(hosts)).await;
-    }
-
-    pub(crate) async fn append_metadata(&self, driver_info: DriverInfo) {
-        self.send_message(UpdateMessage::AppendMetadata(driver_info))
-            .await;
     }
 
     pub(crate) async fn shutdown(&self) {
