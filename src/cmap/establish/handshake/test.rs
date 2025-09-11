@@ -19,6 +19,7 @@ async fn metadata_no_options() {
         server_api: None,
         load_balanced: false,
         auth_options: AuthOptions::default(),
+        test_hello_sender: None,
     })
     .unwrap();
 
@@ -68,6 +69,7 @@ async fn metadata_with_options() {
         server_api: None,
         load_balanced: false,
         auth_options: AuthOptions::default(),
+        test_hello_sender: None,
     };
 
     let handshaker = Handshaker::new(options).unwrap();

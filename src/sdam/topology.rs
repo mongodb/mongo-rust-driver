@@ -143,6 +143,7 @@ impl Topology {
         &self.watcher
     }
 
+    #[cfg(any(feature = "tracing-unstable", test))]
     pub(crate) fn latest(&self) -> Ref<TopologyState> {
         self.watcher.peek_latest()
     }
