@@ -1,3 +1,4 @@
+mod append_metadata;
 mod bulk_write;
 mod collection;
 mod command;
@@ -318,6 +319,9 @@ impl<'de> Deserialize<'de> for Operation {
 
         let definition = OperationDefinition::deserialize(deserializer)?;
         let boxed_op = match definition.name.as_str() {
+            "appendMetadata" => {
+                deserialize_op::<append_metadata::AppendMetadata>(definition.arguments)
+            }
             "insertOne" => deserialize_op::<InsertOne>(definition.arguments),
             "insertMany" => deserialize_op::<InsertMany>(definition.arguments),
             "updateOne" => deserialize_op::<UpdateOne>(definition.arguments),
