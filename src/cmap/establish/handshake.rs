@@ -60,7 +60,7 @@ impl ClientMetadata {
 impl From<&ClientOptions> for ClientMetadata {
     fn from(options: &ClientOptions) -> Self {
         let mut out = BASE_CLIENT_METADATA.clone();
-        // Initializing the environment here (i.e. on `Client` construction) rather than as part of
+        // Initializing the environment on construction rather than as part of
         // `BASE_CLIENT_METADATA` makes testing easier.
         out.env = RuntimeEnvironment::new();
         if let Some(name) = options.app_name.clone() {
