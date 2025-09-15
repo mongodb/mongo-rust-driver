@@ -657,8 +657,8 @@ pub(crate) struct TestOptions {
     /// Async-capable command event listener.
     pub(crate) async_event_listener: Option<TestEventSender>,
 
-    /// Channel to publish hello commands.
-    pub(crate) hello_sender: Option<tokio::sync::mpsc::Sender<crate::cmap::Command>>,
+    /// Callback to receive hello commands.
+    pub(crate) hello_cb: Option<EventHandler<crate::cmap::Command>>,
 }
 
 pub(crate) type TestEventSender = tokio::sync::mpsc::Sender<
