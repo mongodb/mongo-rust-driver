@@ -194,10 +194,7 @@ impl TopologyDescription {
         self.cluster_time.as_ref()
     }
 
-    pub(crate) fn server(
-        &self,
-        address: &ServerAddress,
-    ) -> Option<&ServerDescription> {
+    pub(crate) fn server(&self, address: &ServerAddress) -> Option<&ServerDescription> {
         self.servers.get(address)
     }
 
