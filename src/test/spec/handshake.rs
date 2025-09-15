@@ -1,8 +1,12 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 
 use crate::{
     bson::{doc, oid::ObjectId, Bson, Document},
     cmap::Command,
+    event::EventHandler,
     sdam::topology::TopologySpec,
 };
 
@@ -90,15 +94,12 @@ impl InitialMetadata {
                 }
                 InitialMetadata::Appended => Some(initial_info),
             };
-            let (hs_sender, mut hellos) = tokio::sync::mpsc::channel::<Command>(100);
-            let mut latest_hello = async move || {
-                let mut out = hellos.recv().await.unwrap();
-                while let Ok(hello) = hellos.try_recv() {
-                    out = hello;
-                }
-                out
-            };
-            options.test_options_mut().hello_sender = Some(hs_sender);
+            let hello: Arc<Mutex<Command>> = Arc::new(Mutex::new(Command::default()));
+            let cb_hello = hello.clone();
+            options.test_options_mut().hello_cb =
+                Some(EventHandler::callback(move |command: Command| {
+                    *cb_hello.lock().unwrap() = command;
+                }));
             let client = Client::with_options(options).unwrap();
             if let Some(append_info) = to_append {
                 client.append_metadata(append_info);
@@ -109,7 +110,7 @@ impl InitialMetadata {
                 .run_command(doc! { "ping": 1 })
                 .await
                 .unwrap();
-            let initial_hello = latest_hello().await;
+            let initial_hello = hello.lock().unwrap().clone();
             let mut initial_client_metadata: Document = initial_hello
                 .body
                 .get_document("client")
@@ -125,7 +126,7 @@ impl InitialMetadata {
                 .run_command(doc! { "ping": 1 })
                 .await
                 .unwrap();
-            let test_hello = latest_hello().await;
+            let test_hello = hello.lock().unwrap().clone();
             let mut test_client_metadata: Document = test_hello
                 .body
                 .get_document("client")
@@ -173,12 +174,12 @@ impl InitialMetadata {
 
 // Client Metadata Update Prose Test 1: Test that the driver updates metadata
 #[tokio::test]
-async fn driver_updates_metadata() {
+async fn append_metadata_driver_update() {
     InitialMetadata::InOptions.run_test().await
 }
 
 // Client Metadata Update Prose Test 2: Multiple Successive Metadata Updates
 #[tokio::test]
-async fn successive_metadata_updates() {
+async fn append_metadata_successive_updates() {
     InitialMetadata::Appended.run_test().await
 }

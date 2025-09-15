@@ -1,5 +1,7 @@
 use std::{env, sync::Arc};
 
+#[cfg(test)]
+use crate::event::EventHandler;
 use crate::{
     bson::{rawdoc, RawBson, RawDocumentBuf},
     bson_compat::cstr,
@@ -372,7 +374,7 @@ pub(crate) struct Handshaker {
     auth_options: AuthOptions,
 
     #[cfg(test)]
-    test_hello_sender: Option<tokio::sync::mpsc::Sender<crate::cmap::Command>>,
+    test_hello_cb: Option<EventHandler<crate::cmap::Command>>,
 }
 
 #[cfg(test)]
@@ -418,7 +420,7 @@ impl Handshaker {
             metadata: options.metadata,
             auth_options: options.auth_options,
             #[cfg(test)]
-            test_hello_sender: options.test_hello_sender,
+            test_hello_cb: options.test_hello_cb,
         })
     }
 
@@ -464,9 +466,8 @@ impl Handshaker {
     ) -> Result<HelloReply> {
         let (command, client_first) = self.build_command(credential).await?;
         #[cfg(test)]
-        if let Some(sender) = &self.test_hello_sender {
-            // Ignore channel closed errors.
-            let _ = sender.send(command.clone()).await;
+        if let Some(handler) = &self.test_hello_cb {
+            handler.handle(command.clone());
         }
         let mut hello_reply = run_hello(conn, command, cancellation_receiver).await?;
 
@@ -537,9 +538,9 @@ pub(crate) struct HandshakerOptions {
 
     pub(crate) metadata: Arc<std::sync::RwLock<ClientMetadata>>,
 
-    /// Channel to publish hello commands.
+    /// Callback to receive hello commands.
     #[cfg(test)]
-    pub(crate) test_hello_sender: Option<tokio::sync::mpsc::Sender<crate::cmap::Command>>,
+    pub(crate) test_hello_cb: Option<EventHandler<crate::cmap::Command>>,
 }
 
 impl From<&TopologySpec> for HandshakerOptions {
@@ -556,11 +557,11 @@ impl From<&TopologySpec> for HandshakerOptions {
             auth_options: AuthOptions::from(&spec.options),
             metadata: spec.metadata.clone(),
             #[cfg(test)]
-            test_hello_sender: spec
+            test_hello_cb: spec
                 .options
                 .test_options
                 .as_ref()
-                .and_then(|to| to.hello_sender.clone()),
+                .and_then(|to| to.hello_cb.clone()),
         }
     }
 }
