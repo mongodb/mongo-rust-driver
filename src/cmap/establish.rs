@@ -13,6 +13,8 @@ use super::{
     Connection,
     PoolGeneration,
 };
+#[cfg(test)]
+use crate::options::ClientOptions;
 use crate::{
     client::{
         auth::Credential,
@@ -57,6 +59,13 @@ impl From<&TopologySpec> for EstablisherOptions {
             #[cfg(test)]
             test_patch_reply: None,
         }
+    }
+}
+
+#[cfg(test)]
+impl From<&ClientOptions> for EstablisherOptions {
+    fn from(options: &ClientOptions) -> Self {
+        Self::from(&TopologySpec::from(options.clone()))
     }
 }
 
