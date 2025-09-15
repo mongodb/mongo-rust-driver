@@ -60,6 +60,9 @@ impl ClientMetadata {
 impl From<&ClientOptions> for ClientMetadata {
     fn from(options: &ClientOptions) -> Self {
         let mut out = BASE_CLIENT_METADATA.clone();
+        // Initializing the environment here (i.e. on `Client` construction) rather than as part of
+        // `BASE_CLIENT_METADATA` makes testing easier.
+        out.env = RuntimeEnvironment::new();
         if let Some(name) = options.app_name.clone() {
             out.application = Some(AppMetadata { name });
         }
@@ -321,7 +324,7 @@ pub(crate) static BASE_CLIENT_METADATA: LazyLock<ClientMetadata> =
             RUNTIME_NAME,
             if cfg!(feature = "bson-3") { "3" } else { "2" },
         ),
-        env: RuntimeEnvironment::new(),
+        env: None,
     });
 
 type Truncation = fn(&mut ClientMetadata);
