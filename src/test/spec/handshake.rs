@@ -7,7 +7,6 @@ use crate::{
     bson::{doc, oid::ObjectId, Bson, Document},
     cmap::Command,
     event::EventHandler,
-    sdam::topology::TopologySpec,
 };
 
 use crate::{
@@ -25,7 +24,7 @@ use crate::{
 #[tokio::test]
 async fn arbitrary_auth_mechanism() {
     let client_options = get_client_options().await;
-    let mut options = EstablisherOptions::from(&TopologySpec::from(client_options.clone()));
+    let mut options = EstablisherOptions::from(client_options);
     options.test_patch_reply = Some(|reply| {
         reply
             .as_mut()
