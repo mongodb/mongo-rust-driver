@@ -130,7 +130,6 @@ async fn append_metadata_driver_update() {
         let initial_client_metadata = hello.lock().unwrap().client_metadata();
         let (initial_name, initial_version, initial_platform) =
             extract_driver_info(&initial_client_metadata);
-
         tokio::time::sleep(Duration::from_millis(5)).await;
 
         client.append_metadata(addl_info.clone());
@@ -179,7 +178,6 @@ async fn append_metadata_successive_updates() {
         let initial_client_metadata = hello.lock().unwrap().client_metadata();
         let (initial_name, initial_version, initial_platform) =
             extract_driver_info(&initial_client_metadata);
-
         tokio::time::sleep(Duration::from_millis(5)).await;
 
         client.append_metadata(addl_info.clone());
@@ -226,7 +224,6 @@ async fn append_metadata_duplicate_successive() {
         client.append_metadata(setup_info.clone());
         client.ping().await;
         let updated_client_metadata = hello.lock().unwrap().client_metadata();
-
         tokio::time::sleep(Duration::from_millis(5)).await;
 
         client.append_metadata(info.clone());
@@ -297,4 +294,135 @@ async fn append_metadata_duplicate_multiple() {
     let updated_client_metadata = hello.lock().unwrap().client_metadata();
 
     assert_eq!(client_metadata, updated_client_metadata);
+}
+
+// Client Metadata Update Prose Test 5: Metadata is not appended if identical to initial metadata
+#[tokio::test]
+async fn append_metadata_duplicate_of_initial() {
+    let mut options = get_client_options().await.clone();
+    options.max_idle_time = Some(Duration::from_millis(1));
+    options.driver_info = Some(DriverInfo::new(
+        "library",
+        Some("1.2"),
+        Some("Library Platform"),
+    ));
+    let hello = watch_hello(&mut options);
+    let client = Client::with_options(options).unwrap();
+
+    client.ping().await;
+    let client_metadata = hello.lock().unwrap().client_metadata();
+    tokio::time::sleep(Duration::from_millis(5)).await;
+
+    client.append_metadata(DriverInfo::new(
+        "library",
+        Some("1.2"),
+        Some("Library Platform"),
+    ));
+    client.ping().await;
+    let updated_client_metadata = hello.lock().unwrap().client_metadata();
+
+    assert_eq!(client_metadata, updated_client_metadata);
+}
+
+// Client Metadata Update Prose Test 6: Metadata is not appended if identical to initial metadata
+// (separated by non-identical metadata)
+#[tokio::test]
+async fn append_metadata_duplicate_of_initial_separated() {
+    let mut options = get_client_options().await.clone();
+    options.max_idle_time = Some(Duration::from_millis(1));
+    options.driver_info = Some(DriverInfo::new(
+        "library",
+        Some("1.2"),
+        Some("Library Platform"),
+    ));
+    let hello = watch_hello(&mut options);
+    let client = Client::with_options(options).unwrap();
+
+    client.ping().await;
+    tokio::time::sleep(Duration::from_millis(5)).await;
+
+    client.append_metadata(DriverInfo::new(
+        "framework",
+        Some("2.0"),
+        Some("Framework Platform"),
+    ));
+    client.ping().await;
+    let client_metadata = hello.lock().unwrap().client_metadata();
+    tokio::time::sleep(Duration::from_millis(5)).await;
+
+    client.append_metadata(DriverInfo::new(
+        "library",
+        Some("1.2"),
+        Some("Library Platform"),
+    ));
+    client.ping().await;
+    let updated_client_metadata = hello.lock().unwrap().client_metadata();
+
+    assert_eq!(client_metadata, updated_client_metadata);
+}
+
+// Client Metadata Update Prose Test 7: Empty strings are considered unset when appending duplicate
+// metadata
+#[tokio::test]
+async fn append_metadata_duplicate_empty_strings() {
+    let test_info = [
+        (
+            DriverInfo::new("library", None, Some("Library Platform")),
+            DriverInfo::new("library", Some(""), Some("Library Platform")),
+        ),
+        (
+            DriverInfo::new("library", Some("1.2"), None),
+            DriverInfo::new("library", Some("1.2"), Some("")),
+        ),
+    ];
+    for (initial_info, appended_info) in test_info {
+        let mut options = get_client_options().await.clone();
+        options.max_idle_time = Some(Duration::from_millis(1));
+        let hello = watch_hello(&mut options);
+        let client = Client::with_options(options).unwrap();
+
+        client.append_metadata(initial_info);
+        client.ping().await;
+        let initial_client_metadata = hello.lock().unwrap().client_metadata();
+        tokio::time::sleep(Duration::from_millis(5)).await;
+
+        client.append_metadata(appended_info);
+        client.ping().await;
+        let updated_client_metadata = hello.lock().unwrap().client_metadata();
+
+        assert_eq!(initial_client_metadata, updated_client_metadata);
+    }
+}
+
+// Client Metadata Update Prose Test 8: Empty strings are considered unset when appending metadata
+// identical to initial metadata
+#[tokio::test]
+async fn append_metadata_duplicate_empty_strings_initial() {
+    let test_info = [
+        (
+            DriverInfo::new("library", None, Some("Library Platform")),
+            DriverInfo::new("library", Some(""), Some("Library Platform")),
+        ),
+        (
+            DriverInfo::new("library", Some("1.2"), None),
+            DriverInfo::new("library", Some("1.2"), Some("")),
+        ),
+    ];
+    for (initial_info, appended_info) in test_info {
+        let mut options = get_client_options().await.clone();
+        options.max_idle_time = Some(Duration::from_millis(1));
+        options.driver_info = Some(initial_info);
+        let hello = watch_hello(&mut options);
+        let client = Client::with_options(options).unwrap();
+
+        client.ping().await;
+        let initial_client_metadata = hello.lock().unwrap().client_metadata();
+        tokio::time::sleep(Duration::from_millis(5)).await;
+
+        client.append_metadata(appended_info);
+        client.ping().await;
+        let updated_client_metadata = hello.lock().unwrap().client_metadata();
+
+        assert_eq!(initial_client_metadata, updated_client_metadata);
+    }
 }
