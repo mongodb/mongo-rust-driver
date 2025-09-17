@@ -394,7 +394,7 @@ impl Client {
             .metadata
             .write()
             .unwrap()
-            .append(&driver_info);
+            .append(driver_info);
     }
 
     pub(crate) fn register_async_drop(&self) -> AsyncDropToken {
