@@ -10,7 +10,6 @@ mod handshake;
 #[cfg(feature = "dns-resolver")]
 mod initial_dns_seedlist_discovery;
 mod load_balancers;
-mod mongodb_handshake;
 #[path = "spec/oidc.rs"]
 pub(crate) mod oidc_skip_ci;
 mod read_write_concern;
