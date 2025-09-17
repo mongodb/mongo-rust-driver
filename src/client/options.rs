@@ -1115,7 +1115,7 @@ impl TlsOptions {
 
 /// Extra information to append to the driver version in the metadata of the handshake with the
 /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
-#[derive(Clone, Debug, Deserialize, TypedBuilder, PartialEq)]
+#[derive(Clone, Debug, Deserialize, TypedBuilder, Eq)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct DriverInfo {
@@ -1128,6 +1128,32 @@ pub struct DriverInfo {
 
     /// Optional platform information for the wrapping driver.
     pub platform: Option<String>,
+}
+
+impl DriverInfo {
+    pub(crate) fn spec_version(&self) -> &str {
+        self.version.as_deref().unwrap_or("")
+    }
+
+    pub(crate) fn spec_platform(&self) -> &str {
+        self.platform.as_deref().unwrap_or("")
+    }
+}
+
+impl PartialEq for DriverInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.spec_version() == other.spec_version()
+            && self.spec_platform() == other.spec_platform()
+    }
+}
+
+impl Hash for DriverInfo {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.spec_version().hash(state);
+        self.spec_platform().hash(state);
+    }
 }
 
 impl ClientOptions {

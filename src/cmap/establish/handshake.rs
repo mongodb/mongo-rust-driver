@@ -1,4 +1,4 @@
-use std::{env, sync::Arc};
+use std::{collections::HashSet, env, sync::Arc};
 
 #[cfg(test)]
 use crate::event::EventHandler;
@@ -38,22 +38,31 @@ pub(crate) struct ClientMetadata {
     pub(crate) os: OsMetadata,
     pub(crate) platform: String,
     pub(crate) env: Option<RuntimeEnvironment>,
+    pub(crate) appended: HashSet<DriverInfo>,
 }
 
 impl ClientMetadata {
-    pub(crate) fn append(&mut self, driver_info: &DriverInfo) {
+    pub(crate) fn append(&mut self, driver_info: DriverInfo) {
+        if self.appended.contains(&driver_info) {
+            return;
+        }
+
         self.driver.name.push('|');
         self.driver.name.push_str(&driver_info.name);
 
-        if let Some(version) = &driver_info.version {
+        let version = driver_info.spec_version();
+        if !version.is_empty() {
             self.driver.version.push('|');
             self.driver.version.push_str(version);
         }
 
-        if let Some(driver_info_platform) = &driver_info.platform {
+        let platform = driver_info.spec_platform();
+        if !platform.is_empty() {
             self.platform.push('|');
-            self.platform.push_str(driver_info_platform);
+            self.platform.push_str(platform);
         }
+
+        self.appended.insert(driver_info);
     }
 }
 
@@ -67,7 +76,7 @@ impl From<&ClientOptions> for ClientMetadata {
             out.application = Some(AppMetadata { name });
         }
         if let Some(driver_info) = &options.driver_info {
-            out.append(driver_info);
+            out.append(driver_info.clone());
         }
         out
     }
@@ -325,6 +334,7 @@ pub(crate) static BASE_CLIENT_METADATA: LazyLock<ClientMetadata> =
             if cfg!(feature = "bson-3") { "3" } else { "2" },
         ),
         env: None,
+        appended: HashSet::new(),
     });
 
 type Truncation = fn(&mut ClientMetadata);
