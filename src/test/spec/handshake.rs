@@ -8,6 +8,7 @@ use crate::{
     cmap::Command,
     event::EventHandler,
     options::ClientOptions,
+    test::{spec::unified_runner::run_unified_tests, topology_is_sharded},
 };
 
 use crate::{
@@ -20,6 +21,21 @@ use crate::{
     test::get_client_options,
     Client,
 };
+
+#[tokio::test]
+async fn run_unified() {
+    let mut runner = run_unified_tests(&["mongodb-handshake", "unified"]);
+    if topology_is_sharded().await {
+        // This test is flaky on sharded deployments.
+        runner = runner.skip_tests(
+            &[
+                "metadata append does not create new connections or close existing ones and no \
+                 hello command is sent",
+            ],
+        );
+    }
+    runner.await;
+}
 
 // Prose test 1: Test that the driver accepts an arbitrary auth mechanism
 #[tokio::test]
