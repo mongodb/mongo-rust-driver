@@ -97,14 +97,10 @@ impl TopologyDescription {
         if self.has_available_servers() {
             format!(
                 "Server selection timeout: None of the available servers suitable for criteria \
-                 {:?}. Topology: {}",
-                criteria, self
+                 {criteria:?}. Topology: {self}"
             )
         } else {
-            format!(
-                "Server selection timeout: No available servers. Topology: {}",
-                self
-            )
+            format!("Server selection timeout: No available servers. Topology: {self}")
         }
     }
 
@@ -389,19 +385,19 @@ impl fmt::Display for TopologyDescription {
         write!(f, "{{ Type: {}", self.topology_type)?;
 
         if let Some(ref set_name) = self.set_name {
-            write!(f, ", Set Name: {}", set_name)?;
+            write!(f, ", Set Name: {set_name}")?;
         }
 
         if let Some(max_set_version) = self.max_set_version {
-            write!(f, ", Max Set Version: {}", max_set_version)?;
+            write!(f, ", Max Set Version: {max_set_version}")?;
         }
 
         if let Some(max_election_id) = self.max_election_id {
-            write!(f, ", Max Election ID: {}", max_election_id)?;
+            write!(f, ", Max Election ID: {max_election_id}")?;
         }
 
         if let Some(ref compatibility_error) = self.compatibility_error {
-            write!(f, ", Compatibility Error: {}", compatibility_error)?;
+            write!(f, ", Compatibility Error: {compatibility_error}")?;
         }
 
         if !self.servers.is_empty() {

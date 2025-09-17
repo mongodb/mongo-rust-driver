@@ -1,4 +1,4 @@
-use bson::{Bson, Document};
+use crate::bson::{Bson, Document};
 use std::time::Duration;
 
 use crate::{
@@ -78,7 +78,7 @@ where
     ///
     /// [`run`](EstimatedDocumentCount::run) will return d[`Result<u64>`].
     #[deeplink]
-    #[options_doc(estimated_doc_count, sync)]
+    #[options_doc(estimated_doc_count, "run")]
     pub fn estimated_document_count(&self) -> EstimatedDocumentCount {
         self.async_collection.estimated_document_count()
     }
@@ -89,7 +89,7 @@ where
     ///
     /// [`run`](CountDocuments::run) will return d[`Result<u64>`].
     #[deeplink]
-    #[options_doc(count_docs, sync)]
+    #[options_doc(count_docs, "run")]
     pub fn count_documents(&self, filter: Document) -> CountDocuments {
         self.async_collection.count_documents(filter)
     }

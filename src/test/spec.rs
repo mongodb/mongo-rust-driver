@@ -41,7 +41,7 @@ pub(crate) use self::{
     unified_runner::{merge_uri_options, ExpectedEventType, Topology},
     v2_runner::{operation::Operation, test_file::RunOn},
 };
-use crate::{bson::Bson, test::SERVERLESS};
+use crate::bson::Bson;
 
 use super::log_uncaptured;
 
@@ -105,7 +105,7 @@ fn deserialize_spec_tests_common<T: DeserializeOwned>(
             )
         });
 
-        let deserializer = bson::Deserializer::new(test_bson);
+        let deserializer = crate::bson::Deserializer::new(test_bson);
         let test: T = serde_path_to_error::deserialize(deserializer).unwrap_or_else(|e| {
             panic!(
                 "Failed to deserialize test BSON to {} in {:?}: {}",
@@ -142,10 +142,6 @@ pub(crate) enum Serverless {
 
 impl Serverless {
     pub(crate) fn can_run(&self) -> bool {
-        match self {
-            Self::Forbid if *SERVERLESS => false,
-            Self::Require if !*SERVERLESS => false,
-            _ => true,
-        }
+        *self != Self::Require
     }
 }

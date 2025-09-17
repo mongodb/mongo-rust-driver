@@ -1,5 +1,7 @@
 use crate::{
     action::Action,
+    bson::Document,
+    bson_compat::serialize_to_bson,
     error::Result,
     options::{RunCursorCommandOptions, SelectionCriteria},
     test::spec::unified_runner::{
@@ -9,7 +11,6 @@ use crate::{
         TestRunner,
     },
 };
-use bson::{to_bson, Document};
 use futures::{future::BoxFuture, TryStreamExt};
 use futures_util::FutureExt;
 use serde::Deserialize;
@@ -46,7 +47,7 @@ impl TestOperation for RunCommand {
                     }),
             )
             .await?;
-            let result = to_bson(&result)?;
+            let result = serialize_to_bson(&result)?;
             Ok(Some(result.into()))
         }
         .boxed()
@@ -93,7 +94,7 @@ impl TestOperation for RunCursorCommand {
                 }
             };
 
-            Ok(Some(bson::to_bson(&result)?.into()))
+            Ok(Some(crate::bson_compat::serialize_to_bson(&result)?.into()))
         }
         .boxed()
     }

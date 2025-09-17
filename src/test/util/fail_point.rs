@@ -16,7 +16,7 @@ impl Client {
     /// method should remain in scope while the fail point is intended for use. Upon drop, the
     /// guard will disable the fail point on the server.
     pub(crate) async fn enable_fail_point(&self, fail_point: FailPoint) -> Result<FailPointGuard> {
-        let command = bson::to_document(&fail_point)?;
+        let command = crate::bson_compat::serialize_to_document(&fail_point)?;
         self.database("admin")
             .run_command(command)
             .selection_criteria(fail_point.selection_criteria.clone())
@@ -73,7 +73,7 @@ impl FailPoint {
         self
     }
 
-    /// How long the server should block the affected commands. Only available on 4.2.9+ servers.
+    /// How long the server should block the affected commands.
     pub(crate) fn block_connection(mut self, block_connection_duration: Duration) -> Self {
         self.data.insert("blockConnection", true);
         self.data
@@ -147,6 +147,16 @@ impl Drop for FailPointGuard {
         // multi-threaded runtime.
         let result = tokio::task::block_in_place(|| {
             futures::executor::block_on(async move {
+                let client = if client.options().app_name.is_some() {
+                    // Create a fresh client with no app name to avoid issues when disabling a
+                    // failpoint configured on the "hello" command.
+                    let mut options = client.options().clone();
+                    options.app_name = None;
+                    Client::for_test().options(options).await.into_client()
+                } else {
+                    client
+                };
+
                 client
                     .database("admin")
                     .run_command(
@@ -158,7 +168,7 @@ impl Drop for FailPointGuard {
         });
 
         if let Err(error) = result {
-            log_uncaptured(format!("failed disabling failpoint: {:?}", error));
+            log_uncaptured(format!("failed disabling failpoint: {error:?}"));
         }
     }
 }

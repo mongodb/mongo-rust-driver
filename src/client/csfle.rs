@@ -100,12 +100,14 @@ impl ClientState {
             .kms_providers(&opts.kms_providers.credentials_doc()?)?
             .use_need_kms_credentials_state()
             .retry_kms(true)?
-            .use_range_v2()?;
+            .use_range_v2()?
+            .use_need_mongo_collinfo_with_db_state();
         if let Some(m) = &opts.schema_map {
-            builder = builder.schema_map(&bson::to_document(m)?)?;
+            builder = builder.schema_map(&crate::bson_compat::serialize_to_document(m)?)?;
         }
         if let Some(m) = &opts.encrypted_fields_map {
-            builder = builder.encrypted_field_config_map(&bson::to_document(m)?)?;
+            builder = builder
+                .encrypted_field_config_map(&crate::bson_compat::serialize_to_document(m)?)?;
         }
         #[cfg(not(test))]
         let disable_crypt_shared = false;
@@ -214,11 +216,11 @@ impl ClientState {
 
 pub(crate) fn aux_collections(
     base_ns: &Namespace,
-    enc_fields: &bson::Document,
+    enc_fields: &crate::bson::Document,
 ) -> Result<Vec<Namespace>> {
     let mut out = vec![];
     for &key in &["esc", "ecoc"] {
-        let coll = match enc_fields.get_str(format!("{}Collection", key)) {
+        let coll = match enc_fields.get_str(format!("{key}Collection")) {
             Ok(s) => s.to_string(),
             Err(_) => format!("enxcol_.{}.{}", base_ns.coll, key),
         };
@@ -228,4 +230,16 @@ pub(crate) fn aux_collections(
         });
     }
     Ok(out)
+}
+
+impl Client {
+    pub(crate) async fn init_csfle(&self, opts: AutoEncryptionOptions) -> Result<()> {
+        let mut csfle_state = self.inner.csfle.write().await;
+        if csfle_state.is_some() {
+            return Err(Error::internal("double initialization of csfle state"));
+        }
+        *csfle_state = Some(ClientState::new(self, opts).await?);
+
+        Ok(())
+    }
 }

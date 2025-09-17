@@ -92,7 +92,7 @@ async fn run_test(mut test_file: TestFile) {
         return;
     }
 
-    assert!(result.is_ok(), "non-Ok result: {:?}", result);
+    assert!(result.is_ok(), "non-Ok result: {result:?}");
 
     let options = result.unwrap();
 
@@ -207,8 +207,7 @@ async fn replica_set() {
     if let Some(skip) = skip {
         log_uncaptured(format!(
             "skipping initial_dns_seedlist_discovery::replica_set due to unmet topology \
-             requirement ({})",
-            skip
+             requirement ({skip})"
         ));
         return;
     }

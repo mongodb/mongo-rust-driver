@@ -6,18 +6,11 @@ use crate::{
     error::ErrorKind,
     event::command::CommandEvent,
     runtime::process::Process,
-    test::{log_uncaptured, server_version_lt, util::Event, EventClient},
+    test::{util::Event, EventClient},
     Client,
 };
 
 async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
-    if server_version_lt(4, 2).await {
-        log_uncaptured(format!(
-            "Skipping {name}: cannot spawn mongocryptd due to server version < 4.2"
-        ));
-        return None;
-    }
-
     let pid_file_path = format!("--pidfilepath={name}.pid");
     let args = vec!["--port=47017", &pid_file_path];
     let process = Process::spawn("mongocryptd", args).expect("failed to spawn mongocryptd");

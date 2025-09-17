@@ -1,4 +1,4 @@
-use bson::{doc, Bson, Document};
+use crate::bson::{doc, Bson, Document};
 use futures_util::{StreamExt, TryStreamExt};
 
 use crate::{
@@ -17,7 +17,6 @@ use crate::{
 };
 
 use super::{
-    fail_command_supported,
     get_client_options,
     log_uncaptured,
     server_version_gte,
@@ -43,10 +42,6 @@ async fn init_stream(
 > {
     if !(topology_is_replica_set().await || topology_is_sharded().await) {
         log_uncaptured("skipping change stream test on unsupported topology");
-        return Ok(None);
-    }
-    if !fail_command_supported().await {
-        log_uncaptured("skipping change stream test on version without fail commands");
         return Ok(None);
     }
 
@@ -286,59 +281,14 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
     Ok(())
 }
 
-/// Prose test 9: $changeStream stage for ChangeStream against a server >=4.0 and <4.0.7 that has
-/// not received any results yet MUST include a startAtOperationTime option when resuming a change
-/// stream.
-#[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
-async fn resume_start_at_operation_time() -> Result<()> {
-    if !server_version_matches(">=4.0, <4.0.7").await {
-        log_uncaptured("skipping change stream test due to server version");
-        return Ok(());
-    }
-
-    let (client, coll, mut stream) =
-        match init_stream("resume_start_at_operation_time", true).await? {
-            Some(t) => t,
-            None => return Ok(()),
-        };
-
-    let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(43);
-    let _guard = client.enable_fail_point(fail_point).await?;
-
-    coll.insert_one(doc! { "_id": 2 }).await?;
-    stream.next().await.transpose()?;
-
-    let events = client.events.get_command_events(&["aggregate"]);
-    assert_eq!(events.len(), 4);
-
-    fn has_saot(command: &Document) -> Result<bool> {
-        Ok(command.get_array("pipeline")?[0]
-            .as_document()
-            .unwrap()
-            .get_document("$changeStream")?
-            .contains_key("startAtOperationTime"))
-    }
-    assert!(matches!(&events[2],
-        CommandEvent::Started(CommandStartedEvent {
-            command,
-            ..
-        }) if has_saot(command)?
-    ));
-
-    Ok(())
-}
+// Prose test 9: removed.
 
 // Prose test 10: removed.
 
-/// Prose test 11: Running against a server >=4.0.7, resume token at the end of a batch must return
-/// the postBatchResumeToken from the current command response
+/// Prose test 11: Resume token at the end of a batch must return the postBatchResumeToken from the
+/// current command response
 #[tokio::test]
 async fn batch_end_resume_token() -> Result<()> {
-    if !server_version_matches(">=4.0.7").await {
-        log_uncaptured("skipping change stream test due to server version");
-        return Ok(());
-    }
-
     let (client, _, mut stream) = match init_stream("batch_end_resume_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -357,36 +307,7 @@ async fn batch_end_resume_token() -> Result<()> {
     Ok(())
 }
 
-/// Prose test 12: Running against a server <4.0.7, end of batch resume token must follow the spec
-#[tokio::test]
-async fn batch_end_resume_token_legacy() -> Result<()> {
-    if !server_version_matches("<4.0.7").await {
-        log_uncaptured("skipping change stream test due to server version");
-        return Ok(());
-    }
-
-    let (_, coll, mut stream) = match init_stream("batch_end_resume_token_legacy", false).await? {
-        Some(t) => t,
-        None => return Ok(()),
-    };
-
-    // Case: empty batch, `resume_after` not specified
-    assert_eq!(stream.next_if_any().await?, None);
-    assert_eq!(stream.resume_token(), None);
-
-    // Case: end of batch
-    coll.insert_one(doc! {}).await?;
-    let expected_id = stream.next_if_any().await?.unwrap().id;
-    assert_eq!(stream.next_if_any().await?, None);
-    assert_eq!(stream.resume_token().as_ref(), Some(&expected_id));
-
-    // Case: empty batch, `resume_after` specified
-    let mut stream = coll.watch().resume_after(expected_id.clone()).await?;
-    assert_eq!(stream.next_if_any().await?, None);
-    assert_eq!(stream.resume_token(), Some(expected_id));
-
-    Ok(())
-}
+// Prose test 12: removed.
 
 /// Prose test 13: Mid-batch resume token must be `_id` of last document returned.
 #[tokio::test]
@@ -430,10 +351,6 @@ async fn aggregate_batch() -> Result<()> {
         log_uncaptured("skipping change stream test on unsupported topology");
         return Ok(());
     }
-    if server_version_lt(4, 2).await {
-        log_uncaptured("skipping change stream test on unsupported version > 4.2");
-        return Ok(());
-    }
 
     let (_, coll, mut stream) = match init_stream("aggregate_batch", false).await? {
         Some(t) => t,
@@ -466,11 +383,6 @@ async fn aggregate_batch() -> Result<()> {
 /// Prose test 17: Resuming a change stream with no results uses `startAfter`.
 #[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_uses_start_after() -> Result<()> {
-    if !server_version_matches(">=4.1.1").await {
-        log_uncaptured("skipping change stream test on unsupported version");
-        return Ok(());
-    }
-
     let (client, coll, mut stream) = match init_stream("resume_uses_start_after", true).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -502,8 +414,7 @@ async fn resume_uses_start_after() -> Result<()> {
         command,
         ..
     } if has_start_after(command)?),
-        "resume mismatch: {:#?}",
-        last,
+        "resume mismatch: {last:#?}",
     );
 
     Ok(())
@@ -512,11 +423,6 @@ async fn resume_uses_start_after() -> Result<()> {
 /// Prose test 18: Resuming a change stream after results uses `resumeAfter`.
 #[tokio::test(flavor = "multi_thread")] // multi_thread required for FailPoint
 async fn resume_uses_resume_after() -> Result<()> {
-    if !server_version_matches(">=4.1.1").await {
-        log_uncaptured("skipping change stream test on unsupported version");
-        return Ok(());
-    }
-
     let (client, coll, mut stream) = match init_stream("resume_uses_resume_after", true).await? {
         Some(t) => t,
         None => return Ok(()),
@@ -552,8 +458,7 @@ async fn resume_uses_resume_after() -> Result<()> {
         command,
         ..
     } if has_resume_after(command)?),
-        "resume mismatch: {:#?}",
-        last,
+        "resume mismatch: {last:#?}",
     );
 
     Ok(())
@@ -681,8 +586,8 @@ async fn transaction_fields() -> Result<()> {
 // run because it's just asserting that this compiles.
 #[allow(unreachable_code, unused_variables, clippy::diverging_sub_expression)]
 async fn _collection_watch_typed() {
-    let coll: Collection<bson::RawDocumentBuf> = unimplemented!();
+    let coll: Collection<crate::bson::RawDocumentBuf> = unimplemented!();
     let mut stream = coll.watch().await.unwrap();
-    let _: Option<crate::error::Result<ChangeStreamEvent<bson::RawDocumentBuf>>> =
+    let _: Option<crate::error::Result<ChangeStreamEvent<crate::bson::RawDocumentBuf>>> =
         stream.next().await;
 }

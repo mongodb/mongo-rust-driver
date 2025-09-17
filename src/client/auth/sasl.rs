@@ -1,7 +1,8 @@
-use bson::{rawdoc, RawBson};
+use crate::bson::{rawdoc, RawBson};
 
 use crate::{
     bson::{spec::BinarySubtype, Binary, Bson, Document},
+    bson_compat::cstr,
     bson_util,
     client::{auth::AuthMechanism, options::ServerApi},
     cmap::Command,
@@ -32,7 +33,7 @@ impl SaslStart {
         }
     }
 
-    pub(super) fn into_command(self) -> Command {
+    pub(super) fn into_command(self) -> Result<Command> {
         let mut body = rawdoc! {
             "saslStart": 1,
             "mechanism": self.mechanism.as_str(),
@@ -41,7 +42,7 @@ impl SaslStart {
         if self.mechanism == AuthMechanism::ScramSha1
             || self.mechanism == AuthMechanism::ScramSha256
         {
-            body.append("options", rawdoc! { "skipEmptyExchange": true });
+            body.append(cstr!("options"), rawdoc! { "skipEmptyExchange": true });
         }
 
         let mut command = Command::new("saslStart", self.source, body);
@@ -49,7 +50,7 @@ impl SaslStart {
             command.set_server_api(&server_api);
         }
 
-        command
+        Ok(command)
     }
 }
 
@@ -104,9 +105,9 @@ fn validate_command_success(auth_mechanism: &str, response: &Document) -> Result
     match bson_util::get_int(ok) {
         Some(1) => Ok(()),
         Some(_) => {
-            let source = bson::from_bson::<CommandResponse<CommandErrorBody>>(Bson::Document(
-                response.clone(),
-            ))
+            let source = crate::bson_compat::deserialize_from_bson::<
+                CommandResponse<CommandErrorBody>,
+            >(Bson::Document(response.clone()))
             .map(|cmd_resp| cmd_resp.body.into())
             .ok();
             Err(Error::authentication_error(

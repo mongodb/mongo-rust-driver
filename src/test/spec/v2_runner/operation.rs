@@ -111,7 +111,7 @@ impl Operation {
         }
 
         if let Some(error) = self.error {
-            assert_eq!(error, result.is_err(), "{}", description);
+            assert_eq!(error, result.is_err(), "{description}");
         }
 
         if let Some(expected_result) = &self.result {
@@ -119,35 +119,31 @@ impl Operation {
                 OperationResult::Success(expected) => {
                     let result = match result.as_ref() {
                         Ok(Some(r)) => r,
-                        _ => panic!("{}: expected value, got {:?}", description, result),
+                        _ => panic!("{description}: expected value, got {result:?}"),
                     };
                     assert_matches(result, expected, Some(description));
                 }
                 OperationResult::Error(operation_error) => {
                     assert!(
                         result.is_err(),
-                        "{}: expected error\n{:#?}  got value\n{:#?}",
-                        description,
-                        operation_error,
-                        result,
+                        "{description}: expected error\n{operation_error:#?}  got \
+                         value\n{result:#?}",
                     );
                     let error = result.as_ref().unwrap_err();
                     if let Some(error_contains) = &operation_error.error_contains {
                         let message = error.message().unwrap().to_lowercase();
                         assert!(
                             message.contains(&error_contains.to_lowercase()),
-                            "{}: expected error message to contain \"{}\" but got \"{}\"",
-                            description,
-                            error_contains,
-                            message
+                            "{description}: expected error message to contain \
+                             \"{error_contains}\" but got \"{message}\""
                         );
                     }
                     if let Some(error_code_name) = &operation_error.error_code_name {
                         let code_name = error.code_name().unwrap();
                         assert_eq!(
                             error_code_name, code_name,
-                            "{}: expected error with codeName {:?}, instead got {:#?}",
-                            description, error_code_name, error
+                            "{description}: expected error with codeName {error_code_name:?}, \
+                             instead got {error:#?}"
                         );
                     }
                     if let Some(error_code) = operation_error.error_code {
@@ -294,7 +290,7 @@ impl<'de> Deserialize<'de> for Operation {
             "wait" => deserialize_op::<Wait>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
-        .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
+        .map_err(|e| serde::de::Error::custom(format!("{e}")))?;
 
         Ok(Operation {
             operation: boxed_op,
@@ -311,7 +307,7 @@ impl<'de> Deserialize<'de> for Operation {
 
 fn deserialize_op<'de, 'a, Op: TestOperation + Deserialize<'de> + 'a>(
     arguments: Document,
-) -> std::result::Result<Box<dyn TestOperation + 'a>, bson::de::Error> {
+) -> std::result::Result<Box<dyn TestOperation + 'a>, crate::bson_compat::DeError> {
     Ok(Box::new(Op::deserialize(BsonDeserializer::new(
         Bson::Document(arguments),
     ))?))
@@ -344,7 +340,7 @@ impl TestOperation for DeleteMany {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -370,7 +366,7 @@ impl TestOperation for DeleteOne {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -440,7 +436,7 @@ impl TestOperation for InsertMany {
                 .into_iter()
                 .map(|(k, v)| (k.to_string(), v))
                 .collect();
-            let ids = bson::to_bson(&ids)?;
+            let ids = crate::bson_compat::serialize_to_bson(&ids)?;
             Ok(Some(Bson::from(doc! { "insertedIds": ids })))
         }
         .boxed()
@@ -468,7 +464,7 @@ impl TestOperation for InsertOne {
                 .with_options(options)
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -495,7 +491,7 @@ impl TestOperation for UpdateMany {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -522,7 +518,7 @@ impl TestOperation for UpdateOne {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -729,7 +725,7 @@ impl TestOperation for ListCollections {
                     cursor.try_collect::<Vec<_>>().await?
                 }
             };
-            Ok(Some(bson::to_bson(&result)?))
+            Ok(Some(crate::bson_compat::serialize_to_bson(&result)?))
         }
         .boxed()
     }
@@ -781,7 +777,7 @@ impl TestOperation for ReplaceOne {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -808,7 +804,7 @@ impl TestOperation for FindOneAndUpdate {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -835,7 +831,7 @@ impl TestOperation for FindOneAndReplace {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -861,7 +857,7 @@ impl TestOperation for FindOneAndDelete {
                 .with_options(self.options.clone())
                 .optional(session, |a, s| a.session(s))
                 .await?;
-            let result = bson::to_bson(&result)?;
+            let result = crate::bson_compat::serialize_to_bson(&result)?;
             Ok(Some(result))
         }
         .boxed()
@@ -880,7 +876,8 @@ impl TestOperation for TargetedFailPoint {
         _client: &'a TestClient,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            let command_document = bson::to_document(&self.fail_point).unwrap();
+            let command_document =
+                crate::bson_compat::serialize_to_document(&self.fail_point).unwrap();
             Ok(Some(command_document.into()))
         }
         .boxed()
@@ -935,7 +932,7 @@ impl TestOperation for ListDatabases {
                 .list_databases()
                 .with_options(self.options.clone())
                 .await?;
-            Ok(Some(bson::to_bson(&result)?))
+            Ok(Some(crate::bson_compat::serialize_to_bson(&result)?))
         }
         .boxed()
     }
@@ -993,7 +990,7 @@ impl TestOperation for AssertSessionTransactionState {
                     session.transaction.state,
                     TransactionState::Aborted
                 )),
-                other => panic!("Unknown transaction state: {}", other),
+                other => panic!("Unknown transaction state: {other}"),
             }
             Ok(None)
         }
@@ -1267,7 +1264,7 @@ impl TestOperation for ListIndexes {
             };
             let indexes: Vec<Document> = indexes
                 .iter()
-                .map(|index| bson::to_document(index).unwrap())
+                .map(|index| crate::bson_compat::serialize_to_document(index).unwrap())
                 .collect();
             Ok(Some(indexes.into()))
         }

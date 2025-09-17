@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use bson::Document;
+use crate::bson::Document;
 use serde::Deserialize;
 
 use super::TestSdamEvent;
@@ -269,7 +269,7 @@ async fn run_test(test_file: TestFile) {
         }
     }
 
-    log_uncaptured(format!("Executing {}", test_description));
+    log_uncaptured(format!("Executing {test_description}"));
 
     let mut options = ClientOptions::parse(&test_file.uri)
         .await
@@ -363,7 +363,7 @@ async fn run_test(test_file: TestFile) {
         topology.watch().wait_until_initialized().await;
         let topology_description = topology.description();
         let servers = topology.servers();
-        let phase_description = phase.description.unwrap_or_else(|| format!("{}", i));
+        let phase_description = phase.description.unwrap_or_else(|| format!("{i}"));
 
         match phase.outcome {
             Outcome::Description(outcome) => {
@@ -385,17 +385,14 @@ async fn run_test(test_file: TestFile) {
                 assert_eq!(
                     actual.len(),
                     expected.len(),
-                    "{}: {}: event list length mismatch:\n actual: {:#?}, expected: {:#?}",
-                    test_description,
-                    phase_description,
-                    actual,
-                    expected
+                    "{test_description}: {phase_description}: event list length mismatch:\n \
+                     actual: {actual:#?}, expected: {expected:#?}"
                 );
                 for (actual, expected) in actual.zip(expected.into_iter()) {
                     assert_eq!(
                         actual, expected,
-                        "{}: {}: SDAM events do not match:\n actual: {:#?}, expected: {:#?}",
-                        test_description, phase_description, actual, expected
+                        "{test_description}: {phase_description}: SDAM events do not match:\n \
+                         actual: {actual:#?}, expected: {expected:#?}"
                     );
                 }
             }
@@ -412,14 +409,12 @@ fn verify_description_outcome(
 ) {
     assert_eq!(
         topology_description.topology_type, outcome.topology_type,
-        "{}: {}",
-        test_description, phase_description
+        "{test_description}: {phase_description}"
     );
 
     assert_eq!(
         topology_description.set_name, outcome.set_name,
-        "{}: {}",
-        test_description, phase_description,
+        "{test_description}: {phase_description}",
     );
 
     let expected_timeout = outcome
@@ -427,71 +422,56 @@ fn verify_description_outcome(
         .map(|mins| Duration::from_secs((mins as u64) * 60));
     assert_eq!(
         topology_description.logical_session_timeout, expected_timeout,
-        "{}: {}",
-        test_description, phase_description
+        "{test_description}: {phase_description}"
     );
 
     if let Some(compatible) = outcome.compatible {
         assert_eq!(
             topology_description.compatibility_error.is_none(),
             compatible,
-            "{}: {}",
-            test_description,
-            phase_description,
+            "{test_description}: {phase_description}",
         );
     }
 
     assert_eq!(
         topology_description.servers.len(),
         outcome.servers.len(),
-        "{}: {}",
-        test_description,
-        phase_description
+        "{test_description}: {phase_description}"
     );
 
     for (address, server) in outcome.servers {
         let address = ServerAddress::parse(&address).unwrap_or_else(|_| {
-            panic!(
-                "{}: couldn't parse address \"{:?}\"",
-                test_description, address
-            )
+            panic!("{test_description}: couldn't parse address \"{address:?}\"")
         });
         let actual_server = &topology_description
             .servers
             .get(&address)
-            .unwrap_or_else(|| panic!("{} (phase {})", test_description, phase_description));
+            .unwrap_or_else(|| panic!("{test_description} (phase {phase_description})"));
 
         let server_type = server_type_from_str(&server.server_type)
-            .unwrap_or_else(|| panic!("{} (phase {})", test_description, phase_description));
+            .unwrap_or_else(|| panic!("{test_description} (phase {phase_description})"));
 
         assert_eq!(
             actual_server.server_type, server_type,
-            "{} (phase {}, address: {})",
-            test_description, phase_description, address,
+            "{test_description} (phase {phase_description}, address: {address})",
         );
 
         assert_eq!(
             actual_server.set_name().unwrap_or(None),
             server.set_name,
-            "{} (phase {})",
-            test_description,
-            phase_description
+            "{test_description} (phase {phase_description})"
         );
 
         assert_eq!(
             actual_server.set_version().unwrap_or(None),
             server.set_version,
-            "{} (phase {})",
-            test_description,
-            phase_description
+            "{test_description} (phase {phase_description})"
         );
 
         assert_eq!(
             actual_server.election_id().unwrap_or(None),
             server.election_id,
-            "{} (phase {})",
-            test_description,
-            phase_description
+            "{test_description} (phase {phase_description})"
         );
 
         if let Some(logical_session_timeout_minutes) = server.logical_session_timeout_minutes {
@@ -500,9 +480,7 @@ fn verify_description_outcome(
                 Some(Duration::from_secs(
                     logical_session_timeout_minutes as u64 * 60
                 )),
-                "{} (phase {})",
-                test_description,
-                phase_description
+                "{test_description} (phase {phase_description})"
             );
         }
 
@@ -510,9 +488,7 @@ fn verify_description_outcome(
             assert_eq!(
                 actual_server.min_wire_version().unwrap(),
                 Some(min_wire_version),
-                "{} (phase {})",
-                test_description,
-                phase_description
+                "{test_description} (phase {phase_description})"
             );
         }
 
@@ -520,9 +496,7 @@ fn verify_description_outcome(
             assert_eq!(
                 actual_server.max_wire_version().unwrap(),
                 Some(max_wire_version),
-                "{} (phase {})",
-                test_description,
-                phase_description
+                "{test_description} (phase {phase_description})"
             );
         }
 
@@ -530,9 +504,7 @@ fn verify_description_outcome(
             assert_eq!(
                 actual_server.topology_version(),
                 Some(topology_version),
-                "{} (phase {})",
-                test_description,
-                phase_description
+                "{test_description} (phase {phase_description})"
             )
         }
 
@@ -546,9 +518,7 @@ fn verify_description_outcome(
                     .as_normal()
                     .unwrap(),
                 generation,
-                "{} (phase {})",
-                test_description,
-                phase_description
+                "{test_description} (phase {phase_description})"
             );
         }
     }
@@ -623,8 +593,7 @@ async fn topology_closed_event_last() {
         .await;
     assert!(
         event.is_none(),
-        "expected no more SDAM events, got {:#?}",
-        event
+        "expected no more SDAM events, got {event:#?}"
     );
 }
 
@@ -754,16 +723,17 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     // get the one server in the topology
     let server = topology.servers().into_values().next().unwrap();
 
-    let heartbeat_response: HelloCommandResponse = bson::from_document(doc! {
-        "ok": 1,
-        "isWritablePrimary": true,
-        "minWireVersion": 0,
-        "maxWireVersion": 6,
-        "maxBsonObjectSize": 16_000,
-        "maxWriteBatchSize": 10_000,
-        "maxMessageSizeBytes": 48_000_000,
-    })
-    .unwrap();
+    let heartbeat_response: HelloCommandResponse =
+        crate::bson_compat::deserialize_from_document(doc! {
+            "ok": 1,
+            "isWritablePrimary": true,
+            "minWireVersion": 0,
+            "maxWireVersion": 6,
+            "maxBsonObjectSize": 16_000,
+            "maxWriteBatchSize": 10_000,
+            "maxMessageSizeBytes": 48_000_000,
+        })
+        .unwrap();
 
     // discover the node
     topology

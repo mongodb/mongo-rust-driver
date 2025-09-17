@@ -12,14 +12,16 @@ use std::{
 };
 
 #[cfg(test)]
-use bson::RawDocumentBuf;
-use bson::{Document, Timestamp};
+use crate::bson::RawDocumentBuf;
+use crate::bson::{Document, Timestamp};
 use derive_where::derive_where;
 use futures_core::{future::BoxFuture, Stream};
 use serde::de::DeserializeOwned;
 #[cfg(test)]
 use tokio::sync::oneshot;
 
+#[cfg(feature = "bson-3")]
+use crate::bson_compat::RawBsonRefExt as _;
 use crate::{
     change_stream::event::{ChangeStreamEvent, ResumeToken},
     cursor::{stream_poll_next, BatchValue, CursorStream, NextInBatchFuture},
@@ -158,7 +160,9 @@ where
     /// ```
     pub async fn next_if_any(&mut self) -> Result<Option<T>> {
         Ok(match NextInBatchFuture::new(self).await? {
-            BatchValue::Some { doc, .. } => Some(bson::from_slice(doc.as_bytes())?),
+            BatchValue::Some { doc, .. } => {
+                Some(crate::bson_compat::deserialize_from_slice(doc.as_bytes())?)
+            }
             BatchValue::Empty | BatchValue::Exhausted => None,
         })
     }

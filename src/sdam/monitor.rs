@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bson::doc;
+use crate::bson::doc;
 use tokio::sync::watch;
 
 use super::{
@@ -302,10 +302,9 @@ impl Monitor {
                     self.rtt_monitor_handle.add_sample(duration);
                 }
                 self.emit_event(|| {
-                    let mut reply = r
-                        .raw_command_response
-                        .to_document()
-                        .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() });
+                    let mut reply =
+                        crate::bson::Document::try_from(r.raw_command_response.as_ref())
+                            .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() });
                     // if this hello call is part of a handshake, remove speculative authentication
                     // information before publishing an event
                     reply.remove("speculativeAuthenticate");

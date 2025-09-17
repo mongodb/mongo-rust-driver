@@ -1,6 +1,6 @@
 use std::borrow::Borrow;
 
-use bson::{Bson, Document, RawDocumentBuf};
+use crate::bson::{Bson, Document, RawDocumentBuf};
 use serde::Serialize;
 
 use crate::{
@@ -31,7 +31,8 @@ impl<T: Serialize + Send + Sync> Collection<T> {
         ReplaceOne {
             coll: CollRef::new(self),
             query,
-            replacement: bson::to_raw_document_buf(replacement.borrow()).map_err(Into::into),
+            replacement: crate::bson_compat::serialize_to_raw_document_buf(replacement.borrow())
+                .map_err(Into::into),
             options: None,
             session: None,
         }
@@ -49,7 +50,7 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](ReplaceOne::run) will return d[`Result<UpdateResult>`].
     #[deeplink]
-    #[options_doc(replace_one, sync)]
+    #[options_doc(replace_one, "run")]
     pub fn replace_one(&self, query: Document, replacement: impl Borrow<T>) -> ReplaceOne {
         self.async_collection.replace_one(query, replacement)
     }

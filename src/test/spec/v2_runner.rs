@@ -9,7 +9,8 @@ use std::{future::IntoFuture, sync::Arc, time::Duration};
 use futures::{future::BoxFuture, FutureExt};
 
 use crate::{
-    bson::{doc, from_bson},
+    bson::doc,
+    bson_compat::deserialize_from_bson,
     coll::options::DropCollectionOptions,
     concern::WriteConcern,
     options::{ClientOptions, CreateCollectionOptions},
@@ -29,7 +30,6 @@ use crate::{
         },
         EventClient,
         TestClient,
-        SERVERLESS,
     },
     Client,
     ClientSession,
@@ -275,12 +275,12 @@ impl TestContext {
     async fn run_operation(
         &mut self,
         operation: &Operation,
-    ) -> Option<Result<Option<bson::Bson>, crate::error::Error>> {
+    ) -> Option<Result<Option<crate::bson::Bson>, crate::error::Error>> {
         if operation.name == "endSession" {
             let session = match &operation.object {
                 Some(OperationObject::Session0) => &mut self.session0,
                 Some(OperationObject::Session1) => &mut self.session1,
-                other => panic!("invalid object for `endSession`: {:?}", other),
+                other => panic!("invalid object for `endSession`: {other:?}"),
             };
             drop(session.take());
             tokio::time::sleep(Duration::from_secs(1)).await;
@@ -317,7 +317,7 @@ impl crate::test::util::TestClientBuilder {
 
         let default_options = if is_load_balanced {
             // for serverless testing, ignore use_multiple_mongoses.
-            let uri = if use_multiple_mongoses && !*SERVERLESS {
+            let uri = if use_multiple_mongoses {
                 crate::test::LOAD_BALANCED_MULTIPLE_URI
                     .as_ref()
                     .expect("MULTI_MONGOS_LB_URI is required")
@@ -361,7 +361,7 @@ impl OpRunner<'_> {
         &mut self,
         operation: &Operation,
         mut sessions: OpSessions<'_>,
-    ) -> Option<Result<Option<bson::Bson>, crate::error::Error>> {
+    ) -> Option<Result<Option<crate::bson::Bson>, crate::error::Error>> {
         if operation.name == "withTransaction" {
             if !matches!(&operation.object, Some(OperationObject::Session0)) {
                 panic!("invalid object for withTransaction: {:?}", operation.object);
@@ -383,7 +383,7 @@ impl OpRunner<'_> {
         let session = match operation.session.as_deref() {
             Some("session0") => sessions.session0.as_deref_mut(),
             Some("session1") => sessions.session1.as_deref_mut(),
-            Some(other) => panic!("unknown session name: {}", other),
+            Some(other) => panic!("unknown session name: {other}"),
             None => None,
         };
 
@@ -444,7 +444,7 @@ impl OpRunner<'_> {
                             .unwrap();
                     }
                     "targetedFailPoint" => {
-                        let fail_point: FailPoint = from_bson(
+                        let fail_point: FailPoint = deserialize_from_bson(
                             operation
                                 .execute_on_client(&self.internal_client)
                                 .await
@@ -468,7 +468,7 @@ impl OpRunner<'_> {
                         self.fail_point_guards.push(guard);
                     }
                     "wait" => operation.execute().await,
-                    other => panic!("unknown operation: {}", other),
+                    other => panic!("unknown operation: {other}"),
                 }
                 return None;
             }
@@ -519,21 +519,17 @@ async fn run_v2_test(path: std::path::PathBuf, test_file: TestFile) {
             continue;
         }
 
-        // `killAllSessions` isn't supported on serverless.
-        // TODO CLOUDP-84298 remove this conditional.
-        if !*SERVERLESS {
-            match file_ctx
-                .internal_client
-                .database("admin")
-                .run_command(doc! { "killAllSessions": [] })
-                .await
-            {
-                Ok(_) => {}
-                Err(err) => match err.sdam_code() {
-                    Some(11601) => {}
-                    _ => panic!("{}: killAllSessions failed", test.description),
-                },
-            }
+        match file_ctx
+            .internal_client
+            .database("admin")
+            .run_command(doc! { "killAllSessions": [] })
+            .await
+        {
+            Ok(_) => {}
+            Err(err) => match err.sdam_code() {
+                Some(11601) => {}
+                _ => panic!("{}: killAllSessions failed", test.description),
+            },
         }
 
         #[cfg(feature = "in-use-encryption")]

@@ -20,6 +20,7 @@ use crate::{
         AuthMechanism,
         ClientOptions,
         CollectionOptions,
+        CreateCollectionOptions,
         DatabaseOptions,
         HedgedReadOptions,
         ReadConcern,
@@ -72,7 +73,7 @@ where
     } else if count == 2 {
         schema_version.push_str(".0");
     }
-    Version::parse(&schema_version).map_err(|e| serde::de::Error::custom(format!("{}", e)))
+    Version::parse(&schema_version).map_err(|e| serde::de::Error::custom(format!("{e}")))
 }
 
 #[derive(Debug, Deserialize)]
@@ -85,8 +86,19 @@ pub(crate) struct RunOnRequirement {
     server_parameters: Option<Document>,
     serverless: Option<Serverless>,
     auth: Option<bool>,
-    csfle: Option<bool>,
+    csfle: Option<Csfle>,
     auth_mechanism: Option<AuthMechanism>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum Csfle {
+    Bool(bool),
+    #[serde(rename_all = "camelCase")]
+    Version {
+        #[cfg(feature = "in-use-encryption")]
+        min_libmongocrypt_version: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
@@ -116,8 +128,7 @@ impl RunOnRequirement {
             let client_topology = get_topology().await;
             if !topologies.contains(client_topology) {
                 return Err(format!(
-                    "allowed topologies {:?}, actual: {:?}",
-                    topologies, client_topology
+                    "allowed topologies {topologies:?}, actual: {client_topology:?}"
                 ));
             }
         }
@@ -132,8 +143,8 @@ impl RunOnRequirement {
             .is_err()
             {
                 return Err(format!(
-                    "required server parameters {:?}, actual {:?}",
-                    required_server_parameters, actual_server_parameters
+                    "required server parameters {required_server_parameters:?}, actual \
+                     {actual_server_parameters:?}"
                 ));
             }
         }
@@ -147,8 +158,33 @@ impl RunOnRequirement {
                 return Err("requires auth".to_string());
             }
         }
-        if self.csfle == Some(true) && !cfg!(feature = "in-use-encryption") {
-            return Err("requires csfle but in-use-encryption feature not enabled".to_string());
+        if let Some(ref csfle) = self.csfle {
+            match csfle {
+                Csfle::Bool(true) | Csfle::Version { .. }
+                    if cfg!(not(feature = "in-use-encryption")) =>
+                {
+                    return Err(
+                        "requires csfle but in-use-encryption feature not enabled".to_string()
+                    );
+                }
+                #[cfg(feature = "in-use-encryption")]
+                Csfle::Version {
+                    min_libmongocrypt_version,
+                } => {
+                    let requirement =
+                        semver::VersionReq::parse(&format!(">={min_libmongocrypt_version}"))
+                            .unwrap();
+                    let mut version = semver::Version::parse(mongocrypt::version()).unwrap();
+                    version.pre = semver::Prerelease::EMPTY;
+                    if !requirement.matches(&version) {
+                        return Err(format!(
+                            "requires at least libmongocrypt version {min_libmongocrypt_version} \
+                             but using version {version}"
+                        ));
+                    }
+                }
+                _ => {}
+            }
         }
         if let Some(ref auth_mechanism) = self.auth_mechanism {
             let actual_mechanism = get_client_options()
@@ -158,13 +194,14 @@ impl RunOnRequirement {
                 .and_then(|c| c.mechanism.as_ref());
             if !actual_mechanism.is_some_and(|actual_mechanism| actual_mechanism == auth_mechanism)
             {
-                return Err(format!("requires {:?} auth mechanism", auth_mechanism));
+                return Err(format!("requires {auth_mechanism:?} auth mechanism"));
             }
         }
         Ok(())
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) enum TestFileEntity {
@@ -176,13 +213,6 @@ pub(crate) enum TestFileEntity {
     Thread(Thread),
     #[cfg(feature = "in-use-encryption")]
     ClientEncryption(ClientEncryption),
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct StoreEventsAsEntity {
-    pub id: String,
-    pub events: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -199,11 +229,11 @@ pub(crate) struct Client {
     pub(crate) observe_sensitive_commands: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_server_api_test_format")]
     pub(crate) server_api: Option<ServerApi>,
-    #[serde(default, deserialize_with = "serde_util::deserialize_nonempty_vec")]
-    pub(crate) store_events_as_entities: Option<Vec<StoreEventsAsEntity>>,
     #[cfg(feature = "tracing-unstable")]
     #[serde(default, deserialize_with = "deserialize_tracing_level_map")]
     pub(crate) observe_log_messages: Option<HashMap<String, tracing::Level>>,
+    #[cfg(feature = "in-use-encryption")]
+    pub(crate) auto_encrypt_opts: Option<AutoEncryptionOpts>,
 }
 
 impl Client {
@@ -257,7 +287,7 @@ pub(crate) fn merge_uri_options(
             .next()
             .expect("expected URI to contain at least one host, but it had none");
         hosts_regex
-            .replace(given_uri, format!("mongodb://{}", single_host))
+            .replace(given_uri, format!("mongodb://{single_host}"))
             .to_string()
     } else {
         given_uri.to_string()
@@ -301,6 +331,25 @@ pub(crate) fn merge_uri_options(
     }
 
     uri
+}
+
+#[cfg(feature = "in-use-encryption")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct AutoEncryptionOpts {
+    pub(crate) kms_providers: HashMap<mongocrypt::ctx::KmsProvider, Document>,
+    pub(crate) key_vault_namespace: crate::Namespace,
+    pub(crate) bypass_auto_encryption: Option<bool>,
+    pub(crate) schema_map: Option<HashMap<String, Document>>,
+    pub(crate) encrypted_fields_map: Option<HashMap<String, Document>>,
+    pub(crate) extra_options: Option<Document>,
+    pub(crate) bypass_query_analysis: Option<bool>,
+    #[serde(
+        default,
+        rename = "keyExpirationMS",
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis"
+    )]
+    pub(crate) key_cache_expiration: Option<Duration>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -406,6 +455,7 @@ pub(crate) struct CollectionData {
     pub(crate) collection_name: String,
     pub(crate) database_name: String,
     pub(crate) documents: Vec<Document>,
+    pub(crate) create_options: Option<CreateCollectionOptions>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -540,7 +590,7 @@ impl ExpectError {
 
         if let Some(expected_code_name) = &self.error_code_name {
             let Some(actual_code_name) = error.code_name() else {
-                panic!("{}: expected error to have code name", context);
+                panic!("{context}: expected error to have code name");
             };
             assert_eq!(actual_code_name, expected_code_name, "{}", context);
         }
@@ -562,9 +612,9 @@ impl ExpectError {
                 ErrorKind::BulkWrite(BulkWriteError {
                     ref partial_result, ..
                 }) => {
-                    let actual_result = partial_result
-                        .as_ref()
-                        .map(|result| bson::to_bson(result).expect(&context));
+                    let actual_result = partial_result.as_ref().map(|result| {
+                        crate::bson_compat::serialize_to_bson(result).expect(&context)
+                    });
                     results_match(actual_result.as_ref(), expected_result, false, None)
                         .expect(&context);
                 }
@@ -586,7 +636,7 @@ impl ExpectError {
 
             for (expected_index, expected_error) in write_errors {
                 let actual_error = actual_write_errors.get(expected_index).expect(&context);
-                let actual_error = bson::to_bson(&actual_error)
+                let actual_error = crate::bson_compat::serialize_to_bson(&actual_error)
                     .map_err(|e| e.to_string())
                     .expect(&context);
                 results_match(Some(&actual_error), expected_error, true, None).expect(&context);
@@ -609,7 +659,7 @@ impl ExpectError {
             );
 
             for (actual, expected) in actual_write_concern_errors.iter().zip(write_concern_errors) {
-                let actual = bson::to_bson(&actual)
+                let actual = crate::bson_compat::serialize_to_bson(&actual)
                     .map_err(|e| e.to_string())
                     .expect(&context);
                 results_match(Some(&actual), expected, true, None).expect(&context);
@@ -660,10 +710,7 @@ fn deserialize_selection_criteria() {
                     Some(HedgedReadOptions::builder().enabled(true).build())
                 );
             }
-            other => panic!(
-                "Expected mode SecondaryPreferred with options, got {:?}",
-                other
-            ),
+            other => panic!("Expected mode SecondaryPreferred with options, got {other:?}"),
         },
         SelectionCriteria::Predicate(_) => panic!("Expected read preference, got predicate"),
     }
@@ -685,7 +732,7 @@ fn deserialize_read_concern() {
     let read_concern = ReadConcern::deserialize(d).unwrap();
     match read_concern.level {
         ReadConcernLevel::Custom(level) => assert_eq!(level.as_str(), "customlevel"),
-        other => panic!("Expected custom read concern, got {:?}", other),
+        other => panic!("Expected custom read concern, got {other:?}"),
     };
 }
 
@@ -702,7 +749,7 @@ where
         let key = log_component_as_tracing_target(key);
         let level = val
             .parse::<tracing::Level>()
-            .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
+            .map_err(|e| serde::de::Error::custom(format!("{e}")))?;
         level_map.insert(key, level);
     }
     Ok(Some(level_map))
@@ -725,7 +772,7 @@ fn log_component_as_tracing_target(component: &String) -> String {
         "connection" => trace::CONNECTION_TRACING_EVENT_TARGET.to_string(),
         "serverSelection" => trace::SERVER_SELECTION_TRACING_EVENT_TARGET.to_string(),
         "topology" => trace::TOPOLOGY_TRACING_EVENT_TARGET.to_string(),
-        _ => panic!("Unknown tracing target: {}", component),
+        _ => panic!("Unknown tracing target: {component}"),
     }
 }
 
@@ -739,5 +786,5 @@ where
     String::deserialize(deserializer)?
         .parse::<tracing::Level>()
         .map(Some)
-        .map_err(|e| serde::de::Error::custom(format!("{}", e)))
+        .map_err(|e| serde::de::Error::custom(format!("{e}")))
 }

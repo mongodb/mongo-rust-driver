@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, ops::Deref};
 
-use bson::{Bson, RawDocumentBuf};
+use crate::bson::{Bson, RawDocumentBuf};
 use serde::Serialize;
 
 use crate::{
@@ -32,7 +32,8 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
         InsertOne {
             coll: CollRef::new(self),
-            doc: bson::to_raw_document_buf(doc.borrow()).map_err(Into::into),
+            doc: crate::bson_compat::serialize_to_raw_document_buf(doc.borrow())
+                .map_err(Into::into),
             options: None,
             session: None,
         }
@@ -53,13 +54,13 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](InsertOne::run) will return d[`Result<InsertOneResult>`].
     #[deeplink]
-    #[options_doc(insert_one, sync)]
+    #[options_doc(insert_one, "run")]
     pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
         self.async_collection.insert_one(doc)
     }
 }
 
-/// Inserts a document into a collection.  Construct with ['Collection::insert_one`].
+/// Inserts a document into a collection.  Construct with [`Collection::insert_one`].
 #[must_use]
 pub struct InsertOne<'a> {
     coll: CollRef<'a>,

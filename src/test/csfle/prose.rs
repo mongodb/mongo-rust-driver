@@ -97,7 +97,7 @@ async fn custom_key_material() -> Result<()> {
         .await?
         .unwrap();
     datakeys.delete_one(doc! { "_id": id}).await?;
-    let new_key_id = bson::Binary::from_uuid(bson::Uuid::from_bytes([0; 16]));
+    let new_key_id = crate::bson::Binary::from_uuid(crate::bson::Uuid::from_bytes([0; 16]));
     key_doc.insert("_id", new_key_id.clone());
     datakeys.insert_one(key_doc).await?;
 
@@ -117,6 +117,8 @@ async fn custom_key_material() -> Result<()> {
 // Prose test 4. BSON Size Limits and Batch Splitting
 #[tokio::test]
 async fn bson_size_limits() -> Result<()> {
+    const STRING_LEN_2_MIB: usize = 2_097_152;
+
     // Setup: db initialization.
     let (client, datakeys) = init_client().await?;
     client
@@ -130,7 +132,7 @@ async fn bson_size_limits() -> Result<()> {
 
     // Setup: encrypted client.
     let mut opts = get_client_options().await.clone();
-    let buffer = EventBuffer::<Event>::new();
+    let mut buffer = EventBuffer::<Event>::new();
 
     opts.command_event_handler = Some(buffer.handler());
     let client_encrypted =
@@ -139,26 +141,25 @@ async fn bson_size_limits() -> Result<()> {
             .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
             .build()
             .await?;
-    let coll = client_encrypted
-        .database("db")
-        .collection::<Document>("coll");
+    let db = client_encrypted.database("db");
+    let coll = db.collection::<Document>("coll");
 
     // Tests
     // Test operation 1
     coll.insert_one(doc! {
         "_id": "over_2mib_under_16mib",
-        "unencrypted": "a".repeat(2097152),
+        "unencrypted": "a".repeat(STRING_LEN_2_MIB),
     })
     .await?;
 
     // Test operation 2
     let mut doc: Document = load_testdata("limits/limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_2mib");
-    doc.insert("unencrypted", "a".repeat(2_097_152 - 2_000));
+    doc.insert("unencrypted", "a".repeat(STRING_LEN_2_MIB - 2_000));
     coll.insert_one(doc).await?;
 
     // Test operation 3
-    let value = "a".repeat(2_097_152);
+    let value = "a".repeat(STRING_LEN_2_MIB);
     let mut events = buffer.stream();
     coll.insert_many(vec![
         doc! {
@@ -185,7 +186,7 @@ async fn bson_size_limits() -> Result<()> {
     // Test operation 4
     let mut doc = load_testdata("limits/limits-doc.json")?;
     doc.insert("_id", "encryption_exceeds_2mib_1");
-    doc.insert("unencrypted", "a".repeat(2_097_152 - 2_000));
+    doc.insert("unencrypted", "a".repeat(STRING_LEN_2_MIB - 2_000));
     let mut doc2 = doc.clone();
     doc2.insert("_id", "encryption_exceeds_2mib_2");
     let mut events = buffer.stream();
@@ -216,9 +217,50 @@ async fn bson_size_limits() -> Result<()> {
     let err = result.unwrap_err();
     assert!(
         matches!(*err.kind, ErrorKind::Write(_)),
-        "unexpected error: {}",
-        err
+        "unexpected error: {err}"
     );
+
+    // The remaining test operations use bulk_write.
+    if server_version_lt(8, 0).await {
+        return Ok(());
+    }
+
+    let coll2 = db.collection::<Document>("coll2");
+    coll2.drop().await?;
+    db.create_collection("coll2")
+        .encrypted_fields(load_testdata("limits/limits-encryptedFields.json")?)
+        .await?;
+
+    // Test operation 7
+    let long_string = "a".repeat(STRING_LEN_2_MIB - 1_500);
+    let write_models = vec![
+        coll2.insert_one_model(doc! { "_id": "over_2mib_3", "unencrypted": &long_string })?,
+        coll2.insert_one_model(doc! { "_id": "over_2mib_4", "unencrypted": &long_string })?,
+    ];
+    client_encrypted.bulk_write(write_models).await?;
+    let bulk_write_events = buffer.get_command_started_events(&["bulkWrite"]);
+    assert_eq!(bulk_write_events.len(), 2);
+
+    // Test operation 8
+    buffer.clear_cached_events();
+    let limits: Document = load_testdata("limits/limits-qe-doc.json")?;
+    let long_string = "a".repeat(STRING_LEN_2_MIB - 2_000 - 1_500);
+
+    let mut doc1 = limits.clone();
+    doc1.insert("_id", "encryption_exceeds_2mib_3");
+    doc1.insert("foo", &long_string);
+    let write_model1 = coll2.insert_one_model(doc1)?;
+
+    let mut doc2 = limits;
+    doc2.insert("_id", "encryption_exceeds_2mib_4");
+    doc2.insert("foo", &long_string);
+    let write_model2 = coll2.insert_one_model(doc2)?;
+
+    client_encrypted
+        .bulk_write(vec![write_model1, write_model2])
+        .await?;
+    let bulk_write_events = buffer.get_command_started_events(&["bulkWrite"]);
+    assert_eq!(bulk_write_events.len(), 2);
 
     Ok(())
 }
@@ -259,8 +301,7 @@ async fn views_prohibited() -> Result<()> {
     let err = result.unwrap_err();
     assert!(
         err.to_string().contains("cannot auto encrypt a view"),
-        "unexpected error: {}",
-        err
+        "unexpected error: {err}"
     );
 
     Ok(())
@@ -268,6 +309,8 @@ async fn views_prohibited() -> Result<()> {
 
 // Prose test 7. Custom Endpoint
 mod custom_endpoint {
+    use crate::client_encryption::KmipMasterKey;
+
     use super::*;
 
     async fn custom_endpoint_aws_ok(endpoint: Option<String>) -> Result<()> {
@@ -310,18 +353,14 @@ mod custom_endpoint {
 
     // case 4
     #[tokio::test]
-    async fn aws_invalid_port() -> Result<()> {
+    async fn kmip_invalid_port() -> Result<()> {
         let client_encryption = custom_endpoint_setup(true).await?;
 
         let result = client_encryption
             .create_data_key(
-                AwsMasterKey::builder()
-                    .region("us-east-1")
-                    .key(
-                        "arn:aws:kms:us-east-1:579766882180:key/\
-                         89fcc2c4-08b0-4bd9-9f25-e30687b580d0",
-                    )
-                    .endpoint(Some("kms.us-east-1.amazonaws.com:12345".to_string()))
+                KmipMasterKey::builder()
+                    .key_id("1".to_owned())
+                    .endpoint("localhost:12345".to_owned())
                     .build(),
             )
             .await;
@@ -436,9 +475,61 @@ mod custom_endpoint {
         assert!(err.is_csfle_error());
         assert!(
             err.to_string().contains("Invalid KMS response"),
-            "unexpected error: {}",
-            err
+            "unexpected error: {err}"
         );
+
+        Ok(())
+    }
+
+    // case 10
+    #[cfg(feature = "openssl-tls")]
+    #[tokio::test]
+    async fn kmip_valid() -> Result<()> {
+        let master_key = KmipMasterKey::builder().key_id("1".to_owned()).build();
+
+        let client_encryption = custom_endpoint_setup(true).await?;
+        let key_id = client_encryption
+            .create_data_key(master_key.clone())
+            .await?;
+        validate_roundtrip(&client_encryption, key_id).await?;
+
+        let client_encryption_invalid = custom_endpoint_setup(false).await?;
+        let result = client_encryption_invalid.create_data_key(master_key).await;
+        assert!(result.unwrap_err().is_network_error());
+
+        Ok(())
+    }
+
+    // case 11
+    #[cfg(feature = "openssl-tls")]
+    #[tokio::test]
+    async fn kmip_valid_endpoint() -> Result<()> {
+        let master_key = KmipMasterKey::builder()
+            .key_id("1".to_owned())
+            .endpoint("localhost:5698".to_owned())
+            .build();
+
+        let client_encryption = custom_endpoint_setup(true).await?;
+        let key_id = client_encryption
+            .create_data_key(master_key.clone())
+            .await?;
+        validate_roundtrip(&client_encryption, key_id).await?;
+
+        Ok(())
+    }
+
+    // case 12
+    #[tokio::test]
+    async fn kmip_invalid() -> Result<()> {
+        let master_key = KmipMasterKey::builder()
+            .key_id("1".to_owned())
+            .endpoint("doesnotexist.invalid:5698".to_owned())
+            .build();
+
+        let client_encryption = custom_endpoint_setup(true).await?;
+        let result = client_encryption.create_data_key(master_key).await;
+        let err = result.unwrap_err();
+        assert!(err.is_network_error());
 
         Ok(())
     }
@@ -558,7 +649,7 @@ mod bypass_spawning_mongocryptd {
             .insert_one(doc! { "encrypted": "test" })
             .await
             .unwrap_err();
-        assert!(err.is_server_selection_error(), "unexpected error: {}", err);
+        assert!(err.is_server_selection_error(), "unexpected error: {err}");
 
         Ok(())
     }
@@ -726,10 +817,7 @@ mod deadlock {
                     return;
                 }
             }
-            panic!(
-                "No {} command matching {:?} found, events=\n{:?}",
-                name, self, commands
-            );
+            panic!("No {name} command matching {self:?} found, events=\n{commands:?}");
         }
     }
 
@@ -1198,24 +1286,14 @@ mod unique_index_on_key_alt_names {
             .key_alt_names(vec!["abc".to_string()])
             .await
             .unwrap_err();
-        assert_eq!(
-            Some(11000),
-            write_err_code(&err),
-            "unexpected error: {}",
-            err
-        );
+        assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {err}");
         // Fails: duplicate key
         let err = client_encryption
             .create_data_key(LocalMasterKey::builder().build())
             .key_alt_names(vec!["def".to_string()])
             .await
             .unwrap_err();
-        assert_eq!(
-            Some(11000),
-            write_err_code(&err),
-            "unexpected error: {}",
-            err
-        );
+        assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {err}");
 
         Ok(())
     }
@@ -1241,12 +1319,7 @@ mod unique_index_on_key_alt_names {
             .add_key_alt_name(&new_key, "def")
             .await
             .unwrap_err();
-        assert_eq!(
-            Some(11000),
-            write_err_code(&err),
-            "unexpected error: {}",
-            err
-        );
+        assert_eq!(Some(11000), write_err_code(&err), "unexpected error: {err}");
         // Succeds: re-adding alt name to `new_key`
         let prev_key = client_encryption
             .add_key_alt_name(&key, "def")
@@ -1392,7 +1465,7 @@ mod decryption_events {
             .aggregate(vec![doc! { "$count": "total" }])
             .await
             .unwrap_err();
-        assert!(err.is_network_error(), "unexpected error: {}", err);
+        assert!(err.is_network_error(), "unexpected error: {err}");
         assert!(td.ev_handler.failed.lock().unwrap().is_some());
 
         Ok(())
@@ -1475,7 +1548,7 @@ async fn azure_imds_integration_failure() -> Result<()> {
         )
         .await;
 
-    assert!(result.is_err(), "expected error, got {:?}", result);
+    assert!(result.is_err(), "expected error, got {result:?}");
     assert!(result.unwrap_err().is_auth_error());
 
     Ok(())
@@ -1563,8 +1636,7 @@ mod auto_encryption_keys {
         let result = coll.insert_one(doc! { "ssn": "123-45-6789" }).await;
         assert!(
             result.as_ref().unwrap_err().code() == Some(121),
-            "Expected error 121 (failed validation), got {:?}",
-            result
+            "Expected error 121 (failed validation), got {result:?}"
         );
 
         // Case 2: Missing encryptedFields
@@ -1574,8 +1646,7 @@ mod auto_encryption_keys {
             .1;
         assert!(
             result.as_ref().unwrap_err().is_invalid_argument(),
-            "Expected invalid argument error, got {:?}",
-            result
+            "Expected invalid argument error, got {result:?}"
         );
 
         // Case 3: Invalid keyId
@@ -1592,8 +1663,7 @@ mod auto_encryption_keys {
             .1;
         assert!(
             result.as_ref().unwrap_err().code() == Some(14),
-            "Expected error 14 (type mismatch), got {:?}",
-            result
+            "Expected error 14 (type mismatch), got {result:?}"
         );
 
         // Case 4: Insert encrypted value
@@ -1615,7 +1685,7 @@ mod auto_encryption_keys {
             .unwrap()
         {
             Bson::Binary(bin) => bin.clone(),
-            v => panic!("invalid keyId {:?}", v),
+            v => panic!("invalid keyId {v:?}"),
         };
         let encrypted_payload = ce.encrypt("123-45-6789", key, Algorithm::Unindexed).await?;
         let coll = db.collection::<Document>("case_1");
@@ -1652,7 +1722,7 @@ mod range_explicit_encryption {
         let util_client = Client::for_test().await;
 
         let encrypted_fields =
-            load_testdata(&format!("data/range-encryptedFields-{}.json", bson_type))?;
+            load_testdata(&format!("data/range-encryptedFields-{bson_type}.json"))?;
 
         let key1_document = load_testdata("data/keys/key1-document.json")?;
         let key1_id = match key1_document.get("_id").unwrap() {
@@ -1706,7 +1776,7 @@ mod range_explicit_encryption {
         .build()
         .await?;
 
-        let key = format!("encrypted{}", bson_type);
+        let key = format!("encrypted{bson_type}");
         let bson_numbers: BTreeMap<i32, RawBson> = [0, 6, 30, 200]
             .iter()
             .map(|num| (*num, get_raw_bson_from_num(bson_type, *num)))
@@ -1750,17 +1820,18 @@ mod range_explicit_encryption {
             assert_eq!(actual.len(), expected.len());
             for (idx, num) in expected.iter().enumerate() {
                 assert_eq!(
-                    actual[idx].get(&key),
-                    Ok(Some(bson_numbers[num].as_raw_bson_ref()))
+                    actual[idx].get(&key).unwrap(),
+                    Some(bson_numbers[num].as_raw_bson_ref())
                 );
             }
         };
 
         // Case 2: Find encrypted range and return the maximum
+        let ckey: &crate::bson_compat::CStr = key.as_str().try_into()?;
         let query = rawdoc! {
             "$and": [
-                { &key: { "$gte": bson_numbers[&6].clone() } },
-                { &key: { "$lte": bson_numbers[&200].clone() } },
+                { ckey: { "$gte": bson_numbers[&6].clone() } },
+                { ckey: { "$lte": bson_numbers[&200].clone() } },
             ]
         };
         let find_payload = client_encryption
@@ -1780,8 +1851,8 @@ mod range_explicit_encryption {
         // Case 3: Find encrypted range and return the minimum
         let query = rawdoc! {
             "$and": [
-                { &key: { "$gte": bson_numbers[&0].clone() } },
-                { &key: { "$lte": bson_numbers[&6].clone() } },
+                { ckey: { "$gte": bson_numbers[&0].clone() } },
+                { ckey: { "$lte": bson_numbers[&6].clone() } },
             ]
         };
         let find_payload = client_encryption
@@ -1803,7 +1874,7 @@ mod range_explicit_encryption {
         // Case 4: Find encrypted range with an open range query
         let query = rawdoc! {
             "$and": [
-                { &key: { "$gt": bson_numbers[&30].clone() } },
+                { ckey: { "$gt": bson_numbers[&30].clone() } },
             ]
         };
         let find_payload = client_encryption
@@ -1855,9 +1926,9 @@ mod range_explicit_encryption {
         // Case 7: Encrypting a document of a different type errors
         if bson_type != "DoubleNoPrecision" && bson_type != "DecimalNoPrecision" {
             let value = if bson_type == "Int" {
-                rawdoc! { &key: { "$numberDouble": "6" } }
+                rawdoc! { ckey: { "$numberDouble": "6" } }
             } else {
-                rawdoc! { &key: { "$numberInt": "6" } }
+                rawdoc! { ckey: { "$numberInt": "6" } }
             };
             let error = client_encryption
                 .encrypt(value, key1_id.clone(), Algorithm::Range)

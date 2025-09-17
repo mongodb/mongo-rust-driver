@@ -37,7 +37,7 @@ impl Server {
         options: ClientOptions,
         connection_establisher: ConnectionEstablisher,
         topology_updater: TopologyUpdater,
-        topology_id: bson::oid::ObjectId,
+        topology_id: crate::bson::oid::ObjectId,
     ) -> Arc<Server> {
         Arc::new(Self {
             pool: ConnectionPool::new(

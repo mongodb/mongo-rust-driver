@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bson::doc;
+use crate::bson::doc;
 
 use crate::{
     client::options::{ClientOptions, ServerAddress},
@@ -77,13 +77,11 @@ async fn min_heartbeat_frequency() {
     let elapsed = Instant::now().duration_since(start).as_millis();
     assert!(
         elapsed >= 2000,
-        "expected to take at least 2 seconds, instead took {}ms",
-        elapsed
+        "expected to take at least 2 seconds, instead took {elapsed}ms"
     );
     assert!(
         elapsed <= 3500,
-        "expected to take at most 3.5 seconds, instead took {}ms",
-        elapsed
+        "expected to take at most 3.5 seconds, instead took {elapsed}ms"
     );
 }
 
@@ -192,7 +190,7 @@ async fn hello_ok_true() {
     event_stream
         .next_match(Duration::from_millis(2000), |event| {
             if let Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) = event {
-                assert_eq!(e.reply.get_bool("helloOk"), Ok(true));
+                assert!(e.reply.get_bool("helloOk").unwrap());
                 assert!(e.reply.get(LEGACY_HELLO_COMMAND_NAME_LOWERCASE).is_some());
                 assert!(e.reply.get("isWritablePrimary").is_none());
                 return true;
@@ -237,8 +235,7 @@ async fn repl_set_name_mismatch() -> crate::error::Result<()> {
             Err(Error { ref kind, .. }) => matches!(**kind, ErrorKind::ServerSelection { .. }),
             _ => false,
         },
-        "Unexpected result {:?}",
-        result
+        "Unexpected result {result:?}"
     );
 
     Ok(())
@@ -346,7 +343,7 @@ fn ipv6_invalid_me() {
                 me: Some("[::1]:8191".to_string()),
                 ..Default::default()
             },
-            raw_command_response: bson::RawDocumentBuf::new(),
+            raw_command_response: crate::bson::RawDocumentBuf::new(),
             cluster_time: None,
         })),
     };

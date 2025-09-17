@@ -22,7 +22,7 @@ use super::ClientSession;
 /// errors, such as transient network failures. It can also be done manually by passing
 /// a [`ResumeToken`] retrieved from a past event into either the
 /// [`resume_after`](crate::action::Watch::resume_after) or
-/// [`start_after`](crate::action::Watch::start_after) (4.2+) options used to create
+/// [`start_after`](crate::action::Watch::start_after) options used to create
 /// the `ChangeStream`. Issuing a raw change stream aggregation is discouraged unless users wish to
 /// explicitly opt out of resumability.
 ///
@@ -181,8 +181,7 @@ where
     /// The session provided must be the same session used to create the change stream.
     ///
     /// ```
-    /// # use bson::{doc, Document};
-    /// # use mongodb::sync::Client;
+    /// # use mongodb::{bson::{self, doc, Document}, sync::Client};
     /// # fn main() {
     /// # async {
     /// # let client = Client::with_uri_str("foo")?;

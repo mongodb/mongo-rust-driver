@@ -1,4 +1,5 @@
 use crate::{
+    bson::{doc, Bson, Document},
     error::Result,
     options::{AggregateOptions, CreateCollectionOptions, DropCollectionOptions},
     test::spec::unified_runner::{
@@ -9,7 +10,6 @@ use crate::{
     Collection,
     Database,
 };
-use bson::{doc, Bson, Document};
 use futures::{future::BoxFuture, TryStreamExt};
 use futures_util::FutureExt;
 use serde::Deserialize;
@@ -144,7 +144,7 @@ impl TestOperation for Aggregate {
                     let entity = match test_runner.entities.read().await.get(id).unwrap() {
                         Entity::Collection(c) => AggregateEntity::Collection(c.clone()),
                         Entity::Database(d) => AggregateEntity::Database(d.clone()),
-                        other => AggregateEntity::Other(format!("{:?}", other)),
+                        other => AggregateEntity::Other(format!("{other:?}")),
                     };
                     with_mut_session!(test_runner, session_id, |session| async {
                         let mut cursor = match entity {

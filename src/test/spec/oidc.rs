@@ -28,7 +28,7 @@ async fn get_access_token_test_user(once_cell: &'static OnceCell<String>, user_n
     once_cell
         .get_or_init(|| async {
             let mut path = OIDC_TOKEN_DIR.clone();
-            let user = format!("test_user{}", user_n);
+            let user = format!("test_user{user_n}");
             path.push(user);
             tokio::fs::read_to_string(path).await.unwrap()
         })
@@ -74,6 +74,7 @@ fn remove_mechanism_properties_placeholder(test_file: &mut TestFile) {
 
 mod basic {
     use crate::{
+        bson::{doc, Document},
         client::auth::{oidc, AuthMechanism, Credential},
         options::ClientOptions,
         test::{
@@ -82,7 +83,6 @@ mod basic {
         },
         Client,
     };
-    use bson::{doc, Document};
     use futures_util::FutureExt;
     use std::{
         sync::Arc,
@@ -749,7 +749,7 @@ mod basic {
             let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
             opts.credential = Credential::builder()
                 .mechanism(AuthMechanism::MongoDbOidc)
-                .mechanism_properties(bson::doc! {
+                .mechanism_properties(crate::bson::doc! {
                     ALLOWED_HOSTS_PROP_STR: [],
                 })
                 .oidc_callback(oidc::Callback::human(move |_| {
@@ -790,7 +790,7 @@ mod basic {
             let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
             opts.credential = Credential::builder()
                 .mechanism(AuthMechanism::MongoDbOidc)
-                .mechanism_properties(bson::doc! {
+                .mechanism_properties(crate::bson::doc! {
                     ALLOWED_HOSTS_PROP_STR: ["example.com"],
                 })
                 .oidc_callback(oidc::Callback::human(move |_| {

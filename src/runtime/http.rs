@@ -56,7 +56,7 @@ impl HttpClient {
         let inner = reqwest::Client::builder()
             .timeout(timeout)
             .build()
-            .map_err(|e| Error::internal(format!("error initializing http client: {}", e)))?;
+            .map_err(|e| Error::internal(format!("error initializing http client: {e}")))?;
         Ok(Self { inner })
     }
 

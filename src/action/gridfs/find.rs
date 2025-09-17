@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::Document;
+use crate::bson::Document;
 
 use crate::{
     action::{action_impl, deeplink, export_doc, option_setters, options_doc},
@@ -47,7 +47,7 @@ impl crate::sync::gridfs::GridFsBucket {
     ///
     /// [`run`](Find::run) will return d[`Result<crate::sync::Cursor<FilesCollectionDocument>>`].
     #[deeplink]
-    #[options_doc(find, sync)]
+    #[options_doc(find, "run")]
     pub fn find(&self, filter: Document) -> Find {
         self.async_bucket.find(filter)
     }
@@ -57,7 +57,7 @@ impl crate::sync::gridfs::GridFsBucket {
     ///
     /// [`run`](FindOne::run) will return d[`Result<Option<FilesCollectionDocument>>`].
     #[deeplink]
-    #[options_doc(find_one, sync)]
+    #[options_doc(find_one, "run")]
     pub fn find_one(&self, filter: Document) -> FindOne {
         self.async_bucket.find_one(filter)
     }

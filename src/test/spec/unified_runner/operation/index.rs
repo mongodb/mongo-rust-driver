@@ -1,4 +1,5 @@
 use crate::{
+    bson::{Bson, Document},
     error::Result,
     options::{DropIndexOptions, IndexOptions, ListIndexesOptions},
     test::spec::unified_runner::{
@@ -8,7 +9,6 @@ use crate::{
     },
     IndexModel,
 };
-use bson::{Bson, Document};
 use futures::{future::BoxFuture, TryStreamExt};
 use futures_util::FutureExt;
 use serde::Deserialize;
@@ -78,7 +78,7 @@ impl TestOperation for ListIndexes {
             };
             let indexes: Vec<Document> = indexes
                 .iter()
-                .map(|index| bson::to_document(index).unwrap())
+                .map(|index| crate::bson_compat::serialize_to_document(index).unwrap())
                 .collect();
             Ok(Some(Bson::from(indexes).into()))
         }

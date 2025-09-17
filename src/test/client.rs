@@ -1,6 +1,12 @@
-use std::{borrow::Cow, collections::HashMap, future::IntoFuture, net::Ipv6Addr, time::Duration};
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    future::IntoFuture,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    time::Duration,
+};
 
-use bson::Document;
+use crate::bson::Document;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -74,7 +80,8 @@ async fn metadata_sent_in_handshake() {
         .get_document("clientMetadata")
         .unwrap()
         .clone();
-    let metadata: ClientMetadata = bson::from_document(metadata_document).unwrap();
+    let metadata: ClientMetadata =
+        crate::bson_compat::deserialize_from_document(metadata_document).unwrap();
 
     assert_eq!(metadata.driver.name, "mongo-rust-driver");
     assert_eq!(metadata.driver.version, env!("CARGO_PKG_VERSION"));
@@ -160,9 +167,9 @@ async fn server_selection_timeout_message() {
         .await
         .expect_err("should fail with server selection timeout error");
 
-    let error_description = format!("{}", error);
+    let error_description = format!("{error}");
     for host in options.hosts.iter() {
-        assert!(error_description.contains(format!("{}", host).as_str()));
+        assert!(error_description.contains(format!("{host}").as_str()));
     }
 }
 
@@ -269,7 +276,7 @@ async fn list_authorized_databases() {
             .unwrap();
         client
             .create_user(
-                &format!("user_{}", name),
+                &format!("user_{name}"),
                 "pwd",
                 &[Bson::from(doc! { "role": "readWrite", "db": name })],
                 &[AuthMechanism::ScramSha256],
@@ -282,7 +289,7 @@ async fn list_authorized_databases() {
     for name in dbs {
         let mut options = get_client_options().await.clone();
         let credential = Credential::builder()
-            .username(format!("user_{}", name))
+            .username(format!("user_{name}"))
             .password(String::from("pwd"))
             .build();
         options.credential = Some(credential);
@@ -980,5 +987,36 @@ async fn ipv6_connect() {
         .run_command(doc! { "ping": 1 })
         .await
         .unwrap();
-    assert_eq!(result.get_f64("ok"), Ok(1.0));
+    assert_eq!(result.get_f64("ok").unwrap(), 1.0);
+}
+
+#[test]
+fn server_address_from_socket_addr_ipv4() {
+    let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 27017);
+    let server_address = ServerAddress::from(socket_addr);
+
+    match server_address {
+        ServerAddress::Tcp { host, port } => {
+            assert_eq!(host, "127.0.0.1", "Host was not correctly converted");
+            assert_eq!(port, Some(27017), "Port was not correctly converted");
+        }
+        _ => panic!("ServerAddress should have been Tcp variant"),
+    }
+}
+
+#[test]
+fn server_address_from_socket_addr_ipv6() {
+    let socket_addr = SocketAddr::new(
+        IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)),
+        27017,
+    );
+    let server_address = ServerAddress::from(socket_addr);
+
+    match server_address {
+        ServerAddress::Tcp { host, port } => {
+            assert_eq!(host, "2001:db8::1", "Host was not correctly converted");
+            assert_eq!(port, Some(27017), "Port was not correctly converted");
+        }
+        _ => panic!("ServerAddress should have been Tcp variant"),
+    }
 }

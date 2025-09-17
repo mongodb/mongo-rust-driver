@@ -16,8 +16,8 @@ homepage = "https://www.mongodb.com/docs/drivers/rust/"
 license = "Apache-2.0"
 readme = "README.md"
 name = "mongodb"
-version = "3.2.3"
-rust-version = "1.74"
+version = "3.3.0"
+rust-version = "1.83"
 
 exclude = [
     "etc/**",
@@ -30,7 +30,10 @@ exclude = [
 
 [features]
 default = ["compat-3-0-0", "rustls-tls", "dns-resolver"]
-compat-3-0-0 = []
+compat-3-0-0 = ["compat-3-3-0", "bson-2"]
+compat-3-3-0 = []
+bson-2 = ["dep:bson2", "mongocrypt/bson-2"]
+bson-3 = ["dep:bson3", "mongocrypt/bson-3"]
 sync = []
 rustls-tls = ["dep:rustls", "dep:tokio-rustls"]
 openssl-tls = ["dep:openssl", "dep:openssl-probe", "dep:tokio-openssl"]
@@ -38,11 +41,9 @@ dns-resolver = ["dep:hickory-resolver", "dep:hickory-proto"]
 cert-key-password = ["dep:pem", "dep:pkcs8"]
 
 # Enable support for MONGODB-AWS authentication.
-# This can only be used with the tokio-runtime feature flag.
-aws-auth = ["dep:reqwest"]
+aws-auth = ["dep:aws-config", "dep:aws-types", "dep:aws-credential-types", "dep:aws-sigv4", "dep:http"]
 
 # Enable support for on-demand Azure KMS credentials.
-# This can only be used with the tokio-runtime feature flag.
 azure-kms = ["dep:reqwest"]
 
 # Enable support for azure OIDC authentication.
@@ -52,8 +53,10 @@ azure-oidc = ["dep:reqwest"]
 gcp-oidc = ["dep:reqwest"]
 
 # Enable support for on-demand GCP KMS credentials.
-# This can only be used with the tokio-runtime feature flag.
 gcp-kms = ["dep:reqwest"]
+
+# Enable support for GSSAPI (Kerberos) authentication.
+gssapi-auth = ["dep:cross-krb5", "dep:windows-sys", "dns-resolver"]
 
 zstd-compression = ["dep:zstd"]
 zlib-compression = ["dep:flate2"]
@@ -67,13 +70,12 @@ in-use-encryption-unstable = ["in-use-encryption"]
 # Enables support for emitting tracing events.
 # The tracing API is unstable and may have backwards-incompatible changes in minor version updates.
 # TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.
-tracing-unstable = ["dep:tracing", "dep:log"]
+tracing-unstable = ["dep:tracing", "dep:log", "bson3?/serde_json-1"]
 
 [dependencies]
 async-trait = "0.1.42"
 base64 = "0.13.0"
 bitflags = "1.1.0"
-bson = { git = "https://github.com/mongodb/bson-rust", branch = "main", version = "2.14.0" }
 chrono = { version = "0.4.7", default-features = false, features = [
     "clock",
     "std",
@@ -92,8 +94,7 @@ hmac = "0.12.1"
 once_cell = "1.19.0"
 log = { version = "0.4.17", optional = true }
 md-5 = "0.10.1"
-mongocrypt = { git = "https://github.com/mongodb/libmongocrypt-rust.git", branch = "main", optional = true, version = "0.2.1" }
-mongodb-internal-macros = { path = "macros", version = "3.2.3" }
+mongodb-internal-macros = { path = "macros", version = "3.3.0" }
 num_cpus = { version = "1.13.1", optional = true }
 openssl = { version = "0.10.38", optional = true }
 openssl-probe = { version = "0.1.5", optional = true }
@@ -104,7 +105,7 @@ rand = { version = "0.8.3", features = ["small_rng"] }
 rayon = { version = "1.5.3", optional = true }
 rustc_version_runtime = "0.3.0"
 serde_with = "3.8.1"
-sha-1 = "0.10.0"
+sha1 = "0.10.0"
 sha2 = "0.10.2"
 snap = { version = "1.0.5", optional = true }
 socket2 = "0.5.5"
@@ -119,6 +120,55 @@ webpki-roots = "0.26"
 zstd = { version = "0.11.2", optional = true }
 macro_magic = "0.5.1"
 rustversion = "1.0.20"
+
+[dependencies.aws-config]
+version = "1"
+optional = true
+default-features = false
+features = ["default-https-client", "rt-tokio"]
+
+[dependencies.aws-types]
+version = "1.3.7"
+optional = true
+default-features = false
+
+[dependencies.aws-credential-types]
+version = "1.2.4"
+optional = true
+default-features = false
+
+[dependencies.aws-sigv4]
+version = "1.3.3"
+optional = true
+default-features = false
+features = ["sign-http"]
+
+[dependencies.http]
+version = "1.3"
+optional = true
+default-features = false
+
+[dependencies.bson2]
+version = "2.15.0"
+git = "https://github.com/mongodb/bson-rust"
+branch = "2.15.x"
+package = "bson"
+optional = true
+
+[dependencies.bson3]
+version = "3.0.0"
+git = "https://github.com/mongodb/bson-rust"
+branch = "main"
+package = "bson"
+optional = true
+features = ["serde"]
+
+[dependencies.mongocrypt]
+version = "0.3.1"
+git = "https://github.com/mongodb/libmongocrypt-rust.git"
+branch = "main"
+default-features = false
+optional = true
 
 [dependencies.pbkdf2]
 version = "0.11.0"
@@ -184,9 +234,23 @@ reqwest = { version = "0.12.2", features = ["rustls-tls"] }
 serde-hex = "0.1.0"
 serde_path_to_error = "0.1"
 
+[dev-dependencies.bson3]
+git = "https://github.com/mongodb/bson-rust"
+branch = "main"
+package = "bson"
+version = "3.0.0"
+features = ["serde", "serde_json-1"]
+
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
 all-features = true
+
+# Target-specific dependencies for GSSAPI authentication
+[target.'cfg(not(windows))'.dependencies]
+cross-krb5 = { version = "0.4.2", optional = true, default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.60", optional = true, features = ["Win32_Security_Authentication_Identity", "Win32_Security_Credentials", "Win32_Foundation", "Win32_System", "Win32_System_Rpc"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

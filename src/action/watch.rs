@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, time::Duration};
 
-use bson::{Bson, Document, Timestamp};
+use crate::bson::{Bson, Document, Timestamp};
 use serde::de::DeserializeOwned;
 
 use super::{
@@ -33,8 +33,7 @@ use crate::{
 impl Client {
     /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
     /// stream does not observe changes from system collections or the "config", "local" or
-    /// "admin" databases. Note that this method (`watch` on a cluster) is only supported in
-    /// MongoDB 4.0 or greater.
+    /// "admin" databases.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
     /// streams.
@@ -121,15 +120,14 @@ where
 impl crate::sync::Client {
     /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
     /// stream does not observe changes from system collections or the "config", "local" or
-    /// "admin" databases. Note that this method (`watch` on a cluster) is only supported in
-    /// MongoDB 4.0 or greater.
+    /// "admin" databases.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams/) on change
     /// streams.
     ///
     /// Change streams require either a "majority" read concern or no read
     /// concern. Anything else will cause a server error.
-    #[options_doc(watch, sync)]
+    #[options_doc(watch, "run")]
     pub fn watch(&self) -> Watch {
         self.async_client.watch()
     }
@@ -146,7 +144,7 @@ impl crate::sync::Database {
     ///
     /// Change streams require either a "majority" read concern or no read
     /// concern. Anything else will cause a server error.
-    #[options_doc(watch, sync)]
+    #[options_doc(watch, "run")]
     pub fn watch(&self) -> Watch {
         self.async_database.watch()
     }
@@ -167,7 +165,7 @@ where
     ///
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
-    #[options_doc(watch, sync)]
+    #[options_doc(watch, "run")]
     pub fn watch(&self) -> Watch<T> {
         self.async_collection.watch()
     }

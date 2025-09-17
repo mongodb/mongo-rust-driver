@@ -1,13 +1,9 @@
 use std::{
-    fs::File,
-    io::{BufWriter, Write},
     ops::{Deref, DerefMut},
     sync::Arc,
     time::Duration,
 };
 
-use bson::to_document;
-use time::OffsetDateTime;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 
 use crate::{
@@ -45,7 +41,6 @@ pub(crate) enum Entity {
     Bucket(GridFsBucket),
     Cursor(TestCursor),
     Bson(Bson),
-    EventList(EventList),
     Thread(ThreadEntity),
     TopologyDescription(TopologyDescription),
     #[cfg(feature = "in-use-encryption")]
@@ -70,7 +65,7 @@ impl std::fmt::Debug for crate::client_encryption::ClientEncryption {
 pub(crate) struct ClientEntity {
     /// This is None if a `close` operation has been executed for this entity.
     pub(crate) client: Option<Client>,
-    pub(crate) topology_id: bson::oid::ObjectId,
+    pub(crate) topology_id: crate::bson::oid::ObjectId,
     events: EventBuffer,
     observe_events: Option<Vec<ObserveEvent>>,
     ignore_command_names: Option<Vec<String>>,
@@ -97,18 +92,6 @@ pub(crate) enum TestCursor {
     // `ChangeStream` has the same issue with 59245 as `Cursor`.
     ChangeStream(Mutex<ChangeStream<Document>>),
     Closed,
-}
-
-#[derive(Debug)]
-pub struct EventList {
-    pub client_id: String,
-    pub event_names: Vec<String>,
-}
-
-impl From<EventList> for Entity {
-    fn from(event_list: EventList) -> Self {
-        Self::EventList(event_list)
-    }
 }
 
 impl TestCursor {
@@ -263,34 +246,6 @@ impl ClientEntity {
                 _ => None,
             })
             .collect()
-    }
-
-    /// Writes all events with the given name to the given BufWriter.
-    pub(crate) fn write_events_list_to_file(&self, names: &[&str], writer: &mut BufWriter<File>) {
-        let mut add_comma = false;
-        let mut write_json = |mut event: Document, name: &str, time: &OffsetDateTime| {
-            event.insert("name", name);
-            event.insert("observedAt", time.unix_timestamp());
-            let mut json_string = serde_json::to_string(&event).unwrap();
-            if add_comma {
-                json_string.insert(0, ',');
-            } else {
-                add_comma = true;
-            }
-            write!(writer, "{}", json_string).unwrap();
-        };
-
-        for (event, time) in self.events.all_timed() {
-            let name = match &event {
-                Event::Command(ev) => ev.name(),
-                Event::Sdam(ev) => ev.name(),
-                Event::Cmap(ev) => ev.planned_maintenance_testing_name(),
-            };
-            if names.contains(&name) {
-                let ev_doc = to_document(&event).unwrap();
-                write_json(ev_doc, name, &time);
-            }
-        }
     }
 
     /// Gets the count of connections currently checked out.
@@ -479,14 +434,14 @@ impl Entity {
     pub(crate) fn as_thread(&self) -> &ThreadEntity {
         match self {
             Self::Thread(thread) => thread,
-            _ => panic!("Expected thread, got {:?}", self),
+            _ => panic!("Expected thread, got {self:?}"),
         }
     }
 
     pub(crate) fn as_topology_description(&self) -> &TopologyDescription {
         match self {
             Self::TopologyDescription(desc) => desc,
-            _ => panic!("Expected Topologydescription, got {:?}", self),
+            _ => panic!("Expected Topologydescription, got {self:?}"),
         }
     }
 
@@ -497,15 +452,8 @@ impl Entity {
         }
     }
 
-    pub fn as_event_list(&self) -> &EventList {
-        match self {
-            Self::EventList(event_list) => event_list,
-            _ => panic!("Expected event list, got {:?}", &self),
-        }
-    }
-
     /// If this entity is descended from a client entity, returns the topology ID for that client.
-    pub(crate) async fn client_topology_id(&self) -> Option<bson::oid::ObjectId> {
+    pub(crate) async fn client_topology_id(&self) -> Option<crate::bson::oid::ObjectId> {
         match self {
             Entity::Client(client_entity) => Some(client_entity.topology_id),
             Entity::Database(database) => Some(database.client().topology().id),

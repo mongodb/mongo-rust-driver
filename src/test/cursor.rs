@@ -7,20 +7,12 @@ use crate::{
     bson::doc,
     options::{CreateCollectionOptions, CursorType, FindOptions},
     runtime,
-    test::{log_uncaptured, SERVERLESS},
     Client,
 };
 
 #[tokio::test]
 #[function_name::named]
 async fn tailable_cursor() {
-    if *SERVERLESS {
-        log_uncaptured(
-            "skipping cursor::tailable_cursor; serverless does not support capped collections",
-        );
-        return;
-    }
-
     let client = Client::for_test().await;
     let coll = client
         .create_fresh_collection(
@@ -61,8 +53,7 @@ async fn tailable_cursor() {
         Either::Left((_, next_doc)) => next_doc,
         Either::Right((next_doc, _)) => panic!(
             "should have timed out before getting next document, but instead immediately got
-        {:?}",
-            next_doc
+        {next_doc:?}"
         ),
     };
 
@@ -238,12 +229,13 @@ async fn session_cursor_with_type() {
         .await
         .unwrap();
 
-    let mut cursor: crate::SessionCursor<bson::Document> =
+    let mut cursor: crate::SessionCursor<crate::bson::Document> =
         coll.find(doc! {}).session(&mut session).await.unwrap();
 
     let _ = cursor.next(&mut session).await.unwrap().unwrap();
 
-    let mut cursor_with_type: crate::SessionCursor<bson::RawDocumentBuf> = cursor.with_type();
+    let mut cursor_with_type: crate::SessionCursor<crate::bson::RawDocumentBuf> =
+        cursor.with_type();
 
     let _ = cursor_with_type.next(&mut session).await.unwrap().unwrap();
 }

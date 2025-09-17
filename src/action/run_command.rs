@@ -1,8 +1,9 @@
 use std::time::Duration;
 
-use bson::{Bson, Document, RawDocumentBuf};
+use crate::bson::{Bson, Document, RawDocumentBuf};
 
 use crate::{
+    bson_compat::RawResult,
     client::session::TransactionState,
     coll::options::CursorType,
     db::options::{RunCommandOptions, RunCursorCommandOptions},
@@ -40,7 +41,7 @@ impl Database {
     pub fn run_command(&self, command: Document) -> RunCommand {
         RunCommand {
             db: self,
-            command: RawDocumentBuf::from_document(&command),
+            command: RawDocumentBuf::try_from(&command),
             options: None,
             session: None,
         }
@@ -75,7 +76,7 @@ impl Database {
     pub fn run_cursor_command(&self, command: Document) -> RunCursorCommand {
         RunCursorCommand {
             db: self,
-            command: RawDocumentBuf::from_document(&command),
+            command: RawDocumentBuf::try_from(&command),
             options: None,
             session: ImplicitSession,
         }
@@ -109,7 +110,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](RunCommand::run) will return d[`Result<Document>`].
     #[deeplink]
-    #[options_doc(run_command, sync)]
+    #[options_doc(run_command, "run")]
     pub fn run_command(&self, command: Document) -> RunCommand {
         self.async_database.run_command(command)
     }
@@ -124,7 +125,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](RunCommand::run) will return d[`Result<Document>`].
     #[deeplink]
-    #[options_doc(run_command, sync)]
+    #[options_doc(run_command, "run")]
     pub fn run_raw_command(&self, command: RawDocumentBuf) -> RunCommand {
         self.async_database.run_raw_command(command)
     }
@@ -134,7 +135,7 @@ impl crate::sync::Database {
     /// [`run`](RunCursorCommand::run) will return d[`Result<crate::sync::Cursor<Document>>`] or a
     /// d[`Result<crate::sync::SessionCursor<Document>>`] if a [`ClientSession`] is provided.
     #[deeplink]
-    #[options_doc(run_cursor_command, sync)]
+    #[options_doc(run_cursor_command, "run")]
     pub fn run_cursor_command(&self, command: Document) -> RunCursorCommand {
         self.async_database.run_cursor_command(command)
     }
@@ -144,7 +145,7 @@ impl crate::sync::Database {
     /// [`run`](RunCursorCommand::run) will return d[`Result<crate::sync::Cursor<Document>>`] or a
     /// d[`Result<crate::sync::SessionCursor<Document>>`] if a [`ClientSession`] is provided.
     #[deeplink]
-    #[options_doc(run_cursor_command, sync)]
+    #[options_doc(run_cursor_command, "run")]
     pub fn run_raw_cursor_command(&self, command: RawDocumentBuf) -> RunCursorCommand {
         self.async_database.run_raw_cursor_command(command)
     }
@@ -154,7 +155,7 @@ impl crate::sync::Database {
 #[must_use]
 pub struct RunCommand<'a> {
     db: &'a Database,
-    command: bson::raw::Result<RawDocumentBuf>,
+    command: RawResult<RawDocumentBuf>,
     options: Option<RunCommandOptions>,
     session: Option<&'a mut ClientSession>,
 }
@@ -214,7 +215,7 @@ impl<'a> Action for RunCommand<'a> {
 #[must_use]
 pub struct RunCursorCommand<'a, Session = ImplicitSession> {
     db: &'a Database,
-    command: bson::raw::Result<RawDocumentBuf>,
+    command: RawResult<RawDocumentBuf>,
     options: Option<RunCursorCommandOptions>,
     session: Session,
 }

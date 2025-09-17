@@ -7,6 +7,7 @@ use crate::{
     bson_util::get_u64,
     error::{Error, Result},
     options::WriteConcern,
+    serde_util,
 };
 
 pub(crate) mod duration_option_as_int_seconds {
@@ -73,7 +74,7 @@ pub(crate) fn serialize_u32_option_as_i32<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(ref val) => bson::serde_helpers::serialize_u32_as_i32(val, serializer),
+        Some(ref val) => serde_util::serialize_u32_as_i32(val, serializer),
         None => serializer.serialize_none(),
     }
 }
@@ -101,7 +102,7 @@ pub(crate) fn serialize_u64_option_as_i64<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(ref v) => bson::serde_helpers::serialize_u64_as_i64(v, serializer),
+        Some(ref v) => serde_util::serialize_u64_as_i64(v, serializer),
         None => serializer.serialize_none(),
     }
 }
@@ -113,9 +114,23 @@ where
     D: Deserializer<'de>,
 {
     let bson = Bson::deserialize(deserializer)?;
-    get_u64(&bson).ok_or_else(|| {
-        serde::de::Error::custom(format!("could not deserialize u64 from {:?}", bson))
-    })
+    get_u64(&bson)
+        .ok_or_else(|| serde::de::Error::custom(format!("could not deserialize u64 from {bson:?}")))
+}
+
+pub(crate) fn deserialize_option_u64_from_bson_number<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<Bson>::deserialize(deserializer)?
+        .map(|bson| {
+            get_u64(&bson).ok_or_else(|| {
+                serde::de::Error::custom(format!("could not deserialize u64 from {bson:?}"))
+            })
+        })
+        .transpose()
 }
 
 pub(crate) fn serialize_error_as_string<S: Serializer>(
@@ -134,37 +149,10 @@ pub(crate) fn serialize_result_error_as_string<S: Serializer, T: Serialize>(
         .serialize(serializer)
 }
 
-#[cfg(feature = "aws-auth")]
-pub(crate) fn deserialize_datetime_option_from_double_or_string<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<bson::DateTime>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum AwsDateTime {
-        Double(f64),
-        String(String),
-    }
-
-    let date_time = match AwsDateTime::deserialize(deserializer)? {
-        #[allow(clippy::cast_possible_truncation)]
-        AwsDateTime::Double(seconds) => {
-            let millis = seconds * 1000.0;
-            bson::DateTime::from_millis(millis as i64)
-        }
-        AwsDateTime::String(string) => bson::DateTime::parse_rfc3339_str(string)
-            .map_err(|e| serde::de::Error::custom(format!("invalid RFC 3339 string: {}", e)))?,
-    };
-
-    Ok(Some(date_time))
-}
-
 pub(crate) fn write_concern_is_empty(write_concern: &Option<WriteConcern>) -> bool {
     write_concern
         .as_ref()
-        .map_or(true, |write_concern| write_concern.is_empty())
+        .is_none_or(|write_concern| write_concern.is_empty())
 }
 
 #[cfg(test)]
@@ -224,4 +212,28 @@ pub(crate) fn serialize_bool_or_true<S: Serializer>(
 ) -> std::result::Result<S::Ok, S::Error> {
     let val = val.unwrap_or(true);
     serializer.serialize_bool(val)
+}
+
+pub(crate) fn serialize_u32_as_i32<S: Serializer>(
+    n: &u32,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    match i32::try_from(*n) {
+        Ok(n) => n.serialize(serializer),
+        Err(_) => Err(serde::ser::Error::custom(format!(
+            "cannot serialize u32 {n} as i32"
+        ))),
+    }
+}
+
+pub(crate) fn serialize_u64_as_i64<S: Serializer>(
+    n: &u64,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    match i64::try_from(*n) {
+        Ok(n) => n.serialize(serializer),
+        Err(_) => Err(serde::ser::Error::custom(format!(
+            "cannot serialize u64 {n} as i64"
+        ))),
+    }
 }

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use bson::Array;
+use crate::bson::Array;
 use mongocrypt::ctx::KmsProvider;
 use serde::Deserialize;
 
@@ -107,7 +107,7 @@ pub(crate) type KmsProvidersTlsOptions = HashMap<KmsProvider, TlsOptions>;
 
 impl KmsProviders {
     pub(crate) fn new(
-        providers: impl IntoIterator<Item = (KmsProvider, bson::Document, Option<TlsOptions>)>,
+        providers: impl IntoIterator<Item = (KmsProvider, crate::bson::Document, Option<TlsOptions>)>,
     ) -> Result<Self> {
         let mut credentials = HashMap::new();
         let mut tls_options = None;
@@ -129,7 +129,9 @@ impl KmsProviders {
     }
 
     pub(crate) fn credentials_doc(&self) -> Result<Document> {
-        Ok(bson::to_document(&self.credentials)?)
+        Ok(crate::bson_compat::serialize_to_document(
+            &self.credentials,
+        )?)
     }
 
     pub(crate) fn tls_options(&self) -> Option<&KmsProvidersTlsOptions> {
@@ -213,8 +215,7 @@ impl AutoEncryptionOptions {
             Some(b) => match Opt::as_type(b) {
                 Some(v) => Ok(Some(v)),
                 None => Err(Error::invalid_argument(format!(
-                    "unexpected type for extra option {:?}: {:?}",
-                    key, b
+                    "unexpected type for extra option {key:?}: {b:?}"
                 ))),
             },
         }

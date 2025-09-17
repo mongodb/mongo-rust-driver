@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, time::Duration};
 
-use bson::{Bson, Document, RawDocumentBuf};
+use crate::bson::{Bson, Document, RawDocumentBuf};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -61,8 +61,7 @@ impl<T: DeserializeOwned + Send + Sync> Collection<T> {
 
     /// Atomically finds up to one document in the collection matching `filter` and updates it.
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+.
+    /// passed in place of constructing the enum case.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
@@ -107,7 +106,8 @@ impl<T: Serialize + DeserializeOwned + Send + Sync> Collection<T> {
         FindOneAndReplace {
             coll: self,
             filter,
-            replacement: bson::to_raw_document_buf(replacement.borrow()).map_err(Into::into),
+            replacement: crate::bson_compat::serialize_to_raw_document_buf(replacement.borrow())
+                .map_err(Into::into),
             options: None,
             session: None,
         }
@@ -125,15 +125,14 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](FindOneAndDelete::run) will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_and_delete, sync)]
+    #[options_doc(find_one_and_delete, "run")]
     pub fn find_one_and_delete(&self, filter: Document) -> FindOneAndDelete<'_, T> {
         self.async_collection.find_one_and_delete(filter)
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and updates it.
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+.
+    /// passed in place of constructing the enum case.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
@@ -142,7 +141,7 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](FindOneAndDelete::run) will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_and_update, sync)]
+    #[options_doc(find_one_and_update, "run")]
     pub fn find_one_and_update(
         &self,
         filter: Document,
@@ -164,7 +163,7 @@ impl<T: Serialize + DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](FindOneAndReplace::run) will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one_and_replace, sync)]
+    #[options_doc(find_one_and_replace, "run")]
     pub fn find_one_and_replace(
         &self,
         filter: Document,

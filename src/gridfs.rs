@@ -14,6 +14,7 @@ use crate::{
     checked::Checked,
     error::Error,
     options::{CollectionOptions, ReadConcern, SelectionCriteria, WriteConcern},
+    serde_util,
     Collection,
     Database,
 };
@@ -31,7 +32,7 @@ pub(crate) struct Chunk<'a> {
     #[serde(rename = "_id")]
     id: ObjectId,
     files_id: Bson,
-    #[serde(serialize_with = "bson::serde_helpers::serialize_u32_as_i32")]
+    #[serde(serialize_with = "serde_util::serialize_u32_as_i32")]
     n: u32,
     #[serde(borrow)]
     data: RawBinaryRef<'a>,
@@ -54,7 +55,7 @@ pub struct FilesCollectionDocument {
     /// The size of the file's chunks in bytes.
     #[serde(
         rename = "chunkSize",
-        serialize_with = "bson::serde_helpers::serialize_u32_as_i32"
+        serialize_with = "serde_util::serialize_u32_as_i32"
     )]
     pub chunk_size_bytes: u32,
 
@@ -136,13 +137,11 @@ impl GridFsBucket {
             .selection_criteria(options.selection_criteria.clone())
             .build();
         let files = db.collection_with_options::<FilesCollectionDocument>(
-            &format!("{}.files", bucket_name),
+            &format!("{bucket_name}.files"),
             collection_options.clone(),
         );
-        let chunks = db.collection_with_options::<Chunk>(
-            &format!("{}.chunks", bucket_name),
-            collection_options,
-        );
+        let chunks = db
+            .collection_with_options::<Chunk>(&format!("{bucket_name}.chunks"), collection_options);
 
         GridFsBucket {
             inner: Arc::new(GridFsBucketInner {
@@ -195,6 +194,6 @@ impl GridFsBucket {
 
 impl Error {
     fn into_futures_io_error(self) -> futures_io::Error {
-        futures_io::Error::new(futures_io::ErrorKind::Other, self)
+        futures_io::Error::other(self)
     }
 }

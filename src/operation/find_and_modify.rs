@@ -6,7 +6,8 @@ use serde::{de::DeserializeOwned, Deserialize};
 
 use self::options::FindAndModifyOptions;
 use crate::{
-    bson::{doc, from_slice, rawdoc, Document, RawBson, RawDocumentBuf},
+    bson::{doc, rawdoc, Document, RawBson, RawDocumentBuf},
+    bson_compat::{cstr, deserialize_from_slice, CStr},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::UpdateModifications, Namespace},
@@ -14,7 +15,6 @@ use crate::{
     operation::{
         append_options_to_raw_document,
         find_and_modify::options::Modification,
-        remove_empty_write_concern,
         OperationWithDefaults,
         Retryability,
     },
@@ -56,7 +56,7 @@ impl<T: DeserializeOwned> FindAndModify<T> {
 
 impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
     type O = Option<T>;
-    const NAME: &'static str = "findAndModify";
+    const NAME: &'static CStr = cstr!("findAndModify");
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if let Some(ref options) = self.options {
@@ -72,26 +72,19 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
 
         let mut body = rawdoc! {
             Self::NAME: self.ns.coll.clone(),
-            "query": RawDocumentBuf::from_document(&self.query)?,
+            "query": RawDocumentBuf::try_from(&self.query)?,
         };
 
         match &self.modification {
-            Modification::Delete => body.append("remove", true),
+            Modification::Delete => body.append(cstr!("remove"), true),
             Modification::Update(update_or_replace) => {
-                update_or_replace.append_to_rawdoc(&mut body, "update")?
+                update_or_replace.append_to_rawdoc(&mut body, cstr!("update"))?
             }
         }
 
-        if let Some(ref mut options) = self.options {
-            remove_empty_write_concern!(Some(options));
-        }
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
-            body,
-        ))
+        Ok(Command::new(Self::NAME, &self.ns.db, body))
     }
 
     fn handle_response<'a>(
@@ -106,13 +99,12 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
         let response: Response = response.body()?;
 
         match response.value {
-            RawBson::Document(doc) => Ok(Some(from_slice(doc.as_bytes())?)),
+            RawBson::Document(doc) => Ok(Some(deserialize_from_slice(doc.as_bytes())?)),
             RawBson::Null => Ok(None),
             other => Err(ErrorKind::InvalidResponse {
                 message: format!(
                     "expected document for value field of findAndModify response, but instead got \
-                     {:?}",
-                    other
+                     {other:?}"
                 ),
             }
             .into()),

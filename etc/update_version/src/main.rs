@@ -64,9 +64,13 @@ struct Args {
     #[argh(option)]
     version: String,
 
-    /// version of the bson crate
+    /// version of the bson crate (2.x)
     #[argh(option)]
-    bson: Option<String>,
+    bson2: Option<String>,
+
+    /// version of the bson crate (3.x)
+    #[argh(option)]
+    bson3: Option<String>,
 
     /// version of the mongocrypt crate
     #[argh(option)]
@@ -110,16 +114,26 @@ fn main() {
         pending.apply(loc, &args.version);
     }
 
-    if let Some(bson) = args.bson {
-        let bson_version_loc =
-            Location::new("Cargo.toml", r#"bson =.*version = "(?<target>.*?)".*"#);
-        pending.apply(&bson_version_loc, &bson);
+    if let Some(bson2) = args.bson2 {
+        let bson_version_loc = Location::new(
+            "Cargo.toml",
+            r#"\[dependencies.bson2\]\nversion = "(?<target>.*?)"\n"#,
+        );
+        pending.apply(&bson_version_loc, &bson2);
+    }
+
+    if let Some(bson3) = args.bson3 {
+        let bson_version_loc = Location::new(
+            "Cargo.toml",
+            r#"\[dependencies.bson3\]\nversion = "(?<target>.*?)"\n"#,
+        );
+        pending.apply(&bson_version_loc, &bson3);
     }
 
     if let Some(mongocrypt) = args.mongocrypt {
         let mongocrypt_version_loc = Location::new(
             "Cargo.toml",
-            r#"mongocrypt =.*version = "(?<target>.*?)".*"#,
+            r#"\[dependencies.mongocrypt\]\nversion = "(?<target>.*?)".*"#,
         );
         pending.apply(&mongocrypt_version_loc, &mongocrypt);
     }

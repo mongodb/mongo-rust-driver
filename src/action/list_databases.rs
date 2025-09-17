@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use bson::{Bson, Document};
+use crate::bson::{Bson, Document};
 
 #[cfg(feature = "sync")]
 use crate::sync::Client as SyncClient;
@@ -59,7 +59,7 @@ impl SyncClient {
     ///
     /// [run](ListDatabases::run) will return d[`Result<Vec<DatabaseSpecification>>`].
     #[deeplink]
-    #[options_doc(list_databases, sync)]
+    #[options_doc(list_databases, "run")]
     pub fn list_databases(&self) -> ListDatabases {
         self.async_client.list_databases()
     }
@@ -68,7 +68,7 @@ impl SyncClient {
     ///
     /// [run](ListDatabases::run) will return d[`Result<Vec<String>>`].
     #[deeplink]
-    #[options_doc(list_databases, sync)]
+    #[options_doc(list_databases, "run")]
     pub fn list_database_names(&self) -> ListDatabases<'_, ListNames> {
         self.async_client.list_database_names()
     }
@@ -106,7 +106,8 @@ impl<'a> Action for ListDatabases<'a, ListSpecifications> {
             .and_then(|dbs| {
                 dbs.into_iter()
                     .map(|db_spec| {
-                        bson::from_slice(db_spec.as_bytes()).map_err(crate::error::Error::from)
+                        crate::bson_compat::deserialize_from_slice(db_spec.as_bytes())
+                            .map_err(crate::error::Error::from)
                     })
                     .collect()
             })

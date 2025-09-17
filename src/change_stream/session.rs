@@ -74,8 +74,7 @@ where
     /// The session provided must be the same session used to create the change stream.
     ///
     /// ```
-    /// # use bson::{doc, Document};
-    /// # use mongodb::Client;
+    /// # use mongodb::{Client, bson::{self, doc, Document}};
     /// # fn main() {
     /// # async {
     /// # let client = Client::with_uri_str("foo").await?;
@@ -149,7 +148,9 @@ where
                     match bv {
                         BatchValue::Some { doc, .. } => {
                             self.data.document_returned = true;
-                            return Ok(Some(bson::from_slice(doc.as_bytes())?));
+                            return Ok(Some(crate::bson_compat::deserialize_from_slice(
+                                doc.as_bytes(),
+                            )?));
                         }
                         BatchValue::Empty | BatchValue::Exhausted => return Ok(None),
                     }

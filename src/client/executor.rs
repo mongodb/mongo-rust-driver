@@ -1,6 +1,6 @@
 #[cfg(feature = "in-use-encryption")]
-use bson::RawDocumentBuf;
-use bson::{doc, RawBsonRef, RawDocument, Timestamp};
+use crate::bson::RawDocumentBuf;
+use crate::bson::{doc, RawBsonRef, RawDocument, Timestamp};
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
 use once_cell::sync::Lazy;
@@ -321,7 +321,7 @@ impl Client {
             let (server, effective_criteria) = match self
                 .select_server(
                     selection_criteria,
-                    op.name(),
+                    crate::bson_compat::cstr_to_str(op.name()),
                     retry.as_ref().map(|r| &r.first_server),
                     op.override_criteria(),
                 )
@@ -347,12 +347,19 @@ impl Client {
                         err.add_label(RETRYABLE_WRITE_ERROR);
                     }
 
-                    let op_retry = match self.get_op_retryability(op, &session) {
-                        Retryability::Read => err.is_read_retryable(),
-                        Retryability::Write => err.is_write_retryable(),
-                        _ => false,
+                    let retryability = op.retryability().with_options(self.options());
+                    let can_retry = match retryability {
+                        // Read-retryable operations should be retried on pool cleared errors during
+                        // connection checkout regardless of transaction status.
+                        Retryability::Read if err.is_pool_cleared() => true,
+                        _ => {
+                            retryability.can_retry_error(&err)
+                                && !session
+                                    .as_ref()
+                                    .is_some_and(|session| session.in_transaction())
+                        }
                     };
-                    if err.is_pool_cleared() || op_retry {
+                    if can_retry {
                         retry = Some(ExecutionRetry {
                             prior_txn_number: None,
                             first_error: err,
@@ -378,7 +385,7 @@ impl Client {
                 session = implicit_session.as_mut();
             }
 
-            let retryability = self.get_retryability(&conn, op, &session)?;
+            let retryability = self.get_retryability(op, &session, conn.stream_description()?);
             if retryability == Retryability::None {
                 retry.first_error()?;
             }
@@ -447,9 +454,7 @@ impl Client {
                         } else {
                             return Err(r.first_error);
                         }
-                    } else if retryability == Retryability::Read && err.is_read_retryable()
-                        || retryability == Retryability::Write && err.is_write_retryable()
-                    {
+                    } else if retryability.can_retry_error(&err) {
                         retry = Some(ExecutionRetry {
                             prior_txn_number: txn_number,
                             first_error: err,
@@ -821,7 +826,7 @@ impl Client {
         let ok = match raw_doc.get("ok")? {
             Some(b) => {
                 crate::bson_util::get_int_raw(b).ok_or_else(|| ErrorKind::InvalidResponse {
-                    message: format!("expected ok value to be a number, instead got {:?}", b),
+                    message: format!("expected ok value to be a number, instead got {b:?}"),
                 })?
             }
             None => {
@@ -835,7 +840,7 @@ impl Client {
         let cluster_time: Option<ClusterTime> = raw_doc
             .get("$clusterTime")?
             .and_then(RawBsonRef::as_document)
-            .map(|d| bson::from_slice(d.as_bytes()))
+            .map(|d| crate::bson_compat::deserialize_from_slice(d.as_bytes()))
             .transpose()?;
 
         let at_cluster_time = op.extract_at_cluster_time(raw_doc)?;
@@ -858,7 +863,7 @@ impl Client {
                     let recovery_token = raw_doc
                         .get("recoveryToken")?
                         .and_then(RawBsonRef::as_document)
-                        .map(|d| bson::from_slice(d.as_bytes()))
+                        .map(|d| crate::bson_compat::deserialize_from_slice(d.as_bytes()))
                         .transpose()?;
                     session.transaction.recovery_token = recovery_token;
                 }
@@ -871,7 +876,7 @@ impl Client {
                 .map(|error_response| error_response.into())
                 .unwrap_or_else(|e| {
                     Error::from(ErrorKind::InvalidResponse {
-                        message: format!("error deserializing command error: {}", e),
+                        message: format!("error deserializing command error: {e}"),
                     })
                 }))
         }
@@ -908,49 +913,34 @@ impl Client {
         }
     }
 
-    /// Returns the retryability level for the execution of this operation.
-    fn get_op_retryability<T: Operation>(
+    /// Returns the retryability level for the execution of this operation with the given session
+    /// and connection stream description.
+    fn get_retryability<T: Operation>(
         &self,
         op: &T,
         session: &Option<&mut ClientSession>,
+        stream_description: &StreamDescription,
     ) -> Retryability {
+        // commitTransaction and abortTransaction are always retried, regardless of the value of
+        // retry_writes.
+        if op.name() == CommitTransaction::NAME || op.name() == AbortTransaction::NAME {
+            return Retryability::Write;
+        }
+
         if session
             .as_ref()
-            .map(|session| session.in_transaction())
-            .unwrap_or(false)
+            .is_some_and(|session| session.in_transaction())
         {
             return Retryability::None;
         }
-        match op.retryability() {
-            Retryability::Read if self.inner.options.retry_reads != Some(false) => {
-                Retryability::Read
-            }
-            // commitTransaction and abortTransaction should be retried regardless of the
-            // value for retry_writes set on the Client
-            Retryability::Write
-                if op.name() == CommitTransaction::NAME
-                    || op.name() == AbortTransaction::NAME
-                    || self.inner.options.retry_writes != Some(false) =>
-            {
+
+        match op.retryability().with_options(self.options()) {
+            Retryability::Write if stream_description.supports_retryable_writes() => {
                 Retryability::Write
             }
+            // All servers compatible with the driver support retryable reads.
+            Retryability::Read => Retryability::Read,
             _ => Retryability::None,
-        }
-    }
-
-    /// Returns the retryability level for the execution of this operation on this connection.
-    fn get_retryability<T: Operation>(
-        &self,
-        conn: &PooledConnection,
-        op: &T,
-        session: &Option<&mut ClientSession>,
-    ) -> Result<Retryability> {
-        match self.get_op_retryability(op, session) {
-            Retryability::Read => Ok(Retryability::Read),
-            Retryability::Write if conn.stream_description()?.supports_retryable_writes() => {
-                Ok(Retryability::Write)
-            }
-            _ => Ok(Retryability::None),
         }
     }
 

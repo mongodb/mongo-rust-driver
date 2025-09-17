@@ -2,6 +2,7 @@ use std::convert::TryInto;
 
 use crate::{
     bson::{Document, RawBsonRef, RawDocumentBuf},
+    bson_compat::{cstr, CStr},
     client::SESSIONS_UNSUPPORTED_COMMANDS,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
@@ -33,7 +34,7 @@ impl<'conn> RunCommand<'conn> {
         }
     }
 
-    fn command_name(&self) -> Option<&str> {
+    fn command_name(&self) -> Option<&CStr> {
         self.command
             .into_iter()
             .next()
@@ -47,7 +48,7 @@ impl OperationWithDefaults for RunCommand<'_> {
 
     // Since we can't actually specify a string statically here, we just put a descriptive string
     // that should fail loudly if accidentally passed to the server.
-    const NAME: &'static str = "$genericRunCommand";
+    const NAME: &'static CStr = cstr!("$genericRunCommand");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let command_name = self
@@ -56,17 +57,13 @@ impl OperationWithDefaults for RunCommand<'_> {
                 message: "an empty document cannot be passed to a run_command operation".into(),
             })?;
 
-        Ok(Command::new(
-            command_name.to_string(),
-            self.db.clone(),
-            self.command.clone(),
-        ))
+        Ok(Command::new(command_name, &self.db, self.command.clone()))
     }
 
     fn extract_at_cluster_time(
         &self,
-        response: &bson::RawDocument,
-    ) -> Result<Option<bson::Timestamp>> {
+        response: &crate::bson::RawDocument,
+    ) -> Result<Option<crate::bson::Timestamp>> {
         if let Some(RawBsonRef::Timestamp(ts)) = response.get("atClusterTime")? {
             Ok(Some(ts))
         } else {

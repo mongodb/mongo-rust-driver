@@ -1,6 +1,6 @@
 mod aggregation_data;
 
-use bson::Document;
+use crate::bson::Document;
 use futures::TryStreamExt;
 
 use crate::{
@@ -1316,9 +1316,11 @@ async fn stable_api_examples() -> GenericResult<()> {
     // Start Versioned API Example 5
     // With the `bson-chrono-0_4` feature enabled, this function can be dropped in favor of using
     // `chrono::DateTime` values directly.
-    fn iso_date(text: &str) -> Result<bson::DateTime, Box<dyn Error>> {
+    fn iso_date(text: &str) -> Result<crate::bson::DateTime, Box<dyn Error>> {
         let chrono_dt = chrono::DateTime::parse_from_rfc3339(text)?;
-        Ok(bson::DateTime::from_millis(chrono_dt.timestamp_millis()))
+        Ok(crate::bson::DateTime::from_millis(
+            chrono_dt.timestamp_millis(),
+        ))
     }
     db.collection("sales").insert_many(vec![
         doc! { "_id" : 1, "item" : "abc", "price" : 10, "quantity" : 2, "date" : iso_date("2021-01-01T08:00:00Z")? },
@@ -1682,15 +1684,8 @@ async fn convenient_transaction_examples() -> Result<()> {
         return Ok(());
     }
 
-    let uri = DEFAULT_URI.clone();
+    let client = Client::for_test().await;
     // Start Transactions withTxn API Example 1
-
-    // For a replica set, include the replica set name and a seedlist of the members in the URI
-    // string; e.g. let uri = "mongodb://mongodb0.example.com:27017,mongodb1.example.com:27017/?
-    // replicaSet=myRepl"; For a sharded cluster, connect to the mongos instances; e.g.
-    // let uri = "mongodb://mongos0.example.com:27017,mongos1.example.com:27017/";
-
-    let client = Client::with_uri_str(uri).await?;
 
     // Prereq: Create collections. CRUD operations in transactions must be on existing collections.
 

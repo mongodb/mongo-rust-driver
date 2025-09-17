@@ -162,12 +162,10 @@ impl Executor {
 
         let pool = ConnectionPool::new(
             get_client_options().await.hosts[0].clone(),
-            ConnectionEstablisher::new(EstablisherOptions::from_client_options(
-                get_client_options().await,
-            ))
-            .unwrap(),
+            ConnectionEstablisher::new(EstablisherOptions::from(get_client_options().await))
+                .unwrap(),
             updater,
-            bson::oid::ObjectId::new(),
+            crate::bson::oid::ObjectId::new(),
             Some(self.pool_options),
         );
 
@@ -202,8 +200,7 @@ impl Executor {
                 panic!("Expected {}, but no error occurred", expected.type_)
             }
             (None, Some(ref actual)) => panic!(
-                "Expected no error to occur, but the following error was returned: {:?}",
-                actual
+                "Expected no error to occur, but the following error was returned: {actual:?}"
             ),
             (None, None) | (Some(_), Some(_)) => {}
         }
@@ -216,10 +213,7 @@ impl Executor {
                 .next_match(EVENT_TIMEOUT, filter)
                 .await
                 .unwrap_or_else(|| {
-                    panic!(
-                        "{}: did not receive expected event: {:?}",
-                        description, expected_event
-                    )
+                    panic!("{description}: did not receive expected event: {expected_event:?}")
                 });
             assert_matches(&actual_event, &expected_event, Some(description.as_str()));
         }
@@ -227,8 +221,7 @@ impl Executor {
         assert_eq!(
             event_stream.collect_now(filter),
             Vec::new(),
-            "{}",
-            description
+            "{description}"
         );
     }
 }
@@ -262,7 +255,7 @@ impl Operation {
                 runtime::timeout(timeout.unwrap_or(EVENT_TIMEOUT), task)
                     .await
                     .unwrap_or_else(|_| {
-                        panic!("waiting for {} {} event(s) timed out", count, event_name)
+                        panic!("waiting for {count} {event_name} event(s) timed out")
                     });
             }
             Operation::CheckOut { label } => {
@@ -292,8 +285,7 @@ impl Operation {
                     .await
                     .unwrap_or_else(|| {
                         panic!(
-                            "did not receive checkin event after dropping connection (id={})",
-                            connection
+                            "did not receive checkin event after dropping connection (id={connection})"
                         )
                     });
             }
@@ -435,7 +427,7 @@ impl Matchable for CmapEvent {
             (CmapEvent::PoolCleared(_), CmapEvent::PoolCleared(_)) => Ok(()),
             (CmapEvent::PoolReady(_), CmapEvent::PoolReady(_)) => Ok(()),
             (CmapEvent::PoolClosed(_), CmapEvent::PoolClosed(_)) => Ok(()),
-            (actual, expected) => Err(format!("expected event {:?}, got {:?}", actual, expected)),
+            (actual, expected) => Err(format!("expected event {actual:?}, got {expected:?}")),
         }
     }
 }
@@ -488,3 +480,74 @@ async fn cmap_spec_tests() {
     )
     .await;
 }
+
+// TODO RUST-2074: investigate why this test is flaky
+// #[tokio::test(flavor = "multi_thread")]
+// async fn pool_cleared_error_has_transient_transaction_error_label() {
+//     if !block_connection_supported().await {
+//         log_uncaptured(
+//             "skipping pool_cleared_error_has_transient_transaction_error_label: block connection
+// \              unsupported",
+//         );
+//         return;
+//     }
+//     if !transactions_supported().await {
+//         log_uncaptured(
+//             "skipping pool_cleared_error_has_transient_transaction_error_label: transactions \
+//              unsupported",
+//         );
+//         return;
+//     }
+//     if topology_is_load_balanced().await {
+//         log_uncaptured(
+//             "skipping pool_cleared_error_has_transient_transaction_error_label: load balanced \
+//              topology",
+//         );
+//     }
+
+//     let app_name = "pool_cleared_error_has_transient_transaction_error_label";
+
+//     let mut client_options = get_client_options().await.clone();
+//     if topology_is_sharded().await {
+//         client_options.hosts.drain(1..);
+//     }
+//     client_options.connect_timeout = Some(Duration::from_millis(500));
+//     client_options.heartbeat_freq = Some(Duration::from_millis(500));
+//     client_options.app_name = Some(app_name.to_string());
+//     let client = Client::for_test()
+//         .options(client_options)
+//         .monitor_events()
+//         .await;
+
+//     let mut session = client.start_session().await.unwrap();
+//     session.start_transaction().await.unwrap();
+
+//     let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
+//         .block_connection(Duration::from_secs(15))
+//         .app_name(app_name);
+//     let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+//     let insert_client = client.clone();
+//     let insert_handle = tokio::spawn(async move {
+//         insert_client
+//             .database("db")
+//             .collection("coll")
+//             .insert_one(doc! { "x": 1 })
+//             .session(&mut session)
+//             .await
+//     });
+
+//     let fail_point = FailPoint::fail_command(
+//         &["hello", LEGACY_HELLO_COMMAND_NAME],
+//         // The RTT hellos may encounter this failpoint, so use FailPointMode::AlwaysOn to ensure
+//         // that the server monitors hit it as well.
+//         FailPointMode::AlwaysOn,
+//     )
+//     .block_connection(Duration::from_millis(1500))
+//     .app_name(app_name);
+//     let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+//     let insert_error = insert_handle.await.unwrap().unwrap_err();
+//     assert!(insert_error.is_pool_cleared(), "{:?}", insert_error);
+//     assert!(insert_error.contains_label(TRANSIENT_TRANSACTION_ERROR));
+// }

@@ -1,6 +1,7 @@
 use futures_util::FutureExt;
 
 use crate::{
+    bson_compat::CStr,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     BoxFuture,
@@ -15,7 +16,7 @@ pub(crate) struct RawOutput<Op>(pub(crate) Op);
 
 impl<Op: Operation> Operation for RawOutput<Op> {
     type O = RawCommandResponse;
-    const NAME: &'static str = Op::NAME;
+    const NAME: &'static CStr = Op::NAME;
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.0.build(description)
@@ -23,8 +24,8 @@ impl<Op: Operation> Operation for RawOutput<Op> {
 
     fn extract_at_cluster_time(
         &self,
-        response: &bson::RawDocument,
-    ) -> Result<Option<bson::Timestamp>> {
+        response: &crate::bson::RawDocument,
+    ) -> Result<Option<crate::bson::Timestamp>> {
         self.0.extract_at_cluster_time(response)
     }
 
@@ -76,7 +77,7 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.pinned_connection()
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> &CStr {
         self.0.name()
     }
 }

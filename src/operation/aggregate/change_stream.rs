@@ -42,7 +42,7 @@ impl ChangeStreamAggregate {
 impl OperationWithDefaults for ChangeStreamAggregate {
     type O = (CursorSpecification, ChangeStreamData);
 
-    const NAME: &'static str = "aggregate";
+    const NAME: &'static crate::bson_compat::CStr = Aggregate::NAME;
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if let Some(data) = &mut self.resume_data {
@@ -76,8 +76,8 @@ impl OperationWithDefaults for ChangeStreamAggregate {
 
     fn extract_at_cluster_time(
         &self,
-        response: &bson::RawDocument,
-    ) -> Result<Option<bson::Timestamp>> {
+        response: &crate::bson::RawDocument,
+    ) -> Result<Option<crate::bson::Timestamp>> {
         self.inner.extract_at_cluster_time(response)
     }
 
@@ -89,7 +89,7 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         let op_time = response
             .raw_body()
             .get("operationTime")?
-            .and_then(bson::RawBsonRef::as_timestamp);
+            .and_then(crate::bson::RawBsonRef::as_timestamp);
 
         let inner_context = ExecutionContext {
             connection: context.connection,
@@ -109,7 +109,7 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         };
 
         let description = context.connection.stream_description()?;
-        if self.args.options.as_ref().map_or(true, has_no_time)
+        if self.args.options.as_ref().is_none_or(has_no_time)
             && description.max_wire_version.is_some_and(|v| v >= 7)
             && spec.initial_buffer.is_empty()
             && spec.post_batch_resume_token.is_none()

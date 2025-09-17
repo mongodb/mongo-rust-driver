@@ -45,8 +45,7 @@ pub(crate) static SESSIONS_UNSUPPORTED_COMMANDS: Lazy<HashSet<&'static str>> = L
 /// collections atomically. For more information about when and how to use transactions in MongoDB,
 /// see the [manual](https://www.mongodb.com/docs/manual/core/transactions/).
 ///
-/// Replica set transactions are supported on MongoDB 4.0+. Sharded transactions are supported on
-/// MongoDDB 4.2+. Transactions are associated with a `ClientSession`. To begin a transaction, call
+/// Transactions are associated with a `ClientSession`. To begin a transaction, call
 /// [`ClientSession::start_transaction`] on a `ClientSession`. The `ClientSession` must be passed to
 /// operations to be executed within the transaction.
 ///

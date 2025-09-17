@@ -1,4 +1,4 @@
-use bson::{doc, Bson};
+use crate::bson::{doc, Bson};
 
 use crate::{
     action::{action_impl, deeplink, export_doc, option_setters, options_doc},
@@ -115,7 +115,7 @@ impl crate::sync::gridfs::GridFsBucket {
     ///
     /// [`run`](OpenDownloadStreamByName::run) will return d[`Result<GridFsDownloadStream>`].
     #[deeplink]
-    #[options_doc(download_by_name, sync)]
+    #[options_doc(download_by_name, "run")]
     pub fn open_download_stream_by_name(
         &self,
         filename: impl Into<String>,

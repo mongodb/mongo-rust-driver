@@ -5,15 +5,8 @@ use once_cell::sync::Lazy;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    bson::{
-        doc,
-        rawdoc,
-        serde_helpers::HumanReadable,
-        to_document,
-        Bson,
-        Document,
-        RawDocumentBuf,
-    },
+    bson::{doc, rawdoc, serde_helpers::HumanReadable, Bson, Document, RawDocumentBuf},
+    bson_compat::serialize_to_document,
     error::{ErrorKind, Result, WriteFailure},
     options::{
         Acknowledgment,
@@ -51,7 +44,7 @@ use crate::{
 #[tokio::test]
 #[function_name::named]
 async fn insert_err_details() {
-    if server_version_lt(4, 0).await || !topology_is_replica_set().await {
+    if !topology_is_replica_set().await {
         log_uncaptured("skipping insert_err_details due to test configuration");
         return;
     }
@@ -94,13 +87,13 @@ async fn insert_err_details() {
                         Ok(write_concern_doc) => {
                             assert!(write_concern_doc.contains_key("provenance"));
                         }
-                        Err(e) => panic!("{:?}", e),
+                        Err(e) => panic!("{e:?}"),
                     }
                 }
                 None => panic!("expected details field"),
             }
         }
-        ref e => panic!("expected write concern error, got {:?}", e),
+        ref e => panic!("expected write concern error, got {e:?}"),
     }
 }
 
@@ -143,7 +136,7 @@ async fn find() {
 
     while let Some((i, result)) = cursor.next().await {
         let doc = result.unwrap();
-        assert!(i <= 4, "expected 4 result, got {}", i);
+        assert!(i <= 4, "expected 4 result, got {i}");
         assert_eq!(doc.len(), 2);
         assert!(doc.contains_key("_id"));
         assert_eq!(doc.get("x"), Some(&Bson::Int32(i as i32)));
@@ -453,7 +446,7 @@ async fn large_insert_unordered_with_errors() {
             assert_eq!(write_errors[1].index, 22499);
             assert_eq!(write_errors[2].index, 32499);
         }
-        e => panic!("expected bulk write error, got {:?} instead", e),
+        e => panic!("expected bulk write error, got {e:?} instead"),
     }
 }
 
@@ -493,7 +486,7 @@ async fn large_insert_ordered_with_errors() {
                 7499
             );
         }
-        e => panic!("expected bulk write error, got {:?} instead", e),
+        e => panic!("expected bulk write error, got {e:?} instead"),
     }
 }
 
@@ -511,7 +504,7 @@ async fn empty_insert() {
         .kind
     {
         ErrorKind::InvalidArgument { .. } => {}
-        e => panic!("expected argument error, got {:?}", e),
+        e => panic!("expected argument error, got {e:?}"),
     };
 }
 
@@ -578,7 +571,7 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
         .unwrap()
         .get("hint")
         .cloned()
-        .map(|bson| bson::from_bson(bson).unwrap());
+        .map(|bson| crate::bson_compat::deserialize_from_bson(bson).unwrap());
     let expected_hint = options.and_then(|options| options.hint);
     assert_eq!(event_hint, expected_hint);
 }
@@ -606,11 +599,6 @@ async fn delete_hint_not_specified() {
 }
 
 async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>, name: &str) {
-    if options.is_some() && server_version_lt(4, 2).await {
-        log_uncaptured("skipping find_one_and_delete_hint_test due to test configuration");
-        return;
-    }
-
     let client = Client::for_test().monitor_events().await;
 
     let coll = client.database(name).collection(name);
@@ -626,7 +614,7 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
         .command
         .get("hint")
         .cloned()
-        .map(|bson| bson::from_bson(bson).unwrap());
+        .map(|bson| crate::bson_compat::deserialize_from_bson(bson).unwrap());
     let expected_hint = options.and_then(|options| options.hint);
     assert_eq!(event_hint, expected_hint);
 }
@@ -668,10 +656,7 @@ async fn find_one_and_delete_hint_server_version() {
         .hint(Hint::Name(String::new()))
         .await;
 
-    if server_version_lt(4, 2).await {
-        let error = res.expect_err("find one and delete should fail");
-        assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
-    } else if server_version_eq(4, 2).await {
+    if server_version_eq(4, 2).await {
         let error = res.expect_err("find one and delete should fail");
         assert!(matches!(*error.kind, ErrorKind::Command { .. }));
     } else {
@@ -746,7 +731,7 @@ where
 {
     coll.insert_one(insert_data.clone()).await.unwrap();
     let result = coll
-        .find_one(to_document(&insert_data).unwrap())
+        .find_one(serialize_to_document(&insert_data).unwrap())
         .await
         .unwrap();
     match result {
@@ -1095,7 +1080,7 @@ fn assert_duplicate_key_error_with_utf8_replacement(error: &ErrorKind) {
                 assert_eq!(err.code, 11000);
                 assert!(err.message.contains('�'));
             }
-            e => panic!("expected WriteFailure::WriteError, got {:?} instead", e),
+            e => panic!("expected WriteFailure::WriteError, got {e:?} instead"),
         },
         ErrorKind::InsertMany(ref failure) => match &failure.write_errors {
             Some(write_errors) => {
@@ -1103,15 +1088,11 @@ fn assert_duplicate_key_error_with_utf8_replacement(error: &ErrorKind) {
                 assert_eq!(write_errors[0].code, 11000);
                 assert!(write_errors[0].message.contains('�'));
             }
-            None => panic!(
-                "expected BulkWriteFailure containing write errors, got {:?} instead",
-                failure
-            ),
+            None => {
+                panic!("expected BulkWriteFailure containing write errors, got {failure:?} instead")
+            }
         },
-        e => panic!(
-            "expected ErrorKind::Write or ErrorKind::BulkWrite, got {:?} instead",
-            e
-        ),
+        e => panic!("expected ErrorKind::Write or ErrorKind::BulkWrite, got {e:?} instead"),
     }
 }
 

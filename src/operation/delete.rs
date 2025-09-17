@@ -1,16 +1,11 @@
 use crate::{
     bson::{doc, Document},
+    bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::Namespace,
     collation::Collation,
     error::{convert_insert_many_error, Result},
-    operation::{
-        append_options,
-        remove_empty_write_concern,
-        OperationWithDefaults,
-        Retryability,
-        WriteResponseBody,
-    },
+    operation::{append_options, OperationWithDefaults, Retryability, WriteResponseBody},
     options::{DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
 };
@@ -48,7 +43,7 @@ impl Delete {
 impl OperationWithDefaults for Delete {
     type O = DeleteResult;
 
-    const NAME: &'static str = "delete";
+    const NAME: &'static CStr = cstr!("delete");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut delete = doc! {
@@ -57,27 +52,25 @@ impl OperationWithDefaults for Delete {
         };
 
         if let Some(ref collation) = self.collation {
-            delete.insert("collation", bson::to_bson(&collation)?);
+            delete.insert(
+                "collation",
+                crate::bson_compat::serialize_to_bson(&collation)?,
+            );
         }
 
         if let Some(ref hint) = self.hint {
-            delete.insert("hint", bson::to_bson(&hint)?);
+            delete.insert("hint", crate::bson_compat::serialize_to_bson(&hint)?);
         }
 
         let mut body = doc! {
-            Self::NAME: self.ns.coll.clone(),
+            crate::bson_compat::cstr_to_str(Self::NAME): self.ns.coll.clone(),
             "deletes": [delete],
             "ordered": true, // command monitoring tests expect this (SPEC-1130)
         };
 
-        remove_empty_write_concern!(self.options);
         append_options(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
-            (&body).try_into()?,
-        ))
+        Ok(Command::new(Self::NAME, &self.ns.db, (&body).try_into()?))
     }
 
     fn handle_response<'a>(

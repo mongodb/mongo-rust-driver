@@ -1,6 +1,9 @@
 use std::time::Duration;
 
-use bson::{rawdoc, RawDocumentBuf};
+use crate::{
+    bson::{rawdoc, RawDocumentBuf},
+    bson_compat::cstr,
+};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
@@ -20,6 +23,7 @@ use crate::{
 /// To limit usages of the legacy name in the codebase, this constant should be used
 /// wherever possible.
 pub(crate) const LEGACY_HELLO_COMMAND_NAME: &str = "isMaster";
+pub(crate) const LEGACY_HELLO_COMMAND_NAME_CSTR: &crate::bson_compat::CStr = cstr!("isMaster");
 pub(crate) const LEGACY_HELLO_COMMAND_NAME_LOWERCASE: &str = "ismaster";
 
 #[derive(Debug, Clone, Copy)]
@@ -46,17 +50,17 @@ pub(crate) fn hello_command(
     {
         (rawdoc! { "hello": 1 }, "hello")
     } else {
-        let mut body = rawdoc! { LEGACY_HELLO_COMMAND_NAME: 1 };
+        let mut body = rawdoc! { LEGACY_HELLO_COMMAND_NAME_CSTR: 1 };
         if hello_ok.is_none() {
-            body.append("helloOk", true);
+            body.append(cstr!("helloOk"), true);
         }
         (body, LEGACY_HELLO_COMMAND_NAME)
     };
 
     if let Some(opts) = awaitable_options {
-        body.append("topologyVersion", opts.topology_version);
+        body.append(cstr!("topologyVersion"), opts.topology_version);
         body.append(
-            "maxAwaitTimeMS",
+            cstr!("maxAwaitTimeMS"),
             opts.max_await_time
                 .as_millis()
                 .try_into()

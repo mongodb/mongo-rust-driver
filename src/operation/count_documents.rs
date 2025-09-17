@@ -31,7 +31,7 @@ impl CountDocuments {
         if let Some(skip) = options.as_ref().and_then(|opts| opts.skip) {
             let s: i64 = skip.try_into().map_err(|_| {
                 Error::from(ErrorKind::InvalidArgument {
-                    message: format!("skip exceeds range of i64: {}", skip),
+                    message: format!("skip exceeds range of i64: {skip}"),
                 })
             })?;
             pipeline.push(doc! {
@@ -42,7 +42,7 @@ impl CountDocuments {
         if let Some(limit) = options.as_ref().and_then(|opts| opts.limit) {
             let l: i64 = limit.try_into().map_err(|_| {
                 Error::from(ErrorKind::InvalidArgument {
-                    message: format!("limit exceeds range of i64: {}", limit),
+                    message: format!("limit exceeds range of i64: {limit}"),
                 })
             })?;
             pipeline.push(doc! {
@@ -77,13 +77,16 @@ impl CountDocuments {
 impl OperationWithDefaults for CountDocuments {
     type O = u64;
 
-    const NAME: &'static str = Aggregate::NAME;
+    const NAME: &'static crate::bson_compat::CStr = Aggregate::NAME;
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.aggregate.build(description)
     }
 
-    fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<bson::Timestamp>> {
+    fn extract_at_cluster_time(
+        &self,
+        response: &RawDocument,
+    ) -> Result<Option<crate::bson::Timestamp>> {
         self.aggregate.extract_at_cluster_time(response)
     }
 

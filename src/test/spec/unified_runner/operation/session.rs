@@ -25,7 +25,7 @@ impl TestOperation for EndSession {
         async move {
             match test_runner.entities.write().await.get_mut(id) {
                 Some(Entity::Session(session)) => session.client_session.take(),
-                e => panic!("expected session for {:?}, got {:?}", id, e),
+                e => panic!("expected session for {id:?}, got {e:?}"),
             };
             tokio::time::sleep(Duration::from_secs(1)).await;
             Ok(None)

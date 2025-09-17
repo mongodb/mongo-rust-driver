@@ -19,6 +19,7 @@ use tokio::sync::RwLock;
 
 use crate::{
     bson::{Bson, Document},
+    bson_compat::cstr,
     client::{
         auth::{
             self,
@@ -149,7 +150,7 @@ impl ScramVersion {
     ) -> Result<FirstRound> {
         let client_first = self.build_client_first(credential, false, server_api)?;
 
-        let command = client_first.to_command(self);
+        let command = client_first.to_command(self)?;
 
         let server_first = conn.send_message(command).await?;
 
@@ -318,7 +319,7 @@ impl ScramVersion {
             ScramVersion::Sha1 => {
                 // nosemgrep: insecure-hashes
                 let mut md5 = Md5::new(); // mongodb rating: No Fix Needed
-                md5.update(format!("{}:mongo:{}", username, password));
+                md5.update(format!("{username}:mongo:{password}"));
                 Cow::Owned(hex::encode(md5.finalize()))
             }
             ScramVersion::Sha256 => match stringprep::saslprep(password) {
@@ -414,8 +415,8 @@ pub(crate) struct ClientFirst {
 impl ClientFirst {
     fn new(source: &str, username: &str, include_db: bool, server_api: Option<ServerApi>) -> Self {
         let nonce = auth::generate_nonce();
-        let gs2_header = format!("{},,", NO_CHANNEL_BINDING);
-        let bare = format!("{}={},{}={}", USERNAME_KEY, username, NONCE_KEY, nonce);
+        let gs2_header = format!("{NO_CHANNEL_BINDING},,");
+        let bare = format!("{USERNAME_KEY}={username},{NONCE_KEY}={nonce}");
         let full = format!("{}{}", &gs2_header, &bare);
         let end = full.len();
         ClientFirst {
@@ -447,7 +448,7 @@ impl ClientFirst {
         &self.message[..]
     }
 
-    pub(super) fn to_command(&self, scram: &ScramVersion) -> Command {
+    pub(super) fn to_command(&self, scram: &ScramVersion) -> Result<Command> {
         let payload = self.message().as_bytes().to_vec();
         let auth_mech = AuthMechanism::from_scram_version(scram);
         let sasl_start = SaslStart::new(
@@ -457,13 +458,13 @@ impl ClientFirst {
             self.server_api.clone(),
         );
 
-        let mut cmd = sasl_start.into_command();
+        let mut cmd = sasl_start.into_command()?;
 
         if self.include_db {
-            cmd.body.append("db", self.source.clone());
+            cmd.body.append(cstr!("db"), self.source.clone());
         }
 
-        cmd
+        Ok(cmd)
     }
 }
 
@@ -601,7 +602,7 @@ impl ClientFinal {
         let client_proof =
             base64::encode(xor(client_key.as_ref(), client_signature.as_ref()).as_slice());
 
-        let message = format!("{},{}={}", without_proof, PROOF_KEY, client_proof);
+        let message = format!("{without_proof},{PROOF_KEY}={client_proof}");
 
         Ok(ClientFinal {
             source: source.into(),

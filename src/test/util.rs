@@ -17,7 +17,7 @@ use crate::{
     error::Result,
     hello::{hello_command, HelloCommandResponse},
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
-    test::{get_client_options, server_version_gte, topology_is_sharded},
+    test::{get_client_options, topology_is_sharded},
     BoxFuture,
     Client,
     Collection,
@@ -155,8 +155,9 @@ impl TestClient {
             cmd.insert("pwd", pwd);
         }
 
-        if server_version_gte(4, 0).await && !mechanisms.is_empty() {
-            let ms: bson::Array = mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();
+        if !mechanisms.is_empty() {
+            let ms: crate::bson::Array =
+                mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();
             cmd.insert("mechanisms", ms);
         }
         self.database(db.into().unwrap_or("admin"))
@@ -239,7 +240,9 @@ impl TestClient {
             .database("admin")
             .run_command(hello.body.try_into()?)
             .await?;
-        Ok(bson::from_document(hello_response_doc)?)
+        Ok(crate::bson_compat::deserialize_from_document(
+            hello_response_doc,
+        )?)
     }
 }
 
@@ -258,7 +261,7 @@ fn get_exe_name_skip_ci() {
         .into_os_string()
         .into_string()
         .expect("Failed to convert OS string to string");
-    write!(file, "{}", exe_name).expect("Failed to write executable name to file");
+    write!(file, "{exe_name}").expect("Failed to write executable name to file");
 }
 
 /// Log a message on stderr that won't be captured by `cargo test`.  Panics if the write fails.

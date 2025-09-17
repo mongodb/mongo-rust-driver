@@ -33,6 +33,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bson::{self, Bson, Document},
+    bson_compat::CStr,
     bson_util::{self, extend_raw_document_buf},
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     cmap::{
@@ -51,7 +52,7 @@ use crate::{
         WriteConcernError,
         WriteFailure,
     },
-    options::WriteConcern,
+    options::{ClientOptions, WriteConcern},
     selection_criteria::SelectionCriteria,
     BoxFuture,
     ClientSession,
@@ -74,7 +75,6 @@ pub(crate) use raw_output::RawOutput;
 pub(crate) use search_index::{CreateSearchIndexes, DropSearchIndex, UpdateSearchIndex};
 pub(crate) use update::{Update, UpdateOrReplace};
 
-const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
 const SERVER_4_4_0_WIRE_VERSION: i32 = 9;
 const SERVER_5_0_0_WIRE_VERSION: i32 = 13;
 const SERVER_8_0_0_WIRE_VERSION: i32 = 25;
@@ -99,6 +99,26 @@ pub(crate) enum Retryability {
     None,
 }
 
+impl Retryability {
+    /// Returns this level of retryability in tandem with the client options.
+    pub(crate) fn with_options(&self, options: &ClientOptions) -> Self {
+        match self {
+            Self::Write if options.retry_writes != Some(false) => Self::Write,
+            Self::Read if options.retry_reads != Some(false) => Self::Read,
+            _ => Self::None,
+        }
+    }
+
+    /// Whether this level of retryability can retry the given error.
+    pub(crate) fn can_retry_error(&self, error: &Error) -> bool {
+        match self {
+            Self::Write => error.is_write_retryable(),
+            Self::Read => error.is_read_retryable(),
+            Self::None => false,
+        }
+    }
+}
+
 /// A trait modeling the behavior of a server side operation.
 ///
 /// No methods in this trait should have default behaviors to ensure that wrapper operations
@@ -108,7 +128,7 @@ pub(crate) trait Operation {
     type O;
 
     /// The name of the server side command associated with this operation.
-    const NAME: &'static str;
+    const NAME: &'static CStr;
 
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
@@ -156,7 +176,8 @@ pub(crate) trait Operation {
 
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle>;
 
-    fn name(&self) -> &str;
+    /// The name of the server side command associated with this operation.
+    fn name(&self) -> &CStr;
 }
 
 pub(crate) type OverrideCriteriaFn =
@@ -169,7 +190,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     type O;
 
     /// The name of the server side command associated with this operation.
-    const NAME: &'static str;
+    const NAME: &'static CStr;
 
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
@@ -254,7 +275,8 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         None
     }
 
-    fn name(&self) -> &str {
+    /// The name of the server side command associated with this operation.
+    fn name(&self) -> &CStr {
         Self::NAME
     }
 }
@@ -264,7 +286,7 @@ where
     T: Send + Sync,
 {
     type O = T::O;
-    const NAME: &'static str = T::NAME;
+    const NAME: &'static CStr = T::NAME;
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.build(description)
     }
@@ -308,7 +330,7 @@ where
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.pinned_connection()
     }
-    fn name(&self) -> &str {
+    fn name(&self) -> &CStr {
         self.name()
     }
 }
@@ -389,7 +411,7 @@ pub(crate) fn append_options<T: Serialize + Debug>(
     options: Option<&T>,
 ) -> Result<()> {
     if let Some(options) = options {
-        let options_doc = bson::to_document(options)?;
+        let options_doc = crate::bson_compat::serialize_to_document(options)?;
         doc.extend(options_doc);
     }
     Ok(())
@@ -400,7 +422,7 @@ pub(crate) fn append_options_to_raw_document<T: Serialize>(
     options: Option<&T>,
 ) -> Result<()> {
     if let Some(options) = options {
-        let options_raw_doc = bson::to_raw_document_buf(options)?;
+        let options_raw_doc = crate::bson_compat::serialize_to_raw_document_buf(options)?;
         extend_raw_document_buf(doc, options_raw_doc)?;
     }
     Ok(())
@@ -433,19 +455,39 @@ impl WriteConcernOnlyBody {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug)]
 pub(crate) struct WriteResponseBody<T = SingleWriteBody> {
-    #[serde(flatten)]
     body: T,
-
-    #[serde(rename = "writeErrors")]
     write_errors: Option<Vec<IndexedWriteError>>,
-
-    #[serde(rename = "writeConcernError")]
     write_concern_error: Option<WriteConcernError>,
-
-    #[serde(rename = "errorLabels")]
     labels: Option<Vec<String>>,
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for WriteResponseBody<T> {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use crate::bson_compat::Utf8Lossy;
+        #[derive(Deserialize)]
+        struct Helper<T> {
+            #[serde(flatten)]
+            body: T,
+            #[serde(rename = "writeErrors")]
+            write_errors: Option<Utf8Lossy<Vec<IndexedWriteError>>>,
+            #[serde(rename = "writeConcernError")]
+            write_concern_error: Option<Utf8Lossy<WriteConcernError>>,
+            #[serde(rename = "errorLabels")]
+            labels: Option<Vec<String>>,
+        }
+        let helper = Helper::deserialize(deserializer)?;
+        Ok(Self {
+            body: helper.body,
+            write_errors: helper.write_errors.map(|l| l.0),
+            write_concern_error: helper.write_concern_error.map(|l| l.0),
+            labels: helper.labels,
+        })
+    }
 }
 
 impl<T> WriteResponseBody<T> {
@@ -531,17 +573,3 @@ where
         Ok(SingleCursorResult(full_body.cursor.first_batch.pop()))
     }
 }
-
-macro_rules! remove_empty_write_concern {
-    ($opts:expr) => {
-        if let Some(ref mut options) = $opts {
-            if let Some(ref write_concern) = options.write_concern {
-                if write_concern.is_empty() {
-                    options.write_concern = None;
-                }
-            }
-        }
-    };
-}
-
-pub(crate) use remove_empty_write_concern;

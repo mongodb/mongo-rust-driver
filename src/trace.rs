@@ -21,7 +21,7 @@ pub(crate) trait TracingRepresentation {
     fn tracing_representation(&self) -> Self::Representation;
 }
 
-impl TracingRepresentation for bson::oid::ObjectId {
+impl TracingRepresentation for crate::bson::oid::ObjectId {
     type Representation = String;
 
     fn tracing_representation(&self) -> String {
@@ -74,7 +74,7 @@ pub(crate) fn truncate_on_char_boundary(s: &mut String, new_len: usize) {
     }
 }
 
-fn serialize_command_or_reply(doc: bson::Document, max_length_bytes: usize) -> String {
+fn serialize_command_or_reply(doc: crate::bson::Document, max_length_bytes: usize) -> String {
     let mut ext_json = Bson::Document(doc).into_relaxed_extjson().to_string();
     truncate_on_char_boundary(&mut ext_json, max_length_bytes);
     ext_json

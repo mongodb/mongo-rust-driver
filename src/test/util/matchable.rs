@@ -1,6 +1,6 @@
 use std::{any::Any, fmt::Debug, time::Duration};
 
-use bson::spec::ElementType;
+use crate::bson::spec::ElementType;
 
 use crate::{
     bson::{Bson, Document},
@@ -37,7 +37,7 @@ pub trait MatchErrExt {
 
 impl MatchErrExt for Result<(), String> {
     fn prefix(self, name: &str) -> Self {
-        self.map_err(|s| format!("{}: {}", name, s))
+        self.map_err(|s| format!("{name}: {s}"))
     }
 }
 
@@ -47,10 +47,7 @@ pub fn eq_matches<T: PartialEq + Debug>(
     expected: &T,
 ) -> Result<(), String> {
     if actual != expected {
-        return Err(format!(
-            "expected {} {:?}, got {:?}",
-            name, expected, actual
-        ));
+        return Err(format!("expected {name} {expected:?}, got {actual:?}"));
     }
     Ok(())
 }
@@ -94,7 +91,7 @@ fn type_from_name(name: &str) -> ElementType {
         "decimal" => ElementType::Decimal128,
         "minKey" => ElementType::MinKey,
         "maxKey" => ElementType::MaxKey,
-        _ => panic!("invalid type name {:?}", name),
+        _ => panic!("invalid type name {name:?}"),
     }
 }
 
@@ -112,10 +109,7 @@ impl Matchable for Bson {
             if types.contains(&self.element_type()) {
                 return Ok(());
             } else {
-                return Err(format!(
-                    "expected type {:?}, actual value {:?}",
-                    types, self
-                ));
+                return Err(format!("expected type {types:?}, actual value {self:?}"));
             }
         }
         match (self, expected) {
@@ -141,7 +135,7 @@ impl Matchable for Bson {
                         eq_matches("int", &actual_int, &expected_int)?
                     }
                     (None, Some(expected_int)) => {
-                        return Err(format!("expected int {}, got none", expected_int))
+                        return Err(format!("expected int {expected_int}, got none"))
                     }
                     _ => eq_matches("bson", self, expected)?,
                 }
@@ -164,7 +158,7 @@ impl Matchable for Document {
                 Some(actual_v) => actual_v.matches(v).prefix(k)?,
                 None => {
                     if v != &Bson::Null {
-                        return Err(format!("{:?}: expected value {:?}, got null", k, v));
+                        return Err(format!("{k:?}: expected value {v:?}, got null"));
                     }
                 }
             }

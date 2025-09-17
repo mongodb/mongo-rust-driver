@@ -47,11 +47,17 @@ pub const UNKNOWN_TRANSACTION_COMMIT_RESULT: &str = "UnknownTransactionCommitRes
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// An error that can occur in the `mongodb` crate. The inner
-/// [`ErrorKind`](enum.ErrorKind.html) is wrapped in an `Arc` to allow the errors to be
+/// [`ErrorKind`](enum.ErrorKind.html) is wrapped in an `Box` to allow the errors to be
 /// cloned.
 #[derive(Clone, Debug, Error)]
-#[cfg_attr(test, error("Kind: {kind}, labels: {labels:?}, backtrace: {bt}"))]
-#[cfg_attr(not(test), error("Kind: {kind}, labels: {labels:?}"))]
+#[cfg_attr(
+    test,
+    error("Kind: {kind}, labels: {labels:?}, source: {source:?}, backtrace: {bt}")
+)]
+#[cfg_attr(
+    not(test),
+    error("Kind: {kind}, labels: {labels:?}, source: {source:?}")
+)]
 #[non_exhaustive]
 pub struct Error {
     /// The type of error that occurred.
@@ -101,8 +107,8 @@ impl Error {
     pub(crate) fn pool_cleared_error(address: &ServerAddress, cause: &Error) -> Self {
         ErrorKind::ConnectionPoolCleared {
             message: format!(
-                "Connection pool for {} cleared because another operation failed with: {}",
-                address, cause
+                "Connection pool for {address} cleared because another operation failed with: \
+                 {cause}"
             ),
         }
         .into()
@@ -111,7 +117,7 @@ impl Error {
     /// Creates an `AuthenticationError` for the given mechanism with the provided reason.
     pub(crate) fn authentication_error(mechanism_name: &str, reason: &str) -> Self {
         ErrorKind::Authentication {
-            message: format!("{} failure: {}", mechanism_name, reason),
+            message: format!("{mechanism_name} failure: {reason}"),
         }
         .into()
     }
@@ -290,6 +296,14 @@ impl Error {
         .into()
     }
 
+    #[cfg(feature = "dns-resolver")]
+    pub(crate) fn from_resolve_proto_error(error: hickory_proto::error::ProtoError) -> Self {
+        ErrorKind::DnsResolve {
+            message: error.to_string(),
+        }
+        .into()
+    }
+
     pub(crate) fn is_non_timeout_network_error(&self) -> bool {
         matches!(self.kind.as_ref(), ErrorKind::Io(ref io_err) if io_err.kind() != std::io::ErrorKind::TimedOut)
     }
@@ -444,8 +458,7 @@ impl Error {
                 6, 7, 89, 91, 189, 262, 9001, 10107, 11600, 11602, 13435, 13436, 63, 150, 13388,
                 234, 133,
             ]
-            .iter()
-            .any(|c| *c == code)
+            .contains(&code)
             {
                 return true;
             }
@@ -535,6 +548,8 @@ impl Error {
             | ErrorKind::GridFs(_) => {}
             #[cfg(feature = "in-use-encryption")]
             ErrorKind::Encryption(_) => {}
+            #[cfg(feature = "bson-3")]
+            ErrorKind::Bson(_) => {}
         }
     }
 }
@@ -548,23 +563,33 @@ where
     }
 }
 
-impl From<bson::de::Error> for ErrorKind {
-    fn from(err: bson::de::Error) -> Self {
+#[cfg(not(feature = "bson-3"))]
+impl From<crate::bson::de::Error> for ErrorKind {
+    fn from(err: crate::bson::de::Error) -> Self {
         Self::BsonDeserialization(err)
     }
 }
 
-impl From<bson::ser::Error> for ErrorKind {
-    fn from(err: bson::ser::Error) -> Self {
+#[cfg(not(feature = "bson-3"))]
+impl From<crate::bson::ser::Error> for ErrorKind {
+    fn from(err: crate::bson::ser::Error) -> Self {
         Self::BsonSerialization(err)
     }
 }
 
-impl From<bson::raw::Error> for ErrorKind {
-    fn from(err: bson::raw::Error) -> Self {
+#[cfg(not(feature = "bson-3"))]
+impl From<crate::bson_compat::RawError> for ErrorKind {
+    fn from(err: crate::bson_compat::RawError) -> Self {
         Self::InvalidResponse {
             message: err.to_string(),
         }
+    }
+}
+
+#[cfg(feature = "bson-3")]
+impl From<crate::bson::error::Error> for ErrorKind {
+    fn from(err: crate::bson::error::Error) -> Self {
+        Self::Bson(err)
     }
 }
 
@@ -609,13 +634,18 @@ pub enum ErrorKind {
     #[non_exhaustive]
     Authentication { message: String },
 
-    /// Wrapper around `bson::de::Error`.
+    /// Wrapper around `bson::de::Error`.  Unused if the `bson-3` feature is enabled.
     #[error("{0}")]
-    BsonDeserialization(crate::bson::de::Error),
+    BsonDeserialization(crate::bson_compat::DeError),
 
-    /// Wrapper around `bson::ser::Error`.
+    /// Wrapper around `bson::ser::Error`.  Unused if the `bson-3` feature is enabled.
     #[error("{0}")]
-    BsonSerialization(crate::bson::ser::Error),
+    BsonSerialization(crate::bson_compat::SerError),
+
+    /// Wrapper around `bson::error::Error`.
+    #[cfg(feature = "bson-3")]
+    #[error("{0}")]
+    Bson(crate::bson::error::Error),
 
     /// An error occurred when trying to execute an [`insert_many`](crate::Collection::insert_many)
     /// operation.

@@ -1,4 +1,4 @@
-use bson::{Bson, Document};
+use crate::bson::{Bson, Document};
 
 use crate::{
     coll::options::{DeleteOptions, Hint},
@@ -67,7 +67,7 @@ where
     ///
     /// [`run`](Delete::run) will return d[`Result<DeleteResult>`].
     #[deeplink]
-    #[options_doc(delete, sync)]
+    #[options_doc(delete, "run")]
     pub fn delete_one(&self, query: Document) -> Delete {
         self.async_collection.delete_one(query)
     }
@@ -76,7 +76,7 @@ where
     ///
     /// [`run`](Delete::run) will return d[`Result<DeleteResult>`].
     #[deeplink]
-    #[options_doc(delete, sync)]
+    #[options_doc(delete, "run")]
     pub fn delete_many(&self, query: Document) -> Delete {
         self.async_collection.delete_many(query)
     }

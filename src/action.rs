@@ -88,8 +88,7 @@ pub trait Action: private::Sealed + IntoFuture {
     /// If the value is `Some`, call the provided function on `self`.  Convenient for chained
     /// updates with values that need to be set conditionally.  For example:
     /// ```rust
-    /// # use mongodb::{Client, error::Result};
-    /// # use bson::Document;
+    /// # use mongodb::{Client, error::Result, bson::Document};
     /// use mongodb::action::Action;
     /// async fn list_my_collections(client: &Client, filter: Option<Document>) -> Result<Vec<String>> {
     ///     client.database("my_db")

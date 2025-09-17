@@ -1,6 +1,9 @@
 use std::{collections::VecDeque, time::Duration};
 
-use bson::{rawdoc, RawBson};
+use crate::{
+    bson::{rawdoc, RawBson},
+    bson_compat::{cstr, CStr},
+};
 use serde::Deserialize;
 
 use crate::{
@@ -49,7 +52,7 @@ impl<'conn> GetMore<'conn> {
 impl OperationWithDefaults for GetMore<'_> {
     type O = GetMoreResult;
 
-    const NAME: &'static str = "getMore";
+    const NAME: &'static CStr = cstr!("getMore");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
@@ -60,27 +63,23 @@ impl OperationWithDefaults for GetMore<'_> {
         if let Some(batch_size) = self.batch_size {
             let batch_size = Checked::from(batch_size).try_into::<i32>()?;
             if batch_size != 0 {
-                body.append("batchSize", batch_size);
+                body.append(cstr!("batchSize"), batch_size);
             }
         }
 
         if let Some(ref max_time) = self.max_time {
             body.append(
-                "maxTimeMS",
+                cstr!("maxTimeMS"),
                 max_time.as_millis().try_into().unwrap_or(i32::MAX),
             );
         }
 
         if let Some(comment) = &self.comment {
             let raw_comment: RawBson = comment.clone().try_into()?;
-            body.append("comment", raw_comment);
+            body.append(cstr!("comment"), raw_comment);
         }
 
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
-            body,
-        ))
+        Ok(Command::new(Self::NAME, &self.ns.db, body))
     }
 
     fn handle_response<'a>(

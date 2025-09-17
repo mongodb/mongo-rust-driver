@@ -1,4 +1,4 @@
-use bson::{oid::ObjectId, Bson, Document};
+use crate::bson::{oid::ObjectId, Bson, Document};
 
 #[cfg(docsrs)]
 use crate::gridfs::FilesCollectionDocument;
@@ -32,7 +32,7 @@ impl crate::sync::gridfs::GridFsBucket {
     ///
     /// [`run`](OpenUploadStream::run) will return d[`Result<GridFsUploadStream>`].
     #[deeplink]
-    #[options_doc(open_upload_stream, sync)]
+    #[options_doc(open_upload_stream, "run")]
     pub fn open_upload_stream(&self, filename: impl AsRef<str>) -> OpenUploadStream {
         self.async_bucket.open_upload_stream(filename)
     }

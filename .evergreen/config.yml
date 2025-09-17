@@ -94,9 +94,9 @@ buildvariants:
       SSL: ssl
     tasks:
       # Ubuntu 22.04 does not support MongoDB versions below 6.0.
-      - name: .standalone !.4.0 !.4.2 !.4.4 !.5.0
-      - name: .replicaset !.4.0 !.4.2 !.4.4 !.5.0
-      - name: .sharded !.4.0 !.4.2 !.4.4 !.5.0
+      - name: .standalone !.4.2 !.4.4 !.5.0
+      - name: .replicaset !.4.2 !.4.4 !.5.0
+      - name: .sharded !.4.2 !.4.4 !.5.0
 
   - name: macos-14.00
     display_name: "MacOS 14.00"
@@ -199,8 +199,9 @@ buildvariants:
       # Configuring SSL: ssl causes errors in bootstrap mongo-orchestration.
     tasks:
       # The Stable API was introduced in MongoDB version 5.0. Drivers Evergreen Tools only supports
-      # setting REQUIRE_API_VERSION on standalones.
-      - .standalone !.4.0 !.4.2 !.4.4
+      # setting REQUIRE_API_VERSION on standalones and sharded clusters.
+      - .standalone !.4.2 !.4.4
+      - .sharded !.4.2 !.4.4
 
   - name: sync-api
     display_name: "Sync API"
@@ -256,6 +257,31 @@ buildvariants:
     # Limit the test to only schedule every 14 days to reduce external resource usage.
     batchtime: 20160
 
+  - name: gssapi-auth-linux
+    display_name: "GSSAPI Authentication - Linux"
+    patchable: true
+    run_on:
+      - ubuntu2204-small
+    tasks:
+      - test-gssapi-auth
+
+  - name: gssapi-auth-macos
+    display_name: "GSSAPI Authentication - macOS"
+    patchable: true
+    disable: true
+    run_on:
+      - macos-14
+    tasks:
+      - test-gssapi-auth
+
+  - name: gssapi-auth-windows
+    display_name: "GSSAPI Authentication - Windows"
+    patchable: true
+    run_on:
+      - windows-vsCurrent-small
+    tasks:
+      - test-gssapi-auth
+
   - name: x509-auth
     display_name: "x509 Authentication"
     patchable: false
@@ -266,17 +292,6 @@ buildvariants:
       SSL: ssl
     tasks:
       - name: test-x509-auth
-
-  # - name: serverless
-  #   display_name: "Serverless"
-  #   run_on:
-  #     - rhel80-small
-  #   expansions:
-  #     LIBMONGOCRYPT_OS: rhel-80-64-bit
-  #     AUTH: auth
-  #     SSL: ssl
-  #   tasks:
-  #     - serverless-task-group
 
   - name: oidc-linux
     display_name: "OIDC Linux"
@@ -378,6 +393,7 @@ buildvariants:
 
   - name: happy-eyeballs-macos
     display_name: "Happy Eyeballs (MacOS)"
+    patchable: false
     run_on:
       - macos-14
     tasks:
@@ -407,43 +423,6 @@ buildvariants:
 # Task Groups #
 ###############
 task_groups:
-  - name: serverless-task-group
-    setup_group_can_fail_task: true
-    setup_group_timeout_secs: 1800 # 30 minutes
-    setup_group:
-      - func: "fetch source"
-      - func: "create expansions"
-      - func: "prepare resources"
-      - func: "windows fix"
-      - func: "fix absolute paths"
-      - func: "init test-results"
-      - func: "make files executable"
-      - func: "install rust"
-      - func: "install junit dependencies"
-      - command: shell.exec
-        params:
-          shell: "bash"
-          script: |
-            ${PREPARE_SHELL}
-            bash ${DRIVERS_TOOLS}/.evergreen/serverless/setup-secrets.sh
-            bash ${DRIVERS_TOOLS}/.evergreen/serverless/create-instance.sh
-      - command: expansions.update
-        params:
-          file: serverless-expansion.yml
-    teardown_group:
-      - command: shell.exec
-        params:
-          script: |
-            ${PREPARE_SHELL}
-            bash ${DRIVERS_TOOLS}/.evergreen/serverless/delete-instance.sh
-      - func: "upload test results"
-      - func: "upload-mo-artifacts"
-      - func: "cleanup"
-
-    tasks:
-      - "test-serverless"
-      - "test-in-use-encryption-serverless"
-
   - name: azure-kms-task-group
     setup_group_can_fail_task: true
     setup_group_timeout_secs: 1800 # 30 minutes
@@ -692,6 +671,10 @@ task_groups:
       - func: init test-results
       - func: make files executable
       - func: install rust
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+          duration_seconds: 3600
       - command: subprocess.exec
         params:
           binary: bash
@@ -699,6 +682,10 @@ task_groups:
             AZUREOIDC_VMNAME_PREFIX: "RUST_DRIVER"
           args:
             - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/azure/create-and-setup-vm.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
     teardown_task:
       - command: subprocess.exec
         params:
@@ -719,6 +706,10 @@ task_groups:
       - func: init test-results
       - func: make files executable
       - func: install rust
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+          duration_seconds: 3600
       - command: subprocess.exec
         params:
           binary: bash
@@ -726,6 +717,10 @@ task_groups:
             GCPOIDC_VMNAME_PREFIX: "RUST_DRIVER"
           args:
             - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/gcp/setup.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
     teardown_task:
       - command: subprocess.exec
         params:
@@ -746,11 +741,19 @@ task_groups:
       - func: init test-results
       - func: make files executable
       - func: install rust
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+          duration_seconds: 3600
       - command: subprocess.exec
         params:
           binary: bash
           args:
             - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/setup.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
     teardown_task:
       - command: subprocess.exec
         params:
@@ -795,7 +798,7 @@ tasks:
       - func: "compile only"
         vars:
           # Our minimum supported Rust version. This should be updated whenever the MSRV is bumped.
-          RUST_VERSION: 1.74.0
+          RUST_VERSION: 1.83.0
 
   - name: check-cargo-deny
     commands:
@@ -947,6 +950,10 @@ tasks:
         vars:
           AWS_ROLE_SESSION_NAME: test
 
+  - name: test-gssapi-auth
+    commands:
+      - func: "run gssapi auth test"
+
   - name: test-atlas-connectivity
     commands:
       - func: "run atlas tests"
@@ -987,10 +994,6 @@ tasks:
           MONGODB_VERSION: rapid
           TOPOLOGY: server
       - func: "run x509 tests"
-
-  - name: test-serverless
-    commands:
-      - func: "run serverless tests"
 
   - name: test-tokio-sync
     tags: [sync]
@@ -1087,18 +1090,6 @@ tasks:
           TOPOLOGY: replica_set
       - func: "start csfle servers"
       - func: "run csfle tests"
-
-  - name: test-in-use-encryption-serverless
-    commands:
-      - command: expansions.update
-        params:
-          file: src/expansion.yml
-      - command: expansions.update
-        params:
-          file: serverless-expansion.yml
-      - func: "install libmongocrypt"
-      - func: "start csfle servers"
-      - func: "run csfle serverless tests"
 
   - name: test-load-balancer-5.0
     tags: [load-balancer]
@@ -1415,6 +1406,24 @@ functions:
         env:
           AWS_AUTH_TYPE: web-identity
 
+  "run gssapi auth test":
+    - command: ec2.assume_role
+      params:
+        role_arn: ${aws_test_secrets_role}
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        working_dir: src
+        args:
+          - .evergreen/run-gssapi-tests.sh
+        include_expansions_in_env:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+
   "run x509 tests":
     - command: shell.exec
       type: test
@@ -1554,23 +1563,6 @@ functions:
           - PROJECT_DIRECTORY
           - MONGODB_URI
 
-  "run serverless tests":
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        shell: bash
-        include_expansions_in_env:
-          - SERVERLESS_ATLAS_USER
-          - SERVERLESS_ATLAS_PASSWORD
-        script: |
-          ${PREPARE_SHELL}
-
-          export SINGLE_MONGOS_LB_URI=${SERVERLESS_URI}
-          . .evergreen/generate-uri.sh
-
-          .evergreen/run-serverless-tests.sh
-
   "run atlas tests":
     - command: ec2.assume_role
       params:
@@ -1645,35 +1637,6 @@ functions:
           - CRYPT_SHARED_LIB_PATH
           - DISABLE_CRYPT_SHARED
           - AZURE_IMDS_MOCK_PORT
-
-  "run csfle serverless tests":
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        shell: bash
-        include_expansions_in_env:
-          - DRIVERS_TOOLS
-          - PROJECT_DIRECTORY
-          - MONGODB_URI
-          - MONGOCRYPT_LIB_DIR
-          - OPENSSL
-          - OS
-          - LD_LIBRARY_PATH
-          - AWS_ACCESS_KEY_ID
-          - AWS_SECRET_ACCESS_KEY
-          - CSFLE_LOCAL_KEY
-          - CRYPT_SHARED_LIB_PATH
-          - DISABLE_CRYPT_SHARED
-          - AZURE_IMDS_MOCK_PORT
-          - SERVERLESS_ATLAS_USER
-          - SERVERLESS_ATLAS_PASSWORD
-        script: |
-          export SINGLE_MONGOS_LB_URI=${SERVERLESS_URI}
-          . .evergreen/generate-uri.sh
-          export SERVERLESS=serverless
-
-          .evergreen/run-csfle-tests.sh
 
   "build and upload gcp kms test":
     - command: shell.exec

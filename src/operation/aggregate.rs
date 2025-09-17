@@ -2,11 +2,12 @@ pub(crate) mod change_stream;
 
 use crate::{
     bson::{doc, Bson, Document},
+    bson_compat::{cstr, CStr},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, remove_empty_write_concern, Retryability},
+    operation::{append_options, Retryability},
     options::{AggregateOptions, ReadPreference, SelectionCriteria, WriteConcern},
     Namespace,
 };
@@ -16,7 +17,6 @@ use super::{
     ExecutionContext,
     OperationWithDefaults,
     WriteConcernOnlyBody,
-    SERVER_4_2_0_WIRE_VERSION,
     SERVER_4_4_0_WIRE_VERSION,
 };
 
@@ -46,16 +46,15 @@ impl Aggregate {
 impl OperationWithDefaults for Aggregate {
     type O = CursorSpecification;
 
-    const NAME: &'static str = "aggregate";
+    const NAME: &'static CStr = cstr!("aggregate");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
-            Self::NAME: self.target.to_bson(),
+            crate::bson_compat::cstr_to_str(Self::NAME): self.target.to_bson(),
             "pipeline": bson_util::to_bson_array(&self.pipeline),
             "cursor": {}
         };
 
-        remove_empty_write_concern!(self.options);
         append_options(&mut body, self.options.as_ref())?;
 
         if self.is_out_or_merge() {
@@ -65,8 +64,8 @@ impl OperationWithDefaults for Aggregate {
         }
 
         Ok(Command::new_read(
-            Self::NAME.to_string(),
-            self.target.db_name().to_string(),
+            Self::NAME,
+            self.target.db_name(),
             self.options.as_ref().and_then(|o| o.read_concern.clone()),
             (&body).try_into()?,
         ))
@@ -74,8 +73,8 @@ impl OperationWithDefaults for Aggregate {
 
     fn extract_at_cluster_time(
         &self,
-        response: &bson::RawDocument,
-    ) -> Result<Option<bson::Timestamp>> {
+        response: &crate::bson::RawDocument,
+    ) -> Result<Option<crate::bson::Timestamp>> {
         CursorBody::extract_at_cluster_time(response)
     }
 
@@ -115,10 +114,9 @@ impl OperationWithDefaults for Aggregate {
             .and_then(|opts| opts.selection_criteria.as_ref())
     }
 
-    fn supports_read_concern(&self, description: &StreamDescription) -> bool {
-        // for aggregates that write, read concern is only supported in MongoDB 4.2+.
-        !self.is_out_or_merge()
-            || description.max_wire_version.unwrap_or(0) >= SERVER_4_2_0_WIRE_VERSION
+    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
+        // for aggregates that write, read concern is supported in MongoDB 4.2+.
+        true
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

@@ -1,13 +1,12 @@
 use std::time::Duration;
 
-use bson::{doc, Document};
+use crate::bson::{doc, Document};
 
 use crate::{
     event::sdam::SdamEvent,
     hello::LEGACY_HELLO_COMMAND_NAME,
     runtime,
     test::{
-        block_connection_supported,
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
@@ -41,6 +40,9 @@ async fn run_unified() {
             // The driver does not support socketTimeoutMS.
             "Reset server and pool after network timeout error during authentication",
             "Ignore network timeout error on find",
+            // TODO RUST-2068: unskip these tests
+            "Pool is cleared on handshake error during minPoolSize population",
+            "Pool is cleared on authentication error during minPoolSize population",
         ])
         .await;
 }
@@ -83,7 +85,7 @@ async fn streaming_min_heartbeat_frequency() {
                     })
                     .await;
                 if event.is_none() {
-                    return Err(format!("timed out waiting for heartbeat from {}", address));
+                    return Err(format!("timed out waiting for heartbeat from {address}"));
                 }
             }
             Ok(())
@@ -156,10 +158,6 @@ async fn rtt_is_updated() {
     }
     if topology_is_load_balanced().await {
         log_uncaptured("skipping rtt_is_updated due to load balanced topology");
-        return;
-    }
-    if !block_connection_supported().await {
-        log_uncaptured("skipping rtt_is_updated due to not supporting block_connection");
         return;
     }
 

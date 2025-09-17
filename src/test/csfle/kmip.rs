@@ -207,8 +207,7 @@ async fn data_key_double_encryption() -> Result<()> {
         let err = result.unwrap_err();
         assert!(
             matches!(*err.kind, ErrorKind::Encryption(..)) || err.is_command_error(),
-            "unexpected error: {}",
-            err
+            "unexpected error: {err}"
         );
     }
 
@@ -266,7 +265,7 @@ async fn external_key_vault() -> Result<()> {
             .await;
         if with_external_key_vault {
             let err = result.unwrap_err();
-            assert!(err.is_auth_error(), "unexpected error: {}", err);
+            assert!(err.is_auth_error(), "unexpected error: {err}");
         } else {
             assert!(
                 result.is_ok(),
@@ -287,7 +286,7 @@ async fn external_key_vault() -> Result<()> {
             .await;
         if with_external_key_vault {
             let err = result.unwrap_err();
-            assert!(err.is_auth_error(), "unexpected error: {}", err);
+            assert!(err.is_auth_error(), "unexpected error: {err}");
         } else {
             assert!(
                 result.is_ok(),
@@ -460,7 +459,7 @@ mod corpus {
             }
             if allowed {
                 let bin = match value {
-                    bson::Bson::Binary(b) => b,
+                    crate::bson::Bson::Binary(b) => b,
                     _ => {
                         return Err(failure!(
                             "expected value {:?} should be Binary, got {:?}",
@@ -470,7 +469,7 @@ mod corpus {
                     }
                 };
                 let actual_bin = match actual_value {
-                    bson::Bson::Binary(b) => b,
+                    crate::bson::Bson::Binary(b) => b,
                     _ => {
                         return Err(failure!(
                             "actual value {:?} should be Binary, got {:?}",
@@ -503,9 +502,9 @@ mod corpus {
             }
             new_obj.insert(name.clone(), value.clone());
         }
-        let bson: bson::Bson = serde_json::Value::Object(new_obj).try_into()?;
+        let bson: crate::bson::Bson = serde_json::Value::Object(new_obj).try_into()?;
         match bson {
-            bson::Bson::Document(d) => Ok(d),
+            crate::bson::Bson::Document(d) => Ok(d),
             _ => Err(failure!("expected document, got {:?}", bson)),
         }
     }
@@ -610,8 +609,7 @@ mod kms_tls {
         let err = run_kms_tls_test(KMS_EXPIRED).await.unwrap_err();
         assert!(
             err.to_string().contains("certificate verify failed"),
-            "unexpected error: {}",
-            err
+            "unexpected error: {err}"
         );
     }
 
@@ -620,8 +618,7 @@ mod kms_tls {
         let err = run_kms_tls_test(KMS_WRONG_HOST).await.unwrap_err();
         assert!(
             err.to_string().contains("certificate verify failed"),
-            "unexpected error: {}",
-            err
+            "unexpected error: {err}"
         );
     }
 }

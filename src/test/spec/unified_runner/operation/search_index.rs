@@ -1,4 +1,7 @@
-use bson::{to_bson, Bson, Document};
+use crate::{
+    bson::{Bson, Document},
+    bson_compat::serialize_to_bson,
+};
 use futures_core::future::BoxFuture;
 use futures_util::{FutureExt, TryStreamExt};
 use serde::Deserialize;
@@ -65,7 +68,7 @@ impl TestOperation for CreateSearchIndexes {
                 .create_search_indexes(self.models.clone())
                 .with_options(self.options.clone())
                 .await?;
-            Ok(Some(to_bson(&names)?.into()))
+            Ok(Some(serialize_to_bson(&names)?.into()))
         }
         .boxed()
     }
@@ -123,7 +126,7 @@ impl TestOperation for ListSearchIndexes {
                 .with_options(self.options.clone())
                 .await?;
             let values: Vec<_> = cursor.try_collect().await?;
-            Ok(Some(to_bson(&values)?.into()))
+            Ok(Some(serialize_to_bson(&values)?.into()))
         }
         .boxed()
     }

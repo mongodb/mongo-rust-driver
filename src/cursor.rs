@@ -8,10 +8,10 @@ use std::{
     task::{Context, Poll},
 };
 
-use bson::RawDocument;
+use crate::bson::RawDocument;
 
 #[cfg(test)]
-use bson::RawDocumentBuf;
+use crate::bson::RawDocumentBuf;
 use derive_where::derive_where;
 use futures_core::Stream;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -272,7 +272,7 @@ impl<T> Cursor<T> {
     where
         T: Deserialize<'a>,
     {
-        bson::from_slice(self.current().as_bytes()).map_err(Error::from)
+        crate::bson_compat::deserialize_from_slice(self.current().as_bytes()).map_err(Error::from)
     }
 
     /// Update the type streamed values will be parsed as.

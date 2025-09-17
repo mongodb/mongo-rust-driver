@@ -1,4 +1,4 @@
-use bson::{doc, Binary};
+use crate::bson::{doc, Binary};
 use mongocrypt::ctx::{Ctx, KmsProvider};
 
 use crate::{
@@ -29,7 +29,7 @@ impl<'a> Action for CreateDataKey<'a> {
         self.client_enc.key_vault.insert_one(&data_key).await?;
         let bin_ref = data_key
             .get_binary("_id")
-            .map_err(|e| Error::internal(format!("invalid data key id: {}", e)))?;
+            .map_err(|e| Error::internal(format!("invalid data key id: {e}")))?;
         Ok(bin_ref.to_binary())
     }
 }
@@ -44,7 +44,7 @@ impl ClientEncryption {
         let mut builder = self.crypt.ctx_builder();
         let mut key_doc = doc! { "provider": kms_provider.as_string() };
         if !matches!(master_key, MasterKey::Local(_)) {
-            let master_doc = bson::to_document(&master_key)?;
+            let master_doc = crate::bson_compat::serialize_to_document(&master_key)?;
             key_doc.extend(master_doc);
         }
         if let Some(opts) = opts {

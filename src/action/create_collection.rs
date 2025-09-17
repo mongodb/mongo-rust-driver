@@ -1,4 +1,4 @@
-use bson::{Bson, Document};
+use crate::bson::{Bson, Document};
 use std::time::Duration;
 
 use crate::{
@@ -47,7 +47,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](CreateCollection::run) will return d[`Result<()>`].
     #[deeplink]
-    #[options_doc(create_coll, sync)]
+    #[options_doc(create_coll, "run")]
     pub fn create_collection(&self, name: impl Into<String>) -> CreateCollection {
         self.async_database.create_collection(name)
     }

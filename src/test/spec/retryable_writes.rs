@@ -1,22 +1,19 @@
 use std::{sync::Arc, time::Duration};
 
-use bson::Bson;
+use crate::{bson::Bson, options::SelectionCriteria};
 use tokio::sync::Mutex;
 
 use crate::{
     bson::{doc, Document},
-    error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
+    error::{Result, RETRYABLE_WRITE_ERROR},
     event::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
     runtime::{self, spawn, AcknowledgedMessage, AsyncJoinHandle},
     test::{
-        block_connection_supported,
-        fail_command_supported,
         get_client_options,
         log_uncaptured,
-        server_version_gt,
         server_version_lt,
         spec::unified_runner::run_unified_tests,
         topology_is_load_balanced,
@@ -42,45 +39,6 @@ async fn run_unified() {
 }
 
 #[tokio::test]
-#[function_name::named]
-async fn mmapv1_error_raised() {
-    if server_version_gt(4, 0).await || !topology_is_replica_set().await {
-        log_uncaptured("skipping mmapv1_error_raised due to test topology");
-        return;
-    }
-
-    let client = Client::for_test().await;
-    let coll = client.init_db_and_coll(function_name!(), "coll").await;
-
-    let server_status = client
-        .database(function_name!())
-        .run_command(doc! { "serverStatus": 1 })
-        .await
-        .unwrap();
-    let name = server_status
-        .get_document("storageEngine")
-        .unwrap()
-        .get_str("name")
-        .unwrap();
-    if name != "mmapv1" {
-        log_uncaptured("skipping mmapv1_error_raised due to unsupported storage engine");
-        return;
-    }
-
-    let err = coll.insert_one(doc! { "x": 1 }).await.unwrap_err();
-    match *err.kind {
-        ErrorKind::Command(err) => {
-            assert_eq!(
-                err.message,
-                "This MongoDB deployment does not support retryable writes. Please add \
-                 retryWrites=false to your connection string."
-            );
-        }
-        e => panic!("expected command error, got: {:?}", e),
-    }
-}
-
-#[tokio::test]
 async fn label_not_added_first_read_error() {
     label_not_added(false).await;
 }
@@ -92,11 +50,6 @@ async fn label_not_added_second_read_error() {
 
 #[function_name::named]
 async fn label_not_added(retry_reads: bool) {
-    if !fail_command_supported().await {
-        log_uncaptured("skipping label_not_added due to fail command unsupported");
-        return;
-    }
-
     let mut options = get_client_options().await.clone();
     options.retry_reads = Some(retry_reads);
     let client = Client::for_test()
@@ -136,12 +89,6 @@ async fn retry_write_pool_cleared() {
     }
     if topology_is_load_balanced().await {
         log_uncaptured("skipping retry_write_pool_cleared due to load-balanced topology");
-        return;
-    }
-    if !block_connection_supported().await {
-        log_uncaptured(
-            "skipping retry_write_pool_cleared due to blockConnection not being supported",
-        );
         return;
     }
 
@@ -212,8 +159,7 @@ async fn retry_write_pool_cleared() {
     }) {
         panic!(
             "Expected second checkout to fail, but no ConnectionCheckoutFailed event observed. \
-             CMAP events:\n{:?}",
-            next_cmap_events
+             CMAP events:\n{next_cmap_events:?}"
         );
     }
 
@@ -246,7 +192,9 @@ async fn retry_write_retryable_write_error() {
             while let Some(msg) = event_rx.recv().await {
                 if let CommandEvent::Succeeded(ev) = &*msg {
                     if let Some(Bson::Document(wc_err)) = ev.reply.get("writeConcernError") {
-                        if ev.command_name == "insert" && wc_err.get_i32("code") == Ok(91) {
+                        if ev.command_name == "insert"
+                            && wc_err.get_i32("code").is_ok_and(|c| c == 91)
+                        {
                             // Spawn a new task so events continue to process
                             let client = client.clone();
                             let fp_tx = fp_tx.clone();
@@ -303,10 +251,6 @@ async fn retry_write_retryable_write_error() {
 // Test that in a sharded cluster writes are retried on a different mongos if one available
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_different_mongos() {
-    if !fail_command_supported().await {
-        log_uncaptured("skipping retry_write_different_mongos: requires failCommand");
-        return;
-    }
     let mut client_options = get_client_options().await.clone();
     if !(topology_is_sharded().await && client_options.hosts.len() >= 2) {
         log_uncaptured(
@@ -315,30 +259,47 @@ async fn retry_write_different_mongos() {
         );
         return;
     }
+
+    // NOTE: This test uses a single client to set failpoints on each mongos and run the insert
+    // operation. This avoids flakiness caused by a race between server discovery and server
+    // selection.
+
+    // When a client is first created, it initializes its view of the topology with all configured
+    // mongos addresses, but marks each as Unknown until it completes the server discovery process
+    // by sending and receiving "hello" messages Unknown servers are not eligible for server
+    // selection.
+
+    // Previously, we created a new client for each call to `enable_fail_point` and for the insert
+    // operation. Each new client restarted the discovery process, and sometimes had not yet marked
+    // both mongos servers as usable, leading to test failures when the retry logic couldn't insert
+    // a second eligible server.
+
+    // By reusing a single client, each `enable_fail_point` call forces discovery to complete for
+    // the corresponding mongos. As a result, when the insert operation runs, the client has a
+    // fully discovered topology and can reliably select between both servers.
     client_options.hosts.drain(2..);
     client_options.retry_writes = Some(true);
-
-    let mut guards = vec![];
-    for ix in [0, 1] {
-        let mut opts = client_options.clone();
-        opts.hosts.remove(ix);
-        opts.direct_connection = Some(true);
-        let client = Client::for_test().options(opts).await;
-
-        let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
-            .error_code(6)
-            .error_labels(vec![RETRYABLE_WRITE_ERROR])
-            .close_connection(true);
-        guards.push(client.enable_fail_point(fail_point).await.unwrap());
-    }
-
+    let hosts = client_options.hosts.clone();
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
         .await;
+
+    let mut guards = Vec::new();
+    for address in hosts {
+        let address = address.clone();
+        let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
+            .error_code(6)
+            .error_labels([RETRYABLE_WRITE_ERROR])
+            .selection_criteria(SelectionCriteria::Predicate(Arc::new(move |info| {
+                info.description.address == address
+            })));
+        guards.push(client.enable_fail_point(fail_point).await.unwrap());
+    }
+
     let result = client
         .database("test")
-        .collection::<bson::Document>("retry_write_different_mongos")
+        .collection::<crate::bson::Document>("retry_write_different_mongos")
         .insert_one(doc! {})
         .await;
     assert!(result.is_err());
@@ -353,8 +314,15 @@ async fn retry_write_different_mongos() {
                 CommandEvent::Failed(_),
             ]
         ),
-        "unexpected events: {:#?}",
-        events,
+        "unexpected events: {events:#?}",
+    );
+    let first_failed = events[1].as_command_failed().unwrap();
+    let first_address = &first_failed.connection.address;
+    let second_failed = events[3].as_command_failed().unwrap();
+    let second_address = &second_failed.connection.address;
+    assert_ne!(
+        first_address, second_address,
+        "Failed commands did not occur on two different mongos instances"
     );
 
     drop(guards); // enforce lifetime
@@ -363,10 +331,6 @@ async fn retry_write_different_mongos() {
 // Retryable Reads Are Retried on the Same mongos if No Others are Available
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_same_mongos() {
-    if !fail_command_supported().await {
-        log_uncaptured("skipping retry_write_same_mongos: requires failCommand");
-        return;
-    }
     if !topology_is_sharded().await {
         log_uncaptured("skipping retry_write_same_mongos: requires sharded cluster");
         return;
@@ -382,21 +346,21 @@ async fn retry_write_same_mongos() {
 
         let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
             .error_code(6)
-            .error_labels(vec![RETRYABLE_WRITE_ERROR])
-            .close_connection(true);
+            .error_labels(vec![RETRYABLE_WRITE_ERROR]);
         client.enable_fail_point(fail_point).await.unwrap()
     };
 
+    client_options.direct_connection = Some(false);
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
         .await;
     let result = client
         .database("test")
-        .collection::<bson::Document>("retry_write_same_mongos")
+        .collection::<crate::bson::Document>("retry_write_same_mongos")
         .insert_one(doc! {})
         .await;
-    assert!(result.is_ok(), "{:?}", result);
+    assert!(result.is_ok(), "{result:?}");
     let events = client.events.get_command_events(&["insert"]);
     assert!(
         matches!(
@@ -408,8 +372,15 @@ async fn retry_write_same_mongos() {
                 CommandEvent::Succeeded(_),
             ]
         ),
-        "unexpected events: {:#?}",
-        events,
+        "unexpected events: {events:#?}",
+    );
+    let first_failed = events[1].as_command_failed().unwrap();
+    let first_address = &first_failed.connection.address;
+    let second_failed = events[3].as_command_succeeded().unwrap();
+    let second_address = &second_failed.connection.address;
+    assert_eq!(
+        first_address, second_address,
+        "Failed commands did not occur on the same mongos instance",
     );
 
     drop(fp_guard); // enforce lifetime

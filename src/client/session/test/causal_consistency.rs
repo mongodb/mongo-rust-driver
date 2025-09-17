@@ -1,4 +1,4 @@
-use bson::{doc, Document};
+use crate::bson::{doc, Document};
 use futures::{future::BoxFuture, FutureExt};
 
 use crate::{
@@ -158,7 +158,7 @@ async fn first_read_no_after_cluster_time() {
             &mut session,
         )
         .await
-        .unwrap_or_else(|e| panic!("{} failed: {}", name, e));
+        .unwrap_or_else(|e| panic!("{name} failed: {e}"));
 
         let (started, _) = client.events.get_successful_command_execution(name);
 
@@ -200,7 +200,7 @@ async fn first_op_update_op_time() {
             .get_command_events(&[name])
             .into_iter()
             .find(|e| matches!(e, CommandEvent::Succeeded(_) | CommandEvent::Failed(_)))
-            .unwrap_or_else(|| panic!("no event found for {}", name));
+            .unwrap_or_else(|| panic!("no event found for {name}"));
 
         match event {
             CommandEvent::Succeeded(s) => {
@@ -453,7 +453,7 @@ async fn test_causal_consistency_read_concern_merge() {
         let rc_doc = command_started
             .command
             .get_document("readConcern")
-            .unwrap_or_else(|_| panic!("{} did not include read concern", command_name));
+            .unwrap_or_else(|_| panic!("{command_name} did not include read concern"));
 
         assert_eq!(rc_doc.get_str("level").unwrap(), "majority");
         assert_eq!(rc_doc.get_timestamp("afterClusterTime").unwrap(), op_time);

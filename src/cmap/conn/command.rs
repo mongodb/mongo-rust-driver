@@ -1,4 +1,4 @@
-use bson::{RawDocument, RawDocumentBuf};
+use crate::bson::{RawDocument, RawDocumentBuf};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::wire::{message::DocumentSequence, Message};
@@ -76,14 +76,14 @@ impl Command {
     }
 
     pub(crate) fn new_read(
-        name: String,
-        target_db: String,
+        name: impl ToString,
+        target_db: impl ToString,
         read_concern: Option<ReadConcern>,
         body: RawDocumentBuf,
     ) -> Self {
         Self {
-            name,
-            target_db,
+            name: name.to_string(),
+            target_db: target_db.to_string(),
             exhaust_allowed: false,
             body,
             document_sequences: Vec::new(),
@@ -185,7 +185,7 @@ pub(crate) struct RawCommandResponse {
 impl RawCommandResponse {
     #[cfg(test)]
     pub(crate) fn with_document_and_address(source: ServerAddress, doc: Document) -> Result<Self> {
-        let mut raw = Vec::new();
+        let mut raw = vec![];
         doc.to_writer(&mut raw)?;
         Ok(Self {
             source,
@@ -202,19 +202,9 @@ impl RawCommandResponse {
     }
 
     pub(crate) fn body<'a, T: Deserialize<'a>>(&'a self) -> Result<T> {
-        bson::from_slice(self.raw.as_bytes()).map_err(|e| {
+        crate::bson_compat::deserialize_from_slice(self.raw.as_bytes()).map_err(|e| {
             Error::from(ErrorKind::InvalidResponse {
-                message: format!("{}", e),
-            })
-        })
-    }
-
-    /// Used to handle decoding responses where the server may return invalid UTF-8 in error
-    /// messages.
-    pub(crate) fn body_utf8_lossy<'a, T: Deserialize<'a>>(&'a self) -> Result<T> {
-        bson::from_slice_utf8_lossy(self.raw.as_bytes()).map_err(|e| {
-            Error::from(ErrorKind::InvalidResponse {
-                message: format!("{}", e),
+                message: format!("{e}"),
             })
         })
     }

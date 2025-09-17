@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
+use crate::bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
 use mongocrypt::ctx::{Ctx, KmsCtx, KmsProviderType, State};
 use rayon::ThreadPool;
@@ -49,7 +49,7 @@ impl CryptExecutor {
         let crypto_threads = rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
             .build()
-            .map_err(|e| Error::internal(format!("could not initialize thread pool: {}", e)))?;
+            .map_err(|e| Error::internal(format!("could not initialize thread pool: {e}")))?;
         Ok(Self {
             key_vault_client,
             key_vault_namespace,
@@ -92,6 +92,13 @@ impl CryptExecutor {
         self.mongocryptd_client.is_some()
     }
 
+    fn metadata_client(&self, state: &State) -> Result<Client> {
+        self.metadata_client
+            .as_ref()
+            .and_then(|w| w.upgrade())
+            .ok_or_else(|| Error::internal(format!("metadata client required for {state:?}")))
+    }
+
     pub(crate) async fn run_ctx(&self, ctx: Ctx, db: Option<&str>) -> Result<RawDocumentBuf> {
         let mut result = None;
         // This needs to be a `Result` so that the `Ctx` can be temporarily owned by the processing
@@ -101,16 +108,10 @@ impl CryptExecutor {
         loop {
             let state = result_ref(&ctx)?.state()?;
             match state {
-                State::NeedMongoCollinfo => {
+                State::NeedMongoCollinfo | State::NeedMongoCollinfoWithDb => {
                     let ctx = result_mut(&mut ctx)?;
                     let filter = raw_to_doc(ctx.mongo_op()?)?;
-                    let metadata_client = self
-                        .metadata_client
-                        .as_ref()
-                        .and_then(|w| w.upgrade())
-                        .ok_or_else(|| {
-                        Error::internal("metadata_client required for NeedMongoCollinfo state")
-                    })?;
+                    let metadata_client = self.metadata_client(&state)?;
                     let db = metadata_client.database(db.as_ref().ok_or_else(|| {
                         Error::internal("db required for NeedMongoCollinfo state")
                     })?);
@@ -122,7 +123,7 @@ impl CryptExecutor {
                 }
                 State::NeedMongoMarkings => {
                     let ctx = result_mut(&mut ctx)?;
-                    let command = ctx.mongo_op()?.to_raw_document_buf();
+                    let command = ctx.mongo_op()?.to_owned();
                     let db = db.as_ref().ok_or_else(|| {
                         Error::internal("db required for NeedMongoMarkings state")
                     })?;
@@ -193,7 +194,7 @@ impl CryptExecutor {
                         let mut buf = vec![0];
                         while kms_ctx.bytes_needed() > 0 {
                             let buf_size = kms_ctx.bytes_needed().try_into().map_err(|e| {
-                                Error::internal(format!("buffer size overflow: {}", e))
+                                Error::internal(format!("buffer size overflow: {e}"))
                             })?;
                             buf.resize(buf_size, 0);
                             let count = stream.read(&mut buf).await?;
@@ -242,28 +243,32 @@ impl CryptExecutor {
                             continue;
                         }
 
+                        #[cfg(any(feature = "aws-auth", feature = "azure-kms"))]
+                        let prov_name: crate::bson_compat::CString =
+                            provider.as_string().try_into()?;
                         match provider.provider_type() {
                             KmsProviderType::Aws => {
                                 #[cfg(feature = "aws-auth")]
                                 {
-                                    use crate::{
-                                        client::auth::{aws::AwsCredential, Credential},
-                                        runtime::HttpClient,
+                                    use crate::client::auth::{
+                                        aws::get_aws_credentials,
+                                        Credential,
                                     };
 
-                                    let aws_creds = AwsCredential::get(
-                                        &Credential::default(),
-                                        &HttpClient::default(),
-                                    )
-                                    .await?;
+                                    let aws_creds =
+                                        get_aws_credentials(&Credential::default()).await?;
+
                                     let mut creds = rawdoc! {
-                                        "accessKeyId": aws_creds.access_key(),
-                                        "secretAccessKey": aws_creds.secret_key(),
+                                        "accessKeyId": aws_creds.access_key_id().to_string(),
+                                        "secretAccessKey": aws_creds.secret_access_key().to_string(),
                                     };
                                     if let Some(token) = aws_creds.session_token() {
-                                        creds.append("sessionToken", token);
+                                        creds.append(
+                                            crate::bson_compat::cstr!("sessionToken"),
+                                            token,
+                                        );
                                     }
-                                    kms_providers.append(provider.as_string(), creds);
+                                    kms_providers.append(prov_name, creds);
                                 }
                                 #[cfg(not(feature = "aws-auth"))]
                                 {
@@ -276,10 +281,7 @@ impl CryptExecutor {
                             KmsProviderType::Azure => {
                                 #[cfg(feature = "azure-kms")]
                                 {
-                                    kms_providers.append(
-                                        provider.as_string(),
-                                        self.azure.get_token().await?,
-                                    );
+                                    kms_providers.append(prov_name, self.azure.get_token().await?);
                                 }
                                 #[cfg(not(feature = "azure-kms"))]
                                 {
@@ -302,8 +304,8 @@ impl CryptExecutor {
 
                                     fn kms_error(error: String) -> Error {
                                         let message = format!(
-                                            "An error occurred when obtaining GCP credentials: {}",
-                                            error
+                                            "An error occurred when obtaining GCP credentials: \
+                                             {error}"
                                         );
                                         let error = mongocrypt::error::Error {
                                             kind: mongocrypt::error::ErrorKind::Kms,
@@ -317,8 +319,7 @@ impl CryptExecutor {
                                     let host = std::env::var("GCE_METADATA_HOST")
                                         .unwrap_or_else(|_| "metadata.google.internal".into());
                                     let uri = format!(
-                                        "http://{}/computeMetadata/v1/instance/service-accounts/default/token",
-                                        host
+                                        "http://{host}/computeMetadata/v1/instance/service-accounts/default/token"
                                     );
 
                                     let response: ResponseBody = http_client
@@ -328,7 +329,7 @@ impl CryptExecutor {
                                         .await
                                         .map_err(|e| kms_error(e.to_string()))?;
                                     kms_providers.append(
-                                        "gcp",
+                                        crate::bson_compat::cstr!("gcp"),
                                         rawdoc! { "accessToken": response.access_token },
                                     );
                                 }
@@ -362,7 +363,7 @@ impl CryptExecutor {
                     result = Some(output?);
                 }
                 State::Done => break,
-                s => return Err(Error::internal(format!("unhandled state {:?}", s))),
+                s => return Err(Error::internal(format!("unhandled state {s:?}"))),
             }
         }
         match result {
@@ -447,12 +448,12 @@ fn result_mut<T>(r: &mut Result<T>) -> Result<&mut T> {
 
 fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
     raw.try_into()
-        .map_err(|e| Error::internal(format!("could not parse raw document: {}", e)))
+        .map_err(|e| Error::internal(format!("could not parse raw document: {e}")))
 }
 
 #[cfg(feature = "azure-kms")]
 pub(crate) mod azure {
-    use bson::{rawdoc, RawDocumentBuf};
+    use crate::bson::{rawdoc, RawDocumentBuf};
     use serde::Deserialize;
     use std::time::{Duration, Instant};
     use tokio::sync::Mutex;
@@ -508,11 +509,11 @@ pub(crate) mod azure {
                 .headers(&self.make_headers())
                 .send()
                 .await
-                .map_err(|e| Error::authentication_error("azure imds", &format!("{}", e)))?;
+                .map_err(|e| Error::authentication_error("azure imds", &format!("{e}")))?;
             let expires_in_secs: u64 = server_response.expires_in.parse().map_err(|e| {
                 Error::authentication_error(
                     "azure imds",
-                    &format!("invalid `expires_in` response field: {}", e),
+                    &format!("invalid `expires_in` response field: {e}"),
                 )
             })?;
             #[allow(clippy::redundant_clone)]
@@ -532,15 +533,15 @@ pub(crate) mod azure {
                     ("resource", "https://vault.azure.net"),
                 ],
             )
-            .map_err(|e| Error::internal(format!("invalid Azure IMDS URL: {}", e)))?;
+            .map_err(|e| Error::internal(format!("invalid Azure IMDS URL: {e}")))?;
             #[cfg(test)]
             let url = {
                 let mut url = url;
                 if let Some((host, port)) = self.test_host {
                     url.set_host(Some(host))
-                        .map_err(|e| Error::internal(format!("invalid test host: {}", e)))?;
+                        .map_err(|e| Error::internal(format!("invalid test host: {e}")))?;
                     url.set_port(Some(port))
-                        .map_err(|()| Error::internal(format!("invalid test port {}", port)))?;
+                        .map_err(|()| Error::internal(format!("invalid test port {port}")))?;
                 }
                 url
             };

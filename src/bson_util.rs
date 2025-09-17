@@ -6,6 +6,8 @@ use std::{
 
 use serde::Serialize;
 
+#[cfg(feature = "bson-3")]
+use crate::bson_compat::{RawBsonRefExt as _, RawDocumentBufExt as _};
 use crate::{
     bson::{
         oid::ObjectId,
@@ -17,7 +19,9 @@ use crate::{
         RawBsonRef,
         RawDocumentBuf,
     },
+    bson_compat::CStr,
     checked::Checked,
+    cmap::Command,
     error::{Error, ErrorKind, Result},
     runtime::SyncLittleEndianRead,
 };
@@ -77,14 +81,14 @@ pub(crate) fn to_bson_array(docs: &[Document]) -> Bson {
 pub(crate) fn to_raw_bson_array(docs: &[Document]) -> Result<RawBson> {
     let mut array = RawArrayBuf::new();
     for doc in docs {
-        array.push(RawDocumentBuf::from_document(doc)?);
+        array.push(RawDocumentBuf::try_from(doc)?);
     }
     Ok(RawBson::Array(array))
 }
 pub(crate) fn to_raw_bson_array_ser<T: Serialize>(values: &[T]) -> Result<RawBson> {
     let mut array = RawArrayBuf::new();
     for value in values {
-        array.push(bson::to_raw_document_buf(value)?);
+        array.push(crate::bson_compat::serialize_to_raw_document_buf(value)?);
     }
     Ok(RawBson::Array(array))
 }
@@ -126,7 +130,7 @@ pub(crate) fn replacement_document_check(replacement: &Document) -> Result<()> {
 
 pub(crate) fn replacement_raw_document_check(replacement: &RawDocumentBuf) -> Result<()> {
     if let Some((key, _)) = replacement.iter().next().transpose()? {
-        if key.starts_with('$') {
+        if crate::bson_compat::cstr_to_str(key).starts_with('$') {
             return Err(ErrorKind::InvalidArgument {
                 message: "replacement document must not contain update modifiers".to_string(),
             }
@@ -187,17 +191,14 @@ pub(crate) fn extend_raw_document_buf(
     this: &mut RawDocumentBuf,
     other: RawDocumentBuf,
 ) -> Result<()> {
-    let mut keys: HashSet<String> = HashSet::new();
+    let mut keys: HashSet<crate::bson_compat::CString> = HashSet::new();
     for elem in this.iter_elements() {
         keys.insert(elem?.key().to_owned());
     }
     for result in other.iter() {
         let (k, v) = result?;
         if keys.contains(k) {
-            return Err(Error::internal(format!(
-                "duplicate raw document key {:?}",
-                k
-            )));
+            return Err(Error::internal(format!("duplicate raw document key {k:?}")));
         }
         this.append(k, v.to_raw_bson());
     }
@@ -206,14 +207,14 @@ pub(crate) fn extend_raw_document_buf(
 
 pub(crate) fn append_ser(
     this: &mut RawDocumentBuf,
-    key: impl AsRef<str>,
+    key: impl AsRef<crate::bson_compat::CStr>,
     value: impl Serialize,
 ) -> Result<()> {
     #[derive(Serialize)]
     struct Helper<T> {
         value: T,
     }
-    let raw_doc = bson::to_raw_document_buf(&Helper { value })?;
+    let raw_doc = crate::bson_compat::serialize_to_raw_document_buf(&Helper { value })?;
     this.append_ref(
         key,
         raw_doc
@@ -244,6 +245,49 @@ pub(crate) fn get_or_prepend_id_field(doc: &mut RawDocumentBuf) -> Result<Bson> 
 
             Ok(id.into())
         }
+    }
+}
+
+/// A helper trait for working with collections of raw documents. This is useful for unifying
+/// command-building implementations that conditionally construct either document sequences or a
+/// single command document.
+pub(crate) trait RawDocumentCollection: Default {
+    /// Calculates the total number of bytes that would be added to a collection of this type by the
+    /// given document.
+    fn bytes_added(index: usize, doc: &RawDocumentBuf) -> Result<usize>;
+
+    /// Adds the given document to the collection.
+    fn push(&mut self, doc: RawDocumentBuf);
+
+    /// Adds the collection of raw documents to the provided command.
+    fn add_to_command(self, identifier: &CStr, command: &mut Command);
+}
+
+impl RawDocumentCollection for Vec<RawDocumentBuf> {
+    fn bytes_added(_index: usize, doc: &RawDocumentBuf) -> Result<usize> {
+        Ok(doc.as_bytes().len())
+    }
+
+    fn push(&mut self, doc: RawDocumentBuf) {
+        self.push(doc);
+    }
+
+    fn add_to_command(self, identifier: &CStr, command: &mut Command) {
+        command.add_document_sequence(identifier, self);
+    }
+}
+
+impl RawDocumentCollection for RawArrayBuf {
+    fn bytes_added(index: usize, doc: &RawDocumentBuf) -> Result<usize> {
+        array_entry_size_bytes(index, doc.as_bytes().len())
+    }
+
+    fn push(&mut self, doc: RawDocumentBuf) {
+        self.push(doc);
+    }
+
+    fn add_to_command(self, identifier: &CStr, command: &mut Command) {
+        command.body.append(identifier, self);
     }
 }
 

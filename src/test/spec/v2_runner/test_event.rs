@@ -1,5 +1,8 @@
-use crate::{bson::Document, event, test::Matchable};
-use bson::Bson;
+use crate::{
+    bson::{Bson, Document},
+    event,
+    test::Matchable,
+};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -38,7 +41,7 @@ impl CommandStartedEvent {
                 "session1" => {
                     expected.insert("lsid", session1_lsid.clone());
                 }
-                other => panic!("unknown session name: {}", other),
+                other => panic!("unknown session name: {other}"),
             }
         }
 

@@ -1,4 +1,4 @@
-use bson::rawdoc;
+use crate::bson::rawdoc;
 use serde::Deserialize;
 
 use super::EVENT_TIMEOUT;
@@ -17,8 +17,6 @@ use crate::{
     sdam::TopologyUpdater,
     selection_criteria::ReadPreference,
     test::{
-        block_connection_supported,
-        fail_command_supported,
         get_client_options,
         log_uncaptured,
         topology_is_load_balanced,
@@ -49,10 +47,9 @@ async fn acquire_connection_and_send_command() {
 
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
-        ConnectionEstablisher::new(EstablisherOptions::from_client_options(&client_options))
-            .unwrap(),
+        ConnectionEstablisher::new(EstablisherOptions::from(&client_options)).unwrap(),
         TopologyUpdater::channel().0,
-        bson::oid::ObjectId::new(),
+        crate::bson::oid::ObjectId::new(),
         Some(pool_options),
     );
     let mut connection = pool.check_out().await.unwrap();
@@ -72,7 +69,8 @@ async fn acquire_connection_and_send_command() {
 
     assert!(doc_response.is_success());
 
-    let response: ListDatabasesResponse = bson::from_document(doc_response.body).unwrap();
+    let response: ListDatabasesResponse =
+        crate::bson_compat::deserialize_from_document(doc_response.body).unwrap();
 
     let names: Vec<_> = response
         .databases
@@ -86,13 +84,6 @@ async fn acquire_connection_and_send_command() {
 
 #[tokio::test]
 async fn concurrent_connections() {
-    if !block_connection_supported().await {
-        log_uncaptured(
-            "skipping concurrent_connections test due to server not supporting block connection",
-        );
-        return;
-    }
-
     let mut options = get_client_options().await.clone();
     if options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping concurrent_connections test due to load-balanced topology");
@@ -123,10 +114,9 @@ async fn concurrent_connections() {
 
     let pool = ConnectionPool::new(
         get_client_options().await.hosts[0].clone(),
-        ConnectionEstablisher::new(EstablisherOptions::from_client_options(&client_options))
-            .unwrap(),
+        ConnectionEstablisher::new(EstablisherOptions::from(&client_options)).unwrap(),
         TopologyUpdater::channel().0,
-        bson::oid::ObjectId::new(),
+        crate::bson::oid::ObjectId::new(),
         Some(options),
     );
 
@@ -167,20 +157,11 @@ async fn concurrent_connections() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[function_name::named]
-
 async fn connection_error_during_establishment() {
     if topology_is_load_balanced().await {
         log_uncaptured(
             "skipping connection_error_during_establishment test due to load-balanced topology",
         );
-        return;
-    }
-    if !fail_command_supported().await {
-        log_uncaptured(format!(
-            "skipping {} due to failCommand not being supported",
-            function_name!()
-        ));
         return;
     }
 
@@ -208,10 +189,9 @@ async fn connection_error_during_establishment() {
     options.cmap_event_handler = Some(buffer.handler());
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
-        ConnectionEstablisher::new(EstablisherOptions::from_client_options(&client_options))
-            .unwrap(),
+        ConnectionEstablisher::new(EstablisherOptions::from(&client_options)).unwrap(),
         TopologyUpdater::channel().0,
-        bson::oid::ObjectId::new(),
+        crate::bson::oid::ObjectId::new(),
         Some(options),
     );
 
@@ -229,17 +209,7 @@ async fn connection_error_during_establishment() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[function_name::named]
-
 async fn connection_error_during_operation() {
-    if !fail_command_supported().await {
-        log_uncaptured(format!(
-            "skipping {} due to failCommand not being supported",
-            function_name!()
-        ));
-        return;
-    }
-
     let mut options = get_client_options().await.clone();
     let buffer = EventBuffer::<CmapEvent>::new();
     options.cmap_event_handler = Some(buffer.handler());

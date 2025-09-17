@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::UuidRepresentation;
+use crate::bson::UuidRepresentation;
 use once_cell::sync::Lazy;
 use pretty_assertions::assert_eq;
 use serde::Deserialize;
@@ -10,6 +10,7 @@ use crate::{
     bson_util::get_int,
     client::options::{ClientOptions, ConnectionString, ServerAddress},
     error::ErrorKind,
+    options::Tls,
     test::spec::deserialize_spec_tests,
     Client,
 };
@@ -22,6 +23,14 @@ static SKIPPED_TESTS: Lazy<Vec<&'static str>> = Lazy::new(|| {
         "maxPoolSize=0 does not error",
         #[cfg(not(feature = "cert-key-password"))]
         "Valid tlsCertificateKeyFilePassword is parsed correctly",
+        // The driver does not support OCSP (see RUST-361)
+        "tlsDisableCertificateRevocationCheck can be set to true",
+        "tlsDisableCertificateRevocationCheck can be set to false",
+        "tlsDisableOCSPEndpointCheck can be set to true",
+        "tlsDisableOCSPEndpointCheck can be set to false",
+        // TODO RUST-582: unskip these tests
+        "Valid connection and timeout options are parsed correctly",
+        "timeoutMS=0",
     ];
 
     // TODO RUST-1896: unskip this test when openssl-tls is enabled
@@ -121,8 +130,8 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                     );
                 }
 
-                let mut actual_options =
-                    bson::to_document(&client_options).expect(&test_case.description);
+                let mut actual_options = crate::bson_compat::serialize_to_document(&client_options)
+                    .expect(&test_case.description);
 
                 if let Some(mode) = actual_options.remove("mode") {
                     actual_options.insert("readPreference", mode);
@@ -209,13 +218,23 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
 
 #[tokio::test]
 async fn run_uri_options_spec_tests() {
-    let skipped_files = vec!["single-threaded-options.json"];
+    let mut skipped_files = vec![
+        "single-threaded-options.json",
+        // TODO RUST-1054 unskip this file
+        "proxy-options.json",
+    ];
+    if cfg!(not(feature = "gssapi-auth")) {
+        skipped_files.push("auth-options.json");
+    }
     run_tests(&["uri-options"], &skipped_files).await;
 }
 
 #[tokio::test]
 async fn run_connection_string_spec_tests() {
     let mut skipped_files = Vec::new();
+    if cfg!(not(feature = "gssapi-auth")) {
+        skipped_files.push("valid-auth.json");
+    }
     if cfg!(not(unix)) {
         skipped_files.push("valid-unix_socket-absolute.json");
         skipped_files.push("valid-unix_socket-relative.json");
@@ -258,8 +277,7 @@ async fn parse_uri_with_uuid_representation(
     uuid_repr: &str,
 ) -> std::result::Result<UuidRepresentation, String> {
     match ConnectionString::parse(format!(
-        "mongodb://localhost:27017/?uuidRepresentation={}",
-        uuid_repr
+        "mongodb://localhost:27017/?uuidRepresentation={uuid_repr}"
     ))
     .map_err(|e| e.message().unwrap())
     {
@@ -271,17 +289,17 @@ async fn parse_uri_with_uuid_representation(
 #[test]
 fn parse_unknown_options() {
     fn parse_uri(option: &str, suggestion: Option<&str>) {
-        match ConnectionString::parse(format!("mongodb://host:27017/?{}=test", option))
+        match ConnectionString::parse(format!("mongodb://host:27017/?{option}=test"))
             .map_err(|e| *e.kind)
         {
-            Ok(_) => panic!("expected error for option {}", option),
+            Ok(_) => panic!("expected error for option {option}"),
             Err(ErrorKind::InvalidArgument { message, .. }) => {
                 match suggestion {
                     Some(s) => assert!(message.contains(s)),
                     None => assert!(!message.contains("similar")),
                 };
             }
-            Err(e) => panic!("expected InvalidArgument, but got {:?}", e),
+            Err(e) => panic!("expected InvalidArgument, but got {e:?}"),
         }
     }
 
@@ -318,7 +336,7 @@ async fn options_debug_omits_uri() {
     let uri = "mongodb://username:password@localhost/";
     let options = ClientOptions::parse(uri).await.unwrap();
 
-    let debug_output = format!("{:?}", options);
+    let debug_output = format!("{options:?}");
     assert!(!debug_output.contains("username"));
     assert!(!debug_output.contains("password"));
     assert!(!debug_output.contains("uri"));
@@ -381,7 +399,7 @@ fn unix_domain_socket_not_allowed() {
 async fn tls_cert_key_password_connect() {
     use std::path::PathBuf;
 
-    use bson::doc;
+    use crate::bson::doc;
 
     use crate::{
         options::TlsOptions,
@@ -410,4 +428,56 @@ async fn tls_cert_key_password_connect() {
         .run_command(doc! {"ping": 1})
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn tls_insecure() {
+    let uri = "mongodb://localhost:27017?tls=true&tlsInsecure=true";
+    let options = ClientOptions::parse(uri).await.unwrap();
+    let Some(Tls::Enabled(tls_options)) = options.tls else {
+        panic!("expected tls options to be set");
+    };
+    assert_eq!(tls_options.allow_invalid_certificates, Some(true));
+    #[cfg(feature = "openssl-tls")]
+    assert_eq!(tls_options.allow_invalid_hostnames, Some(true));
+
+    let uri = "mongodb://localhost:27017?tls=true&tlsInsecure=false";
+    let options = ClientOptions::parse(uri).await.unwrap();
+    let Some(Tls::Enabled(tls_options)) = options.tls else {
+        panic!("expected tls options to be set");
+    };
+    assert_eq!(tls_options.allow_invalid_certificates, Some(false));
+    #[cfg(feature = "openssl-tls")]
+    assert_eq!(tls_options.allow_invalid_hostnames, Some(false));
+
+    let uri = "mongodb://localhost:27017?tls=false&tlsInsecure=true";
+    let error = ClientOptions::parse(uri).await.unwrap_err();
+    assert!(error.message().unwrap().contains("TLS is disabled"));
+
+    let uri = "mongodb://localhost:27017?tlsInsecure=true&tls=false";
+    let error = ClientOptions::parse(uri).await.unwrap_err();
+    assert!(error
+        .message()
+        .unwrap()
+        .contains("other TLS options are set"));
+
+    let uri = "mongodb://localhost:27017?tlsInsecure=true&tlsAllowInvalidCertificates=true";
+    let error = ClientOptions::parse(uri).await.unwrap_err();
+    assert!(error.message().unwrap().contains("cannot set both"));
+
+    let uri = "mongodb://localhost:27017?tlsInsecure=true&tlsAllowInvalidCertificates=false";
+    let error = ClientOptions::parse(uri).await.unwrap_err();
+    assert!(error.message().unwrap().contains("cannot set both"));
+
+    // TODO RUST-1896: uncomment these tests
+    // #[cfg(feature = "openssl-tls")]
+    // {
+    //     let uri = "mongodb://localhost:27017?tlsInsecure=true&tlsAllowInvalidHostnames=true";
+    //     let error = ClientOptions::parse(uri).await.unwrap_err();
+    //     assert!(error.message().unwrap().contains("cannot set both"));
+
+    //     let uri = "mongodb://localhost:27017?tlsInsecure=true&tlsAllowInvalidHostnames=false";
+    //     let error = ClientOptions::parse(uri).await.unwrap_err();
+    //     assert!(error.message().unwrap().contains("cannot set both"));
+    // }
 }

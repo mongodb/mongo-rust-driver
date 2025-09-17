@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use bson::oid::ObjectId;
+use crate::bson::oid::ObjectId;
 
 use crate::{
     cmap::{
@@ -15,7 +15,7 @@ use crate::{
 #[tokio::test]
 async fn arbitrary_auth_mechanism() {
     let client_options = get_client_options().await;
-    let mut options = EstablisherOptions::from_client_options(client_options);
+    let mut options = EstablisherOptions::from(client_options);
     options.test_patch_reply = Some(|reply| {
         reply
             .as_mut()

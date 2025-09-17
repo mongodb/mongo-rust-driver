@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::{Bson, Document};
+use crate::bson::{Bson, Document};
 use serde::de::DeserializeOwned;
 
 use crate::{
@@ -66,7 +66,7 @@ impl<T: Send + Sync> crate::sync::Collection<T> {
     /// [`run`](Find::run) will return d[`Result<crate::sync::Cursor<T>>`] (or
     /// d[`Result<crate::sync::SessionCursor<T>>`] if a session is provided).
     #[deeplink]
-    #[options_doc(find, sync)]
+    #[options_doc(find, "run")]
     pub fn find(&self, filter: Document) -> Find<'_, T> {
         self.async_collection.find(filter)
     }
@@ -78,7 +78,7 @@ impl<T: DeserializeOwned + Send + Sync> crate::sync::Collection<T> {
     ///
     /// [`run`](FindOne::run) will return d[`Result<Option<T>>`].
     #[deeplink]
-    #[options_doc(find_one, sync)]
+    #[options_doc(find_one, "run")]
     pub fn find_one(&self, filter: Document) -> FindOne<'_, T> {
         self.async_collection.find_one(filter)
     }

@@ -6,7 +6,7 @@ use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::{doc, serde_helpers, Bson, Document, RawBson, RawDocumentBuf},
+    bson::{doc, Bson, Document, RawBson, RawDocumentBuf},
     concern::{ReadConcern, WriteConcern},
     error::Result,
     options::Collation,
@@ -60,8 +60,7 @@ impl<'de> Deserialize<'de> for ReturnDocument {
             "after" => Ok(ReturnDocument::After),
             "before" => Ok(ReturnDocument::Before),
             other => Err(D::Error::custom(format!(
-                "Unknown return document value: {}",
-                other
+                "Unknown return document value: {other}"
             ))),
         }
     }
@@ -81,7 +80,7 @@ pub enum Hint {
 impl Hint {
     pub(crate) fn to_raw_bson(&self) -> Result<RawBson> {
         Ok(match self {
-            Hint::Keys(ref d) => RawBson::Document(RawDocumentBuf::from_document(d)?),
+            Hint::Keys(ref d) => RawBson::Document(RawDocumentBuf::try_from(d)?),
             Hint::Name(ref s) => RawBson::String(s.clone()),
         })
     }
@@ -117,6 +116,7 @@ pub struct InsertOneOptions {
     pub bypass_document_validation: Option<bool>,
 
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
@@ -177,7 +177,6 @@ pub enum UpdateModifications {
     Document(Document),
 
     /// An aggregation pipeline.
-    /// Only available in MongoDB 4.2+.
     Pipeline(Vec<Document>),
 }
 
@@ -223,7 +222,7 @@ pub struct UpdateOptions {
 
     /// A document or string that specifies the index to use to support the query predicate.
     ///
-    /// Only available in MongoDB 4.2+. See the official MongoDB
+    /// See the official MongoDB
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#ex-update-command-hint) for examples.
     pub hint: Option<Hint>,
 
@@ -290,11 +289,12 @@ pub struct ReplaceOptions {
 
     /// A document or string that specifies the index to use to support the query predicate.
     ///
-    /// Only available in MongoDB 4.2+. See the official MongoDB
+    /// See the official MongoDB
     /// [documentation](https://www.mongodb.com/docs/manual/reference/command/update/#ex-update-command-hint) for examples.
     pub hint: Option<Hint>,
 
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// Map of parameter names and values. Values must be constant or closed
@@ -335,6 +335,7 @@ pub struct DeleteOptions {
     pub collation: Option<Collation>,
 
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// The index to use for the operation.
@@ -379,6 +380,7 @@ pub struct FindOneAndDeleteOptions {
     pub sort: Option<Document>,
 
     /// The level of the write concern
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// The collation to use for the operation.
@@ -438,6 +440,7 @@ pub struct FindOneAndReplaceOptions {
     pub upsert: Option<bool>,
 
     /// The level of the write concern
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// The collation to use for the operation.
@@ -503,6 +506,7 @@ pub struct FindOneAndUpdateOptions {
     pub upsert: Option<bool>,
 
     /// The level of the write concern
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// The collation to use for the operation.
@@ -615,6 +619,7 @@ pub struct AggregateOptions {
     ///
     /// If none is specified, the write concern defined on the object executing this operation will
     /// be used.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// A document with any amount of parameter names, each followed by definitions of constants in
@@ -1056,6 +1061,7 @@ pub struct CreateIndexOptions {
     pub max_time: Option<Duration>,
 
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
@@ -1075,6 +1081,7 @@ pub struct CreateIndexOptions {
 #[export_tokens]
 pub struct DropCollectionOptions {
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// Map of encrypted fields for the collection.
@@ -1108,6 +1115,7 @@ pub struct DropIndexOptions {
     pub max_time: Option<Duration>,
 
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
@@ -1176,7 +1184,7 @@ impl Serialize for CommitQuorum {
         S: Serializer,
     {
         match self {
-            CommitQuorum::Nodes(n) => serde_helpers::serialize_u32_as_i32(n, serializer),
+            CommitQuorum::Nodes(n) => serde_util::serialize_u32_as_i32(n, serializer),
             CommitQuorum::VotingMembers => serializer.serialize_str("votingMembers"),
             CommitQuorum::Majority => serializer.serialize_str("majority"),
             CommitQuorum::Custom(s) => serializer.serialize_str(s),

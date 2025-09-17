@@ -11,13 +11,13 @@ use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter, Write},
     hash::{Hash, Hasher},
-    net::{Ipv4Addr, Ipv6Addr},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
     path::PathBuf,
     str::FromStr,
     time::Duration,
 };
 
-use bson::UuidRepresentation;
+use crate::bson::UuidRepresentation;
 use derive_where::derive_where;
 use macro_magic::export_tokens;
 use once_cell::sync::Lazy;
@@ -43,7 +43,7 @@ use crate::{
     options::ReadConcernLevel,
     sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
-    serde_util,
+    serde_util::{self, write_concern_is_empty},
     srv::{OriginalSrvInfo, SrvResolver},
 };
 
@@ -55,6 +55,10 @@ pub(crate) use resolver_config::ResolverConfig;
 
 pub(crate) const DEFAULT_PORT: u16 = 27017;
 
+const TLS_INSECURE: &str = "tlsinsecure";
+const TLS_ALLOW_INVALID_CERTIFICATES: &str = "tlsallowinvalidcertificates";
+#[cfg(feature = "openssl-tls")]
+const TLS_ALLOW_INVALID_HOSTNAMES: &str = "tlsallowinvalidhostnames";
 const URI_OPTIONS: &[&str] = &[
     "appname",
     "authmechanism",
@@ -82,8 +86,8 @@ const URI_OPTIONS: &[&str] = &[
     "sockettimeoutms",
     "tls",
     "ssl",
-    "tlsinsecure",
-    "tlsallowinvalidcertificates",
+    TLS_INSECURE,
+    TLS_ALLOW_INVALID_CERTIFICATES,
     "tlscafile",
     "tlscertificatekeyfile",
     "uuidRepresentation",
@@ -123,6 +127,15 @@ pub enum ServerAddress {
         /// The path to the Unix Domain Socket.
         path: PathBuf,
     },
+}
+
+impl From<SocketAddr> for ServerAddress {
+    fn from(item: SocketAddr) -> Self {
+        ServerAddress::Tcp {
+            host: item.ip().to_string(),
+            port: Some(item.port()),
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for ServerAddress {
@@ -230,8 +243,8 @@ impl ServerAddress {
             let Some((hostname, port)) = ip_literal.split_once("]") else {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
-                        "invalid server address {}: missing closing ']' in IP literal hostname",
-                        address
+                        "invalid server address {address}: missing closing ']' in IP literal \
+                         hostname"
                     ),
                 }
                 .into());
@@ -239,7 +252,7 @@ impl ServerAddress {
 
             if let Err(parse_error) = Ipv6Addr::from_str(hostname) {
                 return Err(ErrorKind::InvalidArgument {
-                    message: format!("invalid server address {}: {}", address, parse_error),
+                    message: format!("invalid server address {address}: {parse_error}"),
                 }
                 .into());
             }
@@ -251,9 +264,8 @@ impl ServerAddress {
             } else {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
-                        "invalid server address {}: the hostname can only be followed by a port \
-                         prefixed with ':', got {}",
-                        address, port
+                        "invalid server address {address}: the hostname can only be followed by a \
+                         port prefixed with ':', got {port}"
                     ),
                 }
                 .into());
@@ -269,10 +281,7 @@ impl ServerAddress {
 
         if hostname.is_empty() {
             return Err(ErrorKind::InvalidArgument {
-                message: format!(
-                    "invalid server address {}: the hostname cannot be empty",
-                    address
-                ),
+                message: format!("invalid server address {address}: the hostname cannot be empty"),
             }
             .into());
         }
@@ -290,9 +299,8 @@ impl ServerAddress {
                 Ok(0) | Err(_) => {
                     return Err(ErrorKind::InvalidArgument {
                         message: format!(
-                            "invalid server address {}: the port must be an integer between 1 and \
-                             65535, got {}",
-                            address, port
+                            "invalid server address {address}: the port must be an integer \
+                             between 1 and 65535, got {port}"
                         ),
                     }
                     .into())
@@ -347,7 +355,7 @@ impl FromStr for ServerApiVersion {
         match str {
             "1" => Ok(Self::V1),
             _ => Err(ErrorKind::InvalidArgument {
-                message: format!("invalid server api version string: {}", str),
+                message: format!("invalid server api version string: {str}"),
             }
             .into()),
         }
@@ -753,7 +761,7 @@ impl Serialize for ClientOptions {
             servermonitoringmode: self
                 .server_monitoring_mode
                 .as_ref()
-                .map(|m| format!("{:?}", m).to_lowercase()),
+                .map(|m| format!("{m:?}").to_lowercase()),
             selectioncriteria: &self.selection_criteria,
             serverselectiontimeoutms: &self.server_selection_timeout,
             sockettimeoutms: &self.socket_timeout,
@@ -914,10 +922,10 @@ pub struct ConnectionString {
     /// Default read preference for the client.
     pub read_preference: Option<ReadPreference>,
 
-    /// The [`UuidRepresentation`] to use when decoding [`Binary`](bson::Binary) values with the
-    /// [`UuidOld`](bson::spec::BinarySubtype::UuidOld) subtype. This is not used by the
-    /// driver; client code can use this when deserializing relevant values with
-    /// [`Binary::to_uuid_with_representation`](bson::binary::Binary::to_uuid_with_representation).
+    /// The [`UuidRepresentation`] to use when decoding [`Binary`](crate::bson::Binary) values with
+    /// the [`UuidOld`](crate::bson::spec::BinarySubtype::UuidOld) subtype. This is not used by
+    /// the driver; client code can use this when deserializing relevant values with
+    /// [`Binary::to_uuid_with_representation`](crate::bson::binary::Binary::to_uuid_with_representation).
     pub uuid_representation: Option<UuidRepresentation>,
 
     /// Limit on the number of mongos connections that may be created for sharded topologies.
@@ -1366,8 +1374,7 @@ fn percent_decode(s: &str, err_message: &str) -> Result<String> {
 fn validate_and_parse_userinfo(s: &str, userinfo_type: &str) -> Result<String> {
     if s.chars().any(|c| USERINFO_RESERVED_CHARACTERS.contains(&c)) {
         return Err(Error::invalid_argument(format!(
-            "{} must be URL encoded",
-            userinfo_type
+            "{userinfo_type} must be URL encoded"
         )));
     }
 
@@ -1378,12 +1385,11 @@ fn validate_and_parse_userinfo(s: &str, userinfo_type: &str) -> Result<String> {
         .any(|part| part.len() < 2 || part[0..2].chars().any(|c| !c.is_ascii_hexdigit()))
     {
         return Err(Error::invalid_argument(format!(
-            "{} cannot contain unescaped %",
-            userinfo_type
+            "{userinfo_type} cannot contain unescaped %"
         )));
     }
 
-    percent_decode(s, &format!("{} must be URL encoded", userinfo_type))
+    percent_decode(s, &format!("{userinfo_type} must be URL encoded"))
 }
 
 impl TryFrom<&str> for ConnectionString {
@@ -1435,8 +1441,7 @@ impl ConnectionString {
             }
             other => {
                 return Err(Error::invalid_argument(format!(
-                    "unsupported connection string scheme: {}",
-                    other
+                    "unsupported connection string scheme: {other}"
                 )))
             }
         };
@@ -1503,8 +1508,7 @@ impl ConnectionString {
                 for c in decoded.chars() {
                     if ILLEGAL_DATABASE_CHARACTERS.contains(&c) {
                         return Err(Error::invalid_argument(format!(
-                            "illegal character in database name: {}",
-                            c
+                            "illegal character in database name: {c}"
                         )));
                     }
                 }
@@ -1574,7 +1578,17 @@ impl ConnectionString {
                             let val = match &s.to_lowercase()[..] {
                                 "true" => Bson::Boolean(true),
                                 "false" => Bson::Boolean(false),
-                                _ => Bson::String(s),
+                                "none" | "forward" | "forwardandreverse" => Bson::String(s),
+                                _ => {
+                                    return Err(ErrorKind::InvalidArgument {
+                                        message: format!(
+                                            "Invalid CANONICALIZE_HOST_NAME value: {s}. Valid \
+                                             values are 'none', 'forward', 'forwardAndReverse', \
+                                             'true', 'false'"
+                                        ),
+                                    }
+                                    .into());
+                                }
                             };
                             doc.insert("CANONICALIZE_HOST_NAME", val);
                         }
@@ -1582,6 +1596,22 @@ impl ConnectionString {
                             doc.insert("CANONICALIZE_HOST_NAME", val);
                         }
                         None => {}
+                    }
+
+                    credential.mechanism_properties = Some(doc);
+                }
+
+                #[cfg(feature = "gssapi-auth")]
+                if mechanism == &AuthMechanism::Gssapi {
+                    // Set mongodb as the default SERVICE_NAME if none is provided
+                    let mut doc = if let Some(doc) = credential.mechanism_properties.take() {
+                        doc
+                    } else {
+                        Document::new()
+                    };
+
+                    if !doc.contains_key("SERVICE_NAME") {
+                        doc.insert("SERVICE_NAME", "mongodb");
                     }
 
                     credential.mechanism_properties = Some(doc);
@@ -1621,7 +1651,9 @@ impl ConnectionString {
     }
 
     /// Relax TLS constraints as much as possible (e.g. allowing invalid certificates or hostname
-    /// mismatches).  Not supported by the Rust driver.
+    /// mismatches). This option can only be set in a URI. If it is set in a URI provided to
+    /// [`ConnectionString::parse`], [`TlsOptions::allow_invalid_certificates`] and
+    /// [`TlsOptions::allow_invalid_hostnames`] are set to its value.
     pub fn tls_insecure(&self) -> Option<bool> {
         self.tls_insecure
     }
@@ -1636,40 +1668,45 @@ impl ConnectionString {
             return Ok(parts);
         }
 
-        let mut keys: Vec<&str> = Vec::new();
+        let mut keys = HashSet::new();
 
         for option_pair in options.split('&') {
-            let (key, value) = match option_pair.find('=') {
-                Some(index) => option_pair.split_at(index),
+            let (key, value) = match option_pair.split_once('=') {
+                Some((key, value)) => (key.to_lowercase(), value),
                 None => {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: format!(
-                            "connection string options is not a `key=value` pair: {}",
-                            option_pair,
-                        ),
-                    }
-                    .into())
+                    return Err(Error::invalid_argument(format!(
+                        "connection string option is not a 'key=value' pair: {option_pair}"
+                    )))
                 }
             };
 
-            if key.to_lowercase() != "readpreferencetags" && keys.contains(&key) {
-                return Err(ErrorKind::InvalidArgument {
-                    message: "repeated options are not allowed in the connection string"
-                        .to_string(),
-                }
-                .into());
-            } else {
-                keys.push(key);
+            if !keys.insert(key.clone()) && key != "readpreferencetags" {
+                return Err(Error::invalid_argument(
+                    "repeated options are not allowed in the connection string",
+                ));
             }
 
-            // Skip leading '=' in value.
             self.parse_option_pair(
                 &mut parts,
-                &key.to_lowercase(),
-                percent_encoding::percent_decode(&value.as_bytes()[1..])
+                &key,
+                percent_encoding::percent_decode(value.as_bytes())
                     .decode_utf8_lossy()
                     .as_ref(),
             )?;
+        }
+
+        if keys.contains(TLS_INSECURE) {
+            #[cfg(feature = "openssl-tls")]
+            let disallowed = [TLS_ALLOW_INVALID_CERTIFICATES, TLS_ALLOW_INVALID_HOSTNAMES];
+            #[cfg(not(feature = "openssl-tls"))]
+            let disallowed = [TLS_ALLOW_INVALID_CERTIFICATES];
+            for option in disallowed {
+                if keys.contains(option) {
+                    return Err(Error::invalid_argument(format!(
+                        "cannot set both {TLS_INSECURE} and {option} in the connection string"
+                    )));
+                }
+            }
         }
 
         if let Some(tags) = parts.read_preference_tags.take() {
@@ -1820,14 +1857,12 @@ impl ConnectionString {
                     let Some((k, v)) = property.split_once(":") else {
                         return Err(Error::invalid_argument(format!(
                             "each entry in authMechanismProperties must be a colon-separated \
-                             key-value pair, got {}",
-                            property
+                             key-value pair, got {property}"
                         )));
                     };
                     if k == "ALLOWED_HOSTS" || k == "OIDC_CALLBACK" || k == "OIDC_HUMAN_CALLBACK" {
                         return Err(Error::invalid_argument(format!(
-                            "{} must only be specified through client options",
-                            k
+                            "{k} must only be specified through client options"
                         )));
                     }
                     properties.insert(k, v);
@@ -1874,14 +1909,14 @@ impl ConnectionString {
             }
             "maxstalenessseconds" => {
                 let max_staleness_seconds = value.parse::<i64>().map_err(|e| {
-                    Error::invalid_argument(format!("invalid maxStalenessSeconds value: {}", e))
+                    Error::invalid_argument(format!("invalid maxStalenessSeconds value: {e}"))
                 })?;
 
                 let max_staleness = match max_staleness_seconds.cmp(&-1) {
                     Ordering::Less => {
                         return Err(Error::invalid_argument(format!(
-                            "maxStalenessSeconds must be -1 or positive, instead got {}",
-                            max_staleness_seconds
+                            "maxStalenessSeconds must be -1 or positive, instead got \
+                             {max_staleness_seconds}"
                         )));
                     }
                     Ordering::Equal => {
@@ -1922,7 +1957,7 @@ impl ConnectionString {
                     },
                     other => {
                         return Err(ErrorKind::InvalidArgument {
-                            message: format!("'{}' is not a valid read preference", other),
+                            message: format!("'{other}' is not a valid read preference"),
                         }
                         .into())
                     }
@@ -1943,9 +1978,8 @@ impl ConnectionString {
                                 }
                                 _ => Err(ErrorKind::InvalidArgument {
                                     message: format!(
-                                        "'{}' is not a valid read preference tag (which must be \
-                                         of the form 'key:value'",
-                                        value,
+                                        "'{value}' is not a valid read preference tag (which must \
+                                         be of the form 'key:value'",
                                     ),
                                 }
                                 .into()),
@@ -1975,8 +2009,7 @@ impl ConnectionString {
                     "auto" => ServerMonitoringMode::Auto,
                     other => {
                         return Err(Error::invalid_argument(format!(
-                            "{:?} is not a valid server monitoring mode",
-                            other
+                            "{other:?} is not a valid server monitoring mode"
                         )));
                     }
                 });
@@ -1996,63 +2029,63 @@ impl ConnectionString {
             k @ "tls" | k @ "ssl" => {
                 let tls = get_bool!(value, k);
 
-                match (self.tls.as_ref(), tls) {
-                    (Some(Tls::Disabled), true) | (Some(Tls::Enabled(..)), false) => {
-                        return Err(ErrorKind::InvalidArgument {
-                            message: "All instances of `tls` and `ssl` must have the same
- value"
-                                .to_string(),
-                        }
-                        .into());
-                    }
-                    _ => {}
-                };
-
-                if self.tls.is_none() {
-                    let tls = if tls {
-                        Tls::Enabled(Default::default())
-                    } else {
-                        Tls::Disabled
-                    };
-
-                    self.tls = Some(tls);
-                }
-            }
-            k @ "tlsinsecure" | k @ "tlsallowinvalidcertificates" => {
-                let val = get_bool!(value, k);
-
-                let allow_invalid_certificates = if k == "tlsinsecure" { !val } else { val };
-
                 match self.tls {
-                    Some(Tls::Disabled) => {
-                        return Err(ErrorKind::InvalidArgument {
-                            message: "'tlsInsecure' can't be set if tls=false".into(),
-                        }
-                        .into())
+                    Some(Tls::Enabled(_)) if !tls => {
+                        return Err(Error::invalid_argument(
+                            "cannot set {key}={tls} if other TLS options are set",
+                        ))
                     }
-                    Some(Tls::Enabled(ref options))
-                        if options.allow_invalid_certificates.is_some()
-                            && options.allow_invalid_certificates
-                                != Some(allow_invalid_certificates) =>
-                    {
-                        return Err(ErrorKind::InvalidArgument {
-                            message: "all instances of 'tlsInsecure' and \
-                                      'tlsAllowInvalidCertificates' must be consistent (e.g. \
-                                      'tlsInsecure' cannot be true when \
-                                      'tlsAllowInvalidCertificates' is false, or vice-versa)"
-                                .into(),
-                        }
-                        .into());
-                    }
-                    Some(Tls::Enabled(ref mut options)) => {
-                        options.allow_invalid_certificates = Some(allow_invalid_certificates);
+                    Some(Tls::Disabled) if tls => {
+                        return Err(Error::invalid_argument(
+                            "cannot set {key}={tls} if TLS is disabled",
+                        ))
                     }
                     None => {
-                        self.tls = Some(Tls::Enabled(
-                            TlsOptions::builder()
-                                .allow_invalid_certificates(allow_invalid_certificates)
-                                .build(),
-                        ))
+                        if tls {
+                            self.tls = Some(Tls::Enabled(Default::default()))
+                        } else {
+                            self.tls = Some(Tls::Disabled)
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            TLS_INSECURE => {
+                let val = get_bool!(value, key);
+                self.tls_insecure = Some(val);
+
+                match self
+                    .tls
+                    .get_or_insert_with(|| Tls::Enabled(Default::default()))
+                {
+                    Tls::Enabled(ref mut options) => {
+                        options.allow_invalid_certificates = Some(val);
+                        #[cfg(feature = "openssl-tls")]
+                        {
+                            options.allow_invalid_hostnames = Some(val);
+                        }
+                    }
+                    Tls::Disabled => {
+                        return Err(Error::invalid_argument(format!(
+                            "cannot set {key} when TLS is disabled"
+                        )));
+                    }
+                }
+            }
+            TLS_ALLOW_INVALID_CERTIFICATES => {
+                let val = get_bool!(value, key);
+
+                match self
+                    .tls
+                    .get_or_insert_with(|| Tls::Enabled(Default::default()))
+                {
+                    Tls::Enabled(ref mut options) => {
+                        options.allow_invalid_certificates = Some(val);
+                    }
+                    Tls::Disabled => {
+                        return Err(Error::invalid_argument(format!(
+                            "cannot set {key} when TLS is disabled"
+                        )))
                     }
                 }
             }
@@ -2127,8 +2160,7 @@ impl ConnectionString {
                         message: format!(
                             "connection string `uuidRepresentation` option can be one of \
                              `csharpLegacy`, `javaLegacy`, or `pythonLegacy`. Received invalid \
-                             `{}`",
-                            value
+                             `{value}`"
                         ),
                     }
                     .into())
@@ -2188,13 +2220,9 @@ impl ConnectionString {
                     }
                     acc
                 });
-                let mut message = format!("{} is an invalid option", other);
+                let mut message = format!("{other} is an invalid option");
                 if jaro_winkler >= 0.84 {
-                    let _ = write!(
-                        message,
-                        ". An option with a similar name exists: {}",
-                        option
-                    );
+                    let _ = write!(message, ". An option with a similar name exists: {option}");
                 }
                 return Err(ErrorKind::InvalidArgument { message }.into());
             }
@@ -2670,6 +2698,7 @@ pub struct TransactionOptions {
 
     /// The write concern to use when committing or aborting a transaction.
     #[builder(default)]
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// The selection criteria to use for all read operations in a transaction.

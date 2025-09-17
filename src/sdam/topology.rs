@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use bson::oid::ObjectId;
+use crate::bson::oid::ObjectId;
 use futures_util::{
     stream::{FuturesUnordered, StreamExt},
     FutureExt,
@@ -108,7 +108,7 @@ impl Topology {
         let (watcher, publisher) = TopologyWatcher::channel(state);
 
         let connection_establisher =
-            ConnectionEstablisher::new(EstablisherOptions::from_client_options(&options))?;
+            ConnectionEstablisher::new(EstablisherOptions::from(&options))?;
 
         let worker = TopologyWorker {
             id,
@@ -551,8 +551,7 @@ impl TopologyWorker {
                 let removed_server = self.servers.remove(address);
                 debug_assert!(
                     removed_server.is_some(),
-                    "tried to remove non-existent address from topology: {}",
-                    address
+                    "tried to remove non-existent address from topology: {address}"
                 );
 
                 self.emit_event(|| {
@@ -589,8 +588,7 @@ impl TopologyWorker {
                 if self.servers.contains_key(address) {
                     debug_assert!(
                         false,
-                        "adding address that already exists in topology: {}",
-                        address
+                        "adding address that already exists in topology: {address}"
                     );
                     continue;
                 }

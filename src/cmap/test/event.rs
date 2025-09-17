@@ -85,24 +85,6 @@ impl CmapEvent {
             CmapEvent::ConnectionCheckedIn(_) => "ConnectionCheckedIn",
         }
     }
-
-    // The names in drivers-atlas-testing tests are slightly different than those used in spec
-    // tests.
-    pub(crate) fn planned_maintenance_testing_name(&self) -> &'static str {
-        match self {
-            CmapEvent::PoolCreated(_) => "PoolCreatedEvent",
-            CmapEvent::PoolReady(_) => "PoolReadyEvent",
-            CmapEvent::PoolCleared(_) => "PoolClearedEvent",
-            CmapEvent::PoolClosed(_) => "PoolClosedEvent",
-            CmapEvent::ConnectionCreated(_) => "ConnectionCreatedEvent",
-            CmapEvent::ConnectionReady(_) => "ConnectionReadyEvent",
-            CmapEvent::ConnectionClosed(_) => "ConnectionClosedEvent",
-            CmapEvent::ConnectionCheckoutStarted(_) => "ConnectionCheckOutStartedEvent",
-            CmapEvent::ConnectionCheckoutFailed(_) => "ConnectionCheckOutFailedEvent",
-            CmapEvent::ConnectionCheckedOut(_) => "ConnectionCheckedOutEvent",
-            CmapEvent::ConnectionCheckedIn(_) => "ConnectionCheckedInEvent",
-        }
-    }
 }
 
 #[derive(Debug, Deserialize)]

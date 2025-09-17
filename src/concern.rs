@@ -10,7 +10,7 @@ use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::{doc, serde_helpers, Timestamp},
+    bson::{doc, Timestamp},
     error::{ErrorKind, Result},
     serde_util,
 };
@@ -244,7 +244,7 @@ impl Serialize for Acknowledgment {
     {
         match self {
             Acknowledgment::Majority => serializer.serialize_str("majority"),
-            Acknowledgment::Nodes(n) => serde_helpers::serialize_u32_as_i32(n, serializer),
+            Acknowledgment::Nodes(n) => serde_util::serialize_u32_as_i32(n, serializer),
             Acknowledgment::Custom(name) => serializer.serialize_str(name),
         }
     }

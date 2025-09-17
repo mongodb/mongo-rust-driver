@@ -1,7 +1,7 @@
 use std::io::Read;
 
+use crate::bson::{doc, Array, Document};
 use bitflags::bitflags;
-use bson::{doc, Array, Document};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 #[cfg(any(
@@ -62,7 +62,7 @@ impl TryFrom<Command> for Message {
     type Error = Error;
 
     fn try_from(command: Command) -> Result<Self> {
-        let document_payload = bson::to_raw_document_buf(&command)?;
+        let document_payload = crate::bson_compat::serialize_to_raw_document_buf(&command)?;
         #[cfg(any(
             feature = "zstd-compression",
             feature = "zlib-compression",
@@ -96,7 +96,7 @@ impl Message {
     /// Gets this message's command as a Document. If serialization fails, returns a document
     /// containing the error.
     pub(crate) fn get_command_document(&self) -> Document {
-        let mut command = match self.document_payload.to_document() {
+        let mut command = match Document::try_from(self.document_payload.as_ref()) {
             Ok(document) => document,
             Err(error) => return doc! { "serialization error": error.to_string() },
         };
@@ -104,7 +104,7 @@ impl Message {
         for document_sequence in &self.document_sequences {
             let mut documents = Array::new();
             for document in &document_sequence.documents {
-                match document.to_document() {
+                match Document::try_from(document.as_ref()) {
                     Ok(document) => documents.push(document.into()),
                     Err(error) => return doc! { "serialization error": error.to_string() },
                 }
@@ -291,7 +291,7 @@ impl Message {
             Checked::try_from(max_message_size_bytes.unwrap_or(DEFAULT_MAX_MESSAGE_SIZE_BYTES))?;
         if total_length > max_len {
             return Err(ErrorKind::InvalidArgument {
-                message: format!("Message length {} over maximum {}", total_length, max_len),
+                message: format!("Message length {total_length} over maximum {max_len}"),
             }
             .into());
         }
@@ -344,7 +344,7 @@ impl Message {
             Checked::try_from(max_message_size_bytes.unwrap_or(DEFAULT_MAX_MESSAGE_SIZE_BYTES))?;
         if total_length > max_len {
             return Err(ErrorKind::InvalidArgument {
-                message: format!("Message length {} over maximum {}", total_length, max_len),
+                message: format!("Message length {total_length} over maximum {max_len}"),
             }
             .into());
         }

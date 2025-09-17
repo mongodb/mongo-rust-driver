@@ -1,8 +1,9 @@
-use bson::rawdoc;
+use crate::bson::rawdoc;
 use serde::Deserialize;
 
 use crate::{
     bson::{doc, RawDocumentBuf},
+    bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::ListDatabasesOptions,
     error::Result,
@@ -27,7 +28,7 @@ impl ListDatabases {
 impl OperationWithDefaults for ListDatabases {
     type O = Vec<RawDocumentBuf>;
 
-    const NAME: &'static str = "listDatabases";
+    const NAME: &'static CStr = cstr!("listDatabases");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
@@ -37,11 +38,7 @@ impl OperationWithDefaults for ListDatabases {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            "admin".to_string(),
-            body,
-        ))
+        Ok(Command::new(Self::NAME, "admin", body))
     }
 
     fn handle_response<'a>(

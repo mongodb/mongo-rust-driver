@@ -1,6 +1,7 @@
 use futures_util::FutureExt;
 
 use crate::{
+    bson_compat::{cstr, CStr},
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     concern::WriteConcern,
     cursor::CursorSpecification,
@@ -34,7 +35,7 @@ impl<'conn> RunCursorCommand<'conn> {
 impl Operation for RunCursorCommand<'_> {
     type O = CursorSpecification;
 
-    const NAME: &'static str = "run_cursor_command";
+    const NAME: &'static CStr = cstr!("run_cursor_command");
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.run_command.build(description)
@@ -42,8 +43,8 @@ impl Operation for RunCursorCommand<'_> {
 
     fn extract_at_cluster_time(
         &self,
-        response: &bson::RawDocument,
-    ) -> Result<Option<bson::Timestamp>> {
+        response: &crate::bson::RawDocument,
+    ) -> Result<Option<crate::bson::Timestamp>> {
         self.run_command.extract_at_cluster_time(response)
     }
 
@@ -87,7 +88,7 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.pinned_connection()
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> &CStr {
         self.run_command.name()
     }
 

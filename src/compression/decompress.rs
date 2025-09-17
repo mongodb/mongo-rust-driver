@@ -23,10 +23,7 @@ pub(crate) fn decompress_message(message: &[u8], compressor_id: u8) -> Result<Ve
     }
 
     Err(ErrorKind::InvalidResponse {
-        message: format!(
-            "Unsupported compressor ID returned from the server: {}",
-            compressor_id
-        ),
+        message: format!("Unsupported compressor ID returned from the server: {compressor_id}"),
     }
     .into())
 }
@@ -35,7 +32,7 @@ pub(crate) fn decompress_message(message: &[u8], compressor_id: u8) -> Result<Ve
 fn decompress_zstd(message: &[u8]) -> Result<Vec<u8>> {
     let mut decompressed = Vec::new();
     zstd::stream::copy_decode(message, &mut decompressed).map_err(|error| ErrorKind::Internal {
-        message: format!("Could not decompress message with zstd: {}", error),
+        message: format!("Could not decompress message with zstd: {error}"),
     })?;
     Ok(decompressed)
 }
@@ -50,7 +47,7 @@ fn decompress_zlib(message: &[u8]) -> Result<Vec<u8>> {
     decoder.write_all(message)?;
     decoder.finish().map_err(|error| {
         ErrorKind::Internal {
-            message: format!("Could not decompress message with zlib: {}", error),
+            message: format!("Could not decompress message with zlib: {error}"),
         }
         .into()
     })
@@ -63,7 +60,7 @@ fn decompress_snappy(message: &[u8]) -> Result<Vec<u8>> {
     let mut decoder = Decoder::new();
     decoder.decompress_vec(message).map_err(|error| {
         ErrorKind::Internal {
-            message: format!("Could not decompress message with snappy: {}", error),
+            message: format!("Could not decompress message with snappy: {error}"),
         }
         .into()
     })

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::doc;
+use crate::bson::doc;
 use macro_magic::export_tokens;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -11,7 +11,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     options::{Collation, CursorType},
     selection_criteria::SelectionCriteria,
-    serde_util,
+    serde_util::{self, write_concern_is_empty},
 };
 
 /// These are the valid options for creating a [`Database`](../struct.Database.html) with
@@ -44,7 +44,11 @@ pub struct CreateCollectionOptions {
 
     /// The maximum size (in bytes) for a capped collection. This option is ignored if `capped` is
     /// not set to true.
-    #[serde(serialize_with = "serde_util::serialize_u64_option_as_i64")]
+    #[serde(
+        serialize_with = "serde_util::serialize_u64_option_as_i64",
+        deserialize_with = "serde_util::deserialize_option_u64_from_bson_number",
+        default
+    )]
     pub size: Option<u64>,
 
     /// The maximum number of documents in a capped collection. The `size` limit takes precedence
@@ -84,6 +88,7 @@ pub struct CreateCollectionOptions {
     pub collation: Option<Collation>,
 
     /// The write concern for the operation.   
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
     /// The default configuration for indexes created on this collection, including the _id index.
@@ -288,6 +293,7 @@ pub enum TimeseriesGranularity {
 #[export_tokens]
 pub struct DropDatabaseOptions {
     /// The write concern for the operation.
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 }
 

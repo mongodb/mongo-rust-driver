@@ -8,7 +8,7 @@ use super::{Entity, TestOperation, TestRunner};
 
 use crate::{
     action::csfle::DataKeyOptions,
-    bson::{doc, Binary, Bson, RawBson},
+    bson::{doc, Binary, Bson, Document, RawBson},
     client_encryption::{LocalMasterKey, MasterKey},
     error::Result,
 };
@@ -29,7 +29,7 @@ impl TestOperation for GetKeyByAltName {
             let ce = test_runner.get_client_encryption(id).await;
             let key = ce.get_key_by_alt_name(&self.key_alt_name).await?;
             let ent = match key {
-                Some(rd) => Entity::Bson(Bson::Document(rd.to_document()?)),
+                Some(rd) => Entity::Bson(Bson::Document(Document::try_from(rd)?)),
                 None => Entity::None,
             };
             Ok(Some(ent))
@@ -41,7 +41,7 @@ impl TestOperation for GetKeyByAltName {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct DeleteKey {
-    id: bson::Binary,
+    id: crate::bson::Binary,
 }
 
 impl TestOperation for DeleteKey {
@@ -53,9 +53,9 @@ impl TestOperation for DeleteKey {
         async move {
             let ce = test_runner.get_client_encryption(id).await;
             let result = ce.delete_key(&self.id).await?;
-            Ok(Some(Entity::Bson(Bson::Document(bson::to_document(
-                &result,
-            )?))))
+            Ok(Some(Entity::Bson(Bson::Document(
+                crate::bson_compat::serialize_to_document(&result)?,
+            ))))
         }
         .boxed()
     }
@@ -64,7 +64,7 @@ impl TestOperation for DeleteKey {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct GetKey {
-    id: bson::Binary,
+    id: crate::bson::Binary,
 }
 
 impl TestOperation for GetKey {
@@ -76,7 +76,7 @@ impl TestOperation for GetKey {
         async move {
             let ce = test_runner.get_client_encryption(id).await;
             let entity = match ce.get_key(&self.id).await? {
-                Some(key) => Entity::Bson(Bson::Document(key.to_document()?)),
+                Some(key) => Entity::Bson(Bson::Document(Document::try_from(key)?)),
                 None => Entity::None,
             };
             Ok(Some(entity))
@@ -88,7 +88,7 @@ impl TestOperation for GetKey {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct AddKeyAltName {
-    id: bson::Binary,
+    id: crate::bson::Binary,
     key_alt_name: String,
 }
 
@@ -101,7 +101,7 @@ impl TestOperation for AddKeyAltName {
         async move {
             let ce = test_runner.get_client_encryption(id).await;
             let entity = match ce.add_key_alt_name(&self.id, &self.key_alt_name).await? {
-                Some(key) => Entity::Bson(Bson::Document(key.to_document()?)),
+                Some(key) => Entity::Bson(Bson::Document(Document::try_from(key)?)),
                 None => Entity::None,
             };
             Ok(Some(entity))
@@ -127,7 +127,7 @@ impl<'de> Deserialize<'de> for CreateDataKey {
         struct TestOptions {
             master_key: Option<MasterKey>,
             key_alt_names: Option<Vec<String>>,
-            key_material: Option<bson::Binary>,
+            key_material: Option<crate::bson::Binary>,
         }
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -186,7 +186,7 @@ impl TestOperation for GetKeys {
             let mut cursor = ce.get_keys().await?;
             let mut keys = vec![];
             while let Some(key) = cursor.try_next().await? {
-                keys.push(Bson::Document(key.to_document()?));
+                keys.push(Bson::Document(Document::try_from(key)?));
             }
             Ok(Some(Entity::Bson(Bson::Array(keys))))
         }
@@ -197,7 +197,7 @@ impl TestOperation for GetKeys {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct RemoveKeyAltName {
-    id: bson::Binary,
+    id: crate::bson::Binary,
     key_alt_name: String,
 }
 
@@ -210,7 +210,7 @@ impl TestOperation for RemoveKeyAltName {
         async move {
             let ce = test_runner.get_client_encryption(id).await;
             let entity = match ce.remove_key_alt_name(&self.id, &self.key_alt_name).await? {
-                Some(key) => Entity::Bson(Bson::Document(key.to_document()?)),
+                Some(key) => Entity::Bson(Bson::Document(Document::try_from(key)?)),
                 None => Entity::None,
             };
             Ok(Some(entity))
@@ -236,7 +236,7 @@ struct EncryptOptions {
 fn algorithm_from_string(algorithm: &str) -> Algorithm {
     match algorithm {
         "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic" => Algorithm::Deterministic,
-        other => panic!("unsupported encrypt algorithm: {}", other),
+        other => panic!("unsupported encrypt algorithm: {other}"),
     }
 }
 

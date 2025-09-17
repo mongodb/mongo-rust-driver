@@ -294,7 +294,7 @@ fn transactions() {
                 if error.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
                     continue;
                 } else {
-                    panic!("error while committing: {}", error);
+                    panic!("error while committing: {error}");
                 }
             }
         }

@@ -1,4 +1,6 @@
 use crate::{
+    bson::Document,
+    bson_compat::serialize_to_bson,
     error::Result,
     options::DeleteOptions,
     test::spec::unified_runner::{
@@ -7,7 +9,6 @@ use crate::{
         TestRunner,
     },
 };
-use bson::{to_bson, Document};
 use futures::future::BoxFuture;
 use futures_util::FutureExt;
 use serde::Deserialize;
@@ -37,7 +38,7 @@ impl TestOperation for DeleteMany {
                     .with_options(self.options.clone())
             )
             .await?;
-            let result = to_bson(&result)?;
+            let result = serialize_to_bson(&result)?;
             Ok(Some(result.into()))
         }
         .boxed()
@@ -69,7 +70,7 @@ impl TestOperation for DeleteOne {
                     .with_options(self.options.clone()),
             )
             .await?;
-            let result = to_bson(&result)?;
+            let result = serialize_to_bson(&result)?;
             Ok(Some(result.into()))
         }
         .boxed()

@@ -3,7 +3,11 @@ mod test;
 
 use std::env;
 
-use bson::{rawdoc, RawBson, RawDocumentBuf};
+use crate::{
+    bson::{rawdoc, RawBson, RawDocumentBuf},
+    bson_compat::cstr,
+    options::{AuthOptions, ClientOptions},
+};
 use once_cell::sync::Lazy;
 use tokio::sync::broadcast;
 
@@ -79,22 +83,27 @@ impl From<&ClientMetadata> for RawDocumentBuf {
         let mut metadata_doc = RawDocumentBuf::new();
 
         if let Some(application) = &metadata.application {
-            metadata_doc.append("application", rawdoc! { "name": application.name.as_str() });
+            metadata_doc.append(
+                cstr!("application"),
+                rawdoc! { "name": application.name.as_str() },
+            );
         }
 
         metadata_doc.append(
-            "driver",
+            cstr!("driver"),
             rawdoc! {
                 "name": metadata.driver.name.as_str(),
                 "version": metadata.driver.version.as_str(),
             },
         );
 
-        metadata_doc.append("os", &metadata.os);
-        metadata_doc.append("platform", metadata.platform.as_str());
+        let raw_os: RawBson = (&metadata.os).into();
+        metadata_doc.append(cstr!("os"), raw_os);
+        metadata_doc.append(cstr!("platform"), metadata.platform.as_str());
 
         if let Some(env) = &metadata.env {
-            metadata_doc.append("env", env);
+            let raw_env: RawBson = env.into();
+            metadata_doc.append(cstr!("env"), raw_env);
         }
 
         metadata_doc
@@ -106,15 +115,15 @@ impl From<&OsMetadata> for RawBson {
         let mut doc = rawdoc! { "type": metadata.os_type.as_str() };
 
         if let Some(name) = &metadata.name {
-            doc.append("name", name.as_str());
+            doc.append(cstr!("name"), name.as_str());
         }
 
         if let Some(arch) = &metadata.architecture {
-            doc.append("architecture", arch.as_str());
+            doc.append(cstr!("architecture"), arch.as_str());
         }
 
         if let Some(version) = &metadata.version {
-            doc.append("version", version.as_str());
+            doc.append(cstr!("version"), version.as_str());
         }
 
         RawBson::Document(doc)
@@ -134,25 +143,25 @@ impl From<&RuntimeEnvironment> for RawBson {
         } = env;
         let mut out = rawdoc! {};
         if let Some(name) = name {
-            out.append("name", name.name());
+            out.append(cstr!("name"), name.name());
         }
         if let Some(rt) = runtime {
-            out.append("runtime", rt.as_str());
+            out.append(cstr!("runtime"), rt.as_str());
         }
         if let Some(t) = timeout_sec {
-            out.append("timeout_sec", *t);
+            out.append(cstr!("timeout_sec"), *t);
         }
         if let Some(m) = memory_mb {
-            out.append("memory_mb", *m);
+            out.append(cstr!("memory_mb"), *m);
         }
         if let Some(r) = region {
-            out.append("region", r.as_str());
+            out.append(cstr!("region"), r.as_str());
         }
         if let Some(u) = url {
-            out.append("url", u.as_str());
+            out.append(cstr!("url"), u.as_str());
         }
         if let Some(c) = container {
-            out.append("container", c.clone());
+            out.append(cstr!("container"), c.clone());
         }
         RawBson::Document(out)
     }
@@ -200,10 +209,10 @@ impl RuntimeEnvironment {
         }
         let mut container = rawdoc! {};
         if std::path::Path::new("/.dockerenv").exists() {
-            container.append("runtime", "docker");
+            container.append(cstr!("runtime"), "docker");
         }
         if var_set("KUBERNETES_SERVICE_HOST") {
-            container.append("orchestrator", "kubernetes");
+            container.append(cstr!("orchestrator"), "kubernetes");
         }
         if !container.is_empty() {
             out.container = Some(container);
@@ -276,9 +285,10 @@ pub(crate) static BASE_CLIENT_METADATA: Lazy<ClientMetadata> = Lazy::new(|| Clie
         version: None,
     },
     platform: format!(
-        "{} with {}",
+        "{} with {} / bson-{}",
         rustc_version_runtime::version_meta().short_version_string,
-        RUNTIME_NAME
+        RUNTIME_NAME,
+        if cfg!(feature = "bson-3") { "3" } else { "2" },
     ),
     env: None,
 });
@@ -328,12 +338,9 @@ pub(crate) struct Handshaker {
     ))]
     compressors: Option<Vec<Compressor>>,
 
-    server_api: Option<ServerApi>,
-
     metadata: ClientMetadata,
 
-    #[cfg(feature = "aws-auth")]
-    http_client: crate::runtime::HttpClient,
+    auth_options: AuthOptions,
 }
 
 #[cfg(test)]
@@ -342,7 +349,7 @@ pub(crate) static TEST_METADATA: std::sync::OnceLock<ClientMetadata> = std::sync
 
 impl Handshaker {
     /// Creates a new Handshaker.
-    pub(crate) fn new(options: HandshakerOptions) -> Self {
+    pub(crate) fn new(options: HandshakerOptions) -> Result<Self> {
         let mut metadata = BASE_CLIENT_METADATA.clone();
 
         let mut command = hello_command(
@@ -374,7 +381,7 @@ impl Handshaker {
         metadata.env = RuntimeEnvironment::new();
 
         if options.load_balanced {
-            command.body.append("loadBalanced", true);
+            command.body.append(cstr!("loadBalanced"), true);
         }
 
         #[cfg(any(
@@ -384,15 +391,14 @@ impl Handshaker {
         ))]
         if let Some(ref compressors) = options.compressors {
             command.body.append(
-                "compression",
-                compressors
-                    .iter()
-                    .map(|compressor| compressor.name())
-                    .collect::<bson::RawArrayBuf>(),
+                crate::bson_compat::cstr!("compression"),
+                crate::bson::RawArrayBuf::from_iter(
+                    compressors.iter().map(|compressor| compressor.name()),
+                ),
             );
         }
 
-        Self {
+        Ok(Self {
             command,
             #[cfg(any(
                 feature = "zstd-compression",
@@ -400,11 +406,9 @@ impl Handshaker {
                 feature = "snappy-compression"
             ))]
             compressors: options.compressors,
-            server_api: options.server_api,
             metadata,
-            #[cfg(feature = "aws-auth")]
-            http_client: crate::runtime::HttpClient::default(),
-        }
+            auth_options: options.auth_options,
+        })
     }
 
     async fn build_command(
@@ -412,10 +416,10 @@ impl Handshaker {
         credential: Option<&Credential>,
     ) -> Result<(Command, Option<ClientFirst>)> {
         let mut command = self.command.clone();
+        command.target_db = "admin".to_string();
 
         if let Some(cred) = credential {
             cred.append_needed_mechanism_negotiation(&mut command.body);
-            command.target_db = cred.resolved_source().to_string();
         }
 
         let client_first = set_speculative_auth_info(&mut command.body, credential).await?;
@@ -435,7 +439,7 @@ impl Handshaker {
         #[cfg(test)]
         #[allow(clippy::incompatible_msrv)]
         let _ = TEST_METADATA.set(metadata);
-        body.append("client", meta_doc);
+        body.append(cstr!("client"), meta_doc);
 
         Ok((command, client_first))
     }
@@ -485,13 +489,7 @@ impl Handshaker {
 
         if let Some(credential) = credential {
             credential
-                .authenticate_stream(
-                    conn,
-                    self.server_api.as_ref(),
-                    first_round,
-                    #[cfg(feature = "aws-auth")]
-                    &self.http_client,
-                )
+                .authenticate_stream(conn, first_round, &self.auth_options)
                 .await?
         }
 
@@ -525,9 +523,30 @@ pub(crate) struct HandshakerOptions {
 
     /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
     pub(crate) load_balanced: bool,
+
+    /// Auxiliary data for authentication mechanisms.
+    pub(crate) auth_options: AuthOptions,
 }
 
-/// Updates the handshake command document with the speculative authenitication info.
+impl From<&ClientOptions> for HandshakerOptions {
+    fn from(opts: &ClientOptions) -> Self {
+        Self {
+            app_name: opts.app_name.clone(),
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
+            compressors: opts.compressors.clone(),
+            driver_info: opts.driver_info.clone(),
+            server_api: opts.server_api.clone(),
+            load_balanced: opts.load_balanced.unwrap_or(false),
+            auth_options: AuthOptions::from(opts),
+        }
+    }
+}
+
+/// Updates the handshake command document with the speculative authentication info.
 async fn set_speculative_auth_info(
     command: &mut RawDocumentBuf,
     credential: Option<&Credential>,
@@ -553,7 +572,10 @@ async fn set_speculative_auth_info(
         None => return Ok(None),
     };
 
-    command.append("speculativeAuthenticate", client_first.to_document());
+    command.append(
+        cstr!("speculativeAuthenticate"),
+        client_first.to_document()?,
+    );
 
     Ok(Some(client_first))
 }

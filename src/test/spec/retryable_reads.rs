@@ -1,6 +1,6 @@
-use std::{future::IntoFuture, time::Duration};
+use std::{future::IntoFuture, sync::Arc, time::Duration};
 
-use bson::doc;
+use crate::bson::doc;
 
 use crate::{
     error::Result,
@@ -8,10 +8,9 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
+    options::SelectionCriteria,
     runtime::{self, AsyncJoinHandle},
     test::{
-        block_connection_supported,
-        fail_command_supported,
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
@@ -35,11 +34,6 @@ async fn run_unified() {
 /// pool before the second attempt.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_releases_connection() {
-    if !fail_command_supported().await {
-        log_uncaptured("skipping retry_releases_connection due to failCommand not being supported");
-        return;
-    }
-
     let mut client_options = get_client_options().await.clone();
     client_options.hosts.drain(1..);
     client_options.retry_reads = Some(true);
@@ -70,12 +64,6 @@ async fn retry_releases_connection() {
 /// Prose test from retryable reads spec verifying that PoolClearedErrors are retried.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_read_pool_cleared() {
-    if !block_connection_supported().await {
-        log_uncaptured(
-            "skipping retry_read_pool_cleared due to blockConnection not being supported",
-        );
-        return;
-    }
     if topology_is_load_balanced().await {
         log_uncaptured("skipping retry_read_pool_cleared due to load-balanced topology");
         return;
@@ -148,8 +136,7 @@ async fn retry_read_pool_cleared() {
     }) {
         panic!(
             "Expected second checkout to fail, but no ConnectionCheckoutFailed event observed. \
-             CMAP events:\n{:?}",
-            next_cmap_events
+             CMAP events:\n{next_cmap_events:?}"
         );
     }
 
@@ -159,10 +146,6 @@ async fn retry_read_pool_cleared() {
 // Retryable Reads Are Retried on a Different mongos if One is Available
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_read_different_mongos() {
-    if !fail_command_supported().await {
-        log_uncaptured("skipping retry_read_different_mongos: requires failCommand");
-        return;
-    }
     let mut client_options = get_client_options().await.clone();
     if !(topology_is_sharded().await && client_options.hosts.len() >= 2) {
         log_uncaptured(
@@ -174,26 +157,43 @@ async fn retry_read_different_mongos() {
     client_options.hosts.drain(2..);
     client_options.retry_reads = Some(true);
 
-    let mut guards = vec![];
-    for ix in [0, 1] {
-        let mut opts = client_options.clone();
-        opts.hosts.remove(ix);
-        opts.direct_connection = Some(true);
-        let client = Client::for_test().options(opts).await;
-
-        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
-            .error_code(6)
-            .close_connection(true);
-        guards.push(client.enable_fail_point(fail_point).await.unwrap());
-    }
-
+    let hosts = client_options.hosts.clone();
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
         .await;
+
+    // NOTE: This test uses a single client to set failpoints on each mongos and run the find
+    // operation. This avoids flakiness caused by a race between server discovery and server
+    // selection.
+
+    // When a client is first created, it initializes its view of the topology with all configured
+    // mongos addresses, but marks each as Unknown until it completes the server discovery process
+    // by sending and receiving "hello" messages Unknown servers are not eligible for server
+    // selection.
+
+    // Previously, we created a new client for each call to `enable_fail_point` and for the find
+    // operation. Each new client restarted the discovery process, and sometimes had not yet marked
+    // both mongos servers as usable, leading to test failures when the retry logic couldn't find a
+    // second eligible server.
+
+    // By reusing a single client, each `enable_fail_point` call forces discovery to complete for
+    // the corresponding mongos. As a result, when the find operation runs, the client has a
+    // fully discovered topology and can reliably select between both servers.
+    let mut guards = Vec::new();
+    for address in hosts {
+        let address = address.clone();
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
+            .error_code(6)
+            .selection_criteria(SelectionCriteria::Predicate(Arc::new(move |info| {
+                info.description.address == address
+            })));
+        guards.push(client.enable_fail_point(fail_point).await.unwrap());
+    }
+
     let result = client
         .database("test")
-        .collection::<bson::Document>("retry_read_different_mongos")
+        .collection::<crate::bson::Document>("retry_read_different_mongos")
         .find(doc! {})
         .await;
     assert!(result.is_err());
@@ -208,8 +208,15 @@ async fn retry_read_different_mongos() {
                 CommandEvent::Failed(_),
             ]
         ),
-        "unexpected events: {:#?}",
-        events,
+        "unexpected events: {events:#?}",
+    );
+    let first_failed = events[1].as_command_failed().unwrap();
+    let first_address = &first_failed.connection.address;
+    let second_failed = events[3].as_command_failed().unwrap();
+    let second_address = &second_failed.connection.address;
+    assert_ne!(
+        first_address, second_address,
+        "Failed commands did not occur on two different mongos instances"
     );
 
     drop(guards); // enforce lifetime
@@ -218,10 +225,6 @@ async fn retry_read_different_mongos() {
 // Retryable Reads Are Retried on the Same mongos if No Others are Available
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_read_same_mongos() {
-    if !fail_command_supported().await {
-        log_uncaptured("skipping retry_read_same_mongos: requires failCommand");
-        return;
-    }
     if !topology_is_sharded().await {
         log_uncaptured("skipping retry_read_same_mongos: requires sharded cluster");
         return;
@@ -235,22 +238,21 @@ async fn retry_read_same_mongos() {
         client_options.direct_connection = Some(true);
         let client = Client::for_test().options(client_options).await;
 
-        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
-            .error_code(6)
-            .close_connection(true);
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(6);
         client.enable_fail_point(fail_point).await.unwrap()
     };
 
+    client_options.direct_connection = Some(false);
     let client = Client::for_test()
         .options(client_options)
         .monitor_events()
         .await;
     let result = client
         .database("test")
-        .collection::<bson::Document>("retry_read_same_mongos")
+        .collection::<crate::bson::Document>("retry_read_same_mongos")
         .find(doc! {})
         .await;
-    assert!(result.is_ok(), "{:?}", result);
+    assert!(result.is_ok(), "{result:?}");
     let events = client.events.get_command_events(&["find"]);
     assert!(
         matches!(
@@ -262,8 +264,15 @@ async fn retry_read_same_mongos() {
                 CommandEvent::Succeeded(_),
             ]
         ),
-        "unexpected events: {:#?}",
-        events,
+        "unexpected events: {events:#?}",
+    );
+    let first_failed = events[1].as_command_failed().unwrap();
+    let first_address = &first_failed.connection.address;
+    let second_failed = events[3].as_command_succeeded().unwrap();
+    let second_address = &second_failed.connection.address;
+    assert_eq!(
+        first_address, second_address,
+        "Failed command and retry did not occur on the same mongos instance",
     );
 
     drop(fp_guard); // enforce lifetime

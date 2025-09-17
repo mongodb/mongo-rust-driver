@@ -1,5 +1,8 @@
 #[cfg(feature = "aws-auth")]
 mod aws;
+#[cfg(feature = "gssapi-auth")]
+#[path = "auth/gssapi.rs"]
+mod gssapi_skip_local;
 
 use serde::Deserialize;
 
@@ -36,7 +39,7 @@ async fn plain_auth() {
         authenticated: String,
     }
 
-    let doc: TestDocument = bson::from_document(doc).unwrap();
+    let doc: TestDocument = crate::bson_compat::deserialize_from_document(doc).unwrap();
 
     assert_eq!(
         doc,

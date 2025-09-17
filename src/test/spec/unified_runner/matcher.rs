@@ -26,10 +26,7 @@ use crate::test::util::{TracingEvent, TracingEventValue};
 
 #[cfg(feature = "tracing-unstable")]
 fn mismatch_message(kind: &str, actual: impl Debug, expected: impl Debug) -> String {
-    format!(
-        "{} do not match. Actual:\n{:?}\nExpected:\n{:?}",
-        kind, actual, expected
-    )
+    format!("{kind} do not match. Actual:\n{actual:?}\nExpected:\n{expected:?}")
 }
 
 use std::convert::TryInto;
@@ -119,16 +116,13 @@ pub(crate) fn tracing_events_match(
                                 Ok(code) => {
                                     if code == 0 {
                                         return Err(format! {
-                                            "Expected a non-zero error code, but got {}",
-                                            code,
+                                            "Expected a non-zero error code, but got {code}",
                                         });
                                     }
                                 }
                                 Err(err) => {
                                     return Err(format! {
-                                        "Expected error code {} to be parseable to a u32 but was not; got error {:?}",
-                                        code,
-                                        err,
+                                        "Expected error code {code} to be parseable to a u32 but was not; got error {err:?}",
                                     })
                                 }
                             }
@@ -139,15 +133,13 @@ pub(crate) fn tracing_events_match(
                             // unredacted)
                             if codename.is_empty() {
                                 return Err(format! {
-                                    "Expected a non-empty error codename, but got {}",
-                                    codename,
+                                    "Expected a non-empty error codename, but got {codename}",
                                 });
                             }
 
                             if codename.contains("REDACTED") {
                                 return Err(format! {
-                                    "Expected error codename to not be redacted, but got {}",
-                                    codename,
+                                    "Expected error codename to not be redacted, but got {codename}",
                                 });
                             }
 
@@ -160,29 +152,25 @@ pub(crate) fn tracing_events_match(
 
                             if failure_should_be_redacted && errmsg != "REDACTED" {
                                 return Err(format! {
-                                    "Expected command error message to be redacted, but was not; got message {}",
-                                    errmsg,
+                                    "Expected command error message to be redacted, but was not; got message {errmsg}",
                                 });
                             } else if !failure_should_be_redacted && errmsg.contains("REDACTED") {
                                 return Err(format! {
-                                    "Expected command error message to not be redacted, but was; got message {}",
-                                    errmsg,
+                                    "Expected command error message to not be redacted, but was; got message {errmsg}",
                                 });
                             }
                         } else if let Some(captures) = IO_ERROR_REGEX.captures(failure_str) {
                             let message = captures.name("message").unwrap().as_str();
                             if message.is_empty() || message.contains("REDACTED") {
                                 return Err(format! {
-                                    "Expected I/O error message to not be redacted, but was; got message {}",
-                                    message,
+                                    "Expected I/O error message to not be redacted, but was; got message {message}",
                                 });
                             }
                         }
                     }
                     _ => {
                         return Err(format!(
-                            "Expected failure to be a string, but was not; got {:?}",
-                            failure
+                            "Expected failure to be a string, but was not; got {failure:?}"
                         ))
                     }
                 };
@@ -193,8 +181,8 @@ pub(crate) fn tracing_events_match(
         };
     }
 
-    let serialized_fields = bson::to_document(&actual.fields)
-        .map_err(|e| format!("Failed to serialize tracing fields to document: {}", e))?;
+    let serialized_fields = crate::bson_compat::serialize_to_document(&actual.fields)
+        .map_err(|e| format!("Failed to serialize tracing fields to document: {e}"))?;
 
     results_match(
         Some(&Bson::Document(serialized_fields)),
@@ -411,7 +399,7 @@ fn results_match_inner(
             if let Some((key, value)) = expected_doc.iter().next() {
                 if key.starts_with("$$") && expected_doc.len() == 1 {
                     return special_operator_matches((key, value), actual, entities)
-                        .map_err(|e| format!("{}: {}", key, e));
+                        .map_err(|e| format!("{key}: {e}"));
                 }
             }
 
@@ -419,7 +407,7 @@ fn results_match_inner(
                 Some(Bson::Document(actual)) => actual,
                 // The only case in which None is an acceptable value is if the expected document
                 // is a special operator; otherwise, the two documents do not match.
-                _ => return Err(format!("expected document, found {:?}", actual)),
+                _ => return Err(format!("expected document, found {actual:?}")),
             };
 
             for (key, value) in expected_doc {
@@ -427,14 +415,14 @@ fn results_match_inner(
                     continue;
                 }
                 results_match_inner(actual_doc.get(key), value, false, false, entities)
-                    .map_err(|e| format!("{:?}: {}", key, e))?;
+                    .map_err(|e| format!("{key:?}: {e}"))?;
             }
 
             // Documents that are not the root-level document should not contain extra keys.
             if !root {
                 for (key, _) in actual_doc {
                     if !expected_doc.contains_key(key) {
-                        return Err(format!("extra key {:?} found", key));
+                        return Err(format!("extra key {key:?} found"));
                     }
                 }
             }
@@ -444,7 +432,7 @@ fn results_match_inner(
         Bson::Array(expected_array) => {
             let actual_array = match actual {
                 Some(Bson::Array(arr)) => arr,
-                _ => return Err(format!("expected array, got {:?}", actual)),
+                _ => return Err(format!("expected array, got {actual:?}")),
             };
             if expected_array.len() != actual_array.len() {
                 return Err(format!(
@@ -474,13 +462,13 @@ fn results_match_inner(
         },
         _ => match actual {
             Some(actual) => match_eq(actual, expected),
-            None => Err(format!("expected {:?}, got None", expected)),
+            None => Err(format!("expected {expected:?}, got None")),
         },
     }
 }
 
 fn expected_err<A: Debug, B: Debug>(actual: &A, expected: &B) -> Result<(), String> {
-    Err(format!("expected {:?}, got {:?}", expected, actual))
+    Err(format!("expected {expected:?}, got {actual:?}"))
 }
 
 fn match_eq<V: PartialEq + std::fmt::Debug>(actual: &V, expected: &V) -> Result<(), String> {
@@ -514,8 +502,7 @@ fn special_operator_matches(
                 type_matches(value, actual)
             } else {
                 Err(format!(
-                    "Expected value to have type {:?} but got None",
-                    value
+                    "Expected value to have type {value:?} but got None"
                 ))
             }
         }
@@ -536,15 +523,13 @@ fn special_operator_matches(
                     Ok(())
                 } else {
                     Err(format!(
-                        "hex bytes do not match: expected {:?} but got {:?}",
-                        actual, expected
+                        "hex bytes do not match: expected {actual:?} but got {expected:?}"
                     ))
                 }
             }
             (actual, expected) => Err(format!(
-                "actual and expected should both be BSON strings but got: actual {:?}, expected \
-                 {:?}",
-                actual, expected
+                "actual and expected should both be BSON strings but got: actual {actual:?}, \
+                 expected {expected:?}"
             )),
         },
         "$$sessionLsid" => match entities {
@@ -559,37 +544,34 @@ fn special_operator_matches(
                     entities,
                 )
             }
-            None => panic!("Could not find entity: {}", value),
+            None => panic!("Could not find entity: {value}"),
         },
         "$$matchAsDocument" => {
             let str = match actual {
                 Some(Bson::String(str)) => str,
-                _ => return Err(format!("expected value to be a string, got {:?}", actual)),
+                _ => return Err(format!("expected value to be a string, got {actual:?}")),
             };
             let json: serde_json::Value = serde_json::from_str(str)
-                .map_err(|e| format!("Failed to convert string to JSON: {}", e))?;
+                .map_err(|e| format!("Failed to convert string to JSON: {e}"))?;
             let doc = json
                 .try_into()
-                .map_err(|e| format!("Failed to convert JSON to BSON: {}", e))?;
+                .map_err(|e| format!("Failed to convert JSON to BSON: {e}"))?;
             results_match_inner(Some(&doc), value, false, false, entities)
         }
         "$$matchAsRoot" => results_match_inner(actual, value, false, true, entities),
         "$$lte" => {
             let Some(expected) = get_double(value) else {
-                return Err(format!("expected number for comparison, got {}", value));
+                return Err(format!("expected number for comparison, got {value}"));
             };
             let Some(actual) = actual.and_then(get_double) else {
-                return Err(format!("expected actual to be a number, got {:?}", actual));
+                return Err(format!("expected actual to be a number, got {actual:?}"));
             };
             if actual > expected {
-                return Err(format!(
-                    "expected actual to be <= {}, got {}",
-                    expected, actual
-                ));
+                return Err(format!("expected actual to be <= {expected}, got {actual}"));
             }
             Ok(())
         }
-        other => panic!("unknown special operator: {}", other),
+        other => panic!("unknown special operator: {other}"),
     }
 }
 
@@ -604,7 +586,7 @@ fn type_matches(types: &Bson, actual: &Bson) -> Result<(), String> {
             if types.iter().any(|t| type_matches(t, actual).is_ok()) {
                 Ok(())
             } else {
-                Err(format!("expected any of {:?}, got {:?}", types, actual))
+                Err(format!("expected any of {types:?}, got {actual:?}"))
             }
         }
         Bson::String(str) => {
@@ -634,11 +616,11 @@ fn type_matches(types: &Bson, actual: &Bson) -> Result<(), String> {
                 "decimal" => ElementType::Decimal128,
                 "minKey" => ElementType::MinKey,
                 "maxKey" => ElementType::MaxKey,
-                other => panic!("unrecognized type: {}", other),
+                other => panic!("unrecognized type: {other}"),
             };
             match_eq(&actual.element_type(), &expected)
         }
-        other => panic!("unrecognized type: {}", other),
+        other => panic!("unrecognized type: {other}"),
     }
 }
 

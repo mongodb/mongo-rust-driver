@@ -51,10 +51,10 @@ impl ClientOptions {
     ///   * `socketTimeoutMS`: unsupported, does not map to any field
     ///   * `ssl`: an alias of the `tls` option
     ///   * `tls`: maps to the TLS variant of the `tls` field`.
-    ///   * `tlsInsecure`: relaxes the TLS constraints on connections being made; currently is just
-    ///     an alias of `tlsAllowInvalidCertificates`, but more behavior may be added to this option
-    ///     in the future
-    ///   * `tlsAllowInvalidCertificates`: maps to the `allow_invalidCertificates` field of the
+    ///   * `tlsInsecure`: relaxes the TLS constraints on connections being made; if set, the
+    ///     `allow_invalid_certificates` and `allow_invalid_hostnames` fields of the `tls` field are
+    ///     set to its value
+    ///   * `tlsAllowInvalidCertificates`: maps to the `allow_invalid_certificates` field of the
     ///     `tls` field
     ///   * `tlsCAFile`: maps to the `ca_file_path` field of the `tls` field
     ///   * `tlsCertificateKeyFile`: maps to the `cert_key_file_path` field of the `tls` field
@@ -100,7 +100,8 @@ pub struct ParseConnectionString {
 #[export_tokens(parse_conn_str_setters)]
 impl ParseConnectionString {
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
-    /// provided `ResolverConfig` as part of this method.
+    /// provided `ResolverConfig` as part of this method. In the case that "GSSAPI" auth is used,
+    /// hostname canonicalization will be done using the provided `ResolverConfig`.
     #[cfg(feature = "dns-resolver")]
     pub fn resolver_config(mut self, value: ResolverConfig) -> Self {
         self.resolver_config = Some(value);
