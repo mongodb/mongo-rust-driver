@@ -40,7 +40,7 @@ impl OperationWithDefaults for DropIndexes {
 
     fn handle_response<'a>(
         &'a self,
-        _response: RawCommandResponse,
+        _response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         Ok(())

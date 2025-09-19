@@ -69,14 +69,23 @@ impl ConnectionPool {
         address: ServerAddress,
         connection_establisher: ConnectionEstablisher,
         server_updater: TopologyUpdater,
-        topology_id: ObjectId,
         options: Option<ConnectionPoolOptions>,
+        #[cfg(feature = "tracing-unstable")] topology_id: ObjectId,
     ) -> Self {
         let event_handler = options
             .as_ref()
             .and_then(|opts| opts.cmap_event_handler.clone());
 
-        let event_emitter = CmapEventEmitter::new(event_handler, topology_id);
+        #[cfg(feature = "tracing-unstable")]
+        let event_emitter = CmapEventEmitter::new(
+            event_handler,
+            topology_id,
+            options
+                .as_ref()
+                .and_then(|options| options.max_document_length_bytes),
+        );
+        #[cfg(not(feature = "tracing-unstable"))]
+        let event_emitter = CmapEventEmitter::new(event_handler);
 
         let (manager, connection_requester, generation_subscriber) = ConnectionPoolWorker::start(
             address.clone(),
@@ -114,7 +123,10 @@ impl ConnectionPool {
             manager,
             connection_requester,
             generation_subscriber,
-            event_emitter: CmapEventEmitter::new(None, ObjectId::new()),
+            #[cfg(feature = "tracing-unstable")]
+            event_emitter: CmapEventEmitter::new(None, ObjectId::new(), None),
+            #[cfg(not(feature = "tracing-unstable"))]
+            event_emitter: CmapEventEmitter::new(None),
         }
     }
 

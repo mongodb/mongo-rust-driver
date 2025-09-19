@@ -19,6 +19,7 @@ pub(super) struct CreateIndex {
     session: Option<String>,
     keys: Document,
     name: Option<String>,
+    unique: Option<bool>,
 }
 
 impl TestOperation for CreateIndex {
@@ -28,7 +29,10 @@ impl TestOperation for CreateIndex {
         test_runner: &'a TestRunner,
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
-            let options = IndexOptions::builder().name(self.name.clone()).build();
+            let options = IndexOptions::builder()
+                .name(self.name.clone())
+                .unique(self.unique)
+                .build();
             let index = IndexModel::builder()
                 .keys(self.keys.clone())
                 .options(options)

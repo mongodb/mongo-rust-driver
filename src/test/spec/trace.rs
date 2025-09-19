@@ -123,6 +123,8 @@ async fn command_logging_truncation_explicit_limit() {
     client_opts.tracing_max_document_length_bytes = Some(5);
     let client = Client::for_test().options(client_opts).await;
 
+    let expected_truncated_len = 5 + 3; // max len + 3 for trailing "..."
+
     let _levels_guard = DEFAULT_GLOBAL_TRACING_HANDLER.set_levels(HashMap::from([(
         COMMAND_TRACING_EVENT_TARGET.to_string(),
         tracing::Level::DEBUG,
@@ -142,14 +144,29 @@ async fn command_logging_truncation_explicit_limit() {
 
     let started = &events[0];
     let command = started.get_value_as_string("command");
-    assert_eq!(command.len(), 8); // 5 + 3 for trailing "..."
+    assert_eq!(command.len(), expected_truncated_len); // 5 + 3 for trailing "..."
 
     let succeeded = &events[1];
     let reply = succeeded.get_value_as_string("reply");
-    assert_eq!(reply.len(), 8); // 5 + 3 for trailing "..."
+    assert_eq!(reply.len(), expected_truncated_len); // 5 + 3 for trailing "..."
 
-    // TODO RUST-1405: when we expose the full server reply for command errors, we should confirm
-    // that gets correctly truncated in command failed events here as well.
+    client
+        .database("tracing_test")
+        .run_command(doc! { "invalidOp": 1 })
+        .await
+        .unwrap_err();
+
+    let events = tracing_stream
+        .collect(Duration::from_millis(500), |_| true)
+        .await;
+    assert_eq!(events.len(), 2); // started + failed
+
+    let failed = &events[1];
+    let failure = failed.get_value_as_string("failure");
+    let (_, server_response) = failure
+        .split_once("server response: ")
+        .expect("no server response logged");
+    assert_eq!(server_response.len(), expected_truncated_len);
 }
 
 /// Prose test 3: mid-codepoint truncation

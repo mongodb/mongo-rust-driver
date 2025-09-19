@@ -553,6 +553,7 @@ pub(crate) struct ExpectError {
     #[serde(default, deserialize_with = "serde_util::deserialize_indexed_map")]
     pub(crate) write_errors: Option<HashMap<usize, Bson>>,
     pub(crate) write_concern_errors: Option<Vec<Bson>>,
+    pub(crate) error_response: Option<Document>,
 }
 
 impl ExpectError {
@@ -657,6 +658,19 @@ impl ExpectError {
                     .expect(&context);
                 results_match(Some(&actual), expected, true, None).expect(&context);
             }
+        }
+
+        if let Some(ref expected_server_response) = self.error_response {
+            let Some(actual_server_response) = error.server_response() else {
+                panic!("{context}expected server response to be set");
+            };
+            results_match(
+                Some(&actual_server_response.into()),
+                &expected_server_response.into(),
+                true,
+                None,
+            )
+            .expect(&context);
         }
     }
 }

@@ -43,7 +43,7 @@ impl OperationWithDefaults for ListDatabases {
 
     fn handle_response<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: Response = response.body()?;

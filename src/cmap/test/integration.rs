@@ -49,8 +49,9 @@ async fn acquire_connection_and_send_command() {
         client_options.hosts[0].clone(),
         ConnectionEstablisher::new(EstablisherOptions::from(&client_options)).unwrap(),
         TopologyUpdater::channel().0,
-        crate::bson::oid::ObjectId::new(),
         Some(pool_options),
+        #[cfg(feature = "tracing-unstable")]
+        crate::bson::oid::ObjectId::new(),
     );
     let mut connection = pool.check_out().await.unwrap();
 
@@ -116,8 +117,9 @@ async fn concurrent_connections() {
         get_client_options().await.hosts[0].clone(),
         ConnectionEstablisher::new(EstablisherOptions::from(&client_options)).unwrap(),
         TopologyUpdater::channel().0,
-        crate::bson::oid::ObjectId::new(),
         Some(options),
+        #[cfg(feature = "tracing-unstable")]
+        crate::bson::oid::ObjectId::new(),
     );
 
     let tasks = (0..2).map(|_| {
@@ -191,8 +193,9 @@ async fn connection_error_during_establishment() {
         client_options.hosts[0].clone(),
         ConnectionEstablisher::new(EstablisherOptions::from(&client_options)).unwrap(),
         TopologyUpdater::channel().0,
-        crate::bson::oid::ObjectId::new(),
         Some(options),
+        #[cfg(feature = "tracing-unstable")]
+        crate::bson::oid::ObjectId::new(),
     );
 
     pool.check_out().await.expect_err("check out should fail");

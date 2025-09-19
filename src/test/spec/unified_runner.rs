@@ -126,8 +126,6 @@ async fn valid_pass() {
     let mut skipped_files = vec![
         // TODO RUST-1570: unskip this file
         "collectionData-createOptions.json",
-        // TODO RUST-1405: unskip this file
-        "expectedError-errorResponse.json",
         // TODO RUST-582: unskip these files
         "entity-cursor-iterateOnce.json",
         "matches-lte-operator.json",

@@ -64,7 +64,7 @@ impl CommandTracingEventEmitter {
                 tracing::debug!(
                     target: COMMAND_TRACING_EVENT_TARGET,
                     topologyId = self.topology_id.tracing_representation(),
-                    failure = event.failure.tracing_representation(),
+                    failure = event.failure.tracing_representation(self.max_document_length_bytes),
                     commandName = event.command_name,
                     requestId = event.request_id,
                     driverConnectionId = event.connection.id,

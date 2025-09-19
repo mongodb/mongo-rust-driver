@@ -64,6 +64,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "mapReduce",
     "watch",
     "rewrapManyDataKey",
+    "modifyCollection",
 ];
 
 static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);

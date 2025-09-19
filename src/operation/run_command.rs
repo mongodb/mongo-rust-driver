@@ -73,10 +73,10 @@ impl OperationWithDefaults for RunCommand<'_> {
 
     fn handle_response<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        Ok(response.into_raw_document_buf().try_into()?)
+        Ok(response.raw_body().try_into()?)
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

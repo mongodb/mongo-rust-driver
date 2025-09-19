@@ -29,11 +29,21 @@ impl TracingRepresentation for crate::bson::oid::ObjectId {
     }
 }
 
-impl TracingRepresentation for crate::error::Error {
-    type Representation = String;
-
-    fn tracing_representation(&self) -> String {
-        self.to_string()
+impl crate::error::Error {
+    fn tracing_representation(&self, max_document_length: usize) -> String {
+        let mut error_string = format!(
+            "Kind: {}, labels: {:?}, source: {:?}",
+            self.kind,
+            self.labels(),
+            self.source
+        );
+        if let Some(server_response) = self.server_response() {
+            let server_response_string =
+                serialize_command_or_reply(server_response.clone(), max_document_length);
+            error_string.push_str(", server response: ");
+            error_string.push_str(&server_response_string);
+        }
+        error_string
     }
 }
 

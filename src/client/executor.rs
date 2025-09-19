@@ -532,9 +532,13 @@ impl Client {
             let start_time = Instant::now();
             let command_result = match connection.send_message(message).await {
                 Ok(response) => {
-                    let is_sharded =
-                        connection.stream_description()?.initial_server_type == ServerType::Mongos;
-                    self.parse_response(op, session, is_sharded, response).await
+                    match self
+                        .parse_response(op, session, connection.is_sharded()?, &response)
+                        .await
+                    {
+                        Ok(()) => Ok(response),
+                        Err(error) => Err(error.with_server_response(&response)),
+                    }
                 }
                 Err(err) => Err(err),
             };
@@ -612,7 +616,7 @@ impl Client {
                         effective_criteria: effective_criteria.clone(),
                     };
 
-                    match op.handle_response(response, context).await {
+                    match op.handle_response(&response, context).await {
                         Ok(response) => Ok(response),
                         Err(mut err) => {
                             err.add_labels_and_update_pin(
@@ -620,7 +624,7 @@ impl Client {
                                 session,
                                 Some(retryability),
                             );
-                            Err(err)
+                            Err(err.with_server_response(&response))
                         }
                     }
                 }
@@ -820,8 +824,8 @@ impl Client {
         op: &T,
         session: &mut Option<&mut ClientSession>,
         is_sharded: bool,
-        response: RawCommandResponse,
-    ) -> Result<RawCommandResponse> {
+        response: &RawCommandResponse,
+    ) -> Result<()> {
         let raw_doc = RawDocument::from_bytes(response.as_bytes())?;
 
         let ok = match raw_doc.get("ok")? {
@@ -870,7 +874,7 @@ impl Client {
                 }
             }
 
-            Ok(response)
+            Ok(())
         } else {
             Err(response
                 .body::<CommandErrorBody>()

@@ -70,6 +70,10 @@ pub(crate) struct ConnectionPoolOptions {
     ///
     /// The default is 2.
     pub(crate) max_connecting: Option<u32>,
+
+    /// The maximum length for documents in tracing events.
+    #[cfg(feature = "tracing-unstable")]
+    pub(crate) max_document_length_bytes: Option<usize>,
 }
 
 impl ConnectionPoolOptions {
@@ -86,6 +90,8 @@ impl ConnectionPoolOptions {
             load_balanced: options.load_balanced,
             credential: options.credential.clone(),
             max_connecting: options.max_connecting,
+            #[cfg(feature = "tracing-unstable")]
+            max_document_length_bytes: options.tracing_max_document_length_bytes,
         }
     }
 

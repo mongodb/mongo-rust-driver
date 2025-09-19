@@ -22,14 +22,8 @@ async fn run_unified() {
         "replaceOne-hint-unacknowledged.json",
         "updateMany-hint-unacknowledged.json",
         "updateOne-hint-unacknowledged.json",
-        // TODO RUST-1405: unskip the errorResponse tests
-        "client-bulkWrite-errorResponse.json",
+        // The Rust driver does not support the collection-level bulk write method.
         "bulkWrite-errorResponse.json",
-        "updateOne-errorResponse.json",
-        "insertOne-errorResponse.json",
-        "deleteOne-errorResponse.json",
-        "aggregate-merge-errorResponse.json",
-        "findOneAndUpdate-errorResponse.json",
     ];
 
     let skipped_tests = vec![

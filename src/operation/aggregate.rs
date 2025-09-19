@@ -80,7 +80,7 @@ impl OperationWithDefaults for Aggregate {
 
     fn handle_response<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: &RawCommandResponse,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let cursor_response: CursorBody = response.body()?;

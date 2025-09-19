@@ -531,6 +531,7 @@ impl TopologyWorker {
                     self.options.clone(),
                     self.connection_establisher.clone(),
                     self.topology_updater.clone(),
+                    #[cfg(feature = "tracing-unstable")]
                     self.id,
                 );
 

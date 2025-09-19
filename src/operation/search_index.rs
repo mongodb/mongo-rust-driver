@@ -42,7 +42,7 @@ impl OperationWithDefaults for CreateSearchIndexes {
 
     fn handle_response<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         #[derive(Debug, Deserialize)]
@@ -114,7 +114,7 @@ impl OperationWithDefaults for UpdateSearchIndex {
 
     fn handle_response<'a>(
         &'a self,
-        _response: RawCommandResponse,
+        _response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         Ok(())
@@ -158,7 +158,7 @@ impl OperationWithDefaults for DropSearchIndex {
 
     fn handle_response<'a>(
         &'a self,
-        _response: RawCommandResponse,
+        _response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         Ok(())

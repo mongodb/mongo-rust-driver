@@ -172,7 +172,7 @@ impl OperationWithDefaults for Update {
 
     fn handle_response<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: WriteResponseBody<UpdateBody> = response.body()?;

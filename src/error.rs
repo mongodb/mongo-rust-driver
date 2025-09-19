@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    bson::{Bson, Document},
+    bson::{doc, Bson, Document},
+    cmap::RawCommandResponse,
     options::ServerAddress,
     sdam::{ServerType, TopologyVersion},
 };
@@ -52,20 +53,32 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Clone, Debug, Error)]
 #[cfg_attr(
     test,
-    error("Kind: {kind}, labels: {labels:?}, source: {source:?}, backtrace: {bt}")
+    error(
+        "Kind: {kind}, labels: {labels:?}, source: {source:?}, backtrace: {bt}, server response: \
+         {server_response:?}"
+    )
 )]
 #[cfg_attr(
     not(test),
-    error("Kind: {kind}, labels: {labels:?}, source: {source:?}")
+    error(
+        "Kind: {kind}, labels: {labels:?}, source: {source:?}, server response: \
+         {server_response:?}"
+    )
 )]
 #[non_exhaustive]
 pub struct Error {
     /// The type of error that occurred.
     pub kind: Box<ErrorKind>,
+
     labels: HashSet<String>,
+
     pub(crate) wire_version: Option<i32>,
+
     #[source]
     pub(crate) source: Option<Box<Error>>,
+
+    pub(crate) server_response: Option<Box<Document>>,
+
     #[cfg(test)]
     bt: Arc<std::backtrace::Backtrace>,
 }
@@ -99,6 +112,7 @@ impl Error {
             labels,
             wire_version: None,
             source: None,
+            server_response: None,
             #[cfg(test)]
             bt: Arc::new(std::backtrace::Backtrace::capture()),
         }
@@ -286,6 +300,23 @@ impl Error {
     pub(crate) fn add_label<T: AsRef<str>>(&mut self, label: T) {
         let label = label.as_ref().to_string();
         self.labels.insert(label);
+    }
+
+    /// The full response returned from the server. This can be used to inspect error fields that
+    /// are not represented in the `Error` type.
+    pub fn server_response(&self) -> Option<&Document> {
+        self.server_response.as_deref()
+    }
+
+    /// Adds the server's response to this error if it is not already present.
+    pub(crate) fn with_server_response(mut self, response: &RawCommandResponse) -> Self {
+        if self.server_response.is_none() {
+            self.server_response =
+                Some(Box::new(response.body::<Document>().unwrap_or_else(
+                    |e| doc! { "serialization error": e.to_string() },
+                )));
+        }
+        self
     }
 
     #[cfg(feature = "dns-resolver")]
@@ -494,6 +525,10 @@ impl Error {
     pub(crate) fn redact(&mut self) {
         if let Some(source) = self.source.as_deref_mut() {
             source.redact();
+        }
+
+        if self.server_response.is_some() {
+            self.server_response = Some(Box::new(doc! { "redacted": true }));
         }
 
         // This is intentionally written without a catch-all branch so that if new error
