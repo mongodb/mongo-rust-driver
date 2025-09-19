@@ -280,7 +280,7 @@ async fn run_test(test_file: TestFile) {
     options.test_options_mut().disable_monitoring_threads = true;
 
     let mut event_stream = buffer.stream();
-    let mut topology = Topology::new(options.clone()).unwrap();
+    let topology = Topology::new(options).unwrap();
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
         for Response(address, command_response) in phase.responses {
@@ -319,19 +319,16 @@ async fn run_test(test_file: TestFile) {
                         reply,
                         Duration::from_secs(1),
                     );
-                    topology.clone_updater().update(new_sd).await;
+                    topology.updater().update(new_sd).await;
                 }
                 Err(e) => {
-                    topology
-                        .clone_updater()
-                        .handle_monitor_error(address, e)
-                        .await;
+                    topology.updater().handle_monitor_error(address, e).await;
                 }
             }
         }
 
         for application_error in phase.application_errors {
-            if let Some(server) = topology.servers().get(&application_error.address) {
+            if let Some(server) = topology.watcher().servers().get(&application_error.address) {
                 let error = application_error.to_error();
                 let pool_generation = application_error
                     .generation
@@ -355,14 +352,15 @@ async fn run_test(test_file: TestFile) {
                 };
 
                 topology
+                    .updater()
                     .handle_application_error(server.address.clone(), error, handshake_phase)
                     .await;
             }
         }
 
-        topology.watch().wait_until_initialized().await;
-        let topology_description = topology.description();
-        let servers = topology.servers();
+        topology.watcher().clone().wait_until_initialized().await;
+        let topology_description = topology.watcher().description();
+        let servers = topology.watcher().servers();
         let phase_description = phase.description.unwrap_or_else(|| format!("{i}"));
 
         match phase.outcome {
@@ -717,11 +715,11 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         .hosts(vec![address.clone()])
         .build();
     options.test_options_mut().disable_monitoring_threads = true;
-    let mut topology = Topology::new(options).unwrap();
-    topology.watch().wait_until_initialized().await;
+    let topology = Topology::new(options).unwrap();
+    topology.watcher().clone().wait_until_initialized().await;
 
     // get the one server in the topology
-    let server = topology.servers().into_values().next().unwrap();
+    let server = topology.watcher().servers().into_values().next().unwrap();
 
     let heartbeat_response: HelloCommandResponse =
         crate::bson_compat::deserialize_from_document(doc! {
@@ -737,7 +735,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
 
     // discover the node
     topology
-        .clone_updater()
+        .updater()
         .update(ServerDescription::new_from_hello_reply(
             address.clone(),
             HelloReply {
@@ -751,8 +749,9 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         .await;
     assert_eq!(
         topology
-            .watch()
-            .server_description(&address)
+            .latest()
+            .description
+            .server(&address)
             .unwrap()
             .server_type,
         ServerType::Standalone
@@ -767,12 +766,14 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         generation: server.pool.generation(),
     };
     topology
+        .updater()
         .handle_application_error(server.address.clone(), error, phase)
         .await;
     assert_eq!(
         topology
-            .watch()
-            .server_description(&address)
+            .latest()
+            .description
+            .server(&address)
             .unwrap()
             .server_type,
         ServerType::Standalone

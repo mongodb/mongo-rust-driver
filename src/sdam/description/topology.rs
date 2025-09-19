@@ -194,10 +194,7 @@ impl TopologyDescription {
         self.cluster_time.as_ref()
     }
 
-    pub(crate) fn get_server_description(
-        &self,
-        address: &ServerAddress,
-    ) -> Option<&ServerDescription> {
+    pub(crate) fn server(&self, address: &ServerAddress) -> Option<&ServerDescription> {
         self.servers.get(address)
     }
 
@@ -208,7 +205,7 @@ impl TopologyDescription {
         criteria: &SelectionCriteria,
     ) {
         let server_type = self
-            .get_server_description(address)
+            .server(address)
             .map(|sd| sd.server_type)
             .unwrap_or(ServerType::Unknown);
 
