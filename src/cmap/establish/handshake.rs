@@ -5,6 +5,7 @@ use crate::event::EventHandler;
 use crate::{
     bson::{rawdoc, RawBson, RawDocumentBuf},
     bson_compat::cstr,
+    error::Error,
     options::{AuthOptions, ClientOptions},
     sdam::topology::TopologySpec,
 };
@@ -41,33 +42,50 @@ pub(crate) struct ClientMetadata {
     pub(crate) appended: HashSet<DriverInfo>,
 }
 
+fn exclude_delimiter(input: &str) -> Result<()> {
+    if input.contains('|') {
+        return Err(Error::invalid_argument(
+            "client metadata must not contain '|'",
+        ));
+    }
+    Ok(())
+}
+
 impl ClientMetadata {
-    pub(crate) fn append(&mut self, driver_info: DriverInfo) {
+    pub(crate) fn append(&mut self, driver_info: DriverInfo) -> Result<()> {
         if self.appended.contains(&driver_info) {
-            return;
+            return Ok(());
         }
+
+        exclude_delimiter(&driver_info.name)?;
+        let version = driver_info.spec_version();
+        exclude_delimiter(version)?;
+        let platform = driver_info.spec_platform();
+        exclude_delimiter(platform)?;
 
         self.driver.name.push('|');
         self.driver.name.push_str(&driver_info.name);
 
-        let version = driver_info.spec_version();
         if !version.is_empty() {
             self.driver.version.push('|');
             self.driver.version.push_str(version);
         }
 
-        let platform = driver_info.spec_platform();
         if !platform.is_empty() {
             self.platform.push('|');
             self.platform.push_str(platform);
         }
 
         self.appended.insert(driver_info);
+
+        Ok(())
     }
 }
 
-impl From<&ClientOptions> for ClientMetadata {
-    fn from(options: &ClientOptions) -> Self {
+impl TryFrom<&ClientOptions> for ClientMetadata {
+    type Error = Error;
+
+    fn try_from(options: &ClientOptions) -> Result<Self> {
         let mut out = BASE_CLIENT_METADATA.clone();
         // Initializing the environment on construction rather than as part of
         // `BASE_CLIENT_METADATA` makes testing easier.
@@ -76,9 +94,9 @@ impl From<&ClientOptions> for ClientMetadata {
             out.application = Some(AppMetadata { name });
         }
         if let Some(driver_info) = &options.driver_info {
-            out.append(driver_info.clone());
+            out.append(driver_info.clone())?;
         }
-        out
+        Ok(out)
     }
 }
 

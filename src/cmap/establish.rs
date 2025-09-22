@@ -65,7 +65,7 @@ impl From<&TopologySpec> for EstablisherOptions {
 #[cfg(test)]
 impl From<&ClientOptions> for EstablisherOptions {
     fn from(options: &ClientOptions) -> Self {
-        Self::from(&TopologySpec::from(options.clone()))
+        Self::from(&TopologySpec::try_from(options.clone()).unwrap())
     }
 }
 

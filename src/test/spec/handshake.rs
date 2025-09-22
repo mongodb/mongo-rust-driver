@@ -148,7 +148,7 @@ async fn append_metadata_driver_update() {
             extract_driver_info(&initial_client_metadata);
         tokio::time::sleep(Duration::from_millis(5)).await;
 
-        client.append_metadata(addl_info.clone());
+        client.append_metadata(addl_info.clone()).unwrap();
         client.ping().await;
         let test_client_metadata = hello.lock().unwrap().client_metadata();
         let (test_name, test_version, test_platform) = extract_driver_info(&test_client_metadata);
@@ -185,18 +185,20 @@ async fn append_metadata_successive_updates() {
         let hello = watch_hello(&mut options);
         let client = Client::with_options(options).unwrap();
 
-        client.append_metadata(DriverInfo::new(
-            "library",
-            Some("1.2"),
-            Some("Library Platform"),
-        ));
+        client
+            .append_metadata(DriverInfo::new(
+                "library",
+                Some("1.2"),
+                Some("Library Platform"),
+            ))
+            .unwrap();
         client.ping().await;
         let initial_client_metadata = hello.lock().unwrap().client_metadata();
         let (initial_name, initial_version, initial_platform) =
             extract_driver_info(&initial_client_metadata);
         tokio::time::sleep(Duration::from_millis(5)).await;
 
-        client.append_metadata(addl_info.clone());
+        client.append_metadata(addl_info.clone()).unwrap();
         client.ping().await;
         let test_client_metadata = hello.lock().unwrap().client_metadata();
         let (test_name, test_version, test_platform) = extract_driver_info(&test_client_metadata);
@@ -237,12 +239,12 @@ async fn append_metadata_duplicate_successive() {
         let client = Client::with_options(options).unwrap();
 
         let setup_info = DriverInfo::new("library", Some("1.2"), Some("Library Platform"));
-        client.append_metadata(setup_info.clone());
+        client.append_metadata(setup_info.clone()).unwrap();
         client.ping().await;
         let updated_client_metadata = hello.lock().unwrap().client_metadata();
         tokio::time::sleep(Duration::from_millis(5)).await;
 
-        client.append_metadata(info.clone());
+        client.append_metadata(info.clone()).unwrap();
         client.ping().await;
         let test_client_metadata = hello.lock().unwrap().client_metadata();
         let strip_default = |value: &Bson| {
@@ -284,28 +286,34 @@ async fn append_metadata_duplicate_multiple() {
     let hello = watch_hello(&mut options);
     let client = Client::with_options(options).unwrap();
 
-    client.append_metadata(DriverInfo::new(
-        "library",
-        Some("1.2"),
-        Some("Library Platform"),
-    ));
+    client
+        .append_metadata(DriverInfo::new(
+            "library",
+            Some("1.2"),
+            Some("Library Platform"),
+        ))
+        .unwrap();
     client.ping().await;
     tokio::time::sleep(Duration::from_millis(5)).await;
 
-    client.append_metadata(DriverInfo::new(
-        "framework",
-        Some("2.0"),
-        Some("Framework Platform"),
-    ));
+    client
+        .append_metadata(DriverInfo::new(
+            "framework",
+            Some("2.0"),
+            Some("Framework Platform"),
+        ))
+        .unwrap();
     client.ping().await;
     let client_metadata = hello.lock().unwrap().client_metadata();
     tokio::time::sleep(Duration::from_millis(5)).await;
 
-    client.append_metadata(DriverInfo::new(
-        "library",
-        Some("1.2"),
-        Some("Library Platform"),
-    ));
+    client
+        .append_metadata(DriverInfo::new(
+            "library",
+            Some("1.2"),
+            Some("Library Platform"),
+        ))
+        .unwrap();
     client.ping().await;
     let updated_client_metadata = hello.lock().unwrap().client_metadata();
 
@@ -329,11 +337,13 @@ async fn append_metadata_duplicate_of_initial() {
     let client_metadata = hello.lock().unwrap().client_metadata();
     tokio::time::sleep(Duration::from_millis(5)).await;
 
-    client.append_metadata(DriverInfo::new(
-        "library",
-        Some("1.2"),
-        Some("Library Platform"),
-    ));
+    client
+        .append_metadata(DriverInfo::new(
+            "library",
+            Some("1.2"),
+            Some("Library Platform"),
+        ))
+        .unwrap();
     client.ping().await;
     let updated_client_metadata = hello.lock().unwrap().client_metadata();
 
@@ -357,20 +367,24 @@ async fn append_metadata_duplicate_of_initial_separated() {
     client.ping().await;
     tokio::time::sleep(Duration::from_millis(5)).await;
 
-    client.append_metadata(DriverInfo::new(
-        "framework",
-        Some("2.0"),
-        Some("Framework Platform"),
-    ));
+    client
+        .append_metadata(DriverInfo::new(
+            "framework",
+            Some("2.0"),
+            Some("Framework Platform"),
+        ))
+        .unwrap();
     client.ping().await;
     let client_metadata = hello.lock().unwrap().client_metadata();
     tokio::time::sleep(Duration::from_millis(5)).await;
 
-    client.append_metadata(DriverInfo::new(
-        "library",
-        Some("1.2"),
-        Some("Library Platform"),
-    ));
+    client
+        .append_metadata(DriverInfo::new(
+            "library",
+            Some("1.2"),
+            Some("Library Platform"),
+        ))
+        .unwrap();
     client.ping().await;
     let updated_client_metadata = hello.lock().unwrap().client_metadata();
 
@@ -397,12 +411,12 @@ async fn append_metadata_duplicate_empty_strings() {
         let hello = watch_hello(&mut options);
         let client = Client::with_options(options).unwrap();
 
-        client.append_metadata(initial_info);
+        client.append_metadata(initial_info).unwrap();
         client.ping().await;
         let initial_client_metadata = hello.lock().unwrap().client_metadata();
         tokio::time::sleep(Duration::from_millis(5)).await;
 
-        client.append_metadata(appended_info);
+        client.append_metadata(appended_info).unwrap();
         client.ping().await;
         let updated_client_metadata = hello.lock().unwrap().client_metadata();
 
@@ -435,7 +449,7 @@ async fn append_metadata_duplicate_empty_strings_initial() {
         let initial_client_metadata = hello.lock().unwrap().client_metadata();
         tokio::time::sleep(Duration::from_millis(5)).await;
 
-        client.append_metadata(appended_info);
+        client.append_metadata(appended_info).unwrap();
         client.ping().await;
         let updated_client_metadata = hello.lock().unwrap().client_metadata();
 

@@ -108,7 +108,7 @@ impl Topology {
         };
         let (watcher, publisher) = TopologyWatcher::channel(state);
 
-        let spec = TopologySpec::from(options);
+        let spec = TopologySpec::try_from(options)?;
         let connection_establisher = ConnectionEstablisher::new(EstablisherOptions::from(&spec))?;
 
         let worker = TopologyWorker {
@@ -156,10 +156,11 @@ pub(crate) struct TopologySpec {
     pub(crate) metadata: Arc<std::sync::RwLock<ClientMetadata>>,
 }
 
-impl From<ClientOptions> for TopologySpec {
-    fn from(options: ClientOptions) -> Self {
-        let metadata = Arc::new(std::sync::RwLock::new(ClientMetadata::from(&options)));
-        Self { options, metadata }
+impl TryFrom<ClientOptions> for TopologySpec {
+    type Error = Error;
+    fn try_from(options: ClientOptions) -> Result<Self> {
+        let metadata = Arc::new(std::sync::RwLock::new(ClientMetadata::try_from(&options)?));
+        Ok(Self { options, metadata })
     }
 }
 

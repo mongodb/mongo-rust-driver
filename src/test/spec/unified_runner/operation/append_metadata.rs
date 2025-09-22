@@ -21,7 +21,7 @@ impl TestOperation for AppendMetadata {
     > {
         async move {
             let client = test_runner.get_client(id).await;
-            client.append_metadata(self.driver_info_options.clone());
+            client.append_metadata(self.driver_info_options.clone())?;
             Ok(None)
         }
         .boxed()
