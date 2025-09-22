@@ -949,7 +949,7 @@ impl TopologyWatcher {
         self.peek_latest().description.cluster_time().cloned()
     }
 
-    /// Gets the latest information on whether transactions are support or not.
+    /// Gets the latest information on whether transactions are supported or not.
     pub(crate) fn transaction_support_status(&self) -> TransactionSupportStatus {
         self.peek_latest().description.transaction_support_status()
     }
