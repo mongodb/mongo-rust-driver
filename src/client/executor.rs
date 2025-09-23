@@ -3,8 +3,8 @@ use crate::bson::RawDocumentBuf;
 use crate::bson::{doc, RawBsonRef, RawDocument, Timestamp};
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
-use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
+use std::sync::LazyLock;
 
 use std::{
     borrow::BorrowMut,
@@ -65,7 +65,7 @@ use crate::{
     ClusterTime,
 };
 
-pub(crate) static REDACTED_COMMANDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+pub(crate) static REDACTED_COMMANDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     let mut hash_set = HashSet::new();
     hash_set.insert("authenticate");
     hash_set.insert("saslstart");
@@ -78,7 +78,7 @@ pub(crate) static REDACTED_COMMANDS: Lazy<HashSet<&'static str>> = Lazy::new(|| 
     hash_set.insert("copydb");
     hash_set
 });
-pub(crate) static HELLO_COMMAND_NAMES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+pub(crate) static HELLO_COMMAND_NAMES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     let mut hash_set = HashSet::new();
     hash_set.insert("hello");
     hash_set.insert(LEGACY_HELLO_COMMAND_NAME_LOWERCASE);

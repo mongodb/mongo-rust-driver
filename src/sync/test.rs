@@ -3,9 +3,9 @@ use std::{
     io::{Read, Write},
 };
 
-use once_cell::sync::Lazy;
 use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
 
 use crate::{
     bson::{doc, Document},
@@ -40,7 +40,7 @@ fn init_db_and_typed_coll<T: Send + Sync>(
     coll
 }
 
-static CLIENT_OPTIONS: Lazy<ClientOptions> = Lazy::new(|| {
+static CLIENT_OPTIONS: LazyLock<ClientOptions> = LazyLock::new(|| {
     crate::sync::TOKIO_RUNTIME.block_on(async { crate::test::get_client_options().await.clone() })
 });
 

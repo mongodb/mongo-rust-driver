@@ -12,9 +12,9 @@ use hmac::{
     Mac,
 };
 use md5::Md5;
-use once_cell::sync::Lazy;
 use sha1::Sha1;
 use sha2::Sha256;
+use std::sync::LazyLock;
 use tokio::sync::RwLock;
 
 use crate::{
@@ -50,8 +50,8 @@ const NO_CHANNEL_BINDING: char = 'n';
 const MIN_ITERATION_COUNT: u32 = 4096;
 
 /// Cache of pre-computed salted passwords.
-static CREDENTIAL_CACHE: Lazy<RwLock<HashMap<CacheEntry, Vec<u8>>>> =
-    Lazy::new(|| RwLock::new(HashMap::new()));
+static CREDENTIAL_CACHE: LazyLock<RwLock<HashMap<CacheEntry, Vec<u8>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Hash, Eq, PartialEq)]
 struct CacheEntry {

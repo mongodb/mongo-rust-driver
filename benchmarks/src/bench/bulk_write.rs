@@ -5,7 +5,7 @@ use mongodb::{
     Client,
     Namespace,
 };
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
 use super::{drop_database, Benchmark, COLL_NAME, DATABASE_NAME};
 
@@ -71,8 +71,8 @@ impl Benchmark for InsertBulkWriteBenchmark {
     }
 }
 
-static COLLECTION_NAMES: Lazy<Vec<String>> =
-    Lazy::new(|| (1..=10).map(|i| format!("corpus_{}", i)).collect());
+static COLLECTION_NAMES: LazyLock<Vec<String>> =
+    LazyLock::new(|| (1..=10).map(|i| format!("corpus_{}", i)).collect());
 
 pub struct MixedBulkWriteBenchmark {
     client: Client,

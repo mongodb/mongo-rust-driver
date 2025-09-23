@@ -1,10 +1,10 @@
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
 use crate::{cmap::StreamDescription, options::AuthMechanism};
 
 use super::sasl::SaslStart;
 
-static MECHS: Lazy<[String; 2]> = Lazy::new(|| {
+static MECHS: LazyLock<[String; 2]> = LazyLock::new(|| {
     [
         AuthMechanism::ScramSha1.as_str().to_string(),
         AuthMechanism::ScramSha256.as_str().to_string(),

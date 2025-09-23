@@ -1,8 +1,8 @@
 use std::{fmt::Debug, time::Duration};
 
 use futures::stream::{StreamExt, TryStreamExt};
-use once_cell::sync::Lazy;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::sync::LazyLock;
 
 use crate::{
     bson::{doc, rawdoc, serde_helpers::HumanReadable, Bson, Document, RawDocumentBuf},
@@ -317,7 +317,7 @@ async fn no_kill_cursors_on_exhausted() {
 }
 
 #[allow(clippy::unreadable_literal)]
-static LARGE_DOC: Lazy<Document> = Lazy::new(|| {
+static LARGE_DOC: LazyLock<Document> = LazyLock::new(|| {
     doc! {
         "text": "the quick brown fox jumped over the lazy sheep dog",
         "in_reply_to_status_id": 22213321312i64,

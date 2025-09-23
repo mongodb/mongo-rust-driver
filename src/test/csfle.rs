@@ -23,7 +23,7 @@ use std::{env, path::PathBuf};
 use crate::bson::{doc, Document, RawBson};
 use anyhow::Context;
 use mongocrypt::ctx::{Algorithm, KmsProvider, KmsProviderType};
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
 use crate::{
     client_encryption::{ClientEncryption, EncryptKey},
@@ -41,29 +41,32 @@ pub(crate) type KmsProviderList = Vec<KmsInfo>;
 
 // The environment variables needed to run the CSFLE tests. These values can be retrieved from the
 // AWS secrets manager by running the setup-secrets.sh script in drivers-evergreen-tools.
-static CSFLE_LOCAL_KEY: Lazy<String> = Lazy::new(|| get_env_var("CSFLE_LOCAL_KEY"));
-static FLE_AWS_KEY: Lazy<String> = Lazy::new(|| get_env_var("FLE_AWS_KEY"));
-static FLE_AWS_SECRET: Lazy<String> = Lazy::new(|| get_env_var("FLE_AWS_SECRET"));
-static FLE_AWS_TEMP_KEY: Lazy<String> = Lazy::new(|| get_env_var("CSFLE_AWS_TEMP_ACCESS_KEY_ID"));
-static FLE_AWS_TEMP_SECRET: Lazy<String> =
-    Lazy::new(|| get_env_var("CSFLE_AWS_TEMP_SECRET_ACCESS_KEY"));
-static FLE_AWS_TEMP_SESSION_TOKEN: Lazy<String> =
-    Lazy::new(|| get_env_var("CSFLE_AWS_TEMP_SESSION_TOKEN"));
-static FLE_AZURE_TENANTID: Lazy<String> = Lazy::new(|| get_env_var("FLE_AZURE_TENANTID"));
-static FLE_AZURE_CLIENTID: Lazy<String> = Lazy::new(|| get_env_var("FLE_AZURE_CLIENTID"));
-static FLE_AZURE_CLIENTSECRET: Lazy<String> = Lazy::new(|| get_env_var("FLE_AZURE_CLIENTSECRET"));
-static FLE_GCP_EMAIL: Lazy<String> = Lazy::new(|| get_env_var("FLE_GCP_EMAIL"));
-static FLE_GCP_PRIVATEKEY: Lazy<String> = Lazy::new(|| get_env_var("FLE_GCP_PRIVATEKEY"));
+static CSFLE_LOCAL_KEY: LazyLock<String> = LazyLock::new(|| get_env_var("CSFLE_LOCAL_KEY"));
+static FLE_AWS_KEY: LazyLock<String> = LazyLock::new(|| get_env_var("FLE_AWS_KEY"));
+static FLE_AWS_SECRET: LazyLock<String> = LazyLock::new(|| get_env_var("FLE_AWS_SECRET"));
+static FLE_AWS_TEMP_KEY: LazyLock<String> =
+    LazyLock::new(|| get_env_var("CSFLE_AWS_TEMP_ACCESS_KEY_ID"));
+static FLE_AWS_TEMP_SECRET: LazyLock<String> =
+    LazyLock::new(|| get_env_var("CSFLE_AWS_TEMP_SECRET_ACCESS_KEY"));
+static FLE_AWS_TEMP_SESSION_TOKEN: LazyLock<String> =
+    LazyLock::new(|| get_env_var("CSFLE_AWS_TEMP_SESSION_TOKEN"));
+static FLE_AZURE_TENANTID: LazyLock<String> = LazyLock::new(|| get_env_var("FLE_AZURE_TENANTID"));
+static FLE_AZURE_CLIENTID: LazyLock<String> = LazyLock::new(|| get_env_var("FLE_AZURE_CLIENTID"));
+static FLE_AZURE_CLIENTSECRET: LazyLock<String> =
+    LazyLock::new(|| get_env_var("FLE_AZURE_CLIENTSECRET"));
+static FLE_GCP_EMAIL: LazyLock<String> = LazyLock::new(|| get_env_var("FLE_GCP_EMAIL"));
+static FLE_GCP_PRIVATEKEY: LazyLock<String> = LazyLock::new(|| get_env_var("FLE_GCP_PRIVATEKEY"));
 
 // Additional environment variables. These values should be set to the relevant local paths/ports.
 #[cfg(feature = "azure-kms")]
-static AZURE_IMDS_MOCK_PORT: Lazy<u16> = Lazy::new(|| {
+static AZURE_IMDS_MOCK_PORT: LazyLock<u16> = LazyLock::new(|| {
     get_env_var("AZURE_IMDS_MOCK_PORT")
         .parse()
         .expect("AZURE_IMDS_MOCK_PORT")
 });
-static CSFLE_TLS_CERT_DIR: Lazy<String> = Lazy::new(|| get_env_var("CSFLE_TLS_CERT_DIR"));
-static CRYPT_SHARED_LIB_PATH: Lazy<String> = Lazy::new(|| get_env_var("CRYPT_SHARED_LIB_PATH"));
+static CSFLE_TLS_CERT_DIR: LazyLock<String> = LazyLock::new(|| get_env_var("CSFLE_TLS_CERT_DIR"));
+static CRYPT_SHARED_LIB_PATH: LazyLock<String> =
+    LazyLock::new(|| get_env_var("CRYPT_SHARED_LIB_PATH"));
 
 fn get_env_var(name: &str) -> String {
     match std::env::var(name) {
@@ -77,7 +80,7 @@ fn get_env_var(name: &str) -> String {
     }
 }
 
-pub(crate) static AWS_KMS: Lazy<KmsInfo> = Lazy::new(|| {
+pub(crate) static AWS_KMS: LazyLock<KmsInfo> = LazyLock::new(|| {
     (
         KmsProvider::aws(),
         doc! {
@@ -87,7 +90,7 @@ pub(crate) static AWS_KMS: Lazy<KmsInfo> = Lazy::new(|| {
         None,
     )
 });
-static AWS_TEMP_KMS: Lazy<KmsInfo> = Lazy::new(|| {
+static AWS_TEMP_KMS: LazyLock<KmsInfo> = LazyLock::new(|| {
     (
         KmsProvider::aws(),
         doc! {
@@ -98,11 +101,11 @@ static AWS_TEMP_KMS: Lazy<KmsInfo> = Lazy::new(|| {
         None,
     )
 });
-pub(crate) static AWS_KMS_NAME1: Lazy<KmsInfo> = Lazy::new(|| {
+pub(crate) static AWS_KMS_NAME1: LazyLock<KmsInfo> = LazyLock::new(|| {
     let aws_info = AWS_KMS.clone();
     (aws_info.0.with_name("name1"), aws_info.1, aws_info.2)
 });
-pub(crate) static AWS_KMS_NAME2: Lazy<KmsInfo> = Lazy::new(|| {
+pub(crate) static AWS_KMS_NAME2: LazyLock<KmsInfo> = LazyLock::new(|| {
     (
         KmsProvider::aws().with_name("name2"),
         doc! {
@@ -112,7 +115,7 @@ pub(crate) static AWS_KMS_NAME2: Lazy<KmsInfo> = Lazy::new(|| {
         None,
     )
 });
-pub(crate) static AZURE_KMS: Lazy<KmsInfo> = Lazy::new(|| {
+pub(crate) static AZURE_KMS: LazyLock<KmsInfo> = LazyLock::new(|| {
     (
         KmsProvider::azure(),
         doc! {
@@ -123,11 +126,11 @@ pub(crate) static AZURE_KMS: Lazy<KmsInfo> = Lazy::new(|| {
         None,
     )
 });
-pub(crate) static AZURE_KMS_NAME1: Lazy<KmsInfo> = Lazy::new(|| {
+pub(crate) static AZURE_KMS_NAME1: LazyLock<KmsInfo> = LazyLock::new(|| {
     let azure_info = AZURE_KMS.clone();
     (azure_info.0.with_name("name1"), azure_info.1, azure_info.2)
 });
-pub(crate) static GCP_KMS: Lazy<KmsInfo> = Lazy::new(|| {
+pub(crate) static GCP_KMS: LazyLock<KmsInfo> = LazyLock::new(|| {
     (
         KmsProvider::gcp(),
         doc! {
@@ -137,11 +140,11 @@ pub(crate) static GCP_KMS: Lazy<KmsInfo> = Lazy::new(|| {
         None,
     )
 });
-pub(crate) static GCP_KMS_NAME1: Lazy<KmsInfo> = Lazy::new(|| {
+pub(crate) static GCP_KMS_NAME1: LazyLock<KmsInfo> = LazyLock::new(|| {
     let gcp_info = GCP_KMS.clone();
     (gcp_info.0.with_name("name1"), gcp_info.1, gcp_info.2)
 });
-pub(crate) static LOCAL_KMS: Lazy<KmsInfo> = Lazy::new(|| {
+pub(crate) static LOCAL_KMS: LazyLock<KmsInfo> = LazyLock::new(|| {
     (
         KmsProvider::local(),
         doc! {
@@ -153,11 +156,11 @@ pub(crate) static LOCAL_KMS: Lazy<KmsInfo> = Lazy::new(|| {
         None,
     )
 });
-pub(crate) static LOCAL_KMS_NAME1: Lazy<KmsInfo> = Lazy::new(|| {
+pub(crate) static LOCAL_KMS_NAME1: LazyLock<KmsInfo> = LazyLock::new(|| {
     let local_info = LOCAL_KMS.clone();
     (local_info.0.with_name("name1"), local_info.1, local_info.2)
 });
-pub(crate) static KMIP_KMS: Lazy<KmsInfo> = Lazy::new(|| {
+pub(crate) static KMIP_KMS: LazyLock<KmsInfo> = LazyLock::new(|| {
     let cert_dir = PathBuf::from(&*CSFLE_TLS_CERT_DIR);
     let tls_options = TlsOptions::builder()
         .ca_file_path(cert_dir.join("ca.pem"))
@@ -171,12 +174,12 @@ pub(crate) static KMIP_KMS: Lazy<KmsInfo> = Lazy::new(|| {
         Some(tls_options),
     )
 });
-pub(crate) static KMIP_KMS_NAME1: Lazy<KmsInfo> = Lazy::new(|| {
+pub(crate) static KMIP_KMS_NAME1: LazyLock<KmsInfo> = LazyLock::new(|| {
     let kmip_info = KMIP_KMS.clone();
     (kmip_info.0.with_name("name1"), kmip_info.1, kmip_info.2)
 });
 
-pub(crate) static UNNAMED_KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
+pub(crate) static UNNAMED_KMS_PROVIDERS: LazyLock<KmsProviderList> = LazyLock::new(|| {
     vec![
         AWS_KMS.clone(),
         AZURE_KMS.clone(),
@@ -185,7 +188,7 @@ pub(crate) static UNNAMED_KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
         KMIP_KMS.clone(),
     ]
 });
-pub(crate) static NAME1_KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
+pub(crate) static NAME1_KMS_PROVIDERS: LazyLock<KmsProviderList> = LazyLock::new(|| {
     vec![
         AWS_KMS_NAME1.clone(),
         AZURE_KMS_NAME1.clone(),
@@ -194,19 +197,19 @@ pub(crate) static NAME1_KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
         KMIP_KMS_NAME1.clone(),
     ]
 });
-pub(crate) static ALL_KMS_PROVIDERS: Lazy<KmsProviderList> = Lazy::new(|| {
+pub(crate) static ALL_KMS_PROVIDERS: LazyLock<KmsProviderList> = LazyLock::new(|| {
     let mut providers = UNNAMED_KMS_PROVIDERS.clone();
     providers.extend(NAME1_KMS_PROVIDERS.clone());
     providers.push(AWS_KMS_NAME2.clone());
     providers
 });
 
-static EXTRA_OPTIONS: Lazy<Document> =
-    Lazy::new(|| doc! { "cryptSharedLibPath": &*CRYPT_SHARED_LIB_PATH });
-static KV_NAMESPACE: Lazy<Namespace> =
-    Lazy::new(|| Namespace::from_str("keyvault.datakeys").unwrap());
-static DISABLE_CRYPT_SHARED: Lazy<bool> =
-    Lazy::new(|| env::var("DISABLE_CRYPT_SHARED").is_ok_and(|s| s == "true"));
+static EXTRA_OPTIONS: LazyLock<Document> =
+    LazyLock::new(|| doc! { "cryptSharedLibPath": &*CRYPT_SHARED_LIB_PATH });
+static KV_NAMESPACE: LazyLock<Namespace> =
+    LazyLock::new(|| Namespace::from_str("keyvault.datakeys").unwrap());
+static DISABLE_CRYPT_SHARED: LazyLock<bool> =
+    LazyLock::new(|| env::var("DISABLE_CRYPT_SHARED").is_ok_and(|s| s == "true"));
 
 async fn init_client() -> Result<(EventClient, Collection<Document>)> {
     let client = Client::for_test().monitor_events().await;

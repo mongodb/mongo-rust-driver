@@ -10,7 +10,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use uuid::Uuid;
 
 use crate::{
@@ -27,12 +27,13 @@ pub(super) use pool::ServerSessionPool;
 
 use super::{options::ServerAddress, AsyncDropToken};
 
-pub(crate) static SESSIONS_UNSUPPORTED_COMMANDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
-    let mut hash_set = HashSet::new();
-    hash_set.insert("killcursors");
-    hash_set.insert("parallelcollectionscan");
-    hash_set
-});
+pub(crate) static SESSIONS_UNSUPPORTED_COMMANDS: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| {
+        let mut hash_set = HashSet::new();
+        hash_set.insert("killcursors");
+        hash_set.insert("parallelcollectionscan");
+        hash_set
+    });
 
 /// A MongoDB client session. This struct represents a logical session used for ordering sequential
 /// operations. To create a `ClientSession`, call `start_session` on a `Client`.
