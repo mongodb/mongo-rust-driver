@@ -18,6 +18,7 @@ mod insert;
 pub(crate) mod list_collections;
 pub(crate) mod list_databases;
 mod list_indexes;
+#[cfg(feature = "in-use-encryption")]
 pub(crate) mod raw_output;
 pub(crate) mod run_command;
 pub(crate) mod run_cursor_command;
