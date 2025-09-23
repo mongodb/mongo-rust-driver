@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use crate::bson::UuidRepresentation;
-use once_cell::sync::Lazy;
 use pretty_assertions::assert_eq;
 use serde::Deserialize;
+use std::sync::LazyLock;
 
 use crate::{
     bson::{Bson, Document},
@@ -15,7 +15,7 @@ use crate::{
     Client,
 };
 
-static SKIPPED_TESTS: Lazy<Vec<&'static str>> = Lazy::new(|| {
+static SKIPPED_TESTS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
     let mut skipped_tests = vec![
         // TODO RUST-1309: unskip this test
         "tlsInsecure is parsed correctly",

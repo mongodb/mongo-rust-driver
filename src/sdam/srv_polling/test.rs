@@ -1,7 +1,7 @@
 use std::{collections::HashSet, time::Duration};
 
-use once_cell::sync::Lazy;
 use pretty_assertions::assert_eq;
+use std::sync::LazyLock;
 
 use super::{LookupHosts, SrvPollingMonitor};
 use crate::{
@@ -18,7 +18,7 @@ fn localhost_test_build_10gen(port: u16) -> ServerAddress {
     }
 }
 
-static DEFAULT_HOSTS: Lazy<Vec<ServerAddress>> = Lazy::new(|| {
+static DEFAULT_HOSTS: LazyLock<Vec<ServerAddress>> = LazyLock::new(|| {
     vec![
         localhost_test_build_10gen(27017),
         localhost_test_build_10gen(27108),

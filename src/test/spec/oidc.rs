@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use tokio::sync::OnceCell;
 
 use crate::{
@@ -8,21 +8,23 @@ use crate::{
     test::spec::unified_runner::{TestFile, TestFileEntity},
 };
 
-static MONGODB_URI: Lazy<String> = Lazy::new(|| get_env_var("MONGODB_URI"));
-static MONGODB_URI_SINGLE: Lazy<String> = Lazy::new(|| get_env_var("MONGODB_URI_SINGLE"));
+static MONGODB_URI: LazyLock<String> = LazyLock::new(|| get_env_var("MONGODB_URI"));
+static MONGODB_URI_SINGLE: LazyLock<String> = LazyLock::new(|| get_env_var("MONGODB_URI_SINGLE"));
 #[cfg(target_os = "linux")]
-static MONGODB_URI_MULTI: Lazy<String> = Lazy::new(|| get_env_var("MONGODB_URI_MULTI"));
-static OIDC_DOMAIN: Lazy<String> = Lazy::new(|| get_env_var("OIDC_DOMAIN"));
-static OIDC_TOKEN_DIR: Lazy<PathBuf> = Lazy::new(|| {
+static MONGODB_URI_MULTI: LazyLock<String> = LazyLock::new(|| get_env_var("MONGODB_URI_MULTI"));
+static OIDC_DOMAIN: LazyLock<String> = LazyLock::new(|| get_env_var("OIDC_DOMAIN"));
+static OIDC_TOKEN_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     std::env::var("OIDC_TOKEN_DIR")
         .unwrap_or_else(|_| "/tmp/tokens".to_string())
         .into()
 });
 #[cfg(target_os = "linux")]
-static OIDC_TOKEN_FILE: Lazy<String> = Lazy::new(|| get_env_var("OIDC_TOKEN_FILE"));
-static TEST_USER_1_USERNAME: Lazy<String> = Lazy::new(|| format!("test_user1@{}", *OIDC_DOMAIN));
+static OIDC_TOKEN_FILE: LazyLock<String> = LazyLock::new(|| get_env_var("OIDC_TOKEN_FILE"));
+static TEST_USER_1_USERNAME: LazyLock<String> =
+    LazyLock::new(|| format!("test_user1@{}", *OIDC_DOMAIN));
 #[cfg(target_os = "linux")]
-static TEST_USER_2_USERNAME: Lazy<String> = Lazy::new(|| format!("test_user2@{}", *OIDC_DOMAIN));
+static TEST_USER_2_USERNAME: LazyLock<String> =
+    LazyLock::new(|| format!("test_user2@{}", *OIDC_DOMAIN));
 
 async fn get_access_token_test_user(once_cell: &'static OnceCell<String>, user_n: u8) -> String {
     once_cell

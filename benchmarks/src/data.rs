@@ -4,11 +4,11 @@ use std::{
 };
 
 use mongodb::bson::Document;
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use tokio::sync::OnceCell;
 
-pub static DATA_PATH: Lazy<PathBuf> =
-    Lazy::new(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("data"));
+pub static DATA_PATH: LazyLock<PathBuf> =
+    LazyLock::new(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("data"));
 
 async fn get_data(once_cell: &OnceCell<Document>, path: &[&str]) -> Document {
     once_cell

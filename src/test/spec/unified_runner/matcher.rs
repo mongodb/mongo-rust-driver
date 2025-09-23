@@ -79,8 +79,8 @@ pub(crate) fn tracing_events_match(
         }
     }
 
-    use once_cell::sync::Lazy;
     use regex::Regex;
+    use std::sync::LazyLock;
 
     if let Some(failure_should_be_redacted) = expected.failure_is_redacted {
         match actual.fields.get("failure") {
@@ -90,13 +90,13 @@ pub(crate) fn tracing_events_match(
                         // `Lazy` saves us having to recompile this regex every time this
                         // function is called.
 
-                        static COMMAND_FAILED_REGEX: Lazy<Regex> = Lazy::new(|| {
+                        static COMMAND_FAILED_REGEX: LazyLock<Regex> = LazyLock::new(|| {
                             Regex::new(
                                 r"^Kind: Command failed: Error code (?P<code>\d+) \((?P<codename>.+)\): (?P<message>.+)+, labels: (?P<labels>.+)$"
                             ).unwrap()
                         });
 
-                        static IO_ERROR_REGEX: Lazy<Regex> = Lazy::new(|| {
+                        static IO_ERROR_REGEX: LazyLock<Regex> = LazyLock::new(|| {
                             Regex::new(
                                 r"^Kind: I/O error: (?P<message>.+), labels: (?P<labels>.+)$",
                             )

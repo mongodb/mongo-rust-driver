@@ -49,7 +49,7 @@ pub(crate) use self::{
 
 use futures::FutureExt;
 use home::home_dir;
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use tokio::sync::OnceCell;
 
 #[cfg(feature = "tracing-unstable")]
@@ -259,9 +259,9 @@ pub(crate) async fn streaming_monitor_protocol_supported() -> bool {
         .is_some()
 }
 
-pub(crate) static DEFAULT_URI: Lazy<String> = Lazy::new(get_default_uri);
-pub(crate) static SERVER_API: Lazy<Option<ServerApi>> =
-    Lazy::new(|| match std::env::var("MONGODB_API_VERSION") {
+pub(crate) static DEFAULT_URI: LazyLock<String> = LazyLock::new(get_default_uri);
+pub(crate) static SERVER_API: LazyLock<Option<ServerApi>> =
+    LazyLock::new(|| match std::env::var("MONGODB_API_VERSION") {
         Ok(server_api_version) if !server_api_version.is_empty() => Some(ServerApi {
             version: ServerApiVersion::from_str(server_api_version.as_str()).unwrap(),
             deprecation_errors: None,
@@ -269,12 +269,12 @@ pub(crate) static SERVER_API: Lazy<Option<ServerApi>> =
         }),
         _ => None,
     });
-pub(crate) static LOAD_BALANCED_SINGLE_URI: Lazy<Option<String>> =
-    Lazy::new(|| std::env::var("SINGLE_MONGOS_LB_URI").ok());
-pub(crate) static LOAD_BALANCED_MULTIPLE_URI: Lazy<Option<String>> =
-    Lazy::new(|| std::env::var("MULTI_MONGOS_LB_URI").ok());
-pub(crate) static OIDC_URI: Lazy<Option<String>> =
-    Lazy::new(|| std::env::var("MONGODB_URI_SINGLE").ok());
+pub(crate) static LOAD_BALANCED_SINGLE_URI: LazyLock<Option<String>> =
+    LazyLock::new(|| std::env::var("SINGLE_MONGOS_LB_URI").ok());
+pub(crate) static LOAD_BALANCED_MULTIPLE_URI: LazyLock<Option<String>> =
+    LazyLock::new(|| std::env::var("MULTI_MONGOS_LB_URI").ok());
+pub(crate) static OIDC_URI: LazyLock<Option<String>> =
+    LazyLock::new(|| std::env::var("MONGODB_URI_SINGLE").ok());
 
 // conditional definitions do not work within the lazy_static! macro, so this
 // needs to be defined separately.
@@ -287,7 +287,7 @@ pub(crate) static OIDC_URI: Lazy<Option<String>> =
 /// Its minimum severity levels can be configured on a per-component basis using
 /// [`TracingHandler:set_levels`]. The test lock MUST be acquired exclusively in
 /// any test that will use the handler to avoid mixing events from multiple tests.
-pub(crate) static DEFAULT_GLOBAL_TRACING_HANDLER: Lazy<TracingHandler> = Lazy::new(|| {
+pub(crate) static DEFAULT_GLOBAL_TRACING_HANDLER: LazyLock<TracingHandler> = LazyLock::new(|| {
     let handler = TracingHandler::new();
     tracing::subscriber::set_global_default(handler.clone())
         .expect("setting global default tracing subscriber failed");

@@ -8,7 +8,7 @@ use crate::{
     bson_compat::cstr,
     options::{AuthOptions, ClientOptions},
 };
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use tokio::sync::broadcast;
 
 #[cfg(any(
@@ -272,26 +272,27 @@ impl FaasEnvironmentName {
 /// Contains the basic handshake information that can be statically determined. This document
 /// (potentially with additional fields added) can be cloned and put in the `client` field of
 /// the `hello` or legacy hello command.
-pub(crate) static BASE_CLIENT_METADATA: Lazy<ClientMetadata> = Lazy::new(|| ClientMetadata {
-    application: None,
-    driver: DriverMetadata {
-        name: "mongo-rust-driver".into(),
-        version: env!("CARGO_PKG_VERSION").into(),
-    },
-    os: OsMetadata {
-        os_type: std::env::consts::OS.into(),
-        architecture: Some(std::env::consts::ARCH.into()),
-        name: None,
-        version: None,
-    },
-    platform: format!(
-        "{} with {} / bson-{}",
-        rustc_version_runtime::version_meta().short_version_string,
-        RUNTIME_NAME,
-        if cfg!(feature = "bson-3") { "3" } else { "2" },
-    ),
-    env: None,
-});
+pub(crate) static BASE_CLIENT_METADATA: LazyLock<ClientMetadata> =
+    LazyLock::new(|| ClientMetadata {
+        application: None,
+        driver: DriverMetadata {
+            name: "mongo-rust-driver".into(),
+            version: env!("CARGO_PKG_VERSION").into(),
+        },
+        os: OsMetadata {
+            os_type: std::env::consts::OS.into(),
+            architecture: Some(std::env::consts::ARCH.into()),
+            name: None,
+            version: None,
+        },
+        platform: format!(
+            "{} with {} / bson-{}",
+            rustc_version_runtime::version_meta().short_version_string,
+            RUNTIME_NAME,
+            if cfg!(feature = "bson-3") { "3" } else { "2" },
+        ),
+        env: None,
+    });
 
 type Truncation = fn(&mut ClientMetadata);
 
