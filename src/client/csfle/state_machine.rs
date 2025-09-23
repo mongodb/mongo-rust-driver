@@ -17,6 +17,7 @@ use tokio::{
 use crate::{
     client::{csfle::options::KmsProvidersTlsOptions, options::ServerAddress, WeakClient},
     error::{Error, Result},
+    operation::{raw_output::RawOutput, run_command::RunCommand},
     options::ReadConcern,
     runtime::{process::Process, AsyncStream, TlsConfig},
     Client,
@@ -126,24 +127,17 @@ impl CryptExecutor {
                     let db = db.as_ref().ok_or_else(|| {
                         Error::internal("db required for NeedMongoMarkings state")
                     })?;
+                    let op = RawOutput(RunCommand::new(db.to_string(), command, None, None));
                     let mongocryptd_client = self.mongocryptd_client.as_ref().ok_or_else(|| {
                         Error::invalid_argument("this operation requires mongocryptd")
                     })?;
-                    let result = mongocryptd_client
-                        .database(db)
-                        .run_raw_command(command.clone())
-                        .await;
+                    let result = mongocryptd_client.execute_operation(op.clone(), None).await;
                     let response = match result {
                         Ok(r) => r,
                         Err(e) if e.is_server_selection_error() => {
                             if let Some(mongocryptd) = &self.mongocryptd {
                                 mongocryptd.respawn().await?;
-
-                                match mongocryptd_client
-                                    .database(db)
-                                    .run_raw_command(command)
-                                    .await
-                                {
+                                match mongocryptd_client.execute_operation(op, None).await {
                                     Ok(r) => r,
                                     Err(new_e) if !new_e.is_server_selection_error() => {
                                         return Err(new_e)
@@ -156,7 +150,7 @@ impl CryptExecutor {
                         }
                         Err(e) => return Err(e),
                     };
-                    ctx.mongo_feed(&RawDocumentBuf::try_from(response)?)?;
+                    ctx.mongo_feed(response.raw_body())?;
                     ctx.mongo_done()?;
                 }
                 State::NeedMongoKeys => {
