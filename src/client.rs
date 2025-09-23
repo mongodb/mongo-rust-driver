@@ -36,7 +36,14 @@ use crate::{
     event::command::CommandEvent,
     id_set::IdSet,
     operation::OverrideCriteriaFn,
-    options::{ClientOptions, DatabaseOptions, ReadPreference, SelectionCriteria, ServerAddress},
+    options::{
+        ClientOptions,
+        DatabaseOptions,
+        DriverInfo,
+        ReadPreference,
+        SelectionCriteria,
+        ServerAddress,
+    },
     sdam::{
         server_selection::{self, attempt_to_select_server},
         SelectedServer,
@@ -380,6 +387,16 @@ impl Client {
             .map(|db_name| self.database(db_name))
     }
 
+    /// Append new information to the metadata of the handshake with the server.
+    pub fn append_metadata(&self, driver_info: DriverInfo) -> Result<()> {
+        self.inner
+            .topology
+            .metadata
+            .write()
+            .unwrap()
+            .append(driver_info)
+    }
+
     pub(crate) fn register_async_drop(&self) -> AsyncDropToken {
         let (cleanup_tx, cleanup_rx) = tokio::sync::oneshot::channel::<BoxFuture<'static, ()>>();
         let (id_tx, id_rx) = tokio::sync::oneshot::channel::<crate::id_set::Id>();
@@ -418,7 +435,7 @@ impl Client {
     /// Check in a server session to the server session pool. The session will be discarded if it is
     /// expired or dirty.
     pub(crate) async fn check_in_server_session(&self, session: ServerSession) {
-        let timeout = self.inner.topology.logical_session_timeout();
+        let timeout = self.inner.topology.watcher().logical_session_timeout();
         self.inner.session_pool.check_in(session, timeout).await;
     }
 
@@ -481,12 +498,12 @@ impl Client {
             timeout,
         );
         #[cfg(feature = "tracing-unstable")]
-        event_emitter.emit_started_event(self.inner.topology.watch().observe_latest().description);
+        event_emitter.emit_started_event(self.inner.topology.latest().description.clone());
         // We only want to emit this message once per operation at most.
         #[cfg(feature = "tracing-unstable")]
         let mut emitted_waiting_message = false;
 
-        let mut watcher = self.inner.topology.watch();
+        let mut watcher = self.inner.topology.watcher().clone();
         loop {
             let state = watcher.observe_latest();
             let override_slot;
@@ -550,8 +567,7 @@ impl Client {
 
     #[cfg(all(test, feature = "dns-resolver"))]
     pub(crate) fn get_hosts(&self) -> Vec<String> {
-        let watcher = self.inner.topology.watch();
-        let state = watcher.peek_latest();
+        let state = self.inner.topology.latest();
 
         state
             .servers()
@@ -562,17 +578,12 @@ impl Client {
 
     #[cfg(test)]
     pub(crate) async fn sync_workers(&self) {
-        self.inner.topology.sync_workers().await;
+        self.inner.topology.updater().sync_workers().await;
     }
 
     #[cfg(test)]
     pub(crate) fn topology_description(&self) -> crate::sdam::TopologyDescription {
-        self.inner
-            .topology
-            .watch()
-            .peek_latest()
-            .description
-            .clone()
+        self.inner.topology.latest().description.clone()
     }
 
     #[cfg(test)]
@@ -588,7 +599,7 @@ impl Client {
             .options
             .server_selection_timeout
             .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
-        let mut watcher = self.inner.topology.watch();
+        let mut watcher = self.inner.topology.watcher().clone();
         loop {
             let topology = watcher.observe_latest();
             if let Some(desc) = topology.description.primary() {
@@ -628,7 +639,7 @@ impl Client {
         // The maximum number of session IDs that should be sent in a single endSessions command.
         const MAX_END_SESSIONS_BATCH_SIZE: usize = 10_000;
 
-        let mut watcher = self.inner.topology.watch();
+        let mut watcher = self.inner.topology.watcher().clone();
         let selection_criteria =
             SelectionCriteria::from(ReadPreference::PrimaryPreferred { options: None });
 

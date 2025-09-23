@@ -46,16 +46,21 @@ async fn run_test_extra(
     options.hosts.clone_from(&DEFAULT_HOSTS);
     options.test_options_mut().disable_monitoring_threads = true;
     options.srv_max_hosts = max_hosts;
-    let mut topology = Topology::new(options.clone()).unwrap();
-    topology.watch().wait_until_initialized().await;
-    let mut monitor =
-        SrvPollingMonitor::new(topology.clone_updater(), topology.watch(), options.clone())
-            .unwrap();
+    let topology = Topology::new(options.clone()).unwrap();
+    let mut topology_watcher = topology.watcher().clone();
+    topology_watcher.wait_until_initialized().await;
+    topology_watcher.observe_latest(); // start the monitor from most recent state
+    let mut monitor = SrvPollingMonitor::new(
+        topology.updater().clone(),
+        topology_watcher,
+        options.clone(),
+    )
+    .unwrap();
     monitor
         .update_hosts(new_hosts.and_then(make_lookup_hosts))
         .await;
 
-    topology.server_addresses()
+    topology.watcher().server_addresses()
 }
 
 fn make_lookup_hosts(hosts: Vec<ServerAddress>) -> Result<LookupHosts> {
@@ -138,12 +143,12 @@ async fn load_balanced_no_srv_polling() {
         localhost_test_build_10gen(27017),
         localhost_test_build_10gen(27018),
     ]));
-    let mut topology = Topology::new(options).unwrap();
-    topology.watch().wait_until_initialized().await;
+    let topology = Topology::new(options).unwrap();
+    topology.watcher().clone().wait_until_initialized().await;
     tokio::time::sleep(rescan_interval * 2).await;
     assert_eq!(
         hosts.into_iter().collect::<HashSet<_>>(),
-        topology.server_addresses()
+        topology.watcher().server_addresses()
     );
 }
 
@@ -205,8 +210,11 @@ async fn srv_service_name() {
     // override the min_ttl to speed up lookup interval
     options.original_srv_info.as_mut().unwrap().min_ttl = rescan_interval;
     options.test_options_mut().mock_lookup_hosts = Some(make_lookup_hosts(new_hosts.clone()));
-    let mut topology = Topology::new(options).unwrap();
-    topology.watch().wait_until_initialized().await;
+    let topology = Topology::new(options).unwrap();
+    topology.watcher().clone().wait_until_initialized().await;
     tokio::time::sleep(rescan_interval * 2).await;
-    assert_eq!(topology.server_addresses(), new_hosts.into_iter().collect());
+    assert_eq!(
+        topology.watcher().server_addresses(),
+        new_hosts.into_iter().collect()
+    );
 }

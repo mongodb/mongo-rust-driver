@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crate::bson::oid::ObjectId;
+use crate::{bson::oid::ObjectId, cmap::establish::handshake::ClientMetadata};
 use futures_util::{
     stream::{FuturesUnordered, StreamExt},
     FutureExt,
@@ -62,6 +62,7 @@ pub(crate) struct Topology {
     pub(crate) id: ObjectId,
     watcher: TopologyWatcher,
     updater: TopologyUpdater,
+    pub(crate) metadata: Arc<std::sync::RwLock<ClientMetadata>>,
     _worker_handle: WorkerHandle,
 }
 
@@ -107,8 +108,8 @@ impl Topology {
         };
         let (watcher, publisher) = TopologyWatcher::channel(state);
 
-        let connection_establisher =
-            ConnectionEstablisher::new(EstablisherOptions::from(&options))?;
+        let spec = TopologySpec::try_from(options)?;
+        let connection_establisher = ConnectionEstablisher::new(EstablisherOptions::from(&spec))?;
 
         let worker = TopologyWorker {
             id,
@@ -116,7 +117,7 @@ impl Topology {
             servers: Default::default(),
             update_receiver,
             publisher,
-            options,
+            options: spec.options,
             topology_watcher: watcher.clone(),
             topology_updater: updater.clone(),
             handle_listener,
@@ -131,112 +132,35 @@ impl Topology {
             id,
             watcher,
             updater,
+            metadata: spec.metadata,
             _worker_handle: worker_handle,
         })
     }
 
-    /// Begin watching for changes in the topology.
-    pub(crate) fn watch(&self) -> TopologyWatcher {
-        let mut watcher = self.watcher.clone();
-        // mark the latest topology as seen
-        watcher.receiver.borrow_and_update();
-        watcher
+    pub(crate) fn updater(&self) -> &TopologyUpdater {
+        &self.updater
     }
 
-    #[cfg(test)]
-    pub(crate) fn clone_updater(&self) -> TopologyUpdater {
-        self.updater.clone()
+    pub(crate) fn watcher(&self) -> &TopologyWatcher {
+        &self.watcher
     }
 
-    /// Handle an error that occurred during operation execution.
-    pub(crate) async fn handle_application_error(
-        &self,
-        address: ServerAddress,
-        error: Error,
-        phase: HandshakePhase,
-    ) {
-        self.updater
-            .handle_application_error(address, error, phase)
-            .await;
+    #[cfg(any(feature = "tracing-unstable", test))]
+    pub(crate) fn latest(&self) -> Ref<TopologyState> {
+        self.watcher.peek_latest()
     }
+}
 
-    /// Get the topology's currently highest seen cluster time.
-    pub(crate) fn cluster_time(&self) -> Option<ClusterTime> {
-        self.watcher
-            .peek_latest()
-            .description
-            .cluster_time()
-            .cloned()
-    }
+pub(crate) struct TopologySpec {
+    pub(crate) options: ClientOptions,
+    pub(crate) metadata: Arc<std::sync::RwLock<ClientMetadata>>,
+}
 
-    /// Update the topology's highest seen cluster time.
-    /// If the provided cluster time is not higher than the topology's currently highest seen
-    /// cluster time, this method has no effect.
-    pub(crate) async fn advance_cluster_time(&self, to: ClusterTime) {
-        self.updater.advance_cluster_time(to).await;
-    }
-
-    pub(crate) fn topology_type(&self) -> TopologyType {
-        self.watcher.peek_latest().description.topology_type
-    }
-
-    pub(crate) fn logical_session_timeout(&self) -> Option<Duration> {
-        self.watcher
-            .peek_latest()
-            .description
-            .logical_session_timeout
-    }
-
-    /// Gets the latest information on whether transactions are support or not.
-    pub(crate) fn transaction_support_status(&self) -> TransactionSupportStatus {
-        self.watcher
-            .peek_latest()
-            .description
-            .transaction_support_status()
-    }
-
-    /// Updates the given `command` as needed based on the `criteria`.
-    pub(crate) fn update_command_with_read_pref(
-        &self,
-        server_address: &ServerAddress,
-        command: &mut Command,
-        criteria: &SelectionCriteria,
-    ) {
-        self.watcher
-            .peek_latest()
-            .description
-            .update_command_with_read_pref(server_address, command, criteria)
-    }
-
-    pub(crate) async fn shutdown(&self) {
-        self.updater.shutdown().await;
-    }
-
-    pub(crate) async fn warm_pool(&self) {
-        self.updater.fill_pool().await;
-    }
-
-    /// Gets the addresses of the servers in the cluster.
-    #[cfg(test)]
-    pub(crate) fn server_addresses(&mut self) -> HashSet<ServerAddress> {
-        self.servers().into_keys().collect()
-    }
-
-    /// Gets the addresses of the servers in the cluster.
-    /// If the topology hasn't opened yet, this will wait for it.
-    #[cfg(test)]
-    pub(crate) fn servers(&mut self) -> HashMap<ServerAddress, Arc<Server>> {
-        self.watcher.peek_latest().servers()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn description(&self) -> TopologyDescription {
-        self.watcher.peek_latest().description.clone()
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn sync_workers(&self) {
-        self.updater.sync_workers().await;
+impl TryFrom<ClientOptions> for TopologySpec {
+    type Error = Error;
+    fn try_from(options: ClientOptions) -> Result<Self> {
+        let metadata = Arc::new(std::sync::RwLock::new(ClientMetadata::try_from(&options)?));
+        Ok(Self { options, metadata })
     }
 }
 
@@ -774,9 +698,7 @@ impl TopologyWorker {
 
     /// Get the server at the provided address if present in the topology.
     fn server_description(&self, address: &ServerAddress) -> Option<ServerDescription> {
-        self.topology_description
-            .get_server_description(address)
-            .cloned()
+        self.topology_description.server(address).cloned()
     }
 
     fn emit_event(&self, make_event: impl FnOnce() -> SdamEvent) {
@@ -861,6 +783,9 @@ impl TopologyUpdater {
             .await
     }
 
+    /// Update the topology's highest seen cluster time.
+    /// If the provided cluster time is not higher than the topology's currently highest seen
+    /// cluster time, this method has no effect.
     pub(crate) async fn advance_cluster_time(&self, to: ClusterTime) {
         self.send_message(UpdateMessage::AdvanceClusterTime(to))
             .await;
@@ -948,11 +873,7 @@ impl TopologyWatcher {
 
     /// Get a server description for the server at the provided address.
     pub(crate) fn server_description(&self, address: &ServerAddress) -> Option<ServerDescription> {
-        self.receiver
-            .borrow()
-            .description
-            .get_server_description(address)
-            .cloned()
+        self.receiver.borrow().description.server(address).cloned()
     }
 
     /// Clone the latest state, marking it as seen.
@@ -1020,15 +941,59 @@ impl TopologyWatcher {
         self.peek_latest().description.topology_type
     }
 
+    pub(crate) fn logical_session_timeout(&self) -> Option<Duration> {
+        self.peek_latest().description.logical_session_timeout
+    }
+
+    /// Get the topology's currently highest seen cluster time.
+    pub(crate) fn cluster_time(&self) -> Option<ClusterTime> {
+        self.peek_latest().description.cluster_time().cloned()
+    }
+
+    /// Gets the latest information on whether transactions are supported or not.
+    pub(crate) fn transaction_support_status(&self) -> TransactionSupportStatus {
+        self.peek_latest().description.transaction_support_status()
+    }
+
+    /// Updates the given `command` as needed based on the `criteria`.
+    pub(crate) fn update_command_with_read_pref(
+        &self,
+        server_address: &ServerAddress,
+        command: &mut Command,
+        criteria: &SelectionCriteria,
+    ) {
+        self.peek_latest()
+            .description
+            .update_command_with_read_pref(server_address, command, criteria)
+    }
+
     /// Wait until the topology worker has had time to initialize from the initial seed list and
     /// options.
     #[cfg(test)]
     pub(crate) async fn wait_until_initialized(&mut self) {
-        while !*self.initialized_receiver.borrow() {
+        while !*self.initialized_receiver.borrow_and_update() {
             if self.initialized_receiver.changed().await.is_err() {
                 return;
             }
         }
+    }
+
+    /// Gets the addresses of the servers in the cluster.
+    #[cfg(test)]
+    pub(crate) fn server_addresses(&self) -> HashSet<ServerAddress> {
+        self.servers().into_keys().collect()
+    }
+
+    /// Gets the addresses of the servers in the cluster.
+    /// If the topology hasn't opened yet, this will wait for it.
+    #[cfg(test)]
+    pub(crate) fn servers(&self) -> HashMap<ServerAddress, Arc<Server>> {
+        self.peek_latest().servers()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn description(&self) -> TopologyDescription {
+        self.peek_latest().description.clone()
     }
 }
 

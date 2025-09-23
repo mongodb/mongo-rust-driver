@@ -212,7 +212,7 @@ impl ClientSession {
         options: Option<SessionOptions>,
         is_implicit: bool,
     ) -> Self {
-        let timeout = client.inner.topology.logical_session_timeout();
+        let timeout = client.inner.topology.watcher().logical_session_timeout();
         let server_session = client.inner.session_pool.check_out(timeout).await;
         Self {
             drop_token: client.register_async_drop(),

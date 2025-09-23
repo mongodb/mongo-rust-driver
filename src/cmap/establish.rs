@@ -13,15 +13,17 @@ use super::{
     Connection,
     PoolGeneration,
 };
+#[cfg(test)]
+use crate::options::ClientOptions;
 use crate::{
     client::{
         auth::Credential,
-        options::{ClientOptions, ServerAddress, TlsOptions},
+        options::{ServerAddress, TlsOptions},
     },
     error::{Error as MongoError, ErrorKind, Result},
     hello::HelloReply,
     runtime::{self, stream::DEFAULT_CONNECT_TIMEOUT, AsyncStream, TlsConfig},
-    sdam::HandshakePhase,
+    sdam::{topology::TopologySpec, HandshakePhase},
 };
 
 /// Contains the logic to establish a connection, including handshaking, authenticating, and
@@ -48,15 +50,22 @@ pub(crate) struct EstablisherOptions {
     pub(crate) test_patch_reply: Option<fn(&mut Result<HelloReply>)>,
 }
 
-impl From<&ClientOptions> for EstablisherOptions {
-    fn from(opts: &ClientOptions) -> Self {
+impl From<&TopologySpec> for EstablisherOptions {
+    fn from(spec: &TopologySpec) -> Self {
         Self {
-            handshake_options: HandshakerOptions::from(opts),
-            tls_options: opts.tls_options(),
-            connect_timeout: opts.connect_timeout,
+            handshake_options: HandshakerOptions::from(spec),
+            tls_options: spec.options.tls_options(),
+            connect_timeout: spec.options.connect_timeout,
             #[cfg(test)]
             test_patch_reply: None,
         }
+    }
+}
+
+#[cfg(test)]
+impl From<&ClientOptions> for EstablisherOptions {
+    fn from(options: &ClientOptions) -> Self {
+        Self::from(&TopologySpec::try_from(options.clone()).unwrap())
     }
 }
 

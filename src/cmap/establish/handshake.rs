@@ -1,12 +1,13 @@
+use std::{collections::HashSet, env, sync::Arc};
+
 #[cfg(test)]
-mod test;
-
-use std::env;
-
+use crate::event::EventHandler;
 use crate::{
     bson::{rawdoc, RawBson, RawDocumentBuf},
     bson_compat::cstr,
+    error::Error,
     options::{AuthOptions, ClientOptions},
+    sdam::topology::TopologySpec,
 };
 use std::sync::LazyLock;
 use tokio::sync::broadcast;
@@ -38,6 +39,65 @@ pub(crate) struct ClientMetadata {
     pub(crate) os: OsMetadata,
     pub(crate) platform: String,
     pub(crate) env: Option<RuntimeEnvironment>,
+    pub(crate) appended: HashSet<DriverInfo>,
+}
+
+fn exclude_delimiter(input: &str) -> Result<()> {
+    if input.contains('|') {
+        return Err(Error::invalid_argument(
+            "client metadata must not contain '|'",
+        ));
+    }
+    Ok(())
+}
+
+impl ClientMetadata {
+    pub(crate) fn append(&mut self, driver_info: DriverInfo) -> Result<()> {
+        if self.appended.contains(&driver_info) {
+            return Ok(());
+        }
+
+        exclude_delimiter(&driver_info.name)?;
+        let version = driver_info.spec_version();
+        exclude_delimiter(version)?;
+        let platform = driver_info.spec_platform();
+        exclude_delimiter(platform)?;
+
+        self.driver.name.push('|');
+        self.driver.name.push_str(&driver_info.name);
+
+        if !version.is_empty() {
+            self.driver.version.push('|');
+            self.driver.version.push_str(version);
+        }
+
+        if !platform.is_empty() {
+            self.platform.push('|');
+            self.platform.push_str(platform);
+        }
+
+        self.appended.insert(driver_info);
+
+        Ok(())
+    }
+}
+
+impl TryFrom<&ClientOptions> for ClientMetadata {
+    type Error = Error;
+
+    fn try_from(options: &ClientOptions) -> Result<Self> {
+        let mut out = BASE_CLIENT_METADATA.clone();
+        // Initializing the environment on construction rather than as part of
+        // `BASE_CLIENT_METADATA` makes testing easier.
+        out.env = RuntimeEnvironment::new();
+        if let Some(name) = options.app_name.clone() {
+            out.application = Some(AppMetadata { name });
+        }
+        if let Some(driver_info) = &options.driver_info {
+            out.append(driver_info.clone())?;
+        }
+        Ok(out)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -292,6 +352,7 @@ pub(crate) static BASE_CLIENT_METADATA: LazyLock<ClientMetadata> =
             if cfg!(feature = "bson-3") { "3" } else { "2" },
         ),
         env: None,
+        appended: HashSet::new(),
     });
 
 type Truncation = fn(&mut ClientMetadata);
@@ -339,9 +400,12 @@ pub(crate) struct Handshaker {
     ))]
     compressors: Option<Vec<Compressor>>,
 
-    metadata: ClientMetadata,
+    metadata: Arc<std::sync::RwLock<ClientMetadata>>,
 
     auth_options: AuthOptions,
+
+    #[cfg(test)]
+    test_hello_cb: Option<EventHandler<crate::cmap::Command>>,
 }
 
 #[cfg(test)]
@@ -351,35 +415,12 @@ pub(crate) static TEST_METADATA: std::sync::OnceLock<ClientMetadata> = std::sync
 impl Handshaker {
     /// Creates a new Handshaker.
     pub(crate) fn new(options: HandshakerOptions) -> Result<Self> {
-        let mut metadata = BASE_CLIENT_METADATA.clone();
-
         let mut command = hello_command(
             options.server_api.as_ref(),
             options.load_balanced.into(),
             None,
             None,
         );
-
-        if let Some(app_name) = options.app_name {
-            metadata.application = Some(AppMetadata { name: app_name });
-        }
-
-        if let Some(driver_info) = options.driver_info {
-            metadata.driver.name.push('|');
-            metadata.driver.name.push_str(&driver_info.name);
-
-            if let Some(ref version) = driver_info.version {
-                metadata.driver.version.push('|');
-                metadata.driver.version.push_str(version);
-            }
-
-            if let Some(ref driver_info_platform) = driver_info.platform {
-                metadata.platform.push('|');
-                metadata.platform.push_str(driver_info_platform);
-            }
-        }
-
-        metadata.env = RuntimeEnvironment::new();
 
         if options.load_balanced {
             command.body.append(cstr!("loadBalanced"), true);
@@ -407,8 +448,10 @@ impl Handshaker {
                 feature = "snappy-compression"
             ))]
             compressors: options.compressors,
-            metadata,
+            metadata: options.metadata,
             auth_options: options.auth_options,
+            #[cfg(test)]
+            test_hello_cb: options.test_hello_cb,
         })
     }
 
@@ -427,7 +470,7 @@ impl Handshaker {
 
         let body = &mut command.body;
         let body_size = body.as_bytes().len();
-        let mut metadata = self.metadata.clone();
+        let mut metadata = self.metadata.read().unwrap().clone();
         let mut meta_doc: RawDocumentBuf = (&metadata).into();
         const OVERHEAD: usize = 1 /* tag */ + 6 /* name */ + 1 /* null */;
         for trunc_fn in METADATA_TRUNCATIONS {
@@ -453,6 +496,10 @@ impl Handshaker {
         cancellation_receiver: Option<broadcast::Receiver<()>>,
     ) -> Result<HelloReply> {
         let (command, client_first) = self.build_command(credential).await?;
+        #[cfg(test)]
+        if let Some(handler) = &self.test_hello_cb {
+            handler.handle(command.clone());
+        }
         let mut hello_reply = run_hello(conn, command, cancellation_receiver).await?;
 
         conn.stream_description = Some(StreamDescription::from_hello_reply(&hello_reply));
@@ -500,10 +547,6 @@ impl Handshaker {
 
 #[derive(Debug)]
 pub(crate) struct HandshakerOptions {
-    /// The application name specified by the user. This is sent to the server as part of the
-    /// handshake that each connection makes when it's created.
-    pub(crate) app_name: Option<String>,
-
     /// The compressors specified by the user. This list is sent to the server and the server
     /// replies with the subset of the compressors it supports.
     #[cfg(any(
@@ -512,10 +555,6 @@ pub(crate) struct HandshakerOptions {
         feature = "snappy-compression"
     ))]
     pub(crate) compressors: Option<Vec<Compressor>>,
-
-    /// Extra information to append to the driver version in the metadata of the handshake with the
-    /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
-    pub(crate) driver_info: Option<DriverInfo>,
 
     /// The declared API version.
     ///
@@ -527,22 +566,33 @@ pub(crate) struct HandshakerOptions {
 
     /// Auxiliary data for authentication mechanisms.
     pub(crate) auth_options: AuthOptions,
+
+    pub(crate) metadata: Arc<std::sync::RwLock<ClientMetadata>>,
+
+    /// Callback to receive hello commands.
+    #[cfg(test)]
+    pub(crate) test_hello_cb: Option<EventHandler<crate::cmap::Command>>,
 }
 
-impl From<&ClientOptions> for HandshakerOptions {
-    fn from(opts: &ClientOptions) -> Self {
+impl From<&TopologySpec> for HandshakerOptions {
+    fn from(spec: &TopologySpec) -> Self {
         Self {
-            app_name: opts.app_name.clone(),
             #[cfg(any(
                 feature = "zstd-compression",
                 feature = "zlib-compression",
                 feature = "snappy-compression"
             ))]
-            compressors: opts.compressors.clone(),
-            driver_info: opts.driver_info.clone(),
-            server_api: opts.server_api.clone(),
-            load_balanced: opts.load_balanced.unwrap_or(false),
-            auth_options: AuthOptions::from(opts),
+            compressors: spec.options.compressors.clone(),
+            server_api: spec.options.server_api.clone(),
+            load_balanced: spec.options.load_balanced.unwrap_or(false),
+            auth_options: AuthOptions::from(&spec.options),
+            metadata: spec.metadata.clone(),
+            #[cfg(test)]
+            test_hello_cb: spec
+                .options
+                .test_options
+                .as_ref()
+                .and_then(|to| to.hello_cb.clone()),
         }
     }
 }

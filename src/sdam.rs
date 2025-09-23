@@ -5,7 +5,7 @@ mod server;
 mod srv_polling;
 #[cfg(test)]
 mod test;
-mod topology;
+pub(crate) mod topology;
 
 pub use self::public::{ServerInfo, ServerType, TopologyType};
 
