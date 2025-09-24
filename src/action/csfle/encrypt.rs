@@ -123,6 +123,10 @@ pub struct EncryptOptions {
     /// Set the range options. This should only be set when the algorithm is
     /// [`Algorithm::Range`].
     pub range_options: Option<RangeOptions>,
+
+    /// Set the text options. This should only be set when the algorithm is
+    /// [`Algorithm::TextPreview`].
+    pub text_options: Option<TextOptions>,
 }
 
 /// The index options for a Queryable Encryption field supporting "range" queries.
@@ -151,6 +155,7 @@ pub struct RangeOptions {
 }
 
 /// Options for a queryable encryption field supporting text queries.
+#[skip_serializing_none]
 #[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -165,11 +170,11 @@ pub struct TextOptions {
     /// Options for suffix queries.
     suffix: Option<SuffixOptions>,
 
-    /// Whether text indexes for this field are case-sensitive. Defaults to isabeltodo.
-    case_sensitive: Option<bool>,
+    /// Whether text indexes for this field are case-sensitive.
+    case_sensitive: bool,
 
-    /// Whether text indexes for this field are diacritic-sensitive. Defaults to isabeltodo.
-    diacritic_sensitive: Option<bool>,
+    /// Whether text indexes for this field are diacritic-sensitive.
+    diacritic_sensitive: bool,
 }
 
 /// Options for substring queries.
@@ -179,13 +184,16 @@ pub struct TextOptions {
 #[non_exhaustive]
 pub struct SubstringOptions {
     /// The maximum allowed string length. Inserting a longer string will result in an error.
-    max_string_length: Option<i32>,
+    #[serde(rename = "strMaxLength")]
+    max_string_length: i32,
 
     /// The minimum allowed query length. Querying with a shorter string will result in an error.
-    min_query_length: Option<i32>,
+    #[serde(rename = "strMinQueryLength")]
+    min_query_length: i32,
 
     /// The maximum allowed query length. Querying with a longer string will result in an error.
-    max_query_length: Option<i32>,
+    #[serde(rename = "strMaxQueryLength")]
+    max_query_length: i32,
 }
 
 /// Options for prefix queries.
@@ -195,10 +203,12 @@ pub struct SubstringOptions {
 #[non_exhaustive]
 pub struct PrefixOptions {
     /// The minimum allowed query length. Querying with a shorter string will result in an error.
-    min_query_length: Option<i32>,
+    #[serde(rename = "strMinQueryLength")]
+    min_query_length: i32,
 
     /// The maximum allowed query length. Querying with a longer string will result in an error.
-    max_query_length: Option<i32>,
+    #[serde(rename = "strMaxQueryLength")]
+    max_query_length: i32,
 }
 
 /// Options for suffix queries.
@@ -208,10 +218,12 @@ pub struct PrefixOptions {
 #[non_exhaustive]
 pub struct SuffixOptions {
     /// The minimum allowed query length. Querying with a shorter string will result in an error.
-    min_query_length: Option<i32>,
+    #[serde(rename = "strMinQueryLength")]
+    min_query_length: i32,
 
     /// The maximum allowed query length. Querying with a longer string will result in an error.
-    max_query_length: Option<i32>,
+    #[serde(rename = "strMaxQueryLength")]
+    max_query_length: i32,
 }
 
 #[option_setters(EncryptOptions, skip = [query_type])]
