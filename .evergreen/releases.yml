@@ -12,22 +12,17 @@
 #     --param triggered_by_git_tag=${TAG} \
 #     --param DRY_RUN=yes
 #
-# If the changes need to be developed against the main branch, more steps are needed:
-#
-# 1. Add dummy version numbers to the Cargo.toml lines for mongodb-internal-macros, bson,
-#    and libmongocrypt
-# 2. Comment out the "fetch tag" func call from the "publish-release" task in this file
-# 3. Execute:
+# If the changes need to be developed against the main branch, the "fetch tag" func call
+# in the "publish-release" task needs to be commented out before running:
 #
 # evergreen patch --path .evergreen/releases.yml \
 #     -t publish-release -v all \
 #     -p mongo-rust-driver \
 #     -u --browse \
-#     --param triggered_by_git_tag=${TAG} \
 #     --param DRY_RUN=yes \
 #     --param PACKAGE_ONLY=yes
 #
-# Make sure to remove the changes from 1 and 2 before merging!
+# Make sure to uncomment the call before merging!
 
 exec_timeout_secs: 3600 
 
@@ -144,12 +139,16 @@ functions:
           - src/macros/target/package/mongodb-internal-macros-${CRATE_VERSION}.crate
 
   "sign release":
+    - command: ec2.assume_role
+      params:
+        role_arn: "arn:aws:iam::901841024863:role/ecr-role-evergreen-ro"
     - command: subprocess.exec
       params:
         working_dir: "src"
         include_expansions_in_env:
-          - ARTIFACTORY_USERNAME
-          - ARTIFACTORY_PASSWORD
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
           - GARASIGN_USERNAME
           - GARASIGN_PASSWORD
           - CRATE_VERSION
