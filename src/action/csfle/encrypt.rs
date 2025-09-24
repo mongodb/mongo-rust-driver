@@ -150,6 +150,70 @@ pub struct RangeOptions {
     pub precision: Option<i32>,
 }
 
+/// Options for a queryable encryption field supporting text queries.
+#[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct TextOptions {
+    /// Options for substring queries.
+    substring: Option<SubstringOptions>,
+
+    /// Options for prefix queries.
+    prefix: Option<PrefixOptions>,
+
+    /// Options for suffix queries.
+    suffix: Option<SuffixOptions>,
+
+    /// Whether text indexes for this field are case-sensitive. Defaults to isabeltodo.
+    case_sensitive: Option<bool>,
+
+    /// Whether text indexes for this field are diacritic-sensitive. Defaults to isabeltodo.
+    diacritic_sensitive: Option<bool>,
+}
+
+/// Options for substring queries.
+#[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct SubstringOptions {
+    /// The maximum allowed string length. Inserting a longer string will result in an error.
+    max_string_length: Option<i32>,
+
+    /// The minimum allowed query length. Querying with a shorter string will result in an error.
+    min_query_length: Option<i32>,
+
+    /// The maximum allowed query length. Querying with a longer string will result in an error.
+    max_query_length: Option<i32>,
+}
+
+/// Options for prefix queries.
+#[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct PrefixOptions {
+    /// The minimum allowed query length. Querying with a shorter string will result in an error.
+    min_query_length: Option<i32>,
+
+    /// The maximum allowed query length. Querying with a longer string will result in an error.
+    max_query_length: Option<i32>,
+}
+
+/// Options for suffix queries.
+#[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct SuffixOptions {
+    /// The minimum allowed query length. Querying with a shorter string will result in an error.
+    min_query_length: Option<i32>,
+
+    /// The maximum allowed query length. Querying with a longer string will result in an error.
+    max_query_length: Option<i32>,
+}
+
 #[option_setters(EncryptOptions, skip = [query_type])]
 #[export_doc(encrypt, extra = [query_type])]
 #[export_doc(encrypt_expr)]
