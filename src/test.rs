@@ -259,6 +259,14 @@ pub(crate) async fn streaming_monitor_protocol_supported() -> bool {
         .is_some()
 }
 
+#[cfg(feature = "in-use-encryption")]
+pub(crate) fn mongocrypt_version_lt(version: &str) -> bool {
+    let mut actual_version = semver::Version::parse(mongocrypt::version()).unwrap();
+    actual_version.pre = semver::Prerelease::EMPTY;
+    let requirement = semver::VersionReq::parse(&format!("<{version}")).unwrap();
+    requirement.matches(&actual_version)
+}
+
 pub(crate) static DEFAULT_URI: LazyLock<String> = LazyLock::new(get_default_uri);
 pub(crate) static SERVER_API: LazyLock<Option<ServerApi>> =
     LazyLock::new(|| match std::env::var("MONGODB_API_VERSION") {
