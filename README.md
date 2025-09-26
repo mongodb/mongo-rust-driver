@@ -57,6 +57,7 @@ features = ["sync"]
 | `compat-3-0-0`       | Required for future compatibility if default features are disabled.                                                                                                                                               |
 | `azure-oidc`         | Enable support for Azure OIDC environment authentication. |
 | `gcp-oidc`           | Enable support for GCP OIDC environment authentication. |
+| `text-indexes-unstable` | Enables support for text indexes in explicit encryption. This feature is in preview and should be used for experimental workloads only. This feature is unstable and its security is not guaranteed until released as Generally Available (GA). The GA version of this feature may not be backwards compatible with the preview version. |
 
 ## Web Framework Examples
 
