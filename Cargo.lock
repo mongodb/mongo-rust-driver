@@ -2004,6 +2004,7 @@ dependencies = [
 [[package]]
 name = "mongocrypt"
 version = "0.3.1"
+source = "git+https://github.com/isabelatkinson/libmongocrypt-rust.git?branch=text-indexes#cb31b8b78340a2e12419c48eff0e5763e740d3cf"
 dependencies = [
  "bson 2.15.0",
  "bson 3.0.0",
@@ -2015,6 +2016,7 @@ dependencies = [
 [[package]]
 name = "mongocrypt-sys"
 version = "0.1.4+1.12.0"
+source = "git+https://github.com/isabelatkinson/libmongocrypt-rust.git?branch=text-indexes#cb31b8b78340a2e12419c48eff0e5763e740d3cf"
 
 [[package]]
 name = "mongodb"
