@@ -10,7 +10,7 @@ set -o xtrace
 
 export CSFLE_TLS_CERT_DIR="${DRIVERS_TOOLS}/.evergreen/x509gen"
 
-FEATURE_FLAGS+=("in-use-encryption" "azure-kms")
+FEATURE_FLAGS+=("in-use-encryption" "azure-kms", "text-indexes-unstable")
 CARGO_OPTIONS+=("--ignore-default-filter")
 
 if [[ "$OPENSSL" = true ]]; then

@@ -126,6 +126,7 @@ pub struct EncryptOptions {
 
     /// Set the text options. This should only be set when the algorithm is
     /// [`Algorithm::TextPreview`].
+    #[cfg(feature = "text-indexes-unstable")]
     pub text_options: Option<TextOptions>,
 }
 
@@ -160,6 +161,7 @@ pub struct RangeOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[cfg(feature = "text-indexes-unstable")]
 pub struct TextOptions {
     /// Options for substring queries.
     substring: Option<SubstringOptions>,
@@ -182,6 +184,7 @@ pub struct TextOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[cfg(feature = "text-indexes-unstable")]
 pub struct SubstringOptions {
     /// The maximum allowed string length. Inserting a longer string will result in an error.
     #[serde(rename = "strMaxLength")]
@@ -201,6 +204,7 @@ pub struct SubstringOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[cfg(feature = "text-indexes-unstable")]
 pub struct PrefixOptions {
     /// The minimum allowed query length. Querying with a shorter string will result in an error.
     #[serde(rename = "strMinQueryLength")]
@@ -216,6 +220,7 @@ pub struct PrefixOptions {
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
+#[cfg(feature = "text-indexes-unstable")]
 pub struct SuffixOptions {
     /// The minimum allowed query length. Querying with a shorter string will result in an error.
     #[serde(rename = "strMinQueryLength")]

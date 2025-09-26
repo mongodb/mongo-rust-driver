@@ -13,7 +13,6 @@ use mongocrypt::ctx::Algorithm;
 use tokio::net::TcpListener;
 
 use crate::{
-    action::csfle::encrypt::{PrefixOptions, SubstringOptions, SuffixOptions, TextOptions},
     bson::{
         doc,
         rawdoc,
@@ -45,7 +44,6 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        mongocrypt_version_lt,
         server_version_lt,
         topology_is_standalone,
         util::{
@@ -2269,7 +2267,13 @@ async fn encrypt_expression_with_options() {
 
 // Prose test 27. Text explicit encryption
 #[tokio::test]
+#[cfg(feature = "text-indexes-unstable")]
 async fn text_explicit_encryption() {
+    use crate::{
+        client_encryption::{PrefixOptions, SubstringOptions, SuffixOptions, TextOptions},
+        test::mongocrypt_version_lt,
+    };
+
     if server_version_lt(8, 2).await
         || topology_is_standalone().await
         || mongocrypt_version_lt("1.15.1")
@@ -2464,7 +2468,10 @@ async fn text_explicit_encryption() {
     assert!(message.contains("contention factor is required for textPreview algorithm"));
 }
 
+#[cfg(feature = "text-indexes-unstable")]
 async fn text_explicit_encryption_setup() -> (Client, ClientEncryption, Binary) {
+    use crate::client_encryption::{PrefixOptions, SubstringOptions, SuffixOptions, TextOptions};
+
     let util_client = Client::for_test().await;
     let db = util_client.database("db");
 

@@ -72,6 +72,12 @@ in-use-encryption-unstable = ["in-use-encryption"]
 # TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.
 tracing-unstable = ["dep:tracing", "dep:log", "bson3?/serde_json-1"]
 
+# Enables support for text indexes in explicit encryption. This feature is in preview and should be
+# used for experimental workloads only. This feature is unstable and its security is not guaranteed
+# until released as Generally Available (GA). The GA version of this feature may not be backwards
+# compatible with the preview version.
+text-indexes-unstable = []
+
 [dependencies]
 base64 = "0.13.0"
 bitflags = "1.1.0"
