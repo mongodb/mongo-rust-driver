@@ -2268,7 +2268,7 @@ async fn encrypt_expression_with_options() {
 // Prose test 27. Text explicit encryption
 #[tokio::test]
 #[cfg(feature = "text-indexes-unstable")]
-async fn text_explicit_encryption() {
+async fn text_indexes_explicit_encryption() {
     use crate::{
         client_encryption::{PrefixOptions, SubstringOptions, SuffixOptions, TextOptions},
         test::mongocrypt_version_lt,
@@ -2346,7 +2346,8 @@ async fn text_explicit_encryption() {
     let projection = doc! { "__safeContent__": 0 };
 
     // Case 1: can find a document by prefix
-    let (encrypted_client, client_encryption, key1_id) = text_explicit_encryption_setup().await;
+    let (encrypted_client, client_encryption, key1_id) =
+        text_indexes_explicit_encryption_setup().await;
 
     let prefix = client_encryption
         .encrypt("foo", key1_id, Algorithm::TextPreview)
@@ -2365,7 +2366,8 @@ async fn text_explicit_encryption() {
     assert_eq!(actual, expected);
 
     // Case 2: can find a document by suffix
-    let (encrypted_client, client_encryption, key1_id) = text_explicit_encryption_setup().await;
+    let (encrypted_client, client_encryption, key1_id) =
+        text_indexes_explicit_encryption_setup().await;
 
     let suffix = client_encryption
         .encrypt("baz", key1_id, Algorithm::TextPreview)
@@ -2384,7 +2386,8 @@ async fn text_explicit_encryption() {
     assert_eq!(actual, expected);
 
     // Case 3: assert no document found by prefix
-    let (encrypted_client, client_encryption, key1_id) = text_explicit_encryption_setup().await;
+    let (encrypted_client, client_encryption, key1_id) =
+        text_indexes_explicit_encryption_setup().await;
 
     let prefix = client_encryption
         .encrypt("baz", key1_id, Algorithm::TextPreview)
@@ -2402,7 +2405,8 @@ async fn text_explicit_encryption() {
     assert!(actual.is_none(), "{actual:?}");
 
     // Case 4: assert no document found by suffix
-    let (encrypted_client, client_encryption, key1_id) = text_explicit_encryption_setup().await;
+    let (encrypted_client, client_encryption, key1_id) =
+        text_indexes_explicit_encryption_setup().await;
 
     let suffix = client_encryption
         .encrypt("foo", key1_id, Algorithm::TextPreview)
@@ -2420,7 +2424,8 @@ async fn text_explicit_encryption() {
     assert!(actual.is_none(), "{actual:?}");
 
     // Case 5: can find a document by substring
-    let (encrypted_client, client_encryption, key1_id) = text_explicit_encryption_setup().await;
+    let (encrypted_client, client_encryption, key1_id) =
+        text_indexes_explicit_encryption_setup().await;
 
     let substring = client_encryption
         .encrypt("bar", key1_id, Algorithm::TextPreview)
@@ -2439,7 +2444,8 @@ async fn text_explicit_encryption() {
     assert_eq!(actual, expected);
 
     // Case 6: assert no document found by substring
-    let (encrypted_client, client_encryption, key1_id) = text_explicit_encryption_setup().await;
+    let (encrypted_client, client_encryption, key1_id) =
+        text_indexes_explicit_encryption_setup().await;
 
     let substring = client_encryption
         .encrypt("qux", key1_id, Algorithm::TextPreview)
@@ -2457,7 +2463,7 @@ async fn text_explicit_encryption() {
     assert!(actual.is_none(), "{actual:?}");
 
     // Case 7: assert contentionFactor is required
-    let (_, client_encryption, key1_id) = text_explicit_encryption_setup().await;
+    let (_, client_encryption, key1_id) = text_indexes_explicit_encryption_setup().await;
     let error = client_encryption
         .encrypt("foo", key1_id, Algorithm::TextPreview)
         .query_type(prefix_query_type)
@@ -2469,7 +2475,7 @@ async fn text_explicit_encryption() {
 }
 
 #[cfg(feature = "text-indexes-unstable")]
-async fn text_explicit_encryption_setup() -> (Client, ClientEncryption, Binary) {
+async fn text_indexes_explicit_encryption_setup() -> (Client, ClientEncryption, Binary) {
     use crate::client_encryption::{PrefixOptions, SubstringOptions, SuffixOptions, TextOptions};
 
     let util_client = Client::for_test().await;
