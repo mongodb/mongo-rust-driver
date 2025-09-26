@@ -126,6 +126,9 @@ pub struct EncryptOptions {
 
     /// Set the text options. This should only be set when the algorithm is
     /// [`Algorithm::TextPreview`].
+    ///
+    /// NOTE: This option is unstable and subject to backwards-breaking changes. It should only be
+    /// used in experimental workloads.
     #[cfg(feature = "text-indexes-unstable")]
     pub text_options: Option<TextOptions>,
 }
@@ -156,6 +159,9 @@ pub struct RangeOptions {
 }
 
 /// Options for a queryable encryption field supporting text queries.
+///
+/// NOTE: These options are unstable and subject to backwards-breaking changes. They should only be
+/// used in experimental workloads.
 #[skip_serializing_none]
 #[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
@@ -180,6 +186,9 @@ pub struct TextOptions {
 }
 
 /// Options for substring queries.
+///
+/// NOTE: These options are unstable and subject to backwards-breaking changes. They should only be
+/// used in experimental workloads.
 #[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -200,6 +209,9 @@ pub struct SubstringOptions {
 }
 
 /// Options for prefix queries.
+///
+/// NOTE: These options are unstable and subject to backwards-breaking changes. They should only be
+/// used in experimental workloads.
 #[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
@@ -216,6 +228,9 @@ pub struct PrefixOptions {
 }
 
 /// Options for suffix queries.
+///
+/// NOTE: These options are unstable and subject to backwards-breaking changes. They should only be
+/// used in experimental workloads.
 #[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
