@@ -17,7 +17,7 @@ impl GridFsBucket {
     /// `await` will return d[`Result<Cursor<FilesCollectionDocument>>`].
     #[deeplink]
     #[options_doc(find)]
-    pub fn find(&self, filter: Document) -> Find {
+    pub fn find(&self, filter: Document) -> Find<'_> {
         Find {
             bucket: self,
             filter,
@@ -31,7 +31,7 @@ impl GridFsBucket {
     /// `await` will return d[`Result<Option<FilesCollectionDocument>>`].
     #[deeplink]
     #[options_doc(find_one)]
-    pub fn find_one(&self, filter: Document) -> FindOne {
+    pub fn find_one(&self, filter: Document) -> FindOne<'_> {
         FindOne {
             bucket: self,
             filter,
@@ -48,7 +48,7 @@ impl crate::sync::gridfs::GridFsBucket {
     /// [`run`](Find::run) will return d[`Result<crate::sync::Cursor<FilesCollectionDocument>>`].
     #[deeplink]
     #[options_doc(find, "run")]
-    pub fn find(&self, filter: Document) -> Find {
+    pub fn find(&self, filter: Document) -> Find<'_> {
         self.async_bucket.find(filter)
     }
 
@@ -58,7 +58,7 @@ impl crate::sync::gridfs::GridFsBucket {
     /// [`run`](FindOne::run) will return d[`Result<Option<FilesCollectionDocument>>`].
     #[deeplink]
     #[options_doc(find_one, "run")]
-    pub fn find_one(&self, filter: Document) -> FindOne {
+    pub fn find_one(&self, filter: Document) -> FindOne<'_> {
         self.async_bucket.find_one(filter)
     }
 }

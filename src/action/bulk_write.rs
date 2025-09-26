@@ -30,7 +30,7 @@ impl Client {
     pub fn bulk_write(
         &self,
         models: impl IntoIterator<Item = impl Into<WriteModel>>,
-    ) -> BulkWrite<SummaryBulkWriteResult> {
+    ) -> BulkWrite<'_, SummaryBulkWriteResult> {
         let mut models_vec = Vec::new();
         for model in models.into_iter() {
             models_vec.push(model.into());
@@ -58,7 +58,7 @@ impl crate::sync::Client {
     pub fn bulk_write(
         &self,
         models: impl IntoIterator<Item = impl Into<WriteModel>>,
-    ) -> BulkWrite<SummaryBulkWriteResult> {
+    ) -> BulkWrite<'_, SummaryBulkWriteResult> {
         self.async_client.bulk_write(models)
     }
 }

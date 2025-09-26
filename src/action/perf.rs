@@ -13,7 +13,7 @@ impl Client {
     /// Does nothing if `min_pool_size` is unset or zero.
     ///
     /// `await` will return `()`.
-    pub fn warm_connection_pool(&self) -> WarmConnectionPool {
+    pub fn warm_connection_pool(&self) -> WarmConnectionPool<'_> {
         WarmConnectionPool { client: self }
     }
 }
@@ -32,7 +32,7 @@ impl crate::sync::Client {
     /// Does nothing if `min_pool_size` is unset or zero.
     ///
     /// [`run`](WarmConnectionPool::run) will return `()`.
-    pub fn warm_connection_pool(&self) -> WarmConnectionPool {
+    pub fn warm_connection_pool(&self) -> WarmConnectionPool<'_> {
         self.async_client.warm_connection_pool()
     }
 }

@@ -20,7 +20,7 @@ impl Database {
     /// `await` will return d[`Result<()>`].
     #[deeplink]
     #[options_doc(drop_db)]
-    pub fn drop(&self) -> DropDatabase {
+    pub fn drop(&self) -> DropDatabase<'_> {
         DropDatabase {
             db: self,
             options: None,
@@ -36,7 +36,7 @@ impl crate::sync::Database {
     /// [`run`](DropDatabase::run) will return d[`Result<()>`].
     #[deeplink]
     #[options_doc(drop_db, "run")]
-    pub fn drop(&self) -> DropDatabase {
+    pub fn drop(&self) -> DropDatabase<'_> {
         self.async_database.drop()
     }
 }
@@ -80,7 +80,7 @@ where
     /// `await` will return d[`Result<()>`].
     #[deeplink]
     #[options_doc(drop_coll)]
-    pub fn drop(&self) -> DropCollection {
+    pub fn drop(&self) -> DropCollection<'_> {
         DropCollection {
             cr: CollRef::new(self),
             options: None,
@@ -99,7 +99,7 @@ where
     /// [`run`](DropCollection::run) will return d[`Result<()>`].
     #[deeplink]
     #[options_doc(drop_coll, "run")]
-    pub fn drop(&self) -> DropCollection {
+    pub fn drop(&self) -> DropCollection<'_> {
         self.async_collection.drop()
     }
 }

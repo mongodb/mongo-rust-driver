@@ -63,6 +63,7 @@ async fn _inserting_documents_into_a_collection(db: mongodb::Database) -> Result
 
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(unused)]
 struct Book {
     title: String,
     author: String,

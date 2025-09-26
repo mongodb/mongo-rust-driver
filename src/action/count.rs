@@ -32,7 +32,7 @@ where
     /// `await` will return d[`Result<u64>`].
     #[deeplink]
     #[options_doc(estimated_doc_count)]
-    pub fn estimated_document_count(&self) -> EstimatedDocumentCount {
+    pub fn estimated_document_count(&self) -> EstimatedDocumentCount<'_> {
         EstimatedDocumentCount {
             cr: CollRef::new(self),
             options: None,
@@ -49,7 +49,7 @@ where
     /// `await` will return d[`Result<u64>`].
     #[deeplink]
     #[options_doc(count_docs)]
-    pub fn count_documents(&self, filter: Document) -> CountDocuments {
+    pub fn count_documents(&self, filter: Document) -> CountDocuments<'_> {
         CountDocuments {
             cr: CollRef::new(self),
             filter,
@@ -79,7 +79,7 @@ where
     /// [`run`](EstimatedDocumentCount::run) will return d[`Result<u64>`].
     #[deeplink]
     #[options_doc(estimated_doc_count, "run")]
-    pub fn estimated_document_count(&self) -> EstimatedDocumentCount {
+    pub fn estimated_document_count(&self) -> EstimatedDocumentCount<'_> {
         self.async_collection.estimated_document_count()
     }
 
@@ -90,7 +90,7 @@ where
     /// [`run`](CountDocuments::run) will return d[`Result<u64>`].
     #[deeplink]
     #[options_doc(count_docs, "run")]
-    pub fn count_documents(&self, filter: Document) -> CountDocuments {
+    pub fn count_documents(&self, filter: Document) -> CountDocuments<'_> {
         self.async_collection.count_documents(filter)
     }
 }

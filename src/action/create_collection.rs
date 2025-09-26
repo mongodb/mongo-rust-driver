@@ -28,7 +28,7 @@ impl Database {
     /// `await` will return d[`Result<()>`].
     #[deeplink]
     #[options_doc(create_coll)]
-    pub fn create_collection(&self, name: impl Into<String>) -> CreateCollection {
+    pub fn create_collection(&self, name: impl Into<String>) -> CreateCollection<'_> {
         CreateCollection {
             db: self,
             name: name.into(),
@@ -48,7 +48,7 @@ impl crate::sync::Database {
     /// [`run`](CreateCollection::run) will return d[`Result<()>`].
     #[deeplink]
     #[options_doc(create_coll, "run")]
-    pub fn create_collection(&self, name: impl Into<String>) -> CreateCollection {
+    pub fn create_collection(&self, name: impl Into<String>) -> CreateCollection<'_> {
         self.async_database.create_collection(name)
     }
 }

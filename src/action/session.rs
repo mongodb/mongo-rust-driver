@@ -13,7 +13,7 @@ impl Client {
     /// `await` will return d[`Result<ClientSession>`].
     #[deeplink]
     #[options_doc(start_session)]
-    pub fn start_session(&self) -> StartSession {
+    pub fn start_session(&self) -> StartSession<'_> {
         StartSession {
             client: self,
             options: None,
@@ -28,7 +28,7 @@ impl crate::sync::Client {
     /// [run](StartSession::run) will return d[`Result<crate::sync::ClientSession>`].
     #[deeplink]
     #[options_doc(start_session, "run")]
-    pub fn start_session(&self) -> StartSession {
+    pub fn start_session(&self) -> StartSession<'_> {
         self.async_client.start_session()
     }
 }

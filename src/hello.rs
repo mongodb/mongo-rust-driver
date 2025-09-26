@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
 use crate::{
-    bson::{doc, oid::ObjectId, DateTime, Document, Timestamp},
+    bson::{doc, oid::ObjectId, DateTime, Document},
     client::{
         options::{ServerAddress, ServerApi},
         ClusterTime,
@@ -231,10 +231,4 @@ impl HelloCommandResponse {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LastWrite {
     pub last_write_date: DateTime,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub(crate) struct OpTime {
-    ts: Timestamp,
-    t: i32,
 }

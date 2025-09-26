@@ -146,7 +146,7 @@ impl Topology {
     }
 
     #[cfg(any(feature = "tracing-unstable", test))]
-    pub(crate) fn latest(&self) -> Ref<TopologyState> {
+    pub(crate) fn latest(&self) -> Ref<'_, TopologyState> {
         self.watcher.peek_latest()
     }
 }
@@ -933,7 +933,7 @@ impl TopologyWatcher {
     /// Note: this method holds a read lock on the state, so it is best if the borrow is
     /// short-lived. For longer use-cases, clone the `TopologyState` or use `observe_latest`
     /// instead.
-    pub(crate) fn peek_latest(&self) -> Ref<TopologyState> {
+    pub(crate) fn peek_latest(&self) -> Ref<'_, TopologyState> {
         self.receiver.borrow()
     }
 

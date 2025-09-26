@@ -54,7 +54,7 @@ impl Client {
     /// [`ClientSession`] has been provided.
     #[deeplink]
     #[options_doc(watch)]
-    pub fn watch(&self) -> Watch {
+    pub fn watch(&self) -> Watch<'_> {
         Watch::new_cluster(self)
     }
 }
@@ -83,7 +83,7 @@ impl Database {
     /// [`ClientSession`] has been provided.
     #[deeplink]
     #[options_doc(watch)]
-    pub fn watch(&self) -> Watch {
+    pub fn watch(&self) -> Watch<'_> {
         Watch::new(
             self.client(),
             AggregateTarget::Database(self.name().to_string()),
@@ -111,7 +111,7 @@ where
     /// [`ClientSession`] has been provided.
     #[deeplink]
     #[options_doc(watch)]
-    pub fn watch(&self) -> Watch<T> {
+    pub fn watch(&self) -> Watch<'_, T> {
         Watch::new(self.client(), self.namespace().into())
     }
 }
@@ -128,7 +128,7 @@ impl crate::sync::Client {
     /// Change streams require either a "majority" read concern or no read
     /// concern. Anything else will cause a server error.
     #[options_doc(watch, "run")]
-    pub fn watch(&self) -> Watch {
+    pub fn watch(&self) -> Watch<'_> {
         self.async_client.watch()
     }
 }
@@ -145,7 +145,7 @@ impl crate::sync::Database {
     /// Change streams require either a "majority" read concern or no read
     /// concern. Anything else will cause a server error.
     #[options_doc(watch, "run")]
-    pub fn watch(&self) -> Watch {
+    pub fn watch(&self) -> Watch<'_> {
         self.async_database.watch()
     }
 }
@@ -166,7 +166,7 @@ where
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
     #[options_doc(watch, "run")]
-    pub fn watch(&self) -> Watch<T> {
+    pub fn watch(&self) -> Watch<'_, T> {
         self.async_collection.watch()
     }
 }

@@ -27,7 +27,7 @@ where
     /// `await` will return d[`Result<DeleteResult>`].
     #[deeplink]
     #[options_doc(delete)]
-    pub fn delete_one(&self, query: Document) -> Delete {
+    pub fn delete_one(&self, query: Document) -> Delete<'_> {
         Delete {
             coll: CollRef::new(self),
             query,
@@ -42,7 +42,7 @@ where
     /// `await` will return d[`Result<DeleteResult>`].
     #[deeplink]
     #[options_doc(delete)]
-    pub fn delete_many(&self, query: Document) -> Delete {
+    pub fn delete_many(&self, query: Document) -> Delete<'_> {
         Delete {
             coll: CollRef::new(self),
             query,
@@ -68,7 +68,7 @@ where
     /// [`run`](Delete::run) will return d[`Result<DeleteResult>`].
     #[deeplink]
     #[options_doc(delete, "run")]
-    pub fn delete_one(&self, query: Document) -> Delete {
+    pub fn delete_one(&self, query: Document) -> Delete<'_> {
         self.async_collection.delete_one(query)
     }
 
@@ -77,7 +77,7 @@ where
     /// [`run`](Delete::run) will return d[`Result<DeleteResult>`].
     #[deeplink]
     #[options_doc(delete, "run")]
-    pub fn delete_many(&self, query: Document) -> Delete {
+    pub fn delete_many(&self, query: Document) -> Delete<'_> {
         self.async_collection.delete_many(query)
     }
 }
