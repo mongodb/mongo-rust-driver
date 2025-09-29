@@ -157,7 +157,7 @@ pub(crate) struct HelloCommandResponse {
     pub is_replica_set: Option<bool>,
 
     /// The time in minutes that a session remains active after its most recent use.
-    #[serde(with = "crate::bson_util::option_u64_as_i64")]
+    #[serde(default, with = "crate::bson_util::option_u64_as_i64")]
     pub logical_session_timeout_minutes: Option<u64>,
 
     /// Optime and date information for the server's most recent write operation.

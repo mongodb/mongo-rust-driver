@@ -80,7 +80,7 @@ pub(crate) struct TestHelloCommandResponse {
     pub arbiter_only: Option<bool>,
     #[serde(rename = "isreplicaset")]
     pub is_replica_set: Option<bool>,
-    #[serde(with = "crate::bson_util::option_u64_as_i64")]
+    #[serde(default, with = "crate::bson_util::option_u64_as_i64")]
     pub logical_session_timeout_minutes: Option<u64>,
     pub last_write: Option<LastWrite>,
     pub min_wire_version: Option<i32>,
@@ -203,7 +203,7 @@ pub struct DescriptionOutcome {
     topology_type: TopologyType,
     set_name: Option<String>,
     servers: HashMap<String, Server>,
-    #[serde(with = "crate::bson_util::option_u64_as_i64")]
+    #[serde(default, with = "crate::bson_util::option_u64_as_i64")]
     logical_session_timeout_minutes: Option<u64>,
     compatible: Option<bool>,
 }
@@ -221,7 +221,7 @@ pub struct Server {
     set_name: Option<String>,
     set_version: Option<i32>,
     election_id: Option<ObjectId>,
-    #[serde(with = "crate::bson_util::option_u64_as_i64")]
+    #[serde(default, with = "crate::bson_util::option_u64_as_i64")]
     logical_session_timeout_minutes: Option<u64>,
     min_wire_version: Option<i32>,
     max_wire_version: Option<i32>,
