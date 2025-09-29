@@ -63,7 +63,8 @@ async fn max_write_batch_size_batching() {
     let models = vec![model; max_write_batch_size + 1];
 
     let result = client.bulk_write(models).await.unwrap();
-    assert_eq!(result.inserted_count as usize, max_write_batch_size + 1);
+    let inserted_count: usize = result.inserted_count.try_into().unwrap();
+    assert_eq!(inserted_count, max_write_batch_size + 1);
 
     let mut command_started_events = client
         .events
@@ -105,7 +106,8 @@ async fn max_message_size_bytes_batching() {
     let models = vec![model; num_models];
 
     let result = client.bulk_write(models).await.unwrap();
-    assert_eq!(result.inserted_count as usize, num_models);
+    let inserted_count: usize = result.inserted_count.try_into().unwrap();
+    assert_eq!(inserted_count, num_models);
 
     let mut command_started_events = client
         .events
@@ -162,10 +164,8 @@ async fn write_concern_error_batches() {
     assert_eq!(bulk_write_error.write_concern_errors.len(), 2);
 
     let partial_result = bulk_write_error.partial_result.unwrap();
-    assert_eq!(
-        partial_result.inserted_count() as usize,
-        max_write_batch_size + 1
-    );
+    let inserted_count: usize = partial_result.inserted_count().try_into().unwrap();
+    assert_eq!(inserted_count, max_write_batch_size + 1);
 
     let command_started_events = client.events.get_command_started_events(&["bulkWrite"]);
     assert_eq!(command_started_events.len(), 2);
@@ -428,7 +428,8 @@ async fn namespace_batch_splitting() {
     let num_models = first_models.len();
 
     let result = client.bulk_write(first_models).await.unwrap();
-    assert_eq!(result.inserted_count as usize, num_models);
+    let inserted_count: usize = result.inserted_count.try_into().unwrap();
+    assert_eq!(inserted_count, num_models);
 
     let command_started_events = client.events.get_command_started_events(&["bulkWrite"]);
     assert_eq!(command_started_events.len(), 1);
@@ -459,7 +460,8 @@ async fn namespace_batch_splitting() {
     let num_models = second_models.len();
 
     let result = client.bulk_write(second_models).await.unwrap();
-    assert_eq!(result.inserted_count as usize, num_models);
+    let inserted_count: usize = result.inserted_count.try_into().unwrap();
+    assert_eq!(inserted_count, num_models);
 
     let command_started_events = client.events.get_command_started_events(&["bulkWrite"]);
     assert_eq!(command_started_events.len(), 2);

@@ -409,7 +409,7 @@ impl ServerDescription {
             Ok(Some(ref reply)) => Ok(reply
                 .command_response
                 .logical_session_timeout_minutes
-                .map(|timeout| Duration::from_secs(timeout as u64 * 60))),
+                .map(|timeout| Duration::from_secs(timeout * 60))),
             Err(ref e) => Err(e.clone()),
         }
     }

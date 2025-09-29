@@ -66,12 +66,14 @@ impl GridFsBucket {
         } else {
             (-1, -revision - 1)
         };
+        // unwrap safety: `skip` is always >= 0
+        let skip: u64 = skip.try_into().unwrap();
 
         match self
             .files()
             .find_one(doc! { "filename": filename })
             .sort(doc! { "uploadDate": sort })
-            .skip(skip as u64)
+            .skip(skip)
             .await?
         {
             Some(fcd) => Ok(fcd),

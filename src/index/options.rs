@@ -168,7 +168,9 @@ impl<'de> Deserialize<'de> for IndexVersion {
             0 => Ok(IndexVersion::V0),
             1 => Ok(IndexVersion::V1),
             2 => Ok(IndexVersion::V2),
-            i => Ok(IndexVersion::Custom(i as u32)),
+            i => Ok(IndexVersion::Custom(
+                i.try_into().map_err(serde::de::Error::custom)?,
+            )),
         }
     }
 }
@@ -213,7 +215,9 @@ impl<'de> Deserialize<'de> for TextIndexVersion {
             1 => Ok(TextIndexVersion::V1),
             2 => Ok(TextIndexVersion::V2),
             3 => Ok(TextIndexVersion::V3),
-            i => Ok(TextIndexVersion::Custom(i as u32)),
+            i => Ok(TextIndexVersion::Custom(
+                i.try_into().map_err(serde::de::Error::custom)?,
+            )),
         }
     }
 }
@@ -253,7 +257,9 @@ impl<'de> Deserialize<'de> for Sphere2DIndexVersion {
         match i32::deserialize(deserializer)? {
             2 => Ok(Sphere2DIndexVersion::V2),
             3 => Ok(Sphere2DIndexVersion::V3),
-            i => Ok(Sphere2DIndexVersion::Custom(i as u32)),
+            i => Ok(Sphere2DIndexVersion::Custom(
+                i.try_into().map_err(serde::de::Error::custom)?,
+            )),
         }
     }
 }

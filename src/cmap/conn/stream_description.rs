@@ -57,7 +57,7 @@ impl StreamDescription {
             logical_session_timeout: reply
                 .command_response
                 .logical_session_timeout_minutes
-                .map(|mins| Duration::from_secs(mins as u64 * 60)),
+                .map(|mins| Duration::from_secs(mins * 60)),
             max_bson_object_size: reply.command_response.max_bson_object_size,
             // The defaulting to 100,000 is here because mongocryptd doesn't include this field in
             // hello replies; this should never happen when talking to a real server.

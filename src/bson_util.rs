@@ -62,6 +62,29 @@ pub(crate) fn get_int_raw(val: RawBsonRef<'_>) -> Option<i64> {
     }
 }
 
+#[allow(private_bounds)]
+pub(crate) fn round_clamp<T: RoundClampTarget>(input: f64) -> T {
+    T::round_clamp(input)
+}
+
+trait RoundClampTarget {
+    fn round_clamp(input: f64) -> Self;
+}
+
+impl RoundClampTarget for u64 {
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    fn round_clamp(input: f64) -> Self {
+        input as u64
+    }
+}
+
+impl RoundClampTarget for u32 {
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    fn round_clamp(input: f64) -> Self {
+        input as u32
+    }
+}
+
 /// Coerce numeric types into an `u64` if it would be lossless to do so. If this Bson is not numeric
 /// or the conversion would be lossy (e.g. 1.5 -> 1), this returns `None`.
 #[allow(clippy::cast_possible_truncation)]
@@ -69,7 +92,9 @@ pub(crate) fn get_u64(val: &Bson) -> Option<u64> {
     match *val {
         Bson::Int32(i) => u64::try_from(i).ok(),
         Bson::Int64(i) => u64::try_from(i).ok(),
-        Bson::Double(f) if (f - (f as u64 as f64)).abs() <= f64::EPSILON => Some(f as u64),
+        Bson::Double(f) if (f - (round_clamp::<u64>(f) as f64)).abs() <= f64::EPSILON => {
+            Some(round_clamp(f))
+        }
         _ => None,
     }
 }
@@ -290,6 +315,37 @@ impl RawDocumentCollection for RawArrayBuf {
         command.body.append(identifier, self);
     }
 }
+
+macro_rules! serde_option_u_as_i {
+    ($name:ident, $from:ident, $to:ident) => {
+        pub(crate) mod $name {
+            use serde::{Deserialize, Serialize};
+
+            pub(crate) fn serialize<S: serde::Serializer>(
+                value: &Option<$from>,
+                s: S,
+            ) -> std::result::Result<S::Ok, S::Error> {
+                let conv: Option<$to> = value
+                    .as_ref()
+                    .map(|&u| u.try_into())
+                    .transpose()
+                    .map_err(serde::ser::Error::custom)?;
+                conv.serialize(s)
+            }
+
+            pub(crate) fn deserialize<'de, D: serde::Deserializer<'de>>(
+                d: D,
+            ) -> std::result::Result<Option<$from>, D::Error> {
+                let conv = Option::<$to>::deserialize(d)?;
+                conv.map(|i| i.try_into())
+                    .transpose()
+                    .map_err(serde::de::Error::custom)
+            }
+        }
+    };
+}
+
+serde_option_u_as_i!(option_u64_as_i64, u64, i64);
 
 #[cfg(test)]
 mod test {

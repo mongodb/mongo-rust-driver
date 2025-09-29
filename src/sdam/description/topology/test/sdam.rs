@@ -80,7 +80,8 @@ pub(crate) struct TestHelloCommandResponse {
     pub arbiter_only: Option<bool>,
     #[serde(rename = "isreplicaset")]
     pub is_replica_set: Option<bool>,
-    pub logical_session_timeout_minutes: Option<i64>,
+    #[serde(with = "crate::bson_util::option_u64_as_i64")]
+    pub logical_session_timeout_minutes: Option<u64>,
     pub last_write: Option<LastWrite>,
     pub min_wire_version: Option<i32>,
     pub max_wire_version: Option<i32>,
@@ -202,7 +203,8 @@ pub struct DescriptionOutcome {
     topology_type: TopologyType,
     set_name: Option<String>,
     servers: HashMap<String, Server>,
-    logical_session_timeout_minutes: Option<i32>,
+    #[serde(with = "crate::bson_util::option_u64_as_i64")]
+    logical_session_timeout_minutes: Option<u64>,
     compatible: Option<bool>,
 }
 
@@ -219,7 +221,8 @@ pub struct Server {
     set_name: Option<String>,
     set_version: Option<i32>,
     election_id: Option<ObjectId>,
-    logical_session_timeout_minutes: Option<i32>,
+    #[serde(with = "crate::bson_util::option_u64_as_i64")]
+    logical_session_timeout_minutes: Option<u64>,
     min_wire_version: Option<i32>,
     max_wire_version: Option<i32>,
     topology_version: Option<TopologyVersion>,
@@ -417,7 +420,7 @@ fn verify_description_outcome(
 
     let expected_timeout = outcome
         .logical_session_timeout_minutes
-        .map(|mins| Duration::from_secs((mins as u64) * 60));
+        .map(|mins| Duration::from_secs(mins * 60));
     assert_eq!(
         topology_description.logical_session_timeout, expected_timeout,
         "{test_description}: {phase_description}"
@@ -475,9 +478,7 @@ fn verify_description_outcome(
         if let Some(logical_session_timeout_minutes) = server.logical_session_timeout_minutes {
             assert_eq!(
                 actual_server.logical_session_timeout().unwrap(),
-                Some(Duration::from_secs(
-                    logical_session_timeout_minutes as u64 * 60
-                )),
+                Some(Duration::from_secs(logical_session_timeout_minutes * 60)),
                 "{test_description} (phase {phase_description})"
             );
         }
