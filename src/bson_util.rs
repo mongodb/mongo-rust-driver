@@ -316,36 +316,30 @@ impl RawDocumentCollection for RawArrayBuf {
     }
 }
 
-macro_rules! serde_option_u_as_i {
-    ($name:ident, $from:ident, $to:ident) => {
-        pub(crate) mod $name {
-            use serde::{Deserialize, Serialize};
+pub(crate) mod option_u64_as_i64 {
+    use serde::{Deserialize, Serialize};
 
-            pub(crate) fn serialize<S: serde::Serializer>(
-                value: &Option<$from>,
-                s: S,
-            ) -> std::result::Result<S::Ok, S::Error> {
-                let conv: Option<$to> = value
-                    .as_ref()
-                    .map(|&u| u.try_into())
-                    .transpose()
-                    .map_err(serde::ser::Error::custom)?;
-                conv.serialize(s)
-            }
+    pub(crate) fn serialize<S: serde::Serializer>(
+        value: &Option<u64>,
+        s: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        let conv: Option<i64> = value
+            .as_ref()
+            .map(|&u| u.try_into())
+            .transpose()
+            .map_err(serde::ser::Error::custom)?;
+        conv.serialize(s)
+    }
 
-            pub(crate) fn deserialize<'de, D: serde::Deserializer<'de>>(
-                d: D,
-            ) -> std::result::Result<Option<$from>, D::Error> {
-                let conv = Option::<$to>::deserialize(d)?;
-                conv.map(|i| i.try_into())
-                    .transpose()
-                    .map_err(serde::de::Error::custom)
-            }
-        }
-    };
+    pub(crate) fn deserialize<'de, D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> std::result::Result<Option<u64>, D::Error> {
+        let conv = Option::<i64>::deserialize(d)?;
+        conv.map(|i| i.try_into())
+            .transpose()
+            .map_err(serde::de::Error::custom)
+    }
 }
-
-serde_option_u_as_i!(option_u64_as_i64, u64, i64);
 
 #[cfg(test)]
 mod test {
