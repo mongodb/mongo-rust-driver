@@ -10,7 +10,7 @@
     clippy::match_like_matches_macro,
     clippy::derive_partial_eq_without_eq
 )]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]
 #![doc(html_root_url = "https://docs.rs/mongodb/3.3.0")]
 
