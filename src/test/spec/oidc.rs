@@ -564,6 +564,49 @@ mod basic {
         Ok(())
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn machine_4_5_reauthentication_when_session_involved() -> anyhow::Result<()> {
+        let admin_client = Client::with_uri_str(&*MONGODB_URI).await?;
+
+        // Now set a failpoint for find with 391 error code
+        let fail_point =
+            FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(391);
+        let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
+
+        // we need to assert the callback count
+        let call_count: Arc<Mutex<i32>> = Arc::new(Mutex::new(0));
+        let cb_call_count = call_count.clone();
+
+        let mut opts = ClientOptions::parse(&*MONGODB_URI_SINGLE).await?;
+        opts.credential = Credential::builder()
+            .mechanism(AuthMechanism::MongoDbOidc)
+            .oidc_callback(oidc::Callback::machine(move |_| {
+                let call_count = cb_call_count.clone();
+                async move {
+                    *call_count.lock().await += 1;
+                    Ok(oidc::IdpServerResponse {
+                        access_token: get_access_token_test_user_1().await,
+                        expires: None,
+                        refresh_token: None,
+                    })
+                }
+                .boxed()
+            }))
+            .build()
+            .into();
+        let client = Client::with_options(opts)?;
+        let mut session = client.start_session().await.unwrap();
+
+        client
+            .database("test")
+            .collection::<Document>("test")
+            .find_one(doc! {})
+            .session(&mut session)
+            .await?;
+        assert_eq!(2, *(*call_count).lock().await);
+        Ok(())
+    }
+
     // Human Callback tests
     #[tokio::test]
     async fn human_1_1_single_principal_implicit_username() -> anyhow::Result<()> {

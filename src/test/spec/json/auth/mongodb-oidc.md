@@ -232,6 +232,31 @@ source the `secrets-export.sh` file and use the associated env variables in your
 - Assert there were `SaslStart` commands executed.
 - Close the client.
 
+#### 4.5 Reauthentication Succeeds when a Session is involved
+
+- Create an OIDC configured client.
+- Set a fail point for `find` commands of the form:
+
+```javascript
+{
+  configureFailPoint: "failCommand",
+  mode: {
+    times: 1
+  },
+  data: {
+    failCommands: [
+      "find"
+    ],
+    errorCode: 391 // ReauthenticationRequired
+  }
+}
+```
+
+- Start a new session.
+- In the started session perform a `find` operation that succeeds.
+- Assert that the callback was called 2 times (once during the connection handshake, and again during reauthentication).
+- Close the session and the client.
+
 ## (5) Azure Tests
 
 Drivers MUST only run the Azure tests when testing on an Azure VM. See instructions in
