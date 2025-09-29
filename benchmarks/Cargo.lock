@@ -1088,7 +1088,6 @@ source = "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#1327
 name = "mongodb"
 version = "3.3.0"
 dependencies = [
- "async-trait",
  "base64 0.13.1",
  "bitflags 1.3.2",
  "bson",
@@ -1096,7 +1095,6 @@ dependencies = [
  "derive-where",
  "derive_more",
  "futures-core",
- "futures-executor",
  "futures-io",
  "futures-util",
  "hex",
@@ -1114,7 +1112,6 @@ dependencies = [
  "rustls",
  "rustversion",
  "serde",
- "serde_bytes",
  "serde_with",
  "sha1",
  "sha2",
@@ -1125,7 +1122,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-rustls",
- "tokio-util",
  "typed-builder",
  "uuid",
  "webpki-roots 0.26.11",
@@ -1905,7 +1901,6 @@ checksum = "d7fcaa8d55a2bdd6b83ace262b016eca0d79ee02818c5c1bcdf0305114081078"
 dependencies = [
  "bytes",
  "futures-core",
- "futures-io",
  "futures-sink",
  "pin-project-lite",
  "tokio",
