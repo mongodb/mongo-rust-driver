@@ -130,6 +130,14 @@ impl<T> Cursor<T> {
         self.async_cursor.current()
     }
 
+    /// Returns true if the cursor has any additional buffered items to return and false otherwise.
+    ///
+    /// This method only checks the local buffer and exhaustion state; it does not contact the
+    /// server.
+    pub fn has_next(&self) -> bool {
+        self.async_cursor.has_next()
+    }
+
     /// Deserialize the current result to the generic type associated with this cursor.
     ///
     /// # Panics

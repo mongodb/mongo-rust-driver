@@ -142,24 +142,6 @@ impl<T> Cursor<T> {
             .and_then(|c| c.post_batch_resume_token())
     }
 
-    /// Whether this cursor has exhausted all of its getMore calls. The cursor may have more
-    /// items remaining in the buffer.
-    pub(crate) fn is_exhausted(&self) -> bool {
-        self.wrapped_cursor.as_ref().unwrap().is_exhausted()
-    }
-
-    /// Whether this cursor has any additional items to return.
-    pub(crate) fn has_next(&self) -> bool {
-        !self.is_exhausted()
-            || !self
-                .wrapped_cursor
-                .as_ref()
-                .unwrap()
-                .state()
-                .buffer
-                .is_empty()
-    }
-
     pub(crate) fn client(&self) -> &Client {
         &self.client
     }
@@ -240,6 +222,26 @@ impl<T> Cursor<T> {
         self.wrapped_cursor.as_ref().unwrap().current().unwrap()
     }
 
+    /// Whether this cursor has exhausted all of its getMore calls. The cursor may have more
+    /// items remaining in the buffer.
+    pub(crate) fn is_exhausted(&self) -> bool {
+        self.wrapped_cursor.as_ref().unwrap().is_exhausted()
+    }
+
+    /// Returns true if the cursor has any additional buffered items to return and false otherwise.
+    ///
+    /// This method only checks the local buffer and exhaustion state; it does not contact the
+    /// server.
+    pub fn has_next(&self) -> bool {
+        !self.is_exhausted()
+            || !self
+                .wrapped_cursor
+                .as_ref()
+                .unwrap()
+                .state()
+                .buffer
+                .is_empty()
+    }
     /// Deserialize the current result to the generic type associated with this cursor.
     ///
     /// # Panics

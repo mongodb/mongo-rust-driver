@@ -263,3 +263,29 @@ async fn cursor_final_batch() {
     }
     assert_eq!(found, 5);
 }
+
+#[tokio::test]
+async fn cursor_has_next() {
+    let client = Client::for_test().await;
+    let coll = client
+        .create_fresh_collection("test_cursor_has_next", "test", None)
+        .await;
+    coll.insert_many(vec![
+        doc! { "foo": 1 },
+        doc! { "foo": 2 },
+        doc! { "foo": 3 },
+        doc! { "foo": 4 },
+        doc! { "foo": 5 },
+    ])
+    .await
+    .unwrap();
+
+    let mut cursor = coll.find(doc! {}).batch_size(2).await.unwrap();
+    let mut found = 0;
+    while cursor.has_next() {
+        if cursor.advance().await.unwrap() {
+            found += 1;
+        }
+    }
+    assert_eq!(found, 5);
+}
