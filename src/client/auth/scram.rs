@@ -6,6 +6,7 @@ use std::{
     str,
 };
 
+use aws_lc_rs;
 use hmac::{
     digest::{Digest, KeyInit},
     Hmac,
@@ -16,7 +17,6 @@ use sha1::Sha1;
 use sha2::Sha256;
 use std::sync::LazyLock;
 use tokio::sync::RwLock;
-use aws_lc_rs;
 
 use crate::{
     bson::{Bson, Document},
@@ -302,8 +302,20 @@ impl ScramVersion {
     /// The "h_i" function as defined in the SCRAM RFC.
     fn h_i(&self, str: &str, salt: &[u8], iterations: u32) -> Vec<u8> {
         match self {
-            ScramVersion::Sha1 => h_i_with_hmac(aws_lc_rs::pbkdf2::PBKDF2_HMAC_SHA1, str, salt, iterations, 160 / 8),
-            ScramVersion::Sha256 => h_i_with_hmac(aws_lc_rs::pbkdf2::PBKDF2_HMAC_SHA256, str, salt, iterations, 256 / 8),
+            ScramVersion::Sha1 => h_i_with_hmac(
+                aws_lc_rs::pbkdf2::PBKDF2_HMAC_SHA1,
+                str,
+                salt,
+                iterations,
+                160 / 8,
+            ),
+            ScramVersion::Sha256 => h_i_with_hmac(
+                aws_lc_rs::pbkdf2::PBKDF2_HMAC_SHA256,
+                str,
+                salt,
+                iterations,
+                256 / 8,
+            ),
         }
     }
 
@@ -383,7 +395,13 @@ fn h_i_with_hmac(
     output_size: usize,
 ) -> Vec<u8> {
     let mut buf = vec![0u8; output_size];
-    aws_lc_rs::pbkdf2::derive(algo, std::num::NonZero::new(iterations).unwrap(), salt, str.as_bytes(), &mut buf);
+    aws_lc_rs::pbkdf2::derive(
+        algo,
+        std::num::NonZero::new(iterations).unwrap(),
+        salt,
+        str.as_bytes(),
+        &mut buf,
+    );
     buf
 }
 
