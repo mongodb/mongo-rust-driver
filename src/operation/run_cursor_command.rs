@@ -92,6 +92,14 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.name()
     }
 
+    fn database(&self) -> &str {
+        self.run_command.database()
+    }
+
+    fn collection(&self) -> Option<&str> {
+        self.run_command.collection()
+    }
+
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,

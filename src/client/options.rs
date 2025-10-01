@@ -1352,20 +1352,6 @@ impl ClientOptions {
     }
 
     #[cfg(feature = "opentelemetry")]
-    pub(crate) fn otel_enabled(&self) -> bool {
-        static ENABLED_ENV: LazyLock<bool> = LazyLock::new(|| {
-            match std::env::var("OTEL_RUST_INSTRUMENTATION_MONGODB_ENABLED").as_deref() {
-                Ok("1" | "true" | "yes") => true,
-                _ => false,
-            }
-        });
-        self.tracing
-            .as_ref()
-            .and_then(|t| t.enabled)
-            .unwrap_or_else(|| *ENABLED_ENV)
-    }
-
-    #[cfg(feature = "opentelemetry")]
     pub(crate) fn otel_query_text_max_length(&self) -> usize {
         static MAX_LENGTH_ENV: LazyLock<usize> = LazyLock::new(|| {
             std::env::var("OTEL_RUST_INSTRUMENTATION_MONGODB_QUERY_TEXT_MAX_LENGTH")

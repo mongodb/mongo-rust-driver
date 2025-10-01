@@ -176,6 +176,10 @@ pub(crate) trait Operation {
 
     /// The name of the server side command associated with this operation.
     fn name(&self) -> &CStr;
+
+    fn database(&self) -> &str;
+
+    fn collection(&self) -> Option<&str>;
 }
 
 pub(crate) type OverrideCriteriaFn =
@@ -277,6 +281,14 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     fn name(&self) -> &CStr {
         Self::NAME
     }
+
+    fn database(&self) -> &str {
+        ""
+    }
+
+    fn collection(&self) -> Option<&str> {
+        None
+    }
 }
 
 impl<T: OperationWithDefaults> Operation for T
@@ -330,6 +342,12 @@ where
     }
     fn name(&self) -> &CStr {
         self.name()
+    }
+    fn database(&self) -> &str {
+        self.database()
+    }
+    fn collection(&self) -> Option<&str> {
+        self.collection()
     }
 }
 
