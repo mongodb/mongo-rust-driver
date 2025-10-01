@@ -73,7 +73,7 @@ in-use-encryption-unstable = ["in-use-encryption"]
 tracing-unstable = ["dep:tracing", "dep:log", "bson3?/serde_json-1"]
 
 [dependencies]
-aws-lc-rs = "1.0.0"
+aws-lc-rs = "1.9.0"
 base64 = "0.13.0"
 bitflags = "1.1.0"
 chrono = { version = "0.4.7", default-features = false, features = [
