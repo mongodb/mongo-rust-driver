@@ -80,6 +80,7 @@ chrono = { version = "0.4.7", default-features = false, features = [
     "clock",
     "std",
 ] }
+cmake = "0.1.0"
 derive_more = "0.99.17"
 derive-where = "1.2.7"
 flate2 = { version = "1.0", optional = true }
