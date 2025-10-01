@@ -44,6 +44,8 @@ mod hello;
 pub(crate) mod id_set;
 mod index;
 mod operation;
+#[cfg(feature = "opentelemetry")]
+pub mod otel;
 pub mod results;
 pub(crate) mod runtime;
 mod sdam;
