@@ -80,4 +80,12 @@ impl<Op: Operation> Operation for RawOutput<Op> {
     fn name(&self) -> &CStr {
         self.0.name()
     }
+
+    fn database(&self) -> &str {
+        self.0.database()
+    }
+
+    fn collection(&self) -> Option<&str> {
+        self.0.collection()
+    }
 }

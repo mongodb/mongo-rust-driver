@@ -128,4 +128,12 @@ impl OperationWithDefaults for Find {
     fn retryability(&self) -> Retryability {
         Retryability::Read
     }
+
+    fn database(&self) -> &str {
+        &self.ns.db
+    }
+
+    fn collection(&self) -> Option<&str> {
+        Some(&self.ns.coll)
+    }
 }
