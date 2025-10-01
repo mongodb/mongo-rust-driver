@@ -130,10 +130,7 @@ impl<T> Cursor<T> {
         self.async_cursor.current()
     }
 
-    /// Returns true if the cursor has any additional buffered items to return and false otherwise.
-    ///
-    /// This method only checks the local buffer and exhaustion state; it does not contact the
-    /// server.
+    /// Returns true if the cursor has any additional items to return and false otherwise.
     pub fn has_next(&self) -> bool {
         self.async_cursor.has_next()
     }
