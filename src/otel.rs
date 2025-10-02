@@ -189,19 +189,21 @@ impl Span {
 }
 
 fn op_target(op: &impl Operation) -> String {
-    if let Some(coll) = op.collection() {
-        format!("{}.{}", op.database(), coll)
+    let target = op.target();
+    if let Some(coll) = target.collection {
+        format!("{}.{}", target.database, coll)
     } else {
-        op.database().to_owned()
+        target.database.to_owned()
     }
 }
 
 fn common_attrs(op: &impl Operation) -> Vec<KeyValue> {
+    let target = op.target();
     let mut attrs = vec![
         KeyValue::new("db.system", "mongodb"),
-        KeyValue::new("db.namespace", op.database().to_owned()),
+        KeyValue::new("db.namespace", target.database.to_owned()),
     ];
-    if let Some(coll) = op.collection() {
+    if let Some(coll) = target.collection {
         attrs.push(KeyValue::new("db.collection.name", coll.to_owned()));
     }
     attrs

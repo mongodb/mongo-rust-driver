@@ -110,6 +110,10 @@ impl OperationWithDefaults for CountDocuments {
     fn supports_read_concern(&self, description: &StreamDescription) -> bool {
         self.aggregate.supports_read_concern(description)
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        self.aggregate.target()
+    }
 }
 
 #[derive(Debug, Deserialize)]

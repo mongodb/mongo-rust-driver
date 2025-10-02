@@ -485,4 +485,8 @@ where
             Retryability::Write
         }
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        super::OperationTarget::ADMIN
+    }
 }

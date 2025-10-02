@@ -80,4 +80,8 @@ impl OperationWithDefaults for AbortTransaction {
         // The session must be "unpinned" before server selection for a retry.
         self.pinned = None;
     }
+
+    fn target(&self) -> super::OperationTarget {
+        "admin".into()
+    }
 }
