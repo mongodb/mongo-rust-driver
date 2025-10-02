@@ -8,7 +8,7 @@ use opentelemetry::{
     KeyValue,
 };
 
-use crate::{operation::Operation, Client};
+use crate::{error::Result, operation::Operation, options::ClientOptions, Client};
 
 /// Configuration for OpenTelemetry.
 #[derive(Debug, Clone, PartialEq, serde::Deserialize)]
@@ -24,21 +24,6 @@ pub struct Options {
     pub query_text_max_length: Option<usize>,
 }
 
-static ENABLED_ENV: LazyLock<bool> =
-    LazyLock::new(
-        || match std::env::var("OTEL_RUST_INSTRUMENTATION_MONGODB_ENABLED").as_deref() {
-            Ok("1" | "true" | "yes") => true,
-            _ => false,
-        },
-    );
-
-static MAX_LENGTH_ENV: LazyLock<usize> = LazyLock::new(|| {
-    std::env::var("OTEL_RUST_INSTRUMENTATION_MONGODB_QUERY_TEXT_MAX_LENGTH")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0)
-});
-
 static TRACER: LazyLock<BoxedTracer> = LazyLock::new(|| {
     opentelemetry::global::tracer_with_scope(
         opentelemetry::InstrumentationScope::builder("mongodb")
@@ -47,15 +32,39 @@ static TRACER: LazyLock<BoxedTracer> = LazyLock::new(|| {
     )
 });
 
-impl Client {
-    pub(crate) fn start_operation_span(&self, op: &impl Operation) -> Span {
-        let otel_enabled = self
-            .options()
-            .tracing
+impl ClientOptions {
+    fn otel_enabled(&self) -> bool {
+        static ENABLED_ENV: LazyLock<bool> = LazyLock::new(|| {
+            match std::env::var("OTEL_RUST_INSTRUMENTATION_MONGODB_ENABLED").as_deref() {
+                Ok("1" | "true" | "yes") => true,
+                _ => false,
+            }
+        });
+
+        self.tracing
             .as_ref()
             .and_then(|t| t.enabled)
-            .unwrap_or_else(|| *ENABLED_ENV);
-        if !otel_enabled {
+            .unwrap_or_else(|| *ENABLED_ENV)
+    }
+
+    pub(crate) fn otel_query_text_max_length(&self) -> usize {
+        static MAX_LENGTH_ENV: LazyLock<usize> = LazyLock::new(|| {
+            std::env::var("OTEL_RUST_INSTRUMENTATION_MONGODB_QUERY_TEXT_MAX_LENGTH")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0)
+        });
+
+        self.tracing
+            .as_ref()
+            .and_then(|t| t.query_text_max_length)
+            .unwrap_or_else(|| *MAX_LENGTH_ENV)
+    }
+}
+
+impl Client {
+    pub(crate) fn start_operation_span(&self, op: &impl Operation) -> Span {
+        if !self.options().otel_enabled() {
             return Span { inner: None };
         }
         let span_name = if let Some(coll) = op.collection() {
@@ -89,8 +98,12 @@ pub(crate) struct Span {
 }
 
 impl Span {
-    pub(crate) fn record_error(&mut self, error: &crate::error::Error) {
-        if let Some(inner) = self.inner.as_mut() {
+    pub(crate) async fn record_error<Out>(
+        &mut self,
+        code: impl AsyncFnOnce() -> Result<Out>,
+    ) -> Result<Out> {
+        let result = code().await;
+        if let (Some(inner), Err(error)) = (&mut self.inner, &result) {
             inner.set_attributes([
                 KeyValue::new("exception.message", error.to_string()),
                 KeyValue::new("exception.type", error.kind.name()),
@@ -98,5 +111,6 @@ impl Span {
                 KeyValue::new("exception.backtrace", error.bt.to_string()),
             ]);
         }
+        result
     }
 }

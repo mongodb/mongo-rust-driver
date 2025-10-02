@@ -108,8 +108,7 @@ impl Client {
     ) -> Result<ExecutionDetails<T>> {
         #[cfg(feature = "opentelemetry")]
         let mut span = self.start_operation_span(op);
-
-        let result = (async move || {
+        span.record_error(async move || {
             // Validate inputs that can be checked before server selection and connection checkout.
             if self.inner.shutdown.executed.load(Ordering::SeqCst) {
                 return Err(ErrorKind::Shutdown.into());
@@ -160,15 +159,8 @@ impl Client {
             }
 
             Box::pin(async { self.execute_operation_with_retry(op, session).await }).await
-        })()
-        .await;
-
-        #[cfg(feature = "opentelemetry")]
-        if let Err(error) = result.as_ref() {
-            span.record_error(error);
-        }
-
-        result
+        })
+        .await
     }
 
     /// Execute the given operation, returning the cursor created by the operation.
