@@ -1350,20 +1350,6 @@ impl ClientOptions {
             None
         }
     }
-
-    #[cfg(feature = "opentelemetry")]
-    pub(crate) fn otel_query_text_max_length(&self) -> usize {
-        static MAX_LENGTH_ENV: LazyLock<usize> = LazyLock::new(|| {
-            std::env::var("OTEL_RUST_INSTRUMENTATION_MONGODB_QUERY_TEXT_MAX_LENGTH")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0)
-        });
-        self.tracing
-            .as_ref()
-            .and_then(|t| t.query_text_max_length)
-            .unwrap_or_else(|| *MAX_LENGTH_ENV)
-    }
 }
 
 /// Splits the string once on the first instance of the given delimiter. If the delimiter is not
