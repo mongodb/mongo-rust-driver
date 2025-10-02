@@ -136,4 +136,8 @@ impl OperationWithDefaults for Find {
     fn collection(&self) -> Option<&str> {
         Some(&self.ns.coll)
     }
+
+    fn output_cursor_id(output: &Self::O) -> Option<i64> {
+        Some(output.id())
+    }
 }
