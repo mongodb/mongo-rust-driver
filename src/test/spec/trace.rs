@@ -2,6 +2,7 @@ use std::{collections::HashMap, iter, sync::Arc, time::Duration};
 
 use crate::{
     bson::{doc, Document},
+    bson_util::truncate_on_char_boundary,
     client::options::ServerAddress,
     error::{
         CommandError,
@@ -29,7 +30,6 @@ use crate::{
         SERVER_API,
     },
     trace::{
-        truncate_on_char_boundary,
         TracingRepresentation,
         COMMAND_TRACING_EVENT_TARGET,
         DEFAULT_MAX_DOCUMENT_LENGTH_BYTES,

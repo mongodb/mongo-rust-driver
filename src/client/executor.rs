@@ -108,7 +108,7 @@ impl Client {
     ) -> Result<ExecutionDetails<T>> {
         #[cfg(feature = "opentelemetry")]
         let mut span = self.start_operation_span(op);
-        span.record_error(async move || {
+        let result = (async move || {
             // Validate inputs that can be checked before server selection and connection checkout.
             if self.inner.shutdown.executed.load(Ordering::SeqCst) {
                 return Err(ErrorKind::Shutdown.into());
@@ -159,8 +159,13 @@ impl Client {
             }
 
             Box::pin(async { self.execute_operation_with_retry(op, session).await }).await
-        })
-        .await
+        })()
+        .await;
+
+        #[cfg(feature = "opentelemetry")]
+        span.record_error(&result);
+
+        result
     }
 
     /// Execute the given operation, returning the cursor created by the operation.
@@ -502,9 +507,19 @@ impl Client {
             let should_redact = cmd.should_redact();
             let cmd_name = cmd.name.clone();
             let target_db = cmd.target_db.clone();
+            #[cfg(feature = "opentelemetry")]
+            let cmd_attrs = crate::otel::CommandAttributes::new(&cmd);
 
             let mut message = Message::try_from(cmd)?;
             message.request_id = Some(request_id);
+
+            /*
+            db.mongodb.cursor_id: ???
+            */
+
+            #[cfg(feature = "opentelemetry")]
+            let mut span = self.start_command_span(op, &connection_info, &message, cmd_attrs);
+
             #[cfg(feature = "in-use-encryption")]
             {
                 let guard = self.inner.csfle.read().await;
@@ -635,6 +650,8 @@ impl Client {
                     }
                 }
             };
+            #[cfg(feature = "opentelemetry")]
+            span.record_error(&result);
 
             if result
                 .as_ref()
