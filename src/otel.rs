@@ -114,16 +114,17 @@ impl Client {
         match &conn_info.address {
             ServerAddress::Tcp { host, port } => {
                 let otel_port: i64 = port.unwrap_or(DEFAULT_PORT).into();
-                attrs.push(KeyValue::new("server.port", otel_port));
-                attrs.push(KeyValue::new("server.address", host.clone()));
-                attrs.push(KeyValue::new("network.transport", "tcp"));
+                attrs.extend([
+                    KeyValue::new("server.port", otel_port),
+                    KeyValue::new("server.address", host.clone()),
+                    KeyValue::new("network.transport", "tcp"),
+                ]);
             }
             ServerAddress::Unix { path } => {
-                attrs.push(KeyValue::new(
-                    "server.address",
-                    path.to_string_lossy().into_owned(),
-                ));
-                attrs.push(KeyValue::new("network.transport", "unix"));
+                attrs.extend([
+                    KeyValue::new("server.address", path.to_string_lossy().into_owned()),
+                    KeyValue::new("network.transport", "unix"),
+                ]);
             }
         }
         if let Some(server_id) = &conn_info.server_id {
