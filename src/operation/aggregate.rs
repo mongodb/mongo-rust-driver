@@ -153,6 +153,10 @@ impl OperationWithDefaults for Aggregate {
             None
         }
     }
+
+    fn output_cursor_id(output: &Self::O) -> Option<i64> {
+        Some(output.id())
+    }
 }
 
 impl Aggregate {

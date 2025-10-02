@@ -127,4 +127,12 @@ impl Operation for RunCursorCommand<'_> {
         }
         .boxed()
     }
+
+    fn cursor_id(&self) -> Option<i64> {
+        self.run_command.cursor_id()
+    }
+
+    fn output_cursor_id(output: &Self::O) -> Option<i64> {
+        Some(output.id())
+    }
 }

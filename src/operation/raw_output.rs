@@ -88,4 +88,12 @@ impl<Op: Operation> Operation for RawOutput<Op> {
     fn collection(&self) -> Option<&str> {
         self.0.collection()
     }
+
+    fn cursor_id(&self) -> Option<i64> {
+        self.0.cursor_id()
+    }
+
+    fn output_cursor_id(_output: &Self::O) -> Option<i64> {
+        None
+    }
 }
