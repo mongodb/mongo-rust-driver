@@ -130,6 +130,11 @@ impl<T> Cursor<T> {
         self.async_cursor.current()
     }
 
+    /// Returns true if the cursor has any additional items to return and false otherwise.
+    pub fn has_next(&self) -> bool {
+        self.async_cursor.has_next()
+    }
+
     /// Deserialize the current result to the generic type associated with this cursor.
     ///
     /// # Panics
