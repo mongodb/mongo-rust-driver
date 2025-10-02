@@ -116,7 +116,8 @@ impl<'de> Deserialize<'de> for BackgroundThreadInterval {
             Ordering::Less => BackgroundThreadInterval::Never,
             Ordering::Equal => return Err(D::Error::custom("zero is not allowed")),
             Ordering::Greater => {
-                BackgroundThreadInterval::Every(Duration::from_millis(millis as u64))
+                // unwrap safety: millis is validated to be in the u64 range
+                BackgroundThreadInterval::Every(Duration::from_millis(millis.try_into().unwrap()))
             }
         })
     }

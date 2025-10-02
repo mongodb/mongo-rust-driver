@@ -1,6 +1,9 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use crate::bson::{doc, Document};
+use crate::{
+    bson::{doc, Document},
+    bson_util::round_clamp,
+};
 use approx::abs_diff_eq;
 use serde::Deserialize;
 
@@ -188,14 +191,14 @@ async fn load_balancing_test() {
             assert!(
                 share_of_selections <= max_share,
                 "expected no more than {}% of selections, instead got {}%",
-                (max_share * 100.0) as u32,
-                (share_of_selections * 100.0) as u32
+                round_clamp::<u32>(max_share * 100.0),
+                round_clamp::<u32>(share_of_selections * 100.0)
             );
             assert!(
                 share_of_selections >= min_share,
                 "expected at least {}% of selections, instead got {}%",
-                (min_share * 100.0) as u32,
-                (share_of_selections * 100.0) as u32
+                round_clamp::<u32>(min_share * 100.0),
+                round_clamp::<u32>(share_of_selections * 100.0)
             );
         }
     }

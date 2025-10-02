@@ -1,8 +1,11 @@
 #![doc = include_str!("../README.md")]
-#![warn(missing_docs)]
-#![warn(rustdoc::missing_crate_level_docs)]
-#![warn(clippy::cast_possible_truncation)]
-#![warn(clippy::cast_possible_wrap)]
+#![warn(
+    missing_docs,
+    rustdoc::missing_crate_level_docs,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss
+)]
 #![allow(
     clippy::unreadable_literal,
     clippy::cognitive_complexity,

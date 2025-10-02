@@ -1314,5 +1314,6 @@ async fn aggregate_with_generics() {
         .await
         .unwrap();
     let lens: Vec<B> = cursor.try_collect().await.unwrap();
-    assert_eq!(lens[0].len as usize, len);
+    let first_len: usize = lens[0].len.try_into().unwrap();
+    assert_eq!(first_len, len);
 }

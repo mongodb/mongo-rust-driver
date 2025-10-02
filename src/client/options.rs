@@ -1952,7 +1952,10 @@ impl ConnectionString {
                         // -1 maxStaleness means no maxStaleness, which is the default
                         return Ok(());
                     }
-                    Ordering::Greater => Duration::from_secs(max_staleness_seconds as u64),
+                    Ordering::Greater => {
+                        // unwrap safety: `max_staleness_seconds` will always be >= 0
+                        Duration::from_secs(max_staleness_seconds.try_into().unwrap())
+                    }
                 };
 
                 parts.max_staleness = Some(max_staleness);
