@@ -651,7 +651,7 @@ impl Client {
                 }
             };
             #[cfg(feature = "opentelemetry")]
-            span.record_error(&result);
+            span.record_command_result::<T>(&result);
 
             if result
                 .as_ref()
