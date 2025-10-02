@@ -106,12 +106,8 @@ impl OperationWithDefaults for GetMore<'_> {
         self.pinned_connection
     }
 
-    fn database(&self) -> &str {
-        &self.ns.db
-    }
-
-    fn collection(&self) -> Option<&str> {
-        Some(&self.ns.coll)
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
     }
 
     fn cursor_id(&self) -> Option<i64> {

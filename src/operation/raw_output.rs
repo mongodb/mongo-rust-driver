@@ -81,12 +81,8 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.name()
     }
 
-    fn database(&self) -> &str {
-        self.0.database()
-    }
-
-    fn collection(&self) -> Option<&str> {
-        self.0.collection()
+    fn target(&self) -> super::OperationTarget<'_> {
+        self.0.target()
     }
 
     fn cursor_id(&self) -> Option<i64> {

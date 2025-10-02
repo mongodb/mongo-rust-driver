@@ -92,12 +92,8 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.name()
     }
 
-    fn database(&self) -> &str {
-        self.run_command.database()
-    }
-
-    fn collection(&self) -> Option<&str> {
-        self.run_command.collection()
+    fn target(&self) -> super::OperationTarget<'_> {
+        self.run_command.target()
     }
 
     fn handle_response<'a>(

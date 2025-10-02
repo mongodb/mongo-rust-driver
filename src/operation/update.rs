@@ -212,6 +212,10 @@ impl OperationWithDefaults for Update {
             Retryability::None
         }
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }
 
 #[derive(Deserialize)]

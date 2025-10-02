@@ -177,13 +177,41 @@ pub(crate) trait Operation {
     /// The name of the server side command associated with this operation.
     fn name(&self) -> &CStr;
 
-    fn database(&self) -> &str;
-
-    fn collection(&self) -> Option<&str>;
+    fn target(&self) -> OperationTarget<'_>;
 
     fn cursor_id(&self) -> Option<i64>;
 
     fn output_cursor_id(output: &Self::O) -> Option<i64>;
+}
+
+pub(crate) struct OperationTarget<'a> {
+    pub(crate) database: &'a str,
+    pub(crate) collection: Option<&'a str>,
+}
+
+impl OperationTarget<'static> {
+    pub(crate) const ADMIN: Self = OperationTarget {
+        database: "admin",
+        collection: None,
+    };
+}
+
+impl<'a> From<&'a str> for OperationTarget<'a> {
+    fn from(value: &'a str) -> Self {
+        OperationTarget {
+            database: value,
+            collection: None,
+        }
+    }
+}
+
+impl<'a> From<&'a Namespace> for OperationTarget<'a> {
+    fn from(value: &'a Namespace) -> Self {
+        OperationTarget {
+            database: &value.db,
+            collection: Some(&value.coll),
+        }
+    }
 }
 
 pub(crate) type OverrideCriteriaFn =
@@ -286,13 +314,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         Self::NAME
     }
 
-    fn database(&self) -> &str {
-        ""
-    }
-
-    fn collection(&self) -> Option<&str> {
-        None
-    }
+    fn target(&self) -> OperationTarget<'_>;
 
     fn cursor_id(&self) -> Option<i64> {
         None
@@ -355,11 +377,8 @@ where
     fn name(&self) -> &CStr {
         self.name()
     }
-    fn database(&self) -> &str {
-        self.database()
-    }
-    fn collection(&self) -> Option<&str> {
-        self.collection()
+    fn target(&self) -> OperationTarget<'_> {
+        self.target()
     }
     fn cursor_id(&self) -> Option<i64> {
         self.cursor_id()

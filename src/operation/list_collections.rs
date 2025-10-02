@@ -85,4 +85,8 @@ impl OperationWithDefaults for ListCollections {
     fn output_cursor_id(output: &Self::O) -> Option<i64> {
         Some(output.id())
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        self.db.as_str().into()
+    }
 }

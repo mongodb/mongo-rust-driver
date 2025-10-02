@@ -75,6 +75,10 @@ impl OperationWithDefaults for Count {
     fn retryability(&self) -> Retryability {
         Retryability::Read
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }
 
 #[derive(Debug, Deserialize)]

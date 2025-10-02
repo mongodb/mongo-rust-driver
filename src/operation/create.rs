@@ -52,4 +52,8 @@ impl OperationWithDefaults for Create {
             .as_ref()
             .and_then(|opts| opts.write_concern.as_ref())
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }

@@ -118,4 +118,8 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
     fn retryability(&self) -> Retryability {
         Retryability::Write
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }
