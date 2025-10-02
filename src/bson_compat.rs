@@ -36,6 +36,8 @@ pub(crate) trait RawDocumentBufExt: Sized {
         key: impl AsRef<CStr>,
         value: impl Into<crate::bson::raw::RawBsonRef<'a>> + 'a,
     );
+
+    fn to_document(&self) -> crate::error::Result<crate::bson::Document>;
 }
 
 #[cfg(feature = "bson-3")]
@@ -46,6 +48,10 @@ impl RawDocumentBufExt for crate::bson::RawDocumentBuf {
         value: impl Into<crate::bson::raw::RawBsonRef<'a>> + 'a,
     ) {
         self.append(key, value);
+    }
+
+    fn to_document(&self) -> crate::error::Result<crate::bson::Document> {
+        self.try_into().map_err(Into::into)
     }
 }
 

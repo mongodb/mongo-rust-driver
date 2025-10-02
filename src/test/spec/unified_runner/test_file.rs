@@ -8,6 +8,8 @@ use tokio::sync::oneshot;
 
 use super::{results_match, ExpectedEvent, ObserveEvent, Operation};
 
+#[cfg(feature = "bson-3")]
+use crate::bson_compat::RawDocumentBufExt;
 #[cfg(feature = "tracing-unstable")]
 use crate::trace;
 use crate::{
@@ -662,7 +664,7 @@ impl ExpectError {
 
         if let Some(ref expected) = self.error_response {
             let actual_raw = error.server_response().expect(&context);
-            let actual = Document::try_from(actual_raw).expect(&context);
+            let actual = actual_raw.to_document().expect(&context);
             results_match(Some(&actual.into()), &expected.into(), true, None).expect(&context);
         }
     }
