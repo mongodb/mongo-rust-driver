@@ -137,6 +137,9 @@ impl Client {
                 crate::bson_util::doc_to_json_str(message.get_command_document(), text_max_len),
             ));
         }
+        if let Some(cursor_id) = op.cursor_id() {
+            attrs.push(KeyValue::new("db.mongodb.cursor_id", cursor_id));
+        }
         Span {
             inner: Some(
                 TRACER
@@ -155,7 +158,7 @@ pub(crate) struct Span {
 
 impl Span {
     pub(crate) fn record_error<T>(&mut self, result: &Result<T>) {
-        if let (Some(inner), Err(error)) = (&mut self.inner, &result) {
+        if let (Some(inner), Err(error)) = (&mut self.inner, result) {
             inner.set_attributes([
                 KeyValue::new("exception.message", error.to_string()),
                 KeyValue::new("exception.type", error.kind.name()),
@@ -173,6 +176,15 @@ impl Span {
                 description: error.to_string().into(),
             });
         }
+    }
+
+    pub(crate) fn record_command_result<Op: Operation>(&mut self, result: &Result<Op::O>) {
+        if let (Some(inner), Ok(out)) = (&mut self.inner, result) {
+            if let Some(cursor_id) = Op::output_cursor_id(out) {
+                inner.set_attribute(KeyValue::new("db.mongodb.cursor_id", cursor_id));
+            }
+        }
+        self.record_error(result);
     }
 }
 

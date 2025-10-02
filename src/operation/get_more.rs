@@ -105,6 +105,18 @@ impl OperationWithDefaults for GetMore<'_> {
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.pinned_connection
     }
+
+    fn database(&self) -> &str {
+        &self.ns.db
+    }
+
+    fn collection(&self) -> Option<&str> {
+        Some(&self.ns.coll)
+    }
+
+    fn cursor_id(&self) -> Option<i64> {
+        Some(self.cursor_id)
+    }
 }
 
 #[derive(Debug, Deserialize)]
