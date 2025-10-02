@@ -660,17 +660,10 @@ impl ExpectError {
             }
         }
 
-        if let Some(ref expected_server_response) = self.error_response {
-            let Some(actual_server_response) = error.server_response() else {
-                panic!("{context}expected server response to be set");
-            };
-            results_match(
-                Some(&actual_server_response.into()),
-                &expected_server_response.into(),
-                true,
-                None,
-            )
-            .expect(&context);
+        if let Some(ref expected) = self.error_response {
+            let actual_raw = error.server_response().expect(&context);
+            let actual = Document::try_from(actual_raw).expect(&context);
+            results_match(Some(&actual.into()), &expected.into(), true, None).expect(&context);
         }
     }
 }

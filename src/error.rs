@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, rawdoc, Bson, Document, RawDocumentBuf},
     cmap::RawCommandResponse,
     options::ServerAddress,
     sdam::{ServerType, TopologyVersion},
@@ -77,7 +77,7 @@ pub struct Error {
     #[source]
     pub(crate) source: Option<Box<Error>>,
 
-    pub(crate) server_response: Option<Box<Document>>,
+    pub(crate) server_response: Option<Box<RawDocumentBuf>>,
 
     #[cfg(test)]
     bt: Arc<std::backtrace::Backtrace>,
@@ -304,17 +304,14 @@ impl Error {
 
     /// The full response returned from the server. This can be used to inspect error fields that
     /// are not represented in the `Error` type.
-    pub fn server_response(&self) -> Option<&Document> {
+    pub fn server_response(&self) -> Option<&RawDocumentBuf> {
         self.server_response.as_deref()
     }
 
     /// Adds the server's response to this error if it is not already present.
     pub(crate) fn with_server_response(mut self, response: &RawCommandResponse) -> Self {
         if self.server_response.is_none() {
-            self.server_response =
-                Some(Box::new(response.body::<Document>().unwrap_or_else(
-                    |e| doc! { "serialization error": e.to_string() },
-                )));
+            self.server_response = Some(Box::new(response.raw_body().to_owned()));
         }
         self
     }
@@ -528,7 +525,7 @@ impl Error {
         }
 
         if self.server_response.is_some() {
-            self.server_response = Some(Box::new(doc! { "redacted": true }));
+            self.server_response = Some(Box::new(rawdoc! { "redacted": true }));
         }
 
         // This is intentionally written without a catch-all branch so that if new error

@@ -1,5 +1,5 @@
 use crate::{
-    bson::Bson,
+    bson::{Bson, Document},
     client::options::{ServerAddress, DEFAULT_PORT},
 };
 
@@ -38,8 +38,14 @@ impl crate::error::Error {
             self.source
         );
         if let Some(server_response) = self.server_response() {
-            let server_response_string =
-                serialize_command_or_reply(server_response.clone(), max_document_length);
+            let server_response_string = match Document::try_from(server_response) {
+                Ok(document) => serialize_command_or_reply(document, max_document_length),
+                Err(_) => {
+                    let mut hex_string = hex::encode(server_response.as_bytes());
+                    truncate_on_char_boundary(&mut hex_string, max_document_length);
+                    hex_string
+                }
+            };
             error_string.push_str(", server response: ");
             error_string.push_str(&server_response_string);
         }
