@@ -32,7 +32,7 @@ impl Database {
     /// `await` will return d[`Result<Cursor<CollectionSpecification>>`].
     #[deeplink]
     #[options_doc(list_collections)]
-    pub fn list_collections(&self) -> ListCollections {
+    pub fn list_collections(&self) -> ListCollections<'_> {
         ListCollections {
             db: self,
             options: None,
@@ -64,7 +64,7 @@ impl crate::sync::Database {
     /// d[`Result<Cursor<CollectionSpecification>>`].
     #[deeplink]
     #[options_doc(list_collections, "run")]
-    pub fn list_collections(&self) -> ListCollections {
+    pub fn list_collections(&self) -> ListCollections<'_> {
         self.async_database.list_collections()
     }
 

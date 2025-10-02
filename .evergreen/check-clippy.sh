@@ -5,7 +5,7 @@ set -o errexit
 source ./.evergreen/env.sh
 
 # Pin clippy to the latest version. This should be updated when new versions of Rust are released.
-CLIPPY_VERSION=1.88.0
+CLIPPY_VERSION=1.90.0
 
 rustup install $CLIPPY_VERSION
 

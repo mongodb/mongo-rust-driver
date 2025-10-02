@@ -70,7 +70,7 @@ impl ClientSession {
     /// retryable writes.
     ///
     /// `await` will return [`Result<()>`].
-    pub fn commit_transaction(&mut self) -> CommitTransaction {
+    pub fn commit_transaction(&mut self) -> CommitTransaction<'_> {
         CommitTransaction { session: self }
     }
 
@@ -105,7 +105,7 @@ impl ClientSession {
     /// retryable writes.
     ///
     /// `await` will return [`Result<()>`].
-    pub fn abort_transaction(&mut self) -> AbortTransaction {
+    pub fn abort_transaction(&mut self) -> AbortTransaction<'_> {
         AbortTransaction { session: self }
     }
 }
@@ -162,7 +162,7 @@ impl crate::sync::ClientSession {
     /// retryable writes.
     ///
     /// [`run`](CommitTransaction::run) will return [`Result<()>`].
-    pub fn commit_transaction(&mut self) -> CommitTransaction {
+    pub fn commit_transaction(&mut self) -> CommitTransaction<'_> {
         self.async_client_session.commit_transaction()
     }
 
@@ -187,7 +187,7 @@ impl crate::sync::ClientSession {
     /// fn execute_transaction(coll: Collection<Document>, session: &mut ClientSession) -> Result<()> {
     ///     coll.insert_one(doc! { "x": 1 }).session(&mut *session).run()?;
     ///     coll.delete_one(doc! { "y": 2 }).session(&mut *session).run()?;
-    ///     Ok(())   
+    ///     Ok(())
     /// }
     /// ```
     ///
@@ -197,7 +197,7 @@ impl crate::sync::ClientSession {
     /// retryable writes.
     ///
     /// [`run`](AbortTransaction::run) will return [`Result<()>`].
-    pub fn abort_transaction(&mut self) -> AbortTransaction {
+    pub fn abort_transaction(&mut self) -> AbortTransaction<'_> {
         self.async_client_session.abort_transaction()
     }
 }

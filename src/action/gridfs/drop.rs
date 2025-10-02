@@ -4,7 +4,7 @@ impl GridFsBucket {
     /// Removes all of the files and their associated chunks from this bucket.
     ///
     /// `await` will return [`Result<()>`].
-    pub fn drop(&self) -> Drop {
+    pub fn drop(&self) -> Drop<'_> {
         Drop { bucket: self }
     }
 }
@@ -14,7 +14,7 @@ impl crate::sync::gridfs::GridFsBucket {
     /// Removes all of the files and their associated chunks from this bucket.
     ///
     /// [`run`](Drop::run) will return [`Result<()>`].
-    pub fn drop(&self) -> Drop {
+    pub fn drop(&self) -> Drop<'_> {
         self.async_bucket.drop()
     }
 }

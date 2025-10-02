@@ -39,7 +39,7 @@ where
     pub fn create_search_indexes(
         &self,
         models: impl IntoIterator<Item = SearchIndexModel>,
-    ) -> CreateSearchIndex<Multiple> {
+    ) -> CreateSearchIndex<'_, Multiple> {
         CreateSearchIndex {
             coll: CollRef::new(self),
             models: models.into_iter().collect(),
@@ -53,7 +53,7 @@ where
     /// `await` will return d[`Result<String>`].
     #[deeplink]
     #[options_doc(create_search_index)]
-    pub fn create_search_index(&self, model: SearchIndexModel) -> CreateSearchIndex<Single> {
+    pub fn create_search_index(&self, model: SearchIndexModel) -> CreateSearchIndex<'_, Single> {
         CreateSearchIndex {
             coll: CollRef::new(self),
             models: vec![model],
@@ -70,7 +70,7 @@ where
         &self,
         name: impl Into<String>,
         definition: Document,
-    ) -> UpdateSearchIndex {
+    ) -> UpdateSearchIndex<'_> {
         UpdateSearchIndex {
             coll: CollRef::new(self),
             name: name.into(),
@@ -83,7 +83,7 @@ where
     ///
     /// `await` will return [`Result<()>`].
     #[options_doc(drop_search_index)]
-    pub fn drop_search_index(&self, name: impl Into<String>) -> DropSearchIndex {
+    pub fn drop_search_index(&self, name: impl Into<String>) -> DropSearchIndex<'_> {
         DropSearchIndex {
             coll: CollRef::new(self),
             name: name.into(),
@@ -99,7 +99,7 @@ where
     /// `await` will return d[`Result<Cursor<Document>>`].
     #[deeplink]
     #[options_doc(list_search_indexes)]
-    pub fn list_search_indexes(&self) -> ListSearchIndexes {
+    pub fn list_search_indexes(&self) -> ListSearchIndexes<'_> {
         ListSearchIndexes {
             coll: CollRef::new(self),
             name: None,
@@ -122,7 +122,7 @@ where
     pub fn create_search_indexes(
         &self,
         models: impl IntoIterator<Item = SearchIndexModel>,
-    ) -> CreateSearchIndex<Multiple> {
+    ) -> CreateSearchIndex<'_, Multiple> {
         self.async_collection.create_search_indexes(models)
     }
 
@@ -131,7 +131,7 @@ where
     /// [`run`](CreateSearchIndex::run) will return d[`Result<String>`].
     #[deeplink]
     #[options_doc(create_search_index, "run")]
-    pub fn create_search_index(&self, model: SearchIndexModel) -> CreateSearchIndex<Single> {
+    pub fn create_search_index(&self, model: SearchIndexModel) -> CreateSearchIndex<'_, Single> {
         self.async_collection.create_search_index(model)
     }
 
@@ -143,7 +143,7 @@ where
         &self,
         name: impl Into<String>,
         definition: Document,
-    ) -> UpdateSearchIndex {
+    ) -> UpdateSearchIndex<'_> {
         self.async_collection.update_search_index(name, definition)
     }
 
@@ -151,7 +151,7 @@ where
     ///
     /// [`run`](DropSearchIndex::run) will return [`Result<()>`].
     #[options_doc(drop_search_index, "run")]
-    pub fn drop_search_index(&self, name: impl Into<String>) -> DropSearchIndex {
+    pub fn drop_search_index(&self, name: impl Into<String>) -> DropSearchIndex<'_> {
         self.async_collection.drop_search_index(name)
     }
 
@@ -163,7 +163,7 @@ where
     /// [`run`](ListSearchIndexes::run) will return d[`Result<crate::sync::Cursor<Document>>`].
     #[deeplink]
     #[options_doc(list_search_indexes, "run")]
-    pub fn list_search_indexes(&self) -> ListSearchIndexes {
+    pub fn list_search_indexes(&self) -> ListSearchIndexes<'_> {
         self.async_collection.list_search_indexes()
     }
 }

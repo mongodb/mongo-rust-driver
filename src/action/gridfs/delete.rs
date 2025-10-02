@@ -14,7 +14,7 @@ impl GridFsBucket {
     /// bucket.
     ///
     /// `await` will return [`Result<()>`].
-    pub fn delete(&self, id: Bson) -> Delete {
+    pub fn delete(&self, id: Bson) -> Delete<'_> {
         Delete { bucket: self, id }
     }
 
@@ -23,7 +23,7 @@ impl GridFsBucket {
     /// bucket.
     ///
     /// `await` will return [`Result<()>`].
-    pub fn delete_by_name(&self, filename: impl Into<String>) -> DeleteByName {
+    pub fn delete_by_name(&self, filename: impl Into<String>) -> DeleteByName<'_> {
         DeleteByName {
             bucket: self,
             filename: filename.into(),
@@ -38,7 +38,7 @@ impl crate::sync::gridfs::GridFsBucket {
     /// bucket.
     ///
     /// [`run`](Delete::run) will return [`Result<()>`].
-    pub fn delete(&self, id: Bson) -> Delete {
+    pub fn delete(&self, id: Bson) -> Delete<'_> {
         self.async_bucket.delete(id)
     }
 
@@ -47,7 +47,7 @@ impl crate::sync::gridfs::GridFsBucket {
     /// bucket.
     ///
     /// [`run`](DeleteByName::run) will return [`Result<()>`].
-    pub fn delete_by_name(&self, filename: impl Into<String>) -> DeleteByName {
+    pub fn delete_by_name(&self, filename: impl Into<String>) -> DeleteByName<'_> {
         self.async_bucket.delete_by_name(filename)
     }
 }

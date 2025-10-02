@@ -82,7 +82,7 @@ impl TopologyDescription {
     }
 
     /// Gets the servers in the topology.
-    pub fn servers(&self) -> HashMap<&ServerAddress, ServerInfo> {
+    pub fn servers(&self) -> HashMap<&ServerAddress, ServerInfo<'_>> {
         self.description
             .servers
             .iter()

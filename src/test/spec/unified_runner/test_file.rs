@@ -510,13 +510,6 @@ impl ExpectedEventType {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) enum EventMatch {
-    Exact,
-    Prefix,
-}
-
 #[cfg(feature = "tracing-unstable")]
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]

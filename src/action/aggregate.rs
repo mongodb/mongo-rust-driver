@@ -39,7 +39,7 @@ impl Database {
     /// called, the returned cursor will be generic over the `T` specified.
     #[deeplink]
     #[options_doc(aggregate)]
-    pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
+    pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate<'_> {
         Aggregate::new(
             AggregateTargetRef::Database(self),
             pipeline.into_iter().collect(),
@@ -61,7 +61,7 @@ where
     /// called, the returned cursor will be generic over the `T` specified.
     #[deeplink]
     #[options_doc(aggregate)]
-    pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
+    pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate<'_> {
         Aggregate::new(
             AggregateTargetRef::Collection(CollRef::new(self)),
             pipeline.into_iter().collect(),
@@ -82,7 +82,7 @@ impl crate::sync::Database {
     /// returned cursor will be generic over the `T` specified.
     #[deeplink]
     #[options_doc(aggregate, "run")]
-    pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
+    pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate<'_> {
         self.async_database.aggregate(pipeline)
     }
 }
@@ -103,7 +103,7 @@ where
     /// returned cursor will be generic over the `T` specified.
     #[deeplink]
     #[options_doc(aggregate, "run")]
-    pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate {
+    pub fn aggregate(&self, pipeline: impl IntoIterator<Item = Document>) -> Aggregate<'_> {
         self.async_collection.aggregate(pipeline)
     }
 }

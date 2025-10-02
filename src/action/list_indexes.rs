@@ -37,7 +37,7 @@ where
     /// d[`Result<SessionCursor<IndexModel>>`] if a `ClientSession` is provided).
     #[deeplink]
     #[options_doc(list_indexes)]
-    pub fn list_indexes(&self) -> ListIndexes {
+    pub fn list_indexes(&self) -> ListIndexes<'_> {
         ListIndexes {
             coll: CollRef::new(self),
             options: None,
@@ -51,7 +51,7 @@ where
     /// `await` will return d[`Result<Vec<String>>`].
     #[deeplink]
     #[options_doc(list_indexes)]
-    pub fn list_index_names(&self) -> ListIndexes<ListNames> {
+    pub fn list_index_names(&self) -> ListIndexes<'_, ListNames> {
         ListIndexes {
             coll: CollRef::new(self),
             options: None,
@@ -72,7 +72,7 @@ where
     /// d[`Result<crate::sync::SessionCursor<IndexModel>>`] if a `ClientSession` is provided).
     #[deeplink]
     #[options_doc(list_indexes, "run")]
-    pub fn list_indexes(&self) -> ListIndexes {
+    pub fn list_indexes(&self) -> ListIndexes<'_> {
         self.async_collection.list_indexes()
     }
 
@@ -81,7 +81,7 @@ where
     /// [`run`](ListIndexes::run) will return d[`Result<Vec<String>>`].
     #[deeplink]
     #[options_doc(list_indexes, "run")]
-    pub fn list_index_names(&self) -> ListIndexes<ListNames> {
+    pub fn list_index_names(&self) -> ListIndexes<'_, ListNames> {
         self.async_collection.list_index_names()
     }
 }

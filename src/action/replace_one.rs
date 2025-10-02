@@ -27,7 +27,7 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     /// `await` will return d[`Result<UpdateResult>`].
     #[deeplink]
     #[options_doc(replace_one)]
-    pub fn replace_one(&self, query: Document, replacement: impl Borrow<T>) -> ReplaceOne {
+    pub fn replace_one(&self, query: Document, replacement: impl Borrow<T>) -> ReplaceOne<'_> {
         ReplaceOne {
             coll: CollRef::new(self),
             query,
@@ -51,7 +51,7 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     /// [`run`](ReplaceOne::run) will return d[`Result<UpdateResult>`].
     #[deeplink]
     #[options_doc(replace_one, "run")]
-    pub fn replace_one(&self, query: Document, replacement: impl Borrow<T>) -> ReplaceOne {
+    pub fn replace_one(&self, query: Document, replacement: impl Borrow<T>) -> ReplaceOne<'_> {
         self.async_collection.replace_one(query, replacement)
     }
 }

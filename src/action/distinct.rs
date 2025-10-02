@@ -24,7 +24,7 @@ where
     /// `await` will return d[`Result<Vec<Bson>>`].
     #[deeplink]
     #[options_doc(distinct)]
-    pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
+    pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct<'_> {
         Distinct {
             coll: CollRef::new(self),
             field_name: field_name.as_ref().to_string(),
@@ -45,7 +45,7 @@ where
     /// [`run`](Distinct::run) will return d[`Result<Vec<Bson>>`].
     #[deeplink]
     #[options_doc(distinct, "run")]
-    pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct {
+    pub fn distinct(&self, field_name: impl AsRef<str>, filter: Document) -> Distinct<'_> {
         self.async_collection.distinct(field_name, filter)
     }
 }

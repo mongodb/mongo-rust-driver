@@ -29,7 +29,7 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     /// `await` will return d[`Result<InsertManyResult>`].
     #[deeplink]
     #[options_doc(insert_many)]
-    pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
+    pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany<'_> {
         InsertMany {
             coll: CollRef::new(self),
             docs: docs
@@ -60,7 +60,7 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     /// [`run`](InsertMany::run) will return d[`Result<InsertManyResult>`].
     #[deeplink]
     #[options_doc(insert_many, "run")]
-    pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany {
+    pub fn insert_many(&self, docs: impl IntoIterator<Item = impl Borrow<T>>) -> InsertMany<'_> {
         self.async_collection.insert_many(docs)
     }
 }

@@ -17,7 +17,7 @@ impl GridFsBucket {
     ///
     /// `await` will return d[`Result<GridFsDownloadStream>`].
     #[deeplink]
-    pub fn open_download_stream(&self, id: Bson) -> OpenDownloadStream {
+    pub fn open_download_stream(&self, id: Bson) -> OpenDownloadStream<'_> {
         OpenDownloadStream { bucket: self, id }
     }
 
@@ -35,7 +35,7 @@ impl GridFsBucket {
     pub fn open_download_stream_by_name(
         &self,
         filename: impl Into<String>,
-    ) -> OpenDownloadStreamByName {
+    ) -> OpenDownloadStreamByName<'_> {
         OpenDownloadStreamByName {
             bucket: self,
             filename: filename.into(),
@@ -101,7 +101,7 @@ impl crate::sync::gridfs::GridFsBucket {
     ///
     /// [`run`](OpenDownloadStream::run) will return d[`Result<GridFsDownloadStream>`].
     #[deeplink]
-    pub fn open_download_stream(&self, id: Bson) -> OpenDownloadStream {
+    pub fn open_download_stream(&self, id: Bson) -> OpenDownloadStream<'_> {
         self.async_bucket.open_download_stream(id)
     }
 
@@ -119,7 +119,7 @@ impl crate::sync::gridfs::GridFsBucket {
     pub fn open_download_stream_by_name(
         &self,
         filename: impl Into<String>,
-    ) -> OpenDownloadStreamByName {
+    ) -> OpenDownloadStreamByName<'_> {
         self.async_bucket.open_download_stream_by_name(filename)
     }
 }

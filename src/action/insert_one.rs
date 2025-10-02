@@ -29,7 +29,7 @@ impl<T: Serialize + Send + Sync> Collection<T> {
     /// `await` will return d[`Result<InsertOneResult>`].
     #[deeplink]
     #[options_doc(insert_one)]
-    pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
+    pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne<'_> {
         InsertOne {
             coll: CollRef::new(self),
             doc: crate::bson_compat::serialize_to_raw_document_buf(doc.borrow())
@@ -55,7 +55,7 @@ impl<T: Serialize + Send + Sync> crate::sync::Collection<T> {
     /// [`run`](InsertOne::run) will return d[`Result<InsertOneResult>`].
     #[deeplink]
     #[options_doc(insert_one, "run")]
-    pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne {
+    pub fn insert_one(&self, doc: impl Borrow<T>) -> InsertOne<'_> {
         self.async_collection.insert_one(doc)
     }
 }

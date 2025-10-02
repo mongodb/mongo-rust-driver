@@ -25,7 +25,7 @@ impl ClientEncryption {
         value: impl Into<crate::bson::RawBson>,
         key: impl Into<EncryptKey>,
         algorithm: Algorithm,
-    ) -> Encrypt {
+    ) -> Encrypt<'_> {
         Encrypt {
             client_enc: self,
             mode: Value {

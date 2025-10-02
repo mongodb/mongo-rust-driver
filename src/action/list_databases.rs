@@ -29,7 +29,7 @@ impl Client {
     /// `await` will return d[`Result<Vec<DatabaseSpecification>>`].
     #[deeplink]
     #[options_doc(list_databases)]
-    pub fn list_databases(&self) -> ListDatabases {
+    pub fn list_databases(&self) -> ListDatabases<'_> {
         ListDatabases {
             client: self,
             options: Default::default(),
@@ -60,7 +60,7 @@ impl SyncClient {
     /// [run](ListDatabases::run) will return d[`Result<Vec<DatabaseSpecification>>`].
     #[deeplink]
     #[options_doc(list_databases, "run")]
-    pub fn list_databases(&self) -> ListDatabases {
+    pub fn list_databases(&self) -> ListDatabases<'_> {
         self.async_client.list_databases()
     }
 

@@ -33,7 +33,7 @@ where
     /// `await` will return d[`Result<CreateIndexResult>`].
     #[deeplink]
     #[options_doc(create_index)]
-    pub fn create_index(&self, index: IndexModel) -> CreateIndex {
+    pub fn create_index(&self, index: IndexModel) -> CreateIndex<'_> {
         CreateIndex {
             coll: CollRef::new(self),
             indexes: vec![index],
@@ -72,7 +72,7 @@ where
     /// [`run`](CreateIndex::run) will return d[`Result<CreateIndexResult>`].
     #[deeplink]
     #[options_doc(create_index, "run")]
-    pub fn create_index(&self, index: IndexModel) -> CreateIndex {
+    pub fn create_index(&self, index: IndexModel) -> CreateIndex<'_> {
         self.async_collection.create_index(index)
     }
 

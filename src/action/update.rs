@@ -26,7 +26,11 @@ where
     /// `await` will return d[`Result<UpdateResult>`].
     #[deeplink]
     #[options_doc(update)]
-    pub fn update_many(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
+    pub fn update_many(
+        &self,
+        query: Document,
+        update: impl Into<UpdateModifications>,
+    ) -> Update<'_> {
         Update {
             coll: CollRef::new(self),
             query,
@@ -51,7 +55,11 @@ where
     /// `await` will return d[`Result<UpdateResult>`].
     #[deeplink]
     #[options_doc(update)]
-    pub fn update_one(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
+    pub fn update_one(
+        &self,
+        query: Document,
+        update: impl Into<UpdateModifications>,
+    ) -> Update<'_> {
         Update {
             coll: CollRef::new(self),
             query,
@@ -77,7 +85,11 @@ where
     /// [`run`](Update::run) will return d[`Result<UpdateResult>`].
     #[deeplink]
     #[options_doc(update, "run")]
-    pub fn update_many(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
+    pub fn update_many(
+        &self,
+        query: Document,
+        update: impl Into<UpdateModifications>,
+    ) -> Update<'_> {
         self.async_collection.update_many(query, update)
     }
 
@@ -95,7 +107,11 @@ where
     /// [`run`](Update::run) will return d[`Result<UpdateResult>`].
     #[deeplink]
     #[options_doc(update, "run")]
-    pub fn update_one(&self, query: Document, update: impl Into<UpdateModifications>) -> Update {
+    pub fn update_one(
+        &self,
+        query: Document,
+        update: impl Into<UpdateModifications>,
+    ) -> Update<'_> {
         self.async_collection.update_one(query, update)
     }
 }

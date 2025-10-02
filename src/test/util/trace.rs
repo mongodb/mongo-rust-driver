@@ -129,14 +129,14 @@ impl TracingHandler {
     /// [`TracingLevelsGuard`] which, when dropped, will clear the levels set on this handler.
     /// This can be used to temporarily configure the levels on the global default handler for
     /// the duration of a test.
-    pub(crate) fn set_levels(&self, new_levels: HashMap<String, Level>) -> TracingLevelsGuard {
+    pub(crate) fn set_levels(&self, new_levels: HashMap<String, Level>) -> TracingLevelsGuard<'_> {
         let mut levels = self.levels.write().unwrap();
         *levels = new_levels;
         TracingLevelsGuard { handler: self }
     }
 
     /// Returns an `EventStream` that will yield events received by this handler.
-    pub(crate) fn event_stream(&self) -> EventStream<TracingEvent> {
+    pub(crate) fn event_stream(&self) -> EventStream<'_, TracingEvent> {
         self.buffer.stream()
     }
 }
@@ -259,7 +259,7 @@ struct TracingEventVisitor<'a> {
 }
 
 impl TracingEventVisitor<'_> {
-    fn new(event: &mut TracingEvent) -> TracingEventVisitor {
+    fn new(event: &mut TracingEvent) -> TracingEventVisitor<'_> {
         TracingEventVisitor { event }
     }
 }
