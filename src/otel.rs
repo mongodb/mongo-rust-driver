@@ -18,7 +18,8 @@ use crate::{
 };
 
 /// Configuration for OpenTelemetry.
-#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, typed_builder::TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct Options {
@@ -77,7 +78,10 @@ impl Client {
         let span_name = format!("{} {}", op.name(), op_target(op));
         let mut attrs = common_attrs(op);
         attrs.extend([
-            KeyValue::new("db.operation.name", op.name().as_str().to_owned()),
+            KeyValue::new(
+                "db.operation.name",
+                crate::bson_compat::cstr_to_str(op.name()).to_owned(),
+            ),
             KeyValue::new("db.operation.summary", span_name.clone()),
         ]);
         Span {

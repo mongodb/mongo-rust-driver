@@ -177,13 +177,17 @@ pub(crate) trait Operation {
     /// The name of the server side command associated with this operation.
     fn name(&self) -> &CStr;
 
+    #[allow(dead_code)]
     fn target(&self) -> OperationTarget<'_>;
 
+    #[allow(dead_code)]
     fn cursor_id(&self) -> Option<i64>;
 
+    #[allow(dead_code)]
     fn output_cursor_id(output: &Self::O) -> Option<i64>;
 }
 
+#[allow(dead_code)]
 pub(crate) struct OperationTarget<'a> {
     pub(crate) database: &'a str,
     pub(crate) collection: Option<&'a str>,
