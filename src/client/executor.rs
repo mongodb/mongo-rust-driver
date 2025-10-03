@@ -16,6 +16,8 @@ use std::{
 };
 
 use super::{options::ServerAddress, session::TransactionState, Client, ClientSession};
+#[cfg(not(feature = "opentelemetry"))]
+use crate::otel::OtelFutureStub as _;
 use crate::{
     bson::Document,
     change_stream::{
@@ -169,7 +171,7 @@ impl Client {
         })()
         .with_context(ctx.clone())
         .await;
-
+        #[cfg(feature = "opentelemetry")]
         self.record_error(&ctx, &result);
 
         result
@@ -654,6 +656,7 @@ impl Client {
                     }
                 }
             };
+            #[cfg(feature = "opentelemetry")]
             self.record_command_result::<T>(&ctx, &result);
 
             if result
@@ -1114,13 +1117,3 @@ impl RetryHelper for Option<ExecutionRetry> {
         }
     }
 }
-
-#[cfg(not(feature = "opentelemetry"))]
-trait OtelFutureStub: Sized {
-    fn with_current_context(self) -> Self {
-        self
-    }
-}
-
-#[cfg(not(feature = "opentelemetry"))]
-impl<T: std::future::Future> OtelFutureStub for T {}
