@@ -173,15 +173,11 @@ impl RunOnRequirement {
                 Csfle::Version {
                     min_libmongocrypt_version,
                 } => {
-                    let requirement =
-                        semver::VersionReq::parse(&format!(">={min_libmongocrypt_version}"))
-                            .unwrap();
-                    let mut version = semver::Version::parse(mongocrypt::version()).unwrap();
-                    version.pre = semver::Prerelease::EMPTY;
-                    if !requirement.matches(&version) {
+                    if crate::test::mongocrypt_version_lt(min_libmongocrypt_version) {
                         return Err(format!(
                             "requires at least libmongocrypt version {min_libmongocrypt_version} \
-                             but using version {version}"
+                             but using version {},",
+                            mongocrypt::version()
                         ));
                     }
                 }

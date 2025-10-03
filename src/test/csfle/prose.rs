@@ -2264,3 +2264,339 @@ async fn encrypt_expression_with_options() {
         .await
         .unwrap();
 }
+
+// Prose test 27. Text explicit encryption
+#[tokio::test]
+#[cfg(feature = "text-indexes-unstable")]
+async fn text_indexes_explicit_encryption() {
+    use crate::{
+        client_encryption::{PrefixOptions, SubstringOptions, SuffixOptions, TextOptions},
+        test::mongocrypt_version_lt,
+    };
+
+    if server_version_lt(8, 2).await
+        || topology_is_standalone().await
+        || mongocrypt_version_lt("1.15.1")
+    {
+        log_uncaptured(
+            "skipping text_explicit_encryption: requires non-standalone topology, 8.2+, \
+             libmongocrypt 1.15.1+",
+        );
+        return;
+    }
+
+    // Prefix test utils
+    let prefix_query_type = "prefixPreview";
+    let text_prefix_options = TextOptions::builder()
+        .case_sensitive(true)
+        .diacritic_sensitive(true)
+        .prefix(
+            PrefixOptions::builder()
+                .max_query_length(10)
+                .min_query_length(2)
+                .build(),
+        )
+        .build();
+    let prefix_filter = |prefix: Binary| {
+        doc! { "$expr": { "$encStrStartsWith": { "input": "$encryptedText", "prefix": prefix } } }
+    };
+
+    // Suffix test utils
+    let suffix_query_type = "suffixPreview";
+    let text_suffix_options = TextOptions::builder()
+        .case_sensitive(true)
+        .diacritic_sensitive(true)
+        .suffix(
+            SuffixOptions::builder()
+                .max_query_length(10)
+                .min_query_length(2)
+                .build(),
+        )
+        .build();
+    let suffix_filter = |suffix: Binary| {
+        doc! { "$expr": { "$encStrEndsWith": { "input": "$encryptedText", "suffix": suffix } } }
+    };
+
+    // Substring test utils
+    let substring_query_type = "substringPreview";
+    let text_substring_options = TextOptions::builder()
+        .case_sensitive(true)
+        .diacritic_sensitive(true)
+        .substring(
+            SubstringOptions::builder()
+                .max_string_length(10)
+                .max_query_length(10)
+                .min_query_length(2)
+                .build(),
+        )
+        .build();
+    let substring_filter = |substring: Binary| {
+        doc! { "$expr": { "$encStrContains": { "input": "$encryptedText", "substring": substring } } }
+    };
+    let substring_coll =
+        |client: &Client| client.database("db").collection::<Document>("substring");
+
+    // General utils
+    let prefix_suffix_coll = |client: &Client| {
+        client
+            .database("db")
+            .collection::<Document>("prefix-suffix")
+    };
+    let expected = doc! { "_id": 0, "encryptedText": "foobarbaz" };
+    let projection = doc! { "__safeContent__": 0 };
+
+    // Case 1: can find a document by prefix
+    let (encrypted_client, client_encryption, key1_id) =
+        text_indexes_explicit_encryption_setup().await;
+
+    let prefix = client_encryption
+        .encrypt("foo", key1_id, Algorithm::TextPreview)
+        .query_type(prefix_query_type)
+        .contention_factor(0)
+        .text_options(text_prefix_options.clone())
+        .await
+        .unwrap();
+
+    let actual = prefix_suffix_coll(&encrypted_client)
+        .find_one(prefix_filter(prefix))
+        .projection(projection.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(actual, expected);
+
+    // Case 2: can find a document by suffix
+    let (encrypted_client, client_encryption, key1_id) =
+        text_indexes_explicit_encryption_setup().await;
+
+    let suffix = client_encryption
+        .encrypt("baz", key1_id, Algorithm::TextPreview)
+        .query_type(suffix_query_type)
+        .contention_factor(0)
+        .text_options(text_suffix_options.clone())
+        .await
+        .unwrap();
+
+    let actual = prefix_suffix_coll(&encrypted_client)
+        .find_one(suffix_filter(suffix))
+        .projection(projection.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(actual, expected);
+
+    // Case 3: assert no document found by prefix
+    let (encrypted_client, client_encryption, key1_id) =
+        text_indexes_explicit_encryption_setup().await;
+
+    let prefix = client_encryption
+        .encrypt("baz", key1_id, Algorithm::TextPreview)
+        .query_type(prefix_query_type)
+        .contention_factor(0)
+        .text_options(text_prefix_options.clone())
+        .await
+        .unwrap();
+
+    let actual = prefix_suffix_coll(&encrypted_client)
+        .find_one(prefix_filter(prefix))
+        .projection(projection.clone())
+        .await
+        .unwrap();
+    assert!(actual.is_none(), "{actual:?}");
+
+    // Case 4: assert no document found by suffix
+    let (encrypted_client, client_encryption, key1_id) =
+        text_indexes_explicit_encryption_setup().await;
+
+    let suffix = client_encryption
+        .encrypt("foo", key1_id, Algorithm::TextPreview)
+        .query_type(suffix_query_type)
+        .contention_factor(0)
+        .text_options(text_suffix_options)
+        .await
+        .unwrap();
+
+    let actual = prefix_suffix_coll(&encrypted_client)
+        .find_one(suffix_filter(suffix))
+        .projection(projection.clone())
+        .await
+        .unwrap();
+    assert!(actual.is_none(), "{actual:?}");
+
+    // Case 5: can find a document by substring
+    let (encrypted_client, client_encryption, key1_id) =
+        text_indexes_explicit_encryption_setup().await;
+
+    let substring = client_encryption
+        .encrypt("bar", key1_id, Algorithm::TextPreview)
+        .query_type(substring_query_type)
+        .contention_factor(0)
+        .text_options(text_substring_options.clone())
+        .await
+        .unwrap();
+
+    let actual = substring_coll(&encrypted_client)
+        .find_one(substring_filter(substring))
+        .projection(projection.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(actual, expected);
+
+    // Case 6: assert no document found by substring
+    let (encrypted_client, client_encryption, key1_id) =
+        text_indexes_explicit_encryption_setup().await;
+
+    let substring = client_encryption
+        .encrypt("qux", key1_id, Algorithm::TextPreview)
+        .query_type(substring_query_type)
+        .contention_factor(0)
+        .text_options(text_substring_options)
+        .await
+        .unwrap();
+
+    let actual = substring_coll(&encrypted_client)
+        .find_one(substring_filter(substring))
+        .projection(projection)
+        .await
+        .unwrap();
+    assert!(actual.is_none(), "{actual:?}");
+
+    // Case 7: assert contentionFactor is required
+    let (_, client_encryption, key1_id) = text_indexes_explicit_encryption_setup().await;
+    let error = client_encryption
+        .encrypt("foo", key1_id, Algorithm::TextPreview)
+        .query_type(prefix_query_type)
+        .text_options(text_prefix_options)
+        .await
+        .unwrap_err();
+    let message = error.message().unwrap();
+    assert!(message.contains("contention factor is required for textPreview algorithm"));
+}
+
+#[cfg(feature = "text-indexes-unstable")]
+async fn text_indexes_explicit_encryption_setup() -> (Client, ClientEncryption, Binary) {
+    use crate::client_encryption::{PrefixOptions, SubstringOptions, SuffixOptions, TextOptions};
+
+    let util_client = Client::for_test().await;
+    let db = util_client.database("db");
+
+    let ps_encrypted_fields = load_testdata("data/encryptedFields-prefix-suffix.json").unwrap();
+    db.collection::<Document>("prefix-suffix")
+        .drop()
+        .encrypted_fields(ps_encrypted_fields.clone())
+        .await
+        .unwrap();
+    db.create_collection("prefix-suffix")
+        .encrypted_fields(ps_encrypted_fields)
+        .write_concern(WriteConcern::majority())
+        .await
+        .unwrap();
+
+    let substring_encrypted_fields = load_testdata("data/encryptedFields-substring.json").unwrap();
+    db.collection::<Document>("substring")
+        .drop()
+        .encrypted_fields(substring_encrypted_fields.clone())
+        .await
+        .unwrap();
+    db.create_collection("substring")
+        .encrypted_fields(substring_encrypted_fields)
+        .write_concern(WriteConcern::majority())
+        .await
+        .unwrap();
+
+    let key1_doc = load_testdata("data/keys/key1-document.json").unwrap();
+    let key1_id = match key1_doc.get("_id").unwrap() {
+        Bson::Binary(b) => b.clone(),
+        other => panic!("expected binary, got {other}"),
+    };
+
+    let keyvault = util_client.database("keyvault");
+    let datakeys = keyvault.collection("datakeys");
+    datakeys.drop().await.unwrap();
+    keyvault.create_collection("datakeys").await.unwrap();
+    datakeys
+        .insert_one(key1_doc)
+        .write_concern(WriteConcern::majority())
+        .await
+        .unwrap();
+
+    let key_vault_client = Client::for_test().await;
+    let client_encryption = ClientEncryption::builder(
+        key_vault_client.into_client(),
+        datakeys.namespace(),
+        [LOCAL_KMS.clone()],
+    )
+    .build()
+    .unwrap();
+
+    let encrypted_client = Client::encrypted_builder(
+        get_client_options().await.clone(),
+        datakeys.namespace(),
+        [LOCAL_KMS.clone()],
+    )
+    .unwrap()
+    .bypass_query_analysis(true)
+    .build()
+    .await
+    .unwrap();
+
+    let text_options = TextOptions::builder()
+        .case_sensitive(true)
+        .diacritic_sensitive(true)
+        .prefix(
+            PrefixOptions::builder()
+                .max_query_length(10)
+                .min_query_length(2)
+                .build(),
+        )
+        .suffix(
+            SuffixOptions::builder()
+                .max_query_length(10)
+                .min_query_length(2)
+                .build(),
+        )
+        .build();
+    let encrypted_foobarbaz = client_encryption
+        .encrypt("foobarbaz", key1_id.clone(), Algorithm::TextPreview)
+        .contention_factor(0)
+        .text_options(text_options)
+        .await
+        .unwrap();
+
+    encrypted_client
+        .database("db")
+        .collection("prefix-suffix")
+        .insert_one(doc! { "_id": 0, "encryptedText": encrypted_foobarbaz })
+        .write_concern(WriteConcern::majority())
+        .await
+        .unwrap();
+
+    let text_options = TextOptions::builder()
+        .case_sensitive(true)
+        .diacritic_sensitive(true)
+        .substring(
+            SubstringOptions::builder()
+                .max_string_length(10)
+                .max_query_length(10)
+                .min_query_length(2)
+                .build(),
+        )
+        .build();
+    let encrypted_foobarbaz = client_encryption
+        .encrypt("foobarbaz", key1_id.clone(), Algorithm::TextPreview)
+        .contention_factor(0)
+        .text_options(text_options)
+        .await
+        .unwrap();
+
+    encrypted_client
+        .database("db")
+        .collection("substring")
+        .insert_one(doc! { "_id": 0 , "encryptedText": encrypted_foobarbaz })
+        .write_concern(WriteConcern::majority())
+        .await
+        .unwrap();
+
+    (encrypted_client, client_encryption, key1_id)
+}
