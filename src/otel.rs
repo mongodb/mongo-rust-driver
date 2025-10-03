@@ -4,7 +4,8 @@ use std::sync::LazyLock;
 
 use opentelemetry::{
     global::BoxedTracer,
-    trace::{Span as _, SpanKind, Tracer as _},
+    trace::{SpanKind, TraceContextExt, Tracer as _},
+    Context,
     KeyValue,
 };
 
@@ -71,9 +72,9 @@ static TRACER: LazyLock<BoxedTracer> = LazyLock::new(|| {
 });
 
 impl Client {
-    pub(crate) fn start_operation_span(&self, op: &impl Operation) -> Span {
+    pub(crate) fn start_operation_span(&self, op: &impl Operation) -> Context {
         if !self.options().otel_enabled() {
-            return Span { inner: None };
+            return Context::current();
         }
         let span_name = format!("{} {}", op.name(), op_target(op));
         let mut attrs = common_attrs(op);
@@ -84,15 +85,12 @@ impl Client {
             ),
             KeyValue::new("db.operation.summary", span_name.clone()),
         ]);
-        Span {
-            inner: Some(
-                TRACER
-                    .span_builder(span_name)
-                    .with_kind(SpanKind::Client)
-                    .with_attributes(attrs)
-                    .start(&*TRACER),
-            ),
-        }
+        let span = TRACER
+            .span_builder(span_name)
+            .with_kind(SpanKind::Client)
+            .with_attributes(attrs)
+            .start(&*TRACER);
+        Context::current_with_span(span)
     }
 
     pub(crate) fn start_command_span(
@@ -101,9 +99,9 @@ impl Client {
         conn_info: &ConnectionInfo,
         message: &Message,
         cmd_attrs: CommandAttributes,
-    ) -> Span {
+    ) -> Context {
         if !self.options().otel_enabled() || cmd_attrs.should_redact {
-            return Span { inner: None };
+            return Context::current();
         }
         let otel_driver_conn_id: i64 = conn_info.id.into();
         let mut attrs = common_attrs(op);
@@ -144,51 +142,54 @@ impl Client {
         if let Some(cursor_id) = op.cursor_id() {
             attrs.push(KeyValue::new("db.mongodb.cursor_id", cursor_id));
         }
-        Span {
-            inner: Some(
-                TRACER
-                    .span_builder(cmd_attrs.name)
-                    .with_kind(SpanKind::Client)
-                    .with_attributes(attrs)
-                    .start(&*TRACER),
-            ),
-        }
+        let span = TRACER
+            .span_builder(cmd_attrs.name)
+            .with_kind(SpanKind::Client)
+            .with_attributes(attrs)
+            .start(&*TRACER);
+        Context::current_with_span(span)
     }
-}
 
-pub(crate) struct Span {
-    inner: Option<<BoxedTracer as opentelemetry::trace::Tracer>::Span>,
-}
-
-impl Span {
-    pub(crate) fn record_error<T>(&mut self, result: &Result<T>) {
-        if let (Some(inner), Err(error)) = (&mut self.inner, result) {
-            inner.set_attributes([
+    pub(crate) fn record_error<T>(&self, context: &Context, result: &Result<T>) {
+        if !self.options().otel_enabled() {
+            return;
+        }
+        if let Err(error) = result {
+            let span = context.span();
+            span.set_attributes([
                 KeyValue::new("exception.message", error.to_string()),
                 KeyValue::new("exception.type", error.kind.name()),
                 #[cfg(test)]
                 KeyValue::new("exception.stacktrace", error.bt.to_string()),
             ]);
             if let ErrorKind::Command(cmd_err) = &*error.kind {
-                inner.set_attribute(KeyValue::new(
+                span.set_attribute(KeyValue::new(
                     "db.response.status_code",
                     cmd_err.code_name.clone(),
                 ));
             }
-            inner.record_error(error);
-            inner.set_status(opentelemetry::trace::Status::Error {
+            span.record_error(error);
+            span.set_status(opentelemetry::trace::Status::Error {
                 description: error.to_string().into(),
             });
         }
     }
 
-    pub(crate) fn record_command_result<Op: Operation>(&mut self, result: &Result<Op::O>) {
-        if let (Some(inner), Ok(out)) = (&mut self.inner, result) {
+    pub(crate) fn record_command_result<Op: Operation>(
+        &self,
+        context: &Context,
+        result: &Result<Op::O>,
+    ) {
+        if !self.options().otel_enabled() {
+            return;
+        }
+        if let Ok(out) = result {
             if let Some(cursor_id) = Op::output_cursor_id(out) {
-                inner.set_attribute(KeyValue::new("db.mongodb.cursor_id", cursor_id));
+                let span = context.span();
+                span.set_attribute(KeyValue::new("db.mongodb.cursor_id", cursor_id));
             }
         }
-        self.record_error(result);
+        self.record_error(context, result);
     }
 }
 

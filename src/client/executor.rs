@@ -3,6 +3,8 @@ use crate::bson::RawDocumentBuf;
 use crate::bson::{doc, RawBsonRef, RawDocument, Timestamp};
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
+#[cfg(feature = "opentelemetry")]
+use opentelemetry::context::FutureExt;
 use serde::de::DeserializeOwned;
 use std::sync::LazyLock;
 
@@ -106,8 +108,7 @@ impl Client {
         op: &mut T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<ExecutionDetails<T>> {
-        #[cfg(feature = "opentelemetry")]
-        let mut span = self.start_operation_span(op);
+        let ctx = self.start_operation_span(op);
         let result = (async move || {
             // Validate inputs that can be checked before server selection and connection checkout.
             if self.inner.shutdown.executed.load(Ordering::SeqCst) {
@@ -158,12 +159,18 @@ impl Client {
                 }
             }
 
-            Box::pin(async { self.execute_operation_with_retry(op, session).await }).await
+            Box::pin(async {
+                self.execute_operation_with_retry(op, session)
+                    .with_current_context()
+                    .await
+            })
+            .with_current_context()
+            .await
         })()
+        .with_context(ctx.clone())
         .await;
 
-        #[cfg(feature = "opentelemetry")]
-        span.record_error(&result);
+        self.record_error(&ctx, &result);
 
         result
     }
@@ -419,6 +426,7 @@ impl Client {
                     retryability,
                     effective_criteria,
                 )
+                .with_current_context()
                 .await
             {
                 Ok(output) => ExecutionDetails {
@@ -513,12 +521,8 @@ impl Client {
             let mut message = Message::try_from(cmd)?;
             message.request_id = Some(request_id);
 
-            /*
-            db.mongodb.cursor_id: ???
-            */
-
             #[cfg(feature = "opentelemetry")]
-            let mut span = self.start_command_span(op, &connection_info, &message, cmd_attrs);
+            let ctx = self.start_command_span(op, &connection_info, &message, cmd_attrs);
 
             #[cfg(feature = "in-use-encryption")]
             {
@@ -650,8 +654,7 @@ impl Client {
                     }
                 }
             };
-            #[cfg(feature = "opentelemetry")]
-            span.record_command_result::<T>(&result);
+            self.record_command_result::<T>(&ctx, &result);
 
             if result
                 .as_ref()
@@ -1111,3 +1114,13 @@ impl RetryHelper for Option<ExecutionRetry> {
         }
     }
 }
+
+#[cfg(not(feature = "opentelemetry"))]
+trait OtelFutureStub: Sized {
+    fn with_current_context(self) -> Self {
+        self
+    }
+}
+
+#[cfg(not(feature = "opentelemetry"))]
+impl<T: std::future::Future> OtelFutureStub for T {}
