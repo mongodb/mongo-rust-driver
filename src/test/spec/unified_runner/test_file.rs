@@ -8,6 +8,8 @@ use tokio::sync::oneshot;
 
 use super::{results_match, ExpectedEvent, ObserveEvent, Operation};
 
+#[cfg(feature = "bson-3")]
+use crate::bson_compat::RawDocumentBufExt;
 #[cfg(feature = "tracing-unstable")]
 use crate::trace;
 use crate::{
@@ -553,6 +555,7 @@ pub(crate) struct ExpectError {
     #[serde(default, deserialize_with = "serde_util::deserialize_indexed_map")]
     pub(crate) write_errors: Option<HashMap<usize, Bson>>,
     pub(crate) write_concern_errors: Option<Vec<Bson>>,
+    pub(crate) error_response: Option<Document>,
 }
 
 impl ExpectError {
@@ -657,6 +660,12 @@ impl ExpectError {
                     .expect(&context);
                 results_match(Some(&actual), expected, true, None).expect(&context);
             }
+        }
+
+        if let Some(ref expected) = self.error_response {
+            let actual_raw = error.server_response().expect(&context);
+            let actual = actual_raw.to_document().expect(&context);
+            results_match(Some(&actual.into()), &expected.into(), true, None).expect(&context);
         }
     }
 }

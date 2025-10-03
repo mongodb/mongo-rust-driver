@@ -47,7 +47,7 @@ impl OperationWithDefaults for AbortTransaction {
 
     fn handle_response<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: &RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: WriteConcernOnlyBody = response.body()?;

@@ -427,16 +427,18 @@ pub(crate) struct CmapEventEmitter {
 }
 
 impl CmapEventEmitter {
-    // the topology ID is only used when the tracing feature is on.
-    #[allow(unused_variables)]
     pub(crate) fn new(
         user_handler: Option<EventHandler<CmapEvent>>,
-        topology_id: ObjectId,
+        #[cfg(feature = "tracing-unstable")] topology_id: ObjectId,
+        #[cfg(feature = "tracing-unstable")] max_document_length_bytes: Option<usize>,
     ) -> CmapEventEmitter {
         Self {
             user_handler,
             #[cfg(feature = "tracing-unstable")]
-            tracing_emitter: ConnectionTracingEventEmitter::new(topology_id),
+            tracing_emitter: ConnectionTracingEventEmitter::new(
+                topology_id,
+                max_document_length_bytes,
+            ),
         }
     }
 

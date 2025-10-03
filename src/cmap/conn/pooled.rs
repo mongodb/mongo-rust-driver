@@ -30,6 +30,7 @@ use crate::{
         ConnectionReadyEvent,
     },
     runtime::AsyncStream,
+    ServerType,
 };
 
 /// A wrapper around the [`Connection`] type that represents a connection within a connection pool.
@@ -203,6 +204,11 @@ impl PooledConnection {
             _ => return false,
         };
         Instant::now().duration_since(available_time) >= max_idle_time
+    }
+
+    /// Whether this connection is to a mongos.
+    pub(crate) fn is_sharded(&self) -> Result<bool> {
+        Ok(self.stream_description()?.initial_server_type == ServerType::Mongos)
     }
 
     /// Nullifies the internal state of this connection and returns it in a new [PooledConnection]

@@ -1,3 +1,5 @@
+#[cfg(feature = "bson-3")]
+use crate::bson_compat::RawDocumentBufExt;
 use crate::{
     bson::Bson,
     client::options::{ServerAddress, DEFAULT_PORT},
@@ -29,11 +31,27 @@ impl TracingRepresentation for crate::bson::oid::ObjectId {
     }
 }
 
-impl TracingRepresentation for crate::error::Error {
-    type Representation = String;
-
-    fn tracing_representation(&self) -> String {
-        self.to_string()
+impl crate::error::Error {
+    fn tracing_representation(&self, max_document_length: usize) -> String {
+        let mut error_string = format!(
+            "Kind: {}, labels: {:?}, source: {:?}",
+            self.kind,
+            self.labels(),
+            self.source
+        );
+        if let Some(server_response) = self.server_response() {
+            let server_response_string = match server_response.to_document() {
+                Ok(document) => serialize_command_or_reply(document, max_document_length),
+                Err(_) => {
+                    let mut hex_string = hex::encode(server_response.as_bytes());
+                    truncate_on_char_boundary(&mut hex_string, max_document_length);
+                    hex_string
+                }
+            };
+            error_string.push_str(", server response: ");
+            error_string.push_str(&server_response_string);
+        }
+        error_string
     }
 }
 

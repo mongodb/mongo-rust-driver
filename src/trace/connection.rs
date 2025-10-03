@@ -2,17 +2,29 @@ use crate::bson::oid::ObjectId;
 
 use crate::{
     event::cmap::{CmapEvent, ConnectionCheckoutFailedReason, ConnectionClosedReason},
-    trace::{TracingRepresentation, CONNECTION_TRACING_EVENT_TARGET},
+    trace::{
+        TracingRepresentation,
+        CONNECTION_TRACING_EVENT_TARGET,
+        DEFAULT_MAX_DOCUMENT_LENGTH_BYTES,
+    },
 };
 
 #[derive(Clone)]
 pub(crate) struct ConnectionTracingEventEmitter {
     topology_id: ObjectId,
+    max_document_length_bytes: usize,
 }
 
 impl ConnectionTracingEventEmitter {
-    pub(crate) fn new(topology_id: ObjectId) -> ConnectionTracingEventEmitter {
-        Self { topology_id }
+    pub(crate) fn new(
+        topology_id: ObjectId,
+        max_document_length_bytes: Option<usize>,
+    ) -> ConnectionTracingEventEmitter {
+        Self {
+            topology_id,
+            max_document_length_bytes: max_document_length_bytes
+                .unwrap_or(DEFAULT_MAX_DOCUMENT_LENGTH_BYTES),
+        }
     }
 
     pub(crate) fn handle(&self, event: CmapEvent) {
@@ -88,7 +100,7 @@ impl ConnectionTracingEventEmitter {
                     serverPort = event.address.port_tracing_representation(),
                     driverConnectionId = event.connection_id,
                     reason = event.reason.tracing_representation(),
-                    error = event.error.map(|e| e.tracing_representation()),
+                    error = event.error.map(|e| e.tracing_representation(self.max_document_length_bytes)),
                     "Connection closed",
                 );
             }
@@ -108,7 +120,7 @@ impl ConnectionTracingEventEmitter {
                     serverHost = event.address.host().as_ref(),
                     serverPort = event.address.port_tracing_representation(),
                     reason = event.reason.tracing_representation(),
-                    error = event.error.map(|e| e.tracing_representation()),
+                    error = event.error.map(|e| e.tracing_representation(self.max_document_length_bytes)),
                     durationMS = event.duration.as_millis(),
                     "Connection checkout failed",
                 );

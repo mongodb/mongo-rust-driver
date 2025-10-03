@@ -83,7 +83,7 @@ impl OperationWithDefaults for ChangeStreamAggregate {
 
     fn handle_response<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: &RawCommandResponse,
         mut context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let op_time = response

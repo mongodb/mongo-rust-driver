@@ -19,7 +19,7 @@ pub(crate) mod list_collections;
 pub(crate) mod list_databases;
 mod list_indexes;
 #[cfg(feature = "in-use-encryption")]
-mod raw_output;
+pub(crate) mod raw_output;
 pub(crate) mod run_command;
 pub(crate) mod run_cursor_command;
 mod search_index;
@@ -70,8 +70,6 @@ pub(crate) use find_and_modify::FindAndModify;
 pub(crate) use get_more::GetMore;
 pub(crate) use insert::Insert;
 pub(crate) use list_indexes::ListIndexes;
-#[cfg(feature = "in-use-encryption")]
-pub(crate) use raw_output::RawOutput;
 pub(crate) use search_index::{CreateSearchIndexes, DropSearchIndex, UpdateSearchIndex};
 pub(crate) use update::{Update, UpdateOrReplace};
 
@@ -141,7 +139,7 @@ pub(crate) trait Operation {
     /// Interprets the server response to the command.
     fn handle_response<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: &'a RawCommandResponse,
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>>;
 
@@ -205,7 +203,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     /// Interprets the server response to the command.
     fn handle_response<'a>(
         &'a self,
-        _response: RawCommandResponse,
+        _response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         Err(ErrorKind::Internal {
@@ -218,7 +216,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     /// async code is required to handle the response.
     fn handle_response_async<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: &'a RawCommandResponse,
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move { self.handle_response(response, context) }.boxed()
@@ -295,7 +293,7 @@ where
     }
     fn handle_response<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: &'a RawCommandResponse,
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         self.handle_response_async(response, context)

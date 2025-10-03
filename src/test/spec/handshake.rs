@@ -4,21 +4,15 @@ use std::{
 };
 
 use crate::{
-    bson::{doc, oid::ObjectId, Bson, Document},
-    cmap::Command,
-    event::EventHandler,
-    options::ClientOptions,
-    test::{spec::unified_runner::run_unified_tests, topology_is_sharded},
-};
-
-use crate::{
+    bson::{doc, Bson, Document},
     cmap::{
         conn::PendingConnection,
         establish::{ConnectionEstablisher, EstablisherOptions},
+        Command,
     },
-    event::cmap::CmapEventEmitter,
-    options::DriverInfo,
-    test::get_client_options,
+    event::{cmap::CmapEventEmitter, EventHandler},
+    options::{ClientOptions, DriverInfo},
+    test::{get_client_options, spec::unified_runner::run_unified_tests, topology_is_sharded},
     Client,
 };
 
@@ -56,7 +50,10 @@ async fn arbitrary_auth_mechanism() {
         id: 0,
         address: client_options.hosts[0].clone(),
         generation: crate::cmap::PoolGeneration::normal(),
-        event_emitter: CmapEventEmitter::new(None, ObjectId::new()),
+        #[cfg(feature = "tracing-unstable")]
+        event_emitter: CmapEventEmitter::new(None, crate::bson::oid::ObjectId::new(), None),
+        #[cfg(not(feature = "tracing-unstable"))]
+        event_emitter: CmapEventEmitter::new(None),
         time_created: Instant::now(),
         cancellation_receiver: None,
     };

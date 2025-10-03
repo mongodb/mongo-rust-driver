@@ -89,7 +89,7 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
 
     fn handle_response<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         #[derive(Debug, Deserialize)]

@@ -389,7 +389,7 @@ where
 
     fn handle_response_async<'b>(
         &'b self,
-        response: RawCommandResponse,
+        response: &'b RawCommandResponse,
         mut context: ExecutionContext<'b>,
     ) -> BoxFuture<'b, Result<Self::O>> {
         async move {

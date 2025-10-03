@@ -165,8 +165,9 @@ impl Executor {
             ConnectionEstablisher::new(EstablisherOptions::from(get_client_options().await))
                 .unwrap(),
             updater,
-            crate::bson::oid::ObjectId::new(),
             Some(self.pool_options),
+            #[cfg(feature = "tracing-unstable")]
+            crate::bson::oid::ObjectId::new(),
         );
 
         // Mock a monitoring task responding to errors reported by the pool.

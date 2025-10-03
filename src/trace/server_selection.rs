@@ -9,6 +9,7 @@ use crate::{
     error::Error,
     sdam::{SelectedServer, TopologyDescription},
     selection_criteria::SelectionCriteria,
+    trace::DEFAULT_MAX_DOCUMENT_LENGTH_BYTES,
 };
 use std::time::{Duration, Instant};
 
@@ -35,6 +36,7 @@ pub(crate) struct ServerSelectionTracingEventEmitter<'a> {
     operation_name: &'a str,
     start_time: Instant,
     timeout: Duration,
+    max_document_length_bytes: usize,
 }
 
 impl ServerSelectionTracingEventEmitter<'_> {
@@ -44,6 +46,7 @@ impl ServerSelectionTracingEventEmitter<'_> {
         operation_name: &'a str,
         start_time: Instant,
         timeout: Duration,
+        max_document_length_bytes: Option<usize>,
     ) -> ServerSelectionTracingEventEmitter<'a> {
         ServerSelectionTracingEventEmitter::<'a> {
             topology_id,
@@ -51,6 +54,8 @@ impl ServerSelectionTracingEventEmitter<'_> {
             operation_name,
             start_time,
             timeout,
+            max_document_length_bytes: max_document_length_bytes
+                .unwrap_or(DEFAULT_MAX_DOCUMENT_LENGTH_BYTES),
         }
     }
 
@@ -85,7 +90,7 @@ impl ServerSelectionTracingEventEmitter<'_> {
                 operation = self.operation_name,
                 selector = self.criteria.tracing_representation(),
                 topologyDescription = topology_description.tracing_representation(),
-                failure = error.tracing_representation(),
+                failure = error.tracing_representation(self.max_document_length_bytes),
                 "Server selection failed"
             );
         }

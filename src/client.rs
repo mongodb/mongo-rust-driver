@@ -496,6 +496,7 @@ impl Client {
             operation_name,
             start_time,
             timeout,
+            self.options().tracing_max_document_length_bytes,
         );
         #[cfg(feature = "tracing-unstable")]
         event_emitter.emit_started_event(self.inner.topology.latest().description.clone());

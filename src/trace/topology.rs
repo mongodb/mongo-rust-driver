@@ -195,7 +195,7 @@ impl TopologyTracingEventEmitter {
                 driverConnectionId = event.driver_connection_id,
                 serverConnectionId = event.server_connection_id,
                 awaited = event.awaited,
-                failure = event.failure.tracing_representation(),
+                failure = event.failure.tracing_representation(self.max_document_length_bytes),
                 durationMS = event.duration.as_millis(),
                 "Server heartbeat failed"
             )

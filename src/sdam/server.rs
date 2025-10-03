@@ -37,15 +37,16 @@ impl Server {
         options: ClientOptions,
         connection_establisher: ConnectionEstablisher,
         topology_updater: TopologyUpdater,
-        topology_id: crate::bson::oid::ObjectId,
+        #[cfg(feature = "tracing-unstable")] topology_id: crate::bson::oid::ObjectId,
     ) -> Arc<Server> {
         Arc::new(Self {
             pool: ConnectionPool::new(
                 address.clone(),
                 connection_establisher,
                 topology_updater,
-                topology_id,
                 Some(ConnectionPoolOptions::from_client_options(&options)),
+                #[cfg(feature = "tracing-unstable")]
+                topology_id,
             ),
             address,
             operation_count: AtomicU32::new(0),

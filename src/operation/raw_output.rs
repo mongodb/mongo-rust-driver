@@ -31,10 +31,10 @@ impl<Op: Operation> Operation for RawOutput<Op> {
 
     fn handle_response<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
-        async move { Ok(response) }.boxed()
+        async move { Ok(response.clone()) }.boxed()
     }
 
     fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {

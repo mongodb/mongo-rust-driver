@@ -291,7 +291,7 @@ pub(crate) enum Expectation {
         expected_value: Option<Bson>,
         save_as_entity: Option<String>,
     },
-    Error(ExpectError),
+    Error(Box<ExpectError>),
     Ignore,
 }
 
@@ -460,7 +460,7 @@ impl<'de> Deserialize<'de> for Operation {
                     "expectError is mutually exclusive with expectResult and saveResultAsEntity",
                 ));
             }
-            Expectation::Error(err)
+            Expectation::Error(Box::new(err))
         } else {
             Expectation::Result {
                 expected_value: definition.expect_result,

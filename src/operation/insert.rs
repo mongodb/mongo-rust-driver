@@ -130,7 +130,7 @@ impl OperationWithDefaults for Insert<'_> {
 
     fn handle_response<'b>(
         &'b self,
-        response: RawCommandResponse,
+        response: &'b RawCommandResponse,
         _context: ExecutionContext<'b>,
     ) -> Result<Self::O> {
         let response: WriteResponseBody = response.body()?;

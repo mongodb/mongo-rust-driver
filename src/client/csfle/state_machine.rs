@@ -17,7 +17,7 @@ use tokio::{
 use crate::{
     client::{csfle::options::KmsProvidersTlsOptions, options::ServerAddress, WeakClient},
     error::{Error, Result},
-    operation::{run_command::RunCommand, RawOutput},
+    operation::{raw_output::RawOutput, run_command::RunCommand},
     options::ReadConcern,
     runtime::{process::Process, AsyncStream, TlsConfig},
     Client,

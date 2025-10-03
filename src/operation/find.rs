@@ -92,7 +92,7 @@ impl OperationWithDefaults for Find {
 
     fn handle_response<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: &'a RawCommandResponse,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let response: CursorBody = response.body()?;
