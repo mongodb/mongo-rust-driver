@@ -1,10 +1,12 @@
 //! Support for OpenTelemetry.
 
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
+
+use derive_where::derive_where;
 
 use opentelemetry::{
-    global::BoxedTracer,
-    trace::{SpanKind, TraceContextExt, Tracer as _},
+    global::{BoxedTracer, ObjectSafeTracerProvider},
+    trace::{Span, SpanKind, TraceContextExt, Tracer, TracerProvider},
     Context,
     KeyValue,
 };
@@ -19,7 +21,8 @@ use crate::{
 };
 
 /// Configuration for OpenTelemetry.
-#[derive(Debug, Clone, PartialEq, serde::Deserialize, typed_builder::TypedBuilder)]
+#[derive(Clone, serde::Deserialize, typed_builder::TypedBuilder)]
+#[derive_where(Debug, PartialEq)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -31,9 +34,43 @@ pub struct Options {
     /// value of the `OTEL_RUST_INSTRUMENTATION_MONGODB_QUERY_TEXT_MAX_LENGTH` environment
     /// variable.
     pub query_text_max_length: Option<usize>,
+    /// Tracer provider to use.  If unset, will use the global instance.
+    #[serde(skip)]
+    #[derive_where(skip)]
+    #[builder(
+        setter(
+            fn transform<S, T, P>(provider: P) -> Option<Arc<dyn ObjectSafeTracerProvider + Send + Sync>>
+                where
+                    S: Span + Send + Sync + 'static,
+                    T: Tracer<Span = S> + Send + Sync + 'static,
+                    P: TracerProvider<Tracer = T> + Send + Sync + 'static,
+            {
+                Some(Arc::new(provider))
+            },
+        )
+    )]
+    pub tracer_provider: Option<Arc<dyn ObjectSafeTracerProvider + Send + Sync>>,
 }
 
 impl ClientOptions {
+    pub(crate) fn tracer(&self) -> BoxedTracer {
+        let provider: &dyn ObjectSafeTracerProvider = match self
+            .tracing
+            .as_ref()
+            .and_then(|t| t.tracer_provider.as_ref())
+        {
+            Some(provider) => &**provider,
+            None => &opentelemetry::global::tracer_provider(),
+        };
+        BoxedTracer::new(
+            provider.boxed_tracer(
+                opentelemetry::InstrumentationScope::builder("mongodb")
+                    .with_version(env!("CARGO_PKG_VERSION"))
+                    .build(),
+            ),
+        )
+    }
+
     fn otel_enabled(&self) -> bool {
         static ENABLED_ENV: LazyLock<bool> = LazyLock::new(|| {
             match std::env::var("OTEL_RUST_INSTRUMENTATION_MONGODB_ENABLED").as_deref() {
@@ -63,14 +100,6 @@ impl ClientOptions {
     }
 }
 
-static TRACER: LazyLock<BoxedTracer> = LazyLock::new(|| {
-    opentelemetry::global::tracer_with_scope(
-        opentelemetry::InstrumentationScope::builder("mongodb")
-            .with_version(env!("CARGO_PKG_VERSION"))
-            .build(),
-    )
-});
-
 impl Client {
     pub(crate) fn start_operation_span(&self, op: &impl Operation) -> Context {
         if !self.options().otel_enabled() {
@@ -85,11 +114,12 @@ impl Client {
             ),
             KeyValue::new("db.operation.summary", span_name.clone()),
         ]);
-        let span = TRACER
+        let span = self
+            .tracer()
             .span_builder(span_name)
             .with_kind(SpanKind::Client)
             .with_attributes(attrs)
-            .start(&*TRACER);
+            .start(self.tracer());
         Context::current_with_span(span)
     }
 
@@ -142,11 +172,12 @@ impl Client {
         if let Some(cursor_id) = op.cursor_id() {
             attrs.push(KeyValue::new("db.mongodb.cursor_id", cursor_id));
         }
-        let span = TRACER
+        let span = self
+            .tracer()
             .span_builder(cmd_attrs.name)
             .with_kind(SpanKind::Client)
             .with_attributes(attrs)
-            .start(&*TRACER);
+            .start(self.tracer());
         Context::current_with_span(span)
     }
 

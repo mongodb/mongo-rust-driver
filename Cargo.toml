@@ -122,7 +122,7 @@ take_mut = "0.2.2"
 thiserror = "1.0.24"
 tokio-openssl = { version = "0.6.3", optional = true }
 tracing = { version = "0.1.36", optional = true }
-typed-builder = "0.20.0"
+typed-builder = "0.22.0"
 webpki-roots = "1"
 zstd = { version = "0.11.2", optional = true }
 macro_magic = "0.5.1"
