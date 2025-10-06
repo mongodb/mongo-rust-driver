@@ -165,8 +165,8 @@ features = ["serde"]
 
 [dependencies.mongocrypt]
 version = "0.3.1"
-git = "https://github.com/isabelatkinson/libmongocrypt-rust.git"
-branch = "text-indexes"
+git = "https://github.com/mongodb/libmongocrypt-rust.git"
+branch = "main"
 default-features = false
 optional = true
 
