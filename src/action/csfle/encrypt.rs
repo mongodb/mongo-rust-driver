@@ -170,19 +170,19 @@ pub struct RangeOptions {
 #[cfg(feature = "text-indexes-unstable")]
 pub struct TextOptions {
     /// Options for substring queries.
-    substring: Option<SubstringOptions>,
+    pub substring: Option<SubstringOptions>,
 
     /// Options for prefix queries.
-    prefix: Option<PrefixOptions>,
+    pub prefix: Option<PrefixOptions>,
 
     /// Options for suffix queries.
-    suffix: Option<SuffixOptions>,
+    pub suffix: Option<SuffixOptions>,
 
     /// Whether text indexes for this field are case-sensitive.
-    case_sensitive: bool,
+    pub case_sensitive: bool,
 
     /// Whether text indexes for this field are diacritic-sensitive.
-    diacritic_sensitive: bool,
+    pub diacritic_sensitive: bool,
 }
 
 /// Options for substring queries.
@@ -197,15 +197,15 @@ pub struct TextOptions {
 pub struct SubstringOptions {
     /// The maximum allowed string length. Inserting a longer string will result in an error.
     #[serde(rename = "strMaxLength")]
-    max_string_length: i32,
+    pub max_string_length: i32,
 
     /// The minimum allowed query length. Querying with a shorter string will result in an error.
     #[serde(rename = "strMinQueryLength")]
-    min_query_length: i32,
+    pub min_query_length: i32,
 
     /// The maximum allowed query length. Querying with a longer string will result in an error.
     #[serde(rename = "strMaxQueryLength")]
-    max_query_length: i32,
+    pub max_query_length: i32,
 }
 
 /// Options for prefix queries.
@@ -220,11 +220,11 @@ pub struct SubstringOptions {
 pub struct PrefixOptions {
     /// The minimum allowed query length. Querying with a shorter string will result in an error.
     #[serde(rename = "strMinQueryLength")]
-    min_query_length: i32,
+    pub min_query_length: i32,
 
     /// The maximum allowed query length. Querying with a longer string will result in an error.
     #[serde(rename = "strMaxQueryLength")]
-    max_query_length: i32,
+    pub max_query_length: i32,
 }
 
 /// Options for suffix queries.
@@ -239,11 +239,11 @@ pub struct PrefixOptions {
 pub struct SuffixOptions {
     /// The minimum allowed query length. Querying with a shorter string will result in an error.
     #[serde(rename = "strMinQueryLength")]
-    min_query_length: i32,
+    pub min_query_length: i32,
 
     /// The maximum allowed query length. Querying with a longer string will result in an error.
     #[serde(rename = "strMaxQueryLength")]
-    max_query_length: i32,
+    pub max_query_length: i32,
 }
 
 #[option_setters(EncryptOptions, skip = [query_type])]
