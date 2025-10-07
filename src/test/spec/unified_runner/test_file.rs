@@ -471,7 +471,8 @@ pub(crate) struct TestCase {
     #[cfg(feature = "tracing-unstable")]
     pub(crate) expect_log_messages: Option<Vec<ExpectedMessages>>,
     #[cfg(feature = "opentelemetry")]
-    pub(crate) expect_tracing_messages: Option<crate::otel::testing::ExpectedTracingMessages>,
+    #[serde(default)]
+    pub(crate) expect_tracing_messages: Option<Vec<crate::otel::testing::ExpectedTracingMessages>>,
     #[serde(default, deserialize_with = "serde_util::deserialize_nonempty_vec")]
     pub(crate) outcome: Option<Vec<CollectionData>>,
 }

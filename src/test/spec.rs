@@ -12,6 +12,8 @@ mod initial_dns_seedlist_discovery;
 mod load_balancers;
 #[path = "spec/oidc.rs"]
 pub(crate) mod oidc_skip_ci;
+#[cfg(feature = "opentelemetry")]
+mod open_telemetry;
 mod read_write_concern;
 mod retryable_reads;
 mod retryable_writes;
