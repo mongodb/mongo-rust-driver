@@ -20,6 +20,9 @@ use crate::{
     Client,
 };
 
+#[cfg(test)]
+pub(crate) mod testing;
+
 /// Configuration for OpenTelemetry.
 #[derive(Clone, serde::Deserialize, typed_builder::TypedBuilder)]
 #[derive_where(Debug, PartialEq)]

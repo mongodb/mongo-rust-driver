@@ -362,6 +362,13 @@ impl TestRunner {
                 }
             }
 
+            #[cfg(feature = "opentelemetry")]
+            if let Some(expected) = &test_case.expect_tracing_messages {
+                if let Err(e) = self.match_spans(expected).await {
+                    panic!("[{}] {}", test_case.description, e);
+                }
+            }
+
             self.fail_point_guards.write().await.clear();
 
             if let Some(ref outcome) = test_case.outcome {
@@ -527,6 +534,8 @@ impl TestRunner {
                         observe_events,
                         ignore_command_names,
                         observe_sensitive_commands,
+                        #[cfg(feature = "opentelemetry")]
+                        client.observe_tracing_messages.as_ref(),
                     );
 
                     #[cfg(feature = "in-use-encryption")]
