@@ -34,6 +34,7 @@ pub(crate) struct ExpectedTracingMessages {
 struct ExpectedSpan {
     name: String,
     attributes: Document,
+    #[serde(default)]
     nested: Vec<ExpectedSpan>,
 }
 

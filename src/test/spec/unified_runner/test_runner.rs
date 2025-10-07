@@ -68,7 +68,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
 ];
 
 static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
-static MAX_SPEC_VERSION: Version = Version::new(1, 25, 0);
+static MAX_SPEC_VERSION: Version = Version::new(1, 27, 0);
 
 pub(crate) type EntityMap = HashMap<String, Entity>;
 
@@ -364,8 +364,10 @@ impl TestRunner {
 
             #[cfg(feature = "opentelemetry")]
             if let Some(expected) = &test_case.expect_tracing_messages {
-                if let Err(e) = self.match_spans(expected).await {
-                    panic!("[{}] {}", test_case.description, e);
+                for exp in expected {
+                    if let Err(e) = self.match_spans(exp).await {
+                        panic!("[{}] {}", test_case.description, e);
+                    }
                 }
             }
 
