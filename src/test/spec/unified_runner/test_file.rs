@@ -574,7 +574,12 @@ impl ExpectError {
             let Some(message) = error.message() else {
                 panic!("{context}expected error to have message");
             };
-            assert!(message.contains(error_contains), "{context}");
+            assert!(
+                message
+                    .to_lowercase()
+                    .contains(&error_contains.to_lowercase()),
+                "{context}"
+            );
         }
 
         if let Some(error_code) = self.error_code {
