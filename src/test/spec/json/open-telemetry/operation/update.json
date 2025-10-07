@@ -1,0 +1,108 @@
+{
+  "description": "operation update",
+  "schemaVersion": "1.27",
+  "createEntities": [
+    {
+      "client": {
+        "id": "client0",
+        "useMultipleMongoses": false,
+        "observeTracingMessages": {
+          "enableCommandPayload": true
+        }
+      }
+    },
+    {
+      "database": {
+        "id": "database0",
+        "client": "client0",
+        "databaseName": "operation-update"
+      }
+    },
+    {
+      "collection": {
+        "id": "collection0",
+        "database": "database0",
+        "collectionName": "test"
+      }
+    }
+  ],
+  "tests": [
+    {
+      "description": "update one element",
+      "operations": [
+        {
+          "object": "collection0",
+          "name": "updateOne",
+          "arguments": {
+            "filter": {
+              "_id": 1
+            },
+            "update": {
+              "$inc": {
+                "x": 1
+              }
+            }
+          }
+        }
+      ],
+      "expectTracingMessages": [
+        {
+          "client": "client0",
+          "ignoreExtraSpans": false,
+          "spans": [
+            {
+              "name": "update operation-update.test",
+              "attributes": {
+                "db.system": "mongodb",
+                "db.namespace": "operation-update",
+                "db.collection.name": "test",
+                "db.operation.name": "update",
+                "db.operation.summary": "update operation-update.test"
+              },
+              "nested": [
+                {
+                  "name": "update",
+                  "attributes": {
+                    "db.system": "mongodb",
+                    "db.namespace": "operation-update",
+                    "server.address": {
+                      "$$type": "string"
+                    },
+                    "server.port": {
+                      "$$type": [
+                        "long",
+                        "string"
+                      ]
+                    },
+                    "db.query.summary": "update operation-update.test",
+                    "db.query.text": {
+                      "$$matchAsDocument": {
+                        "$$matchAsRoot": {
+                          "update": "test",
+                          "ordered": true,
+                          "txnNumber": 1,
+                          "updates": [
+                            {
+                              "q": {
+                                "_id": 1
+                              },
+                              "u": {
+                                "$inc": {
+                                  "x": 1
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
