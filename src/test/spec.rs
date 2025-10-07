@@ -22,7 +22,6 @@ mod sessions;
 mod trace;
 mod transactions;
 pub(crate) mod unified_runner;
-pub(crate) mod v2_runner;
 mod versioned_api;
 mod write_error;
 
@@ -38,8 +37,7 @@ use serde::{de::DeserializeOwned, Deserialize};
 
 pub(crate) use self::{
     oidc_skip_ci as oidc,
-    unified_runner::{merge_uri_options, ExpectedEventType, Topology},
-    v2_runner::{operation::Operation, test_file::RunOn},
+    unified_runner::{ExpectedEventType, Topology},
 };
 use crate::bson::Bson;
 
