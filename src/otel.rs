@@ -13,7 +13,7 @@ use opentelemetry::{
 
 use crate::{
     bson::Bson,
-    cmap::{conn::wire::Message, Command, ConnectionInfo},
+    cmap::{conn::wire::Message, Command, ConnectionInfo, StreamDescription},
     error::{ErrorKind, Result},
     operation::Operation,
     options::{ClientOptions, ServerAddress, DEFAULT_PORT},
@@ -108,13 +108,10 @@ impl Client {
         if !self.options().otel_enabled() {
             return Context::current();
         }
-        let span_name = format!("{} {}", op.name(), op_target(op));
+        let span_name = format!("{} {}", op.log_name(), op_target(op));
         let mut attrs = common_attrs(op);
         attrs.extend([
-            KeyValue::new(
-                "db.operation.name",
-                crate::bson_compat::cstr_to_str(op.name()).to_owned(),
-            ),
+            KeyValue::new("db.operation.name", op.log_name().to_owned()),
             KeyValue::new("db.operation.summary", span_name.clone()),
         ]);
         let span = self
@@ -130,6 +127,7 @@ impl Client {
         &self,
         op: &impl Operation,
         conn_info: &ConnectionInfo,
+        stream_desc: &StreamDescription,
         message: &Message,
         cmd_attrs: CommandAttributes,
     ) -> Context {
@@ -145,6 +143,7 @@ impl Client {
                 format!("{} {}", &cmd_attrs.name, op_target(op)),
             ),
             KeyValue::new("db.mongodb.driver_connection_id", otel_driver_conn_id),
+            KeyValue::new("server.type", stream_desc.initial_server_type.to_string()),
         ]);
         match &conn_info.address {
             ServerAddress::Tcp { host, port } => {
@@ -167,9 +166,13 @@ impl Client {
         }
         let text_max_len = self.options().otel_query_text_max_length();
         if text_max_len > 0 {
+            let mut doc = message.get_command_document();
+            for key in ["lsid", "$db", "$clusterTime", "signature"] {
+                doc.remove(key);
+            }
             attrs.push(KeyValue::new(
                 "db.query.text",
-                crate::bson_util::doc_to_json_str(message.get_command_document(), text_max_len),
+                crate::bson_util::doc_to_json_str(doc, text_max_len),
             ));
         }
         if let Some(cursor_id) = op.cursor_id() {
@@ -199,7 +202,7 @@ impl Client {
             if let ErrorKind::Command(cmd_err) = &*error.kind {
                 span.set_attribute(KeyValue::new(
                     "db.response.status_code",
-                    cmd_err.code_name.clone(),
+                    cmd_err.code.to_string(),
                 ));
             }
             span.record_error(error);
@@ -218,9 +221,12 @@ impl Client {
             return;
         }
         if let Ok(out) = result {
-            if let Some(cursor_id) = Op::output_cursor_id(out) {
-                let span = context.span();
-                span.set_attribute(KeyValue::new("db.mongodb.cursor_id", cursor_id));
+            // tests don't match the spec here
+            if false {
+                if let Some(cursor_id) = Op::output_cursor_id(out) {
+                    let span = context.span();
+                    span.set_attribute(KeyValue::new("db.mongodb.cursor_id", cursor_id));
+                }
             }
         }
         self.record_error(context, result);

@@ -61,6 +61,10 @@ impl OperationWithDefaults for DropCollection {
             .and_then(|opts| opts.write_concern.as_ref())
     }
 
+    fn log_name(&self) -> &str {
+        "dropCollection"
+    }
+
     fn target(&self) -> super::OperationTarget<'_> {
         (&self.ns).into()
     }

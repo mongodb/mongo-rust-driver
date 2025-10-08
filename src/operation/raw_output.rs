@@ -81,6 +81,10 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.name()
     }
 
+    fn log_name(&self) -> &str {
+        self.0.log_name()
+    }
+
     fn target(&self) -> super::OperationTarget<'_> {
         self.0.target()
     }

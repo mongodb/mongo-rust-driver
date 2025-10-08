@@ -524,7 +524,13 @@ impl Client {
             message.request_id = Some(request_id);
 
             #[cfg(feature = "opentelemetry")]
-            let ctx = self.start_command_span(op, &connection_info, &message, cmd_attrs);
+            let ctx = self.start_command_span(
+                op,
+                &connection_info,
+                connection.stream_description()?,
+                &message,
+                cmd_attrs,
+            );
 
             #[cfg(feature = "in-use-encryption")]
             {
