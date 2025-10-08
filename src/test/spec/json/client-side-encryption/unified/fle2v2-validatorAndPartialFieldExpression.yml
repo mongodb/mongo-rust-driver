@@ -65,7 +65,7 @@ tests:
           validator:
             unencrypted_string: "foo"
       - name: assertCollectionExists
-        object: "coll"
+        object: testRunner
         arguments:
           databaseName: &database_name "default"
           collectionName: "encryptedCollection"
@@ -147,7 +147,7 @@ tests:
                 partialFilterExpression:
                   unencrypted_string: "foo"
       - name: assertIndexExists
-        object: "coll"
+        object: testRunner
         arguments:
           databaseName: *database_name
           collectionName: "encryptedCollection"

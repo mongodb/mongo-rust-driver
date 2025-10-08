@@ -324,7 +324,7 @@ tests:
           databaseName: *database_name
           collectionName: *encrypted_collection_name
       - name: assertIndexNotExists
-        object: "db"
+        object: testRunner
         arguments:
           databaseName: *database_name
           collectionName: *encrypted_collection_name
