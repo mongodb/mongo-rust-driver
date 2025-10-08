@@ -177,6 +177,10 @@ pub(crate) trait Operation {
     /// The name of the server side command associated with this operation.
     fn name(&self) -> &CStr;
 
+    /// The name to use for telemetry purposes.
+    #[allow(dead_code)]
+    fn log_name(&self) -> &str;
+
     #[allow(dead_code)]
     fn target(&self) -> OperationTarget<'_>;
 
@@ -318,6 +322,11 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         Self::NAME
     }
 
+    /// The name to use for telemetry purposes.
+    fn log_name(&self) -> &str {
+        crate::bson_compat::cstr_to_str(self.name())
+    }
+
     fn target(&self) -> OperationTarget<'_>;
 
     fn cursor_id(&self) -> Option<i64> {
@@ -380,6 +389,9 @@ where
     }
     fn name(&self) -> &CStr {
         self.name()
+    }
+    fn log_name(&self) -> &str {
+        self.log_name()
     }
     fn target(&self) -> OperationTarget<'_> {
         self.target()

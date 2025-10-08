@@ -194,3 +194,30 @@ impl TestOperation for DropIndex {
         .boxed()
     }
 }
+
+#[derive(Debug, Deserialize)]
+pub(super) struct DropIndexes {
+    session: Option<String>,
+    #[serde(flatten)]
+    options: Option<DropIndexOptions>,
+}
+
+impl TestOperation for DropIndexes {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let collection = test_runner.get_collection(id).await;
+            with_opt_session!(
+                test_runner,
+                &self.session,
+                collection.drop_indexes().with_options(self.options.clone())
+            )
+            .await?;
+            Ok(None)
+        }
+        .boxed()
+    }
+}

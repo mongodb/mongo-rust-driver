@@ -102,30 +102,48 @@ fn match_span_slice(
     ignore_extra: bool,
     entities: &EntityMap,
 ) -> Result<(), String> {
+    let err_suffix = || format!("actual:\n{:#?}\nexpected:\n{:#?}", actual, expected);
     if ignore_extra {
         if actual.len() < expected.len() {
             return Err(format!(
-                "expected at least {} spans, got {}\nactual:\n{:#?}\nexpected:\n{:#?}",
+                "expected at least {} spans, got {}\n{}",
                 expected.len(),
                 actual.len(),
-                actual,
-                expected,
+                err_suffix(),
             ));
+        }
+        let mut actual = actual;
+        let mut expected = expected;
+        while let Some((exp_span, rest)) = expected.split_first() {
+            expected = rest;
+            let act_span = loop {
+                let Some((span, rest)) = actual.split_first() else {
+                    return Err(format!(
+                        "no span found with name {:?}\n{}",
+                        exp_span.name,
+                        err_suffix(),
+                    ));
+                };
+                actual = rest;
+                if span.name == exp_span.name {
+                    break span;
+                }
+            };
+            match_span(act_span, actual_nested, exp_span, ignore_extra, &entities)?;
         }
     } else {
         if actual.len() != expected.len() {
             return Err(format!(
-                "expected exactly {} spans, got {}\nactual:\n{:#?}\nexpected:\n{:#?}",
+                "expected exactly {} spans, got {}\n{}",
                 expected.len(),
                 actual.len(),
-                actual,
-                expected,
+                err_suffix(),
             ));
         }
-    }
 
-    for (act_span, exp_span) in actual.iter().zip(expected) {
-        match_span(act_span, actual_nested, exp_span, ignore_extra, &entities)?;
+        for (act_span, exp_span) in actual.iter().zip(expected) {
+            match_span(act_span, actual_nested, exp_span, ignore_extra, &entities)?;
+        }
     }
 
     Ok(())
@@ -152,7 +170,9 @@ fn match_span(
         actual_attrs.insert(kv.key.as_str(), value_to_bson(&kv.value)?);
     }
     for (k, expected_v) in &expected.attributes {
-        results_match(actual_attrs.get(k), expected_v, false, Some(entities))?;
+        if let Err(e) = results_match(actual_attrs.get(k), expected_v, false, Some(entities)) {
+            return Err(format!("span attribute {}: {}\n{}", k, e, err_suffix()));
+        }
     }
 
     let actual_children = actual_nested

@@ -92,6 +92,10 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.name()
     }
 
+    fn log_name(&self) -> &str {
+        self.run_command.log_name()
+    }
+
     fn target(&self) -> super::OperationTarget<'_> {
         self.run_command.target()
     }

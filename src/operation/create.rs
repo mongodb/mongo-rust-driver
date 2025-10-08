@@ -53,6 +53,10 @@ impl OperationWithDefaults for Create {
             .and_then(|opts| opts.write_concern.as_ref())
     }
 
+    fn log_name(&self) -> &str {
+        "createCollection"
+    }
+
     fn target(&self) -> super::OperationTarget<'_> {
         (&self.ns).into()
     }

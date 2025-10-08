@@ -52,6 +52,7 @@ use index::{
     AssertIndexNotExists,
     CreateIndex,
     DropIndex,
+    DropIndexes,
     ListIndexNames,
     ListIndexes,
 };
@@ -437,6 +438,7 @@ impl<'de> Deserialize<'de> for Operation {
             #[cfg(feature = "in-use-encryption")]
             "decrypt" => deserialize_op::<Decrypt>(definition.arguments),
             "dropIndex" => deserialize_op::<DropIndex>(definition.arguments),
+            "dropIndexes" => deserialize_op::<DropIndexes>(definition.arguments),
             s => Ok(Box::new(UnimplementedOperation {
                 _name: s.to_string(),
             }) as Box<dyn TestOperation>),
