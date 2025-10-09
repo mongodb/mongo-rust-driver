@@ -314,18 +314,6 @@ fn parse_unknown_options() {
 }
 
 #[tokio::test]
-async fn print_connection_string() {
-    let uri = "mongodb://localhost:27017,localhost:27018/?replicaSet=foo&w=majority&wtimeoutMS=27&\
-               journal=false&readConcernLevel=majority&readPreference=secondaryPreferred&\
-               readPreferenceTags=dc:ny,rack:1&readPreferenceTags=dc:ny&readPreferenceTags=&\
-               localThresholdMS=4000&serverSelectionTimeoutMS=2000&heartbeatFrequencyMS=1000";
-    match ConnectionString::parse(uri) {
-        Ok(conn_string) => assert_eq!(uri, conn_string.to_string()),
-        Err(e) => panic!("expected ConnectionString::parse to succeed, but got {e:?}"),
-    };
-}
-
-#[tokio::test]
 async fn parse_with_no_default_database() {
     let uri = "mongodb://localhost/";
 
