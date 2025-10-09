@@ -19,7 +19,7 @@ use crate::{bson::RawDocumentBuf, bson_compat::cstr, options::ClientOptions};
 use derive_where::derive_where;
 use hmac::{digest::KeyInit, Mac};
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 use self::scram::ScramVersion;
@@ -44,7 +44,7 @@ const MONGODB_OIDC_STR: &str = "MONGODB-OIDC";
 /// The authentication mechanisms supported by MongoDB.
 ///
 /// Note: not all of these mechanisms are currently supported by the driver.
-#[derive(Clone, Deserialize, PartialEq, Debug)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Debug)]
 #[non_exhaustive]
 pub enum AuthMechanism {
     /// MongoDB Challenge Response nonce and MD5 based authentication system. It is currently
@@ -439,7 +439,7 @@ impl From<&ClientOptions> for AuthOptions {
 ///
 /// Some fields (mechanism and source) may be omitted and will either be negotiated or assigned a
 /// default value, depending on the values of other fields in the credential.
-#[derive(Clone, Default, Deserialize, TypedBuilder)]
+#[derive(Clone, Default, Deserialize, Serialize, TypedBuilder)]
 #[derive_where(PartialEq)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
@@ -558,8 +558,7 @@ impl Credential {
         mechanism.authenticate_stream(conn, self, opts).await
     }
 
-    #[cfg(test)]
-    pub(crate) fn serialize_for_client_options<S>(
+    pub(crate) fn serialize<S>(
         credential: &Option<Credential>,
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error>

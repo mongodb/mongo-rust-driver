@@ -7,7 +7,7 @@ mod resolver_config;
 
 use std::{
     cmp::Ordering,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     convert::TryFrom,
     fmt::{self, Display, Formatter, Write},
     hash::{Hash, Hasher},
@@ -20,7 +20,7 @@ use std::{
 use crate::bson::UuidRepresentation;
 use derive_where::derive_where;
 use macro_magic::export_tokens;
-use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
+use serde::{de::Unexpected, Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use std::sync::LazyLock;
 use strsim::jaro_winkler;
@@ -688,7 +688,7 @@ impl Serialize for ClientOptions {
             #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             connecttimeoutms: &'a Option<Duration>,
 
-            #[serde(flatten, serialize_with = "Credential::serialize_for_client_options")]
+            #[serde(flatten, serialize_with = "Credential::serialize")]
             credential: &'a Option<Credential>,
 
             directconnection: &'a Option<bool>,
@@ -708,7 +708,7 @@ impl Serialize for ClientOptions {
 
             maxconnecting: &'a Option<u32>,
 
-            #[serde(flatten, serialize_with = "ReadConcern::serialize_for_client_options")]
+            #[serde(flatten, serialize_with = "ReadConcern::serialize")]
             readconcern: &'a Option<ReadConcern>,
 
             replicaset: &'a Option<String>,
@@ -731,10 +731,10 @@ impl Serialize for ClientOptions {
             #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             sockettimeoutms: &'a Option<Duration>,
 
-            #[serde(flatten, serialize_with = "Tls::serialize_for_client_options")]
+            #[serde(flatten, serialize_with = "Tls::serialize")]
             tls: &'a Option<Tls>,
 
-            #[serde(flatten, serialize_with = "WriteConcern::serialize_for_client_options")]
+            #[serde(flatten, serialize_with = "WriteConcern::serialize")]
             writeconcern: &'a Option<WriteConcern>,
 
             zlibcompressionlevel: &'a Option<i32>,
@@ -784,10 +784,36 @@ impl Serialize for ClientOptions {
     }
 }
 
+// Copy of UuidRepresentation for serialization
+#[non_exhaustive]
+#[derive(Serialize)]
+#[serde(remote = "UuidRepresentation")]
+enum UuidRepresentationForSerialize {
+    Standard,
+    CSharpLegacy,
+    JavaLegacy,
+    PythonLegacy,
+}
+
+fn serialize_uuid_rep_option<S>(
+    value: &Option<UuidRepresentation>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match value {
+        Some(rep) => UuidRepresentationForSerialize::serialize(rep, serializer),
+        None => serializer.serialize_none(),
+    }
+}
+
 /// Contains the options that can be set via a MongoDB connection string.
 ///
 /// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[skip_serializing_none]
 #[non_exhaustive]
 pub struct ConnectionString {
     /// The initial list of seeds that the Client should connect to, or a DNS name used for SRV
@@ -806,11 +832,13 @@ pub struct ConnectionString {
     /// The TLS configuration for the Client to use in its connections with the server.
     ///
     /// By default, TLS is disabled.
+    #[serde(flatten, serialize_with = "Tls::serialize")]
     pub tls: Option<Tls>,
 
     /// The amount of time each monitoring thread should wait between performing server checks.
     ///
     /// The default value is 10 seconds.
+    #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
     pub heartbeat_frequency: Option<Duration>,
 
     /// When running a read operation with a ReadPreference that allows selecting secondaries,
@@ -824,10 +852,12 @@ pub struct ConnectionString {
     /// lowest average round trip time is eligible.
     ///
     /// The default value is 15 ms.
+    #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
     pub local_threshold: Option<Duration>,
 
     /// Specifies the default read concern for operations performed on the Client. See the
     /// ReadConcern type documentation for more details.
+    #[serde(flatten, serialize_with = "ReadConcern::serialize")]
     pub read_concern: Option<ReadConcern>,
 
     /// The name of the replica set that the Client should connect to.
@@ -835,12 +865,14 @@ pub struct ConnectionString {
 
     /// Specifies the default write concern for operations performed on the Client. See the
     /// WriteConcern type documentation for more details.
+    #[serde(flatten, serialize_with = "WriteConcern::serialize")]
     pub write_concern: Option<WriteConcern>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
     /// timing outs
     ///
     /// The default value is 30 seconds.
+    #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
     pub server_selection_timeout: Option<Duration>,
 
     /// The maximum amount of connections that the Client should allow to be created in a
@@ -867,6 +899,7 @@ pub struct ConnectionString {
     /// closed. A value of zero indicates that connections should not be closed due to being idle.
     ///
     /// By default, connections will not be closed due to being idle.
+    #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
     pub max_idle_time: Option<Duration>,
 
     #[cfg(any(
@@ -884,6 +917,7 @@ pub struct ConnectionString {
     /// server.
     ///
     /// The default value is 10 seconds.
+    #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
     pub connect_timeout: Option<Duration>,
 
     /// Whether or not the client should retry a read operation if the operation fails.
@@ -908,6 +942,7 @@ pub struct ConnectionString {
     pub direct_connection: Option<bool>,
 
     /// The credential to use for authenticating connections made by this client.
+    #[serde(flatten, serialize_with = "Credential::serialize")]
     pub credential: Option<Credential>,
 
     /// Default database for this client.
@@ -920,6 +955,7 @@ pub struct ConnectionString {
 
     /// Amount of time spent attempting to send or receive on a socket before timing out; note that
     /// this only applies to application operations, not server discovery and monitoring.
+    #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
     pub socket_timeout: Option<Duration>,
 
     /// Default read preference for the client.
@@ -929,6 +965,7 @@ pub struct ConnectionString {
     /// the [`UuidOld`](crate::bson::spec::BinarySubtype::UuidOld) subtype. This is not used by
     /// the driver; client code can use this when deserializing relevant values with
     /// [`Binary::to_uuid_with_representation`](crate::bson::binary::Binary::to_uuid_with_representation).
+    #[serde(serialize_with = "serialize_uuid_rep_option")]
     pub uuid_representation: Option<UuidRepresentation>,
 
     /// Limit on the number of mongos connections that may be created for sharded topologies.
@@ -937,10 +974,12 @@ pub struct ConnectionString {
     /// Overrides the default "mongodb" service name for SRV lookup in both discovery and polling
     pub srv_service_name: Option<String>,
 
+    #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
     wait_queue_timeout: Option<Duration>,
     tls_insecure: Option<bool>,
 
     #[cfg(test)]
+    #[serde(skip_serializing)]
     original_uri: String,
 }
 
@@ -956,7 +995,7 @@ struct ConnectionStringParts {
 }
 
 /// Specification for mongodb server connections.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 #[non_exhaustive]
 pub enum HostInfo {
     /// A set of addresses.
@@ -999,7 +1038,7 @@ enum ResolvedHostInfo {
 
 /// Specifies whether TLS configuration should be used with the operations that the
 /// [`Client`](../struct.Client.html) performs.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Tls {
     /// Enable TLS with the specified options.
     Enabled(TlsOptions),
@@ -1021,8 +1060,7 @@ impl From<TlsOptions> for Option<Tls> {
 }
 
 impl Tls {
-    #[cfg(test)]
-    pub(crate) fn serialize_for_client_options<S>(
+    pub(crate) fn serialize<S>(
         tls: &Option<Tls>,
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error>
@@ -1030,16 +1068,14 @@ impl Tls {
         S: serde::Serializer,
     {
         match tls {
-            Some(Tls::Enabled(tls_options)) => {
-                TlsOptions::serialize_for_client_options(tls_options, serializer)
-            }
+            Some(Tls::Enabled(tls_options)) => TlsOptions::serialize(tls_options, serializer),
             _ => serializer.serialize_none(),
         }
     }
 }
 
 /// Specifies the TLS configuration that the [`Client`](../struct.Client.html) should use.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct TlsOptions {
@@ -1074,8 +1110,7 @@ pub struct TlsOptions {
 }
 
 impl TlsOptions {
-    #[cfg(test)]
-    pub(crate) fn serialize_for_client_options<S>(
+    pub(crate) fn serialize<S>(
         tls_options: &TlsOptions,
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error>
@@ -1400,6 +1435,10 @@ fn percent_decode(s: &str, err_message: &str) -> Result<String> {
     }
 }
 
+fn percent_encode(s: &str) -> String {
+    percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
+}
+
 fn validate_and_parse_userinfo(s: &str, userinfo_type: &str) -> Result<String> {
     if s.chars().any(|c| USERINFO_RESERVED_CHARACTERS.contains(&c)) {
         return Err(Error::invalid_argument(format!(
@@ -1671,6 +1710,316 @@ impl ConnectionString {
         }
 
         Ok(conn_str)
+    }
+
+    /// Un-parses a [`ConnectionString`] struct back into a MongoDB connection string.
+    fn to_uri_str(&self) -> String {
+        let mut res: String = String::new();
+        let mut opts = String::new();
+
+        if self.is_srv() {
+            res.push_str("mongodb+srv://");
+        } else {
+            res.push_str("mongodb://");
+        }
+
+        if let Some(credential) = &self.credential {
+            if let Some(username) = &credential.username {
+                res.push_str(&percent_encode(username));
+                if let Some(password) = &credential.password {
+                    res.push_str(&format!(":{}", &percent_encode(password)))
+                }
+                res.push('@');
+            }
+        }
+
+        if self.is_srv() {
+            if let HostInfo::DnsRecord(dns) = &self.host_info {
+                res.push_str(dns);
+            }
+        } else if let HostInfo::HostIdentifiers(hosts) = &self.host_info {
+            res.push_str(
+                &hosts
+                    .iter()
+                    .map(|h| h.to_string())
+                    .collect::<Vec<_>>()
+                    .join(","),
+            );
+        }
+
+        res.push('/');
+
+        if let Some(authdb) = &self.default_database {
+            res.push_str(authdb);
+        }
+
+        if let Some(replica_set) = &self.replica_set {
+            opts.push_str(&format!("&replicaSet={replica_set}"));
+        }
+
+        if let Some(direct_connection) = self.direct_connection {
+            opts.push_str(&format!("&directConnection={direct_connection}"));
+        }
+
+        if let Some(tls) = &self.tls {
+            match tls {
+                Tls::Enabled(options) => {
+                    opts.push_str("&tls=true");
+
+                    if let Some(cert_key_file_path) = &options.cert_key_file_path {
+                        opts.push_str(&format!(
+                            "&tlsCertificateKeyFile={}",
+                            cert_key_file_path.to_str().unwrap()
+                        ));
+                    }
+
+                    #[cfg(feature = "cert-key-password")]
+                    if let Some(tls_certificate_key_file_password) =
+                        &options.tls_certificate_key_file_password
+                    {
+                        opts.push_str(&format!(
+                            "&tlsCertificateKeyFilePassword={}",
+                            std::str::from_utf8(tls_certificate_key_file_password).unwrap()
+                        ));
+                    }
+
+                    if let Some(ca_file_path) = &options.ca_file_path {
+                        opts.push_str(&format!("&tlsCAFile={}", ca_file_path.to_str().unwrap()));
+                    }
+
+                    if let Some(allow_invalid_certificates) = options.allow_invalid_certificates {
+                        opts.push_str(&format!(
+                            "&tlsAllowInvalidCertificates={allow_invalid_certificates}"
+                        ));
+                    }
+
+                    #[cfg(feature = "openssl-tls")]
+                    if let Some(allow_invalid_hostnames) = options.allow_invalid_hostnames {
+                        opts.push_str(&format!(
+                            "&tlsAllowInvalidHostnames={allow_invalid_hostnames}"
+                        ));
+                    }
+
+                    if let Some(tls_insecure) = self.tls_insecure {
+                        opts.push_str(&format!("&tlsInsecure={tls_insecure}"));
+                    }
+                }
+                Tls::Disabled => {
+                    opts.push_str("&tls=false");
+                }
+            }
+        }
+
+        if let Some(connect_timeout) = &self.connect_timeout {
+            opts.push_str(&format!(
+                "&connectTimeoutMS={}",
+                connect_timeout.as_millis()
+            ));
+        }
+
+        if let Some(socket_timeout) = &self.socket_timeout {
+            opts.push_str(&format!("&socketTimeoutMS={}", socket_timeout.as_millis()));
+        }
+
+        #[cfg(any(
+            feature = "zstd-compression",
+            feature = "zlib-compression",
+            feature = "snappy-compression"
+        ))]
+        if let Some(compressors) = &self.compressors {
+            opts.push_str(&format!(
+                "&compressors={}",
+                compressors
+                    .iter()
+                    .map(|c| c.name())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ));
+        }
+
+        #[cfg(feature = "zlib-compression")]
+        if let Some(compressors) = &self.compressors {
+            for compressor in compressors {
+                if let Compressor::Zlib { level: Some(level) } = compressor {
+                    opts.push_str(&format!("&zlibCompressionLevel={level}"));
+                }
+            }
+        }
+
+        if let Some(max_pool_size) = &self.max_pool_size {
+            opts.push_str(&format!("&maxPoolSize={max_pool_size}"));
+        }
+
+        if let Some(min_pool_size) = &self.min_pool_size {
+            opts.push_str(&format!("&minPoolSize={min_pool_size}"));
+        }
+
+        if let Some(max_connecting) = &self.max_connecting {
+            opts.push_str(&format!("&maxConnecting={max_connecting}"));
+        }
+
+        if let Some(max_idle_time) = &self.max_idle_time {
+            opts.push_str(&format!("&maxIdleTimeMS={}", max_idle_time.as_millis()));
+        }
+
+        if let Some(wait_queue_timeout) = &self.wait_queue_timeout {
+            opts.push_str(&format!(
+                "&waitQueueTimeoutMS={}",
+                wait_queue_timeout.as_millis()
+            ));
+        }
+
+        if let Some(write_concern) = &self.write_concern {
+            if let Some(w) = &write_concern.w {
+                match w {
+                    Acknowledgment::Nodes(i) => {
+                        opts.push_str(&format!("&w={i}"));
+                    }
+                    Acknowledgment::Majority => {
+                        opts.push_str("&w=majority");
+                    }
+                    Acknowledgment::Custom(tag) => {
+                        opts.push_str(&format!("&w={tag}"));
+                    }
+                }
+            }
+
+            if let Some(w_timeout) = write_concern.w_timeout {
+                opts.push_str(&format!("&wtimeoutMS={}", w_timeout.as_millis()));
+            }
+
+            if let Some(journal) = write_concern.journal {
+                opts.push_str(&format!("&journal={journal}"));
+            }
+        }
+
+        if let Some(read_concern) = &self.read_concern {
+            opts.push_str(&format!(
+                "&readConcernLevel={}",
+                read_concern.level.as_str()
+            ));
+        }
+
+        if let Some(read_preference) = &self.read_preference {
+            opts.push_str(&format!("&readPreference={}", read_preference.mode()));
+
+            if let Some(max_staleness) = read_preference.max_staleness() {
+                opts.push_str(&format!("&maxStalenessSeconds={}", max_staleness.as_secs()));
+            }
+
+            if let Some(tag_sets) = read_preference.tag_sets() {
+                let ser_tag_set = |tag_set: &HashMap<String, String>| -> String {
+                    let tags = tag_set
+                        .iter()
+                        .map(|(k, v)| format!("{k}:{v}"))
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    format!("&readPreferenceTags={tags}")
+                };
+                opts.push_str(
+                    &tag_sets
+                        .iter()
+                        .map(ser_tag_set)
+                        .collect::<Vec<_>>()
+                        .join(""),
+                )
+            }
+        }
+
+        if let Some(auth_source) = self
+            .credential
+            .as_ref()
+            .and_then(|c: &Credential| c.source.as_ref())
+        {
+            opts.push_str(&format!("&authSource={auth_source}"));
+        }
+
+        if let Some(auth_mechanism) = self
+            .credential
+            .as_ref()
+            .and_then(|c: &Credential| c.mechanism.as_ref())
+        {
+            opts.push_str(&format!(
+                "&authMechanism={}",
+                auth_mechanism.as_str().to_uppercase()
+            ));
+        }
+
+        if let Some(auth_mechanism_properties) = self
+            .credential
+            .as_ref()
+            .and_then(|c: &Credential| c.mechanism_properties.as_ref())
+        {
+            if !auth_mechanism_properties.is_empty() {
+                opts.push_str(&format!(
+                    "&authMechanismProperties={}",
+                    &auth_mechanism_properties
+                        .iter()
+                        .map(|(k, v)| format!("{k}:{v}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ))
+            }
+        }
+
+        if let Some(local_threshold) = &self.local_threshold {
+            opts.push_str(&format!(
+                "&localThresholdMS={}",
+                local_threshold.as_millis()
+            ));
+        }
+
+        if let Some(server_selection_timeout) = &self.server_selection_timeout {
+            opts.push_str(&format!(
+                "&serverSelectionTimeoutMS={}",
+                server_selection_timeout.as_millis()
+            ));
+        }
+
+        if let Some(heartbeat_frequency) = &self.heartbeat_frequency {
+            opts.push_str(&format!(
+                "&heartbeatFrequencyMS={}",
+                heartbeat_frequency.as_millis()
+            ));
+        }
+
+        if let Some(app_name) = &self.app_name {
+            opts.push_str(&format!("&appName={app_name}"));
+        }
+
+        if let Some(retry_reads) = self.retry_reads {
+            opts.push_str(&format!("&retryReads={retry_reads}"));
+        }
+
+        if let Some(retry_writes) = self.retry_writes {
+            opts.push_str(&format!("&retryWrites={retry_writes}"));
+        }
+
+        if let Some(uuid_rep) = &self.uuid_representation {
+            let s = match uuid_rep {
+                UuidRepresentation::Standard => "standard",
+                UuidRepresentation::CSharpLegacy => "csharpLegacy",
+                UuidRepresentation::JavaLegacy => "javaLegacy",
+                UuidRepresentation::PythonLegacy => "pythonLegacy",
+                _ => "",
+            };
+            opts.push_str(&format!("&uuidRepresentation={s}"));
+        }
+
+        if let Some(load_balanced) = self.load_balanced {
+            opts.push_str(&format!("&loadBalanced={load_balanced}"));
+        }
+
+        if let Some(srv_max_hosts) = &self.srv_max_hosts {
+            opts.push_str(&format!("&srvMaxHosts={srv_max_hosts}"));
+        }
+
+        if !opts.is_empty() {
+            opts.replace_range(0..1, "?"); // mark start of options
+            res.push_str(&opts);
+        }
+
+        res
     }
 
     /// Amount of time spent attempting to check out a connection from a server's connection pool
@@ -2277,6 +2626,12 @@ impl<'de> Deserialize<'de> for ConnectionString {
         D: Deserializer<'de>,
     {
         deserializer.deserialize_str(ConnectionStringVisitor)
+    }
+}
+
+impl Display for ConnectionString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_uri_str())
     }
 }
 

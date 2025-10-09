@@ -85,8 +85,7 @@ impl ReadConcern {
         ReadConcernLevel::from_str(level.as_ref()).into()
     }
 
-    #[cfg(test)]
-    pub(crate) fn serialize_for_client_options<S>(
+    pub(crate) fn serialize<S>(
         read_concern: &Option<ReadConcern>,
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error>
@@ -342,8 +341,7 @@ impl WriteConcern {
         Ok(())
     }
 
-    #[cfg(test)]
-    pub(crate) fn serialize_for_client_options<S>(
+    pub(crate) fn serialize<S>(
         write_concern: &Option<WriteConcern>,
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error>
