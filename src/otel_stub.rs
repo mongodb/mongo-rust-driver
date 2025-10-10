@@ -1,9 +1,13 @@
-use crate::{operation::Operation, Client};
+use crate::{operation::Operation, Client, ClientSession};
 
 type Context = ();
 
 impl Client {
-    pub(crate) fn start_operation_span(&self, _op: &impl Operation) -> Context {
+    pub(crate) fn start_operation_span(
+        &self,
+        _op: &impl Operation,
+        _session: Option<&ClientSession>,
+    ) -> Context {
         ()
     }
 }
