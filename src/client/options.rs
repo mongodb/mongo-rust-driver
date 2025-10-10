@@ -1282,54 +1282,6 @@ impl ClientOptions {
         Ok(())
     }
 
-    /// Applies the options in other to these options if a value is not already present
-    #[cfg(test)]
-    pub(crate) fn merge(&mut self, other: ClientOptions) {
-        if self.hosts.is_empty() {
-            self.hosts = other.hosts;
-        }
-
-        #[cfg(any(
-            feature = "zstd-compression",
-            feature = "zlib-compression",
-            feature = "snappy-compression"
-        ))]
-        merge_options!(other, self, [compressors]);
-
-        merge_options!(
-            other,
-            self,
-            [
-                app_name,
-                cmap_event_handler,
-                command_event_handler,
-                connect_timeout,
-                credential,
-                direct_connection,
-                driver_info,
-                heartbeat_freq,
-                load_balanced,
-                local_threshold,
-                max_idle_time,
-                max_pool_size,
-                min_pool_size,
-                read_concern,
-                repl_set_name,
-                retry_reads,
-                retry_writes,
-                selection_criteria,
-                server_api,
-                server_selection_timeout,
-                socket_timeout,
-                test_options,
-                tls,
-                write_concern,
-                original_srv_info,
-                original_uri
-            ]
-        );
-    }
-
     #[cfg(test)]
     pub(crate) fn test_options_mut(&mut self) -> &mut TestOptions {
         self.test_options.get_or_insert_with(Default::default)

@@ -84,10 +84,10 @@ pub struct CreateCollectionOptions {
     /// determine the contents of the view.
     pub pipeline: Option<Vec<Document>>,
 
-    /// The default collation for the collection or view.   
+    /// The default collation for the collection or view.
     pub collation: Option<Collation>,
 
-    /// The write concern for the operation.   
+    /// The write concern for the operation.
     #[serde(skip_serializing_if = "write_concern_is_empty")]
     pub write_concern: Option<WriteConcern>,
 
@@ -155,6 +155,7 @@ pub enum ValidationAction {
 
 /// Specifies options for a clustered collection.  Some fields have required values; the `Default`
 /// impl uses those values.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -169,7 +170,6 @@ pub struct ClusteredIndex {
     pub name: Option<String>,
 
     /// Optional; currently must be `2` if provided.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub v: Option<i32>,
 }
 

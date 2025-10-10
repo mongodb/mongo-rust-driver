@@ -141,67 +141,6 @@ impl KmsProviders {
     pub(crate) fn credentials(&self) -> &HashMap<KmsProvider, Document> {
         &self.credentials
     }
-
-    #[cfg(test)]
-    pub(crate) fn set_test_options(&mut self) {
-        use mongocrypt::ctx::KmsProviderType;
-
-        use crate::{
-            bson::doc,
-            test::csfle::{ALL_KMS_PROVIDERS, AWS_KMS},
-        };
-
-        let all_kms_providers = ALL_KMS_PROVIDERS.clone();
-        for (provider, test_credentials, tls_options) in all_kms_providers {
-            if self.credentials.contains_key(&provider)
-                && !matches!(provider.provider_type(), KmsProviderType::Local)
-            {
-                self.set(provider, test_credentials, tls_options);
-            }
-        }
-
-        let aws_temp_provider = KmsProvider::other("awsTemporary".to_string());
-        if self.credentials.contains_key(&aws_temp_provider) {
-            let aws_credentials = doc! {
-                "accessKeyId": std::env::var("CSFLE_AWS_TEMP_ACCESS_KEY_ID").unwrap(),
-                "secretAccessKey": std::env::var("CSFLE_AWS_TEMP_SECRET_ACCESS_KEY").unwrap(),
-                "sessionToken": std::env::var("CSFLE_AWS_TEMP_SESSION_TOKEN").unwrap()
-            };
-            self.set(KmsProvider::aws(), aws_credentials, AWS_KMS.clone().2);
-            self.clear(&aws_temp_provider);
-        }
-
-        let aws_temp_no_session_token_provider = KmsProvider::other("awsTemporaryNoSessionToken");
-        if self
-            .credentials
-            .contains_key(&aws_temp_no_session_token_provider)
-        {
-            let aws_credentials = doc! {
-                "accessKeyId": std::env::var("CSFLE_AWS_TEMP_ACCESS_KEY_ID").unwrap(),
-                "secretAccessKey": std::env::var("CSFLE_AWS_TEMP_SECRET_ACCESS_KEY").unwrap(),
-            };
-            self.set(KmsProvider::aws(), aws_credentials, AWS_KMS.clone().2);
-            self.clear(&aws_temp_no_session_token_provider);
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn set(&mut self, provider: KmsProvider, creds: Document, tls: Option<TlsOptions>) {
-        self.credentials.insert(provider.clone(), creds);
-        if let Some(tls) = tls {
-            self.tls_options
-                .get_or_insert_with(KmsProvidersTlsOptions::new)
-                .insert(provider, tls);
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn clear(&mut self, provider: &KmsProvider) {
-        self.credentials.remove(provider);
-        if let Some(tls_opts) = &mut self.tls_options {
-            tls_opts.remove(provider);
-        }
-    }
 }
 
 impl AutoEncryptionOptions {

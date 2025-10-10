@@ -33,7 +33,7 @@ pub(crate) mod util;
 #[cfg(feature = "in-use-encryption")]
 pub(crate) use self::csfle_skip_local as csfle;
 pub(crate) use self::{
-    spec::{run_spec_test, RunOn, Serverless, Topology},
+    spec::{run_spec_test, Serverless, Topology},
     util::{
         assert_matches,
         eq_matches,
@@ -205,7 +205,7 @@ pub(crate) async fn get_max_message_size_bytes() -> usize {
         .unwrap()
 }
 
-async fn get_topology() -> &'static Topology {
+pub(crate) async fn get_topology() -> &'static Topology {
     static TOPOLOGY: OnceCell<Topology> = OnceCell::const_new();
     TOPOLOGY
         .get_or_init(|| async {

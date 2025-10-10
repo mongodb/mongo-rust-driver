@@ -32,7 +32,7 @@ pub(crate) use self::trace::{
 };
 pub(crate) use self::{
     event::{Event, EventClient},
-    matchable::{assert_matches, eq_matches, is_expected_type, MatchErrExt, Matchable},
+    matchable::{assert_matches, eq_matches, MatchErrExt, Matchable},
 };
 
 #[derive(Clone, Debug)]
@@ -79,16 +79,6 @@ impl TestClientBuilder {
     /// When running against a sharded topology, only use the first configured host.
     pub(crate) fn use_single_mongos(mut self) -> Self {
         self.use_single_mongos = true;
-        self
-    }
-
-    #[cfg(feature = "in-use-encryption")]
-    pub(crate) fn encrypted_options(
-        mut self,
-        encrypted: crate::client::csfle::options::AutoEncryptionOptions,
-    ) -> Self {
-        assert!(self.encrypted.is_none());
-        self.encrypted = Some(encrypted);
         self
     }
 
@@ -244,13 +234,6 @@ impl TestClient {
             hello_response_doc,
         )?)
     }
-}
-
-pub(crate) fn get_default_name(description: &str) -> String {
-    let mut db_name = description.replace('$', "%").replace([' ', '.'], "_");
-    // database names must have fewer than 38 characters
-    db_name.truncate(37);
-    db_name
 }
 
 #[test]

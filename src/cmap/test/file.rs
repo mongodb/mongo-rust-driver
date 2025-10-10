@@ -8,25 +8,80 @@ use crate::{
     error::Result,
     event::cmap::CmapEvent,
     serde_util,
-    test::{util::fail_point::FailPoint, RunOn},
+    test::{
+        get_topology,
+        log_uncaptured,
+        server_version_matches,
+        util::fail_point::FailPoint,
+        Serverless,
+        Topology,
+    },
 };
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct TestFile {
+pub(super) struct TestFile {
     #[serde(rename = "version")]
     _version: u8, // can ignore this field as there's only one version
     #[serde(rename = "style")]
     _style: TestStyle, // we use the presence of fail_point / run_on to determine this
-    pub description: String,
-    pub(crate) pool_options: Option<ConnectionPoolOptions>,
-    pub operations: Vec<ThreadedOperation>,
-    pub error: Option<Error>,
-    pub(crate) events: Vec<CmapEvent>,
+    pub(super) description: String,
+    pub(super) pool_options: Option<ConnectionPoolOptions>,
+    pub(super) operations: Vec<ThreadedOperation>,
+    pub(super) error: Option<Error>,
+    pub(super) events: Vec<CmapEvent>,
     #[serde(default)]
-    pub ignore: Vec<String>,
-    pub fail_point: Option<FailPoint>,
-    pub(crate) run_on: Option<Vec<RunOn>>,
+    pub(super) ignore: Vec<String>,
+    pub(super) fail_point: Option<FailPoint>,
+    pub(super) run_on: Option<Vec<RunOn>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct RunOn {
+    pub(super) min_server_version: Option<String>,
+    pub(super) max_server_version: Option<String>,
+    pub(super) topology: Option<Vec<Topology>>,
+    pub(super) serverless: Option<Serverless>,
+}
+
+impl RunOn {
+    pub(super) async fn can_run_on(&self) -> bool {
+        if let Some(ref min_version) = self.min_server_version {
+            if !server_version_matches(&format!(">= {min_version}")).await {
+                log_uncaptured(format!(
+                    "runOn mismatch: required server version >= {min_version}",
+                ));
+                return false;
+            }
+        }
+        if let Some(ref max_version) = self.max_server_version {
+            if !server_version_matches(&format!("<= {max_version}")).await {
+                log_uncaptured(format!(
+                    "runOn mismatch: required server version <= {max_version}",
+                ));
+                return false;
+            }
+        }
+        if let Some(ref topology) = self.topology {
+            let actual_topology = get_topology().await;
+            if !topology.contains(actual_topology) {
+                log_uncaptured(format!(
+                    "runOn mismatch: required topology in {topology:?}, got {actual_topology:?}"
+                ));
+                return false;
+            }
+        }
+        if let Some(ref serverless) = self.serverless {
+            if !serverless.can_run() {
+                log_uncaptured(format!(
+                    "runOn mismatch: required serverless {serverless:?}"
+                ));
+                return false;
+            }
+        }
+        true
+    }
 }
 
 #[derive(Debug, Deserialize)]
