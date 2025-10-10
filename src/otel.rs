@@ -18,6 +18,7 @@ use crate::{
     operation::Operation,
     options::{ClientOptions, ServerAddress, DEFAULT_PORT},
     Client,
+    ClientSession,
 };
 
 #[cfg(test)]
@@ -104,7 +105,11 @@ impl ClientOptions {
 }
 
 impl Client {
-    pub(crate) fn start_operation_span(&self, op: &impl Operation) -> Context {
+    pub(crate) fn start_operation_span(
+        &self,
+        op: &impl Operation,
+        session: Option<&ClientSession>,
+    ) -> Context {
         if !self.options().otel_enabled() {
             return Context::current();
         }
@@ -114,13 +119,16 @@ impl Client {
             KeyValue::new("db.operation.name", op.log_name().to_owned()),
             KeyValue::new("db.operation.summary", span_name.clone()),
         ]);
-        let span = self
+        let builder = self
             .tracer()
             .span_builder(span_name)
             .with_kind(SpanKind::Client)
-            .with_attributes(attrs)
-            .start(self.tracer());
-        Context::current_with_span(span)
+            .with_attributes(attrs);
+        if let Some(txn_ctx) = session.and_then(|s| s.transaction.otel_ctx.as_ref()) {
+            txn_ctx.with_span(builder.start_with_context(self.tracer(), txn_ctx))
+        } else {
+            Context::current_with_span(builder.start(self.tracer()))
+        }
     }
 
     pub(crate) fn start_command_span(
@@ -183,6 +191,19 @@ impl Client {
             .span_builder(cmd_attrs.name)
             .with_kind(SpanKind::Client)
             .with_attributes(attrs)
+            .start(self.tracer());
+        Context::current_with_span(span)
+    }
+
+    pub(crate) fn start_transaction_span(&self) -> Context {
+        if !self.options().otel_enabled() {
+            return Context::current();
+        }
+        let span = self
+            .tracer()
+            .span_builder("transaction")
+            .with_kind(SpanKind::Client)
+            .with_attributes([KeyValue::new("db.system", "mongodb")])
             .start(self.tracer());
         Context::current_with_span(span)
     }

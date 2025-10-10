@@ -110,9 +110,11 @@ impl Client {
         op: &mut T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<ExecutionDetails<T>> {
-        let ctx = self.start_operation_span(op);
+        let mut session = session.into();
+        let ctx = self.start_operation_span(op, session.as_deref());
         let result = (async move || {
-            // Validate inputs that can be checked before server selection and connection checkout.
+            // Validate inputs that can be checked before server selection and connection
+            // checkout.
             if self.inner.shutdown.executed.load(Ordering::SeqCst) {
                 return Err(ErrorKind::Shutdown.into());
             }
@@ -127,7 +129,6 @@ impl Client {
                 write_concern.validate()?;
             }
 
-            let mut session = session.into();
             // Validate the session and update its transaction status if needed.
             if let Some(ref mut session) = session {
                 if !TrackingArc::ptr_eq(&self.inner, &session.client().inner) {
