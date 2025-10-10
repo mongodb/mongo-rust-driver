@@ -1,7 +1,7 @@
 use crate::test::spec::unified_runner::run_unified_tests;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn run_unified() {
+async fn run_unified_operation() {
     // TODO:
     //  server.type
     //  output db.mongodb.cursor_id
@@ -12,4 +12,9 @@ async fn run_unified() {
             "insert one element", // expects `txnNumber: 1` in `db.query.text`
         ])
         .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn run_unified_transaction() {
+    run_unified_tests(&["open-telemetry", "transaction"]).await;
 }

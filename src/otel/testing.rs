@@ -83,111 +83,107 @@ impl TestRunner {
         let (root_spans, nested_spans) = (root_spans, nested_spans);
 
         let entities = self.entities.read().await;
-        match_span_slice(
-            &root_spans,
-            &nested_spans,
-            &expected.spans,
-            expected.ignore_extra_spans.unwrap_or(false),
-            &entities,
-        )?;
+        Matcher {
+            nested: &nested_spans,
+            entities: &entities,
+            ignore_extra: expected.ignore_extra_spans.unwrap_or(false),
+        }
+        .match_span_slice(&root_spans, &expected.spans)?;
 
         Ok(())
     }
 }
 
-fn match_span_slice(
-    actual: &[SpanData],
-    actual_nested: &HashMap<SpanId, Vec<SpanData>>,
-    expected: &[ExpectedSpan],
+struct Matcher<'a> {
+    nested: &'a HashMap<SpanId, Vec<SpanData>>,
+    entities: &'a EntityMap,
     ignore_extra: bool,
-    entities: &EntityMap,
-) -> Result<(), String> {
-    let err_suffix = || format!("actual:\n{:#?}\nexpected:\n{:#?}", actual, expected);
-    if ignore_extra {
-        if actual.len() < expected.len() {
-            return Err(format!(
-                "expected at least {} spans, got {}\n{}",
-                expected.len(),
-                actual.len(),
-                err_suffix(),
-            ));
-        }
-        let mut actual = actual;
-        let mut expected = expected;
-        while let Some((exp_span, rest)) = expected.split_first() {
-            expected = rest;
-            let act_span = loop {
-                let Some((span, rest)) = actual.split_first() else {
-                    return Err(format!(
-                        "no span found with name {:?}\n{}",
-                        exp_span.name,
-                        err_suffix(),
-                    ));
-                };
-                actual = rest;
-                if span.name == exp_span.name {
-                    break span;
-                }
-            };
-            match_span(act_span, actual_nested, exp_span, ignore_extra, &entities)?;
-        }
-    } else {
-        if actual.len() != expected.len() {
-            return Err(format!(
-                "expected exactly {} spans, got {}\n{}",
-                expected.len(),
-                actual.len(),
-                err_suffix(),
-            ));
-        }
-
-        for (act_span, exp_span) in actual.iter().zip(expected) {
-            match_span(act_span, actual_nested, exp_span, ignore_extra, &entities)?;
-        }
-    }
-
-    Ok(())
 }
 
-fn match_span(
-    actual: &SpanData,
-    actual_nested: &HashMap<SpanId, Vec<SpanData>>,
-    expected: &ExpectedSpan,
-    ignore_extra: bool,
-    entities: &EntityMap,
-) -> Result<(), String> {
-    let err_suffix = || format!("actual:\n{:#?}\nexpected:\n{:#?}", actual, expected);
-    if expected.name != actual.name {
-        return Err(format!(
-            "expected name {:?}, got {:?}\n{}",
-            expected.name,
-            actual.name,
-            err_suffix(),
-        ));
-    }
-    let mut actual_attrs = doc! {};
-    for kv in &actual.attributes {
-        actual_attrs.insert(kv.key.as_str(), value_to_bson(&kv.value)?);
-    }
-    for (k, expected_v) in &expected.attributes {
-        if let Err(e) = results_match(actual_attrs.get(k), expected_v, false, Some(entities)) {
-            return Err(format!("span attribute {}: {}\n{}", k, e, err_suffix()));
+impl<'a> Matcher<'a> {
+    fn match_span_slice(
+        &self,
+        actual: &[SpanData],
+        expected: &[ExpectedSpan],
+    ) -> Result<(), String> {
+        let err_suffix = || format!("actual:\n{:#?}\n\nexpected:\n{:#?}", actual, expected);
+        if self.ignore_extra {
+            if actual.len() < expected.len() {
+                return Err(format!(
+                    "expected at least {} spans, got {}\n{}",
+                    expected.len(),
+                    actual.len(),
+                    err_suffix(),
+                ));
+            }
+            let mut actual = actual;
+            let mut expected = expected;
+            while let Some((exp_span, rest)) = expected.split_first() {
+                expected = rest;
+                let act_span = loop {
+                    let Some((span, rest)) = actual.split_first() else {
+                        return Err(format!(
+                            "no span found with name {:?}\n{}",
+                            exp_span.name,
+                            err_suffix(),
+                        ));
+                    };
+                    actual = rest;
+                    if span.name == exp_span.name {
+                        break span;
+                    }
+                };
+                self.match_span(act_span, exp_span)?;
+            }
+        } else {
+            if actual.len() != expected.len() {
+                return Err(format!(
+                    "expected exactly {} spans, got {}\n{}",
+                    expected.len(),
+                    actual.len(),
+                    err_suffix(),
+                ));
+            }
+
+            for (act_span, exp_span) in actual.iter().zip(expected) {
+                self.match_span(act_span, exp_span)?;
+            }
         }
+
+        Ok(())
     }
 
-    let actual_children = actual_nested
-        .get(&actual.span_context.span_id())
-        .map(|v| v.as_slice())
-        .unwrap_or(&[]);
-    match_span_slice(
-        actual_children,
-        actual_nested,
-        &expected.nested,
-        ignore_extra,
-        entities,
-    )?;
+    fn match_span(&self, actual: &SpanData, expected: &ExpectedSpan) -> Result<(), String> {
+        let err_suffix = || format!("actual:\n{:#?}\nexpected:\n{:#?}", actual, expected);
+        if expected.name != actual.name {
+            return Err(format!(
+                "expected name {:?}, got {:?}\n{}",
+                expected.name,
+                actual.name,
+                err_suffix(),
+            ));
+        }
+        let mut actual_attrs = doc! {};
+        for kv in &actual.attributes {
+            actual_attrs.insert(kv.key.as_str(), value_to_bson(&kv.value)?);
+        }
+        for (k, expected_v) in &expected.attributes {
+            if let Err(e) =
+                results_match(actual_attrs.get(k), expected_v, false, Some(self.entities))
+            {
+                return Err(format!("span attribute {}: {}\n{}", k, e, err_suffix()));
+            }
+        }
 
-    Ok(())
+        let actual_nested = self
+            .nested
+            .get(&actual.span_context.span_id())
+            .map(|v| v.as_slice())
+            .unwrap_or(&[]);
+        self.match_span_slice(actual_nested, &expected.nested)?;
+
+        Ok(())
+    }
 }
 
 fn value_to_bson(val: &opentelemetry::Value) -> Result<Bson, String> {
