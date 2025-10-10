@@ -1,10 +1,11 @@
+use serde::Serialize;
 use std::str::FromStr;
 
 use crate::error::{Error, ErrorKind, Result};
 
 /// The compressors that may be used to compress messages sent to and decompress messages returned
 /// from the server. Note that each variant requires enabling a corresponding feature flag.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[non_exhaustive]
 pub enum Compressor {
     /// `zstd` compression. See [the `zstd` manual](http://facebook.github.io/zstd/zstd_manual.html)
