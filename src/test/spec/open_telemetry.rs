@@ -5,6 +5,7 @@ async fn run_unified_operation() {
     // TODO:
     //  server.type
     //  output db.mongodb.cursor_id
+    //  test parsing for db.mongodb.lsid
     run_unified_tests(&["open-telemetry", "operation"])
         .skip_tests(&[
             "List collections",   // expects `cursor: {}` in `db.query.text`
