@@ -439,7 +439,7 @@ impl From<&ClientOptions> for AuthOptions {
 ///
 /// Some fields (mechanism and source) may be omitted and will either be negotiated or assigned a
 /// default value, depending on the values of other fields in the credential.
-#[derive(Clone, Default, Deserialize, Serialize, TypedBuilder)]
+#[derive(Clone, Default, Deserialize, TypedBuilder)]
 #[derive_where(PartialEq)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]

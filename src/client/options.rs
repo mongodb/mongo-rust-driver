@@ -784,17 +784,7 @@ impl Serialize for ClientOptions {
     }
 }
 
-// Copy of UuidRepresentation for serialization
-#[non_exhaustive]
-#[derive(Serialize)]
-#[serde(remote = "UuidRepresentation")]
-enum UuidRepresentationForSerialize {
-    Standard,
-    CSharpLegacy,
-    JavaLegacy,
-    PythonLegacy,
-}
-
+// For ConnectionString serialization
 fn serialize_uuid_rep_option<S>(
     value: &Option<UuidRepresentation>,
     serializer: S,
@@ -802,6 +792,15 @@ fn serialize_uuid_rep_option<S>(
 where
     S: Serializer,
 {
+    #[non_exhaustive]
+    #[derive(Serialize)]
+    #[serde(remote = "UuidRepresentation")]
+    enum UuidRepresentationForSerialize {
+        Standard,
+        CSharpLegacy,
+        JavaLegacy,
+        PythonLegacy,
+    }
     match value {
         Some(rep) => UuidRepresentationForSerialize::serialize(rep, serializer),
         None => serializer.serialize_none(),
@@ -811,9 +810,9 @@ where
 /// Contains the options that can be set via a MongoDB connection string.
 ///
 /// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
+#[skip_serializing_none]
 #[derive(Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[skip_serializing_none]
 #[non_exhaustive]
 pub struct ConnectionString {
     /// The initial list of seeds that the Client should connect to, or a DNS name used for SRV
@@ -832,7 +831,7 @@ pub struct ConnectionString {
     /// The TLS configuration for the Client to use in its connections with the server.
     ///
     /// By default, TLS is disabled.
-    #[serde(flatten, serialize_with = "Tls::serialize")]
+    #[serde(serialize_with = "Tls::serialize")]
     pub tls: Option<Tls>,
 
     /// The amount of time each monitoring thread should wait between performing server checks.
@@ -857,7 +856,7 @@ pub struct ConnectionString {
 
     /// Specifies the default read concern for operations performed on the Client. See the
     /// ReadConcern type documentation for more details.
-    #[serde(flatten, serialize_with = "ReadConcern::serialize")]
+    #[serde(serialize_with = "ReadConcern::serialize")]
     pub read_concern: Option<ReadConcern>,
 
     /// The name of the replica set that the Client should connect to.
@@ -865,7 +864,7 @@ pub struct ConnectionString {
 
     /// Specifies the default write concern for operations performed on the Client. See the
     /// WriteConcern type documentation for more details.
-    #[serde(flatten, serialize_with = "WriteConcern::serialize")]
+    #[serde(serialize_with = "WriteConcern::serialize")]
     pub write_concern: Option<WriteConcern>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
@@ -942,7 +941,7 @@ pub struct ConnectionString {
     pub direct_connection: Option<bool>,
 
     /// The credential to use for authenticating connections made by this client.
-    #[serde(flatten, serialize_with = "Credential::serialize")]
+    #[serde(serialize_with = "Credential::serialize")]
     pub credential: Option<Credential>,
 
     /// Default database for this client.
@@ -1038,7 +1037,7 @@ enum ResolvedHostInfo {
 
 /// Specifies whether TLS configuration should be used with the operations that the
 /// [`Client`](../struct.Client.html) performs.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub enum Tls {
     /// Enable TLS with the specified options.
     Enabled(TlsOptions),
@@ -1075,7 +1074,7 @@ impl Tls {
 }
 
 /// Specifies the TLS configuration that the [`Client`](../struct.Client.html) should use.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct TlsOptions {
