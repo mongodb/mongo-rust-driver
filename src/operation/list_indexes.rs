@@ -69,4 +69,12 @@ impl OperationWithDefaults for ListIndexes {
     fn retryability(&self) -> Retryability {
         Retryability::Read
     }
+
+    fn output_cursor_id(output: &Self::O) -> Option<i64> {
+        Some(output.id())
+    }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }

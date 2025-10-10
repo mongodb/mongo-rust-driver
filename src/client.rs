@@ -143,6 +143,8 @@ struct ClientInner {
     end_sessions_token: std::sync::Mutex<AsyncDropToken>,
     #[cfg(feature = "in-use-encryption")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
+    #[cfg(feature = "opentelemetry")]
+    tracer: opentelemetry::global::BoxedTracer,
     #[cfg(test)]
     disable_command_events: AtomicBool,
 }
@@ -181,6 +183,9 @@ impl Client {
             tx: Some(cleanup_tx),
         });
 
+        #[cfg(feature = "opentelemetry")]
+        let tracer = options.tracer();
+
         let inner = TrackingArc::new(ClientInner {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
@@ -193,6 +198,8 @@ impl Client {
             end_sessions_token,
             #[cfg(feature = "in-use-encryption")]
             csfle: Default::default(),
+            #[cfg(feature = "opentelemetry")]
+            tracer,
             #[cfg(test)]
             disable_command_events: AtomicBool::new(false),
         });
@@ -667,6 +674,11 @@ impl Client {
                 .selection_criteria(selection_criteria.clone())
                 .await;
         }
+    }
+
+    #[cfg(feature = "opentelemetry")]
+    pub(crate) fn tracer(&self) -> &opentelemetry::global::BoxedTracer {
+        &self.inner.tracer
     }
 }
 

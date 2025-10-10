@@ -232,6 +232,8 @@ pub(crate) struct Client {
     pub(crate) observe_log_messages: Option<HashMap<String, tracing::Level>>,
     #[cfg(feature = "in-use-encryption")]
     pub(crate) auto_encrypt_opts: Option<AutoEncryptionOpts>,
+    #[cfg(feature = "opentelemetry")]
+    pub(crate) observe_tracing_messages: Option<crate::otel::testing::ObserveTracingMessages>,
 }
 
 impl Client {
@@ -468,6 +470,9 @@ pub(crate) struct TestCase {
     pub(crate) expect_events: Option<Vec<ExpectedEvents>>,
     #[cfg(feature = "tracing-unstable")]
     pub(crate) expect_log_messages: Option<Vec<ExpectedMessages>>,
+    #[cfg(feature = "opentelemetry")]
+    #[serde(default)]
+    pub(crate) expect_tracing_messages: Option<Vec<crate::otel::testing::ExpectedTracingMessages>>,
     #[serde(default, deserialize_with = "serde_util::deserialize_nonempty_vec")]
     pub(crate) outcome: Option<Vec<CollectionData>>,
 }

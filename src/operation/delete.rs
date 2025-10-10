@@ -99,4 +99,8 @@ impl OperationWithDefaults for Delete {
             Retryability::None
         }
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }

@@ -89,6 +89,10 @@ impl OperationWithDefaults for Distinct {
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
         true
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }
 
 #[derive(Debug, Deserialize)]

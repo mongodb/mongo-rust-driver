@@ -57,6 +57,10 @@ impl OperationWithDefaults for ListDatabases {
     fn retryability(&self) -> Retryability {
         Retryability::Read
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        super::OperationTarget::ADMIN
+    }
 }
 
 #[derive(Debug, Deserialize)]

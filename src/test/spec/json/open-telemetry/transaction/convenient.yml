@@ -1,0 +1,132 @@
+description: convenient transactions
+
+schemaVersion: "1.27"
+
+runOnRequirements:
+  - minServerVersion: "4.4"
+    topologies: ["replicaset", "sharded"]
+
+createEntities:
+  - client:
+      id: &client client
+      useMultipleMongoses: false
+      observeTracingMessages:
+        enableCommandPayload: true
+  - database:
+      id: &database database
+      client: *client
+      databaseName: &databaseName convenient-transaction-tests
+  - collection:
+      id: &collection collection
+      database: *database
+      collectionName: &collectionName test
+  - session:
+      id: &session session
+      client: *client
+
+initialData:
+  - collectionName: *collectionName
+    databaseName: *databaseName
+    documents: []
+
+tests:
+  - description: "withTransaction"
+    operations:
+      - name: withTransaction
+        object: *session
+        arguments:
+          callback:
+            - name: insertOne
+              object: *collection
+              arguments:
+                document:
+                  _id: 1
+                session: *session
+      - name: find
+        object: *collection
+        arguments: { filter: { x: 1 } }
+
+    expectTracingMessages:
+      - client: *client
+        ignoreExtraSpans: false
+        spans:
+          - name: transaction
+            attributes:
+              db.system: mongodb
+            nested:
+              - name: insert convenient-transaction-tests.test
+                attributes:
+                  db.system: mongodb
+                  db.namespace: *databaseName
+                  db.collection.name: *collectionName
+                  db.operation.name: insert
+                  db.operation.summary: insert convenient-transaction-tests.test
+                nested:
+                  - name: insert
+                    attributes:
+                      db.system: mongodb
+                      db.namespace: *databaseName
+                      db.collection.name: *collectionName
+                      server.address: { $$type: string }
+                      server.port: { $$type: [ 'long', 'string' ] }
+                      server.type: { $$type: string }
+                      db.query.summary: insert convenient-transaction-tests.test
+                      db.mongodb.lsid: { $$sessionLsid: *session }
+                      db.mongodb.txn_number: 1
+                      db.query.text:
+                        $$matchAsDocument:
+                          $$matchAsRoot:
+                            insert: test
+                            ordered: true
+                            txnNumber: 1
+                            startTransaction: true
+                            autocommit: false
+                            documents:
+                              - _id: 1
+              - name: commitTransaction admin
+                attributes:
+                  db.system: mongodb
+                  db.namespace: admin
+                  db.collection.name: { $$exists: false }
+                  db.operation.name: commitTransaction
+                nested:
+                  - name: commitTransaction
+                    attributes:
+                      db.system: mongodb
+                      db.namespace: admin
+                      db.collection.name: { $$exists: false }
+                      db.query.summary: commitTransaction admin
+                      db.command.name: commitTransaction
+                      db.mongodb.lsid: { $$sessionLsid: *session }
+                      db.mongodb.txn_number: 1
+                      db.query.text:
+                        $$matchAsDocument:
+                          $$matchAsRoot:
+                            commitTransaction: 1
+                            txnNumber: 1
+                            autocommit: false
+
+          - name: find convenient-transaction-tests.test
+            attributes:
+              db.system: mongodb
+              db.namespace: *databaseName
+              db.collection.name: *collectionName
+              db.operation.summary: find convenient-transaction-tests.test
+              db.operation.name: find
+            nested:
+              - name: find
+                attributes:
+                  db.system: mongodb
+                  db.namespace: *databaseName
+                  db.collection.name: *collectionName
+                  db.command.name: find
+                  server.address: { $$type: string }
+                  server.port: { $$type: [ 'long', 'string' ] }
+                  server.type: { $$type: string }
+                  db.query.summary: find convenient-transaction-tests.test
+
+    outcome:
+      - collectionName: test
+        databaseName: convenient-transaction-tests
+        documents:
+          - _id: 1

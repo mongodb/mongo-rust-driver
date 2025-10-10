@@ -73,6 +73,10 @@ impl OperationWithDefaults for CreateSearchIndexes {
     fn supports_read_concern(&self, _description: &crate::cmap::StreamDescription) -> bool {
         false
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }
 
 #[derive(Debug)]
@@ -127,6 +131,10 @@ impl OperationWithDefaults for UpdateSearchIndex {
     fn supports_read_concern(&self, _description: &crate::cmap::StreamDescription) -> bool {
         false
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }
 
 #[derive(Debug)]
@@ -178,5 +186,9 @@ impl OperationWithDefaults for DropSearchIndex {
 
     fn supports_read_concern(&self, _description: &crate::cmap::StreamDescription) -> bool {
         false
+    }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
     }
 }

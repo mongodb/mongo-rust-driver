@@ -94,4 +94,8 @@ impl OperationWithDefaults for RunCommand<'_> {
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.pinned_connection
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        self.db.as_str().into()
+    }
 }

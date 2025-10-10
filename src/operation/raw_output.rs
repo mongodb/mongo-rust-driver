@@ -80,4 +80,20 @@ impl<Op: Operation> Operation for RawOutput<Op> {
     fn name(&self) -> &CStr {
         self.0.name()
     }
+
+    fn log_name(&self) -> &str {
+        self.0.log_name()
+    }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        self.0.target()
+    }
+
+    fn cursor_id(&self) -> Option<i64> {
+        self.0.cursor_id()
+    }
+
+    fn output_cursor_id(_output: &Self::O) -> Option<i64> {
+        None
+    }
 }

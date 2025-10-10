@@ -177,4 +177,8 @@ impl OperationWithDefaults for Insert<'_> {
     fn retryability(&self) -> Retryability {
         Retryability::Write
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }

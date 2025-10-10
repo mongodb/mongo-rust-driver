@@ -3,6 +3,8 @@ use crate::bson::RawDocumentBuf;
 use crate::bson::{doc, RawBsonRef, RawDocument, Timestamp};
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
+#[cfg(feature = "opentelemetry")]
+use opentelemetry::context::FutureExt;
 use serde::de::DeserializeOwned;
 use std::sync::LazyLock;
 
@@ -14,6 +16,8 @@ use std::{
 };
 
 use super::{options::ServerAddress, session::TransactionState, Client, ClientSession};
+#[cfg(not(feature = "opentelemetry"))]
+use crate::otel::OtelFutureStub as _;
 use crate::{
     bson::Document,
     change_stream::{
@@ -106,55 +110,72 @@ impl Client {
         op: &mut T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<ExecutionDetails<T>> {
-        // Validate inputs that can be checked before server selection and connection checkout.
-        if self.inner.shutdown.executed.load(Ordering::SeqCst) {
-            return Err(ErrorKind::Shutdown.into());
-        }
-        // TODO RUST-9: remove this validation
-        if !op.is_acknowledged() {
-            return Err(ErrorKind::InvalidArgument {
-                message: "Unacknowledged write concerns are not supported".to_string(),
-            }
-            .into());
-        }
-        if let Some(write_concern) = op.write_concern() {
-            write_concern.validate()?;
-        }
-
-        // Validate the session and update its transaction status if needed.
         let mut session = session.into();
-        if let Some(ref mut session) = session {
-            if !TrackingArc::ptr_eq(&self.inner, &session.client().inner) {
-                return Err(Error::invalid_argument(
-                    "the session provided to an operation must be created from the same client as \
-                     the collection/database on which the operation is being performed",
-                ));
+        let ctx = self.start_operation_span(op, session.as_deref());
+        let result = (async move || {
+            // Validate inputs that can be checked before server selection and connection
+            // checkout.
+            if self.inner.shutdown.executed.load(Ordering::SeqCst) {
+                return Err(ErrorKind::Shutdown.into());
             }
-            if op
-                .selection_criteria()
-                .and_then(|sc| sc.as_read_pref())
-                .is_some_and(|rp| rp != &ReadPreference::Primary)
-                && session.in_transaction()
-            {
-                return Err(ErrorKind::Transaction {
-                    message: "read preference in a transaction must be primary".into(),
+            // TODO RUST-9: remove this validation
+            if !op.is_acknowledged() {
+                return Err(ErrorKind::InvalidArgument {
+                    message: "Unacknowledged write concerns are not supported".to_string(),
                 }
                 .into());
             }
-            // If the current transaction has been committed/aborted and it is not being
-            // re-committed/re-aborted, reset the transaction's state to None.
-            if matches!(
-                session.transaction.state,
-                TransactionState::Committed { .. }
-            ) && op.name() != CommitTransaction::NAME
-                || session.transaction.state == TransactionState::Aborted
-                    && op.name() != AbortTransaction::NAME
-            {
-                session.transaction.reset();
+            if let Some(write_concern) = op.write_concern() {
+                write_concern.validate()?;
             }
-        }
 
-        Box::pin(async { self.execute_operation_with_retry(op, session).await }).await
+            // Validate the session and update its transaction status if needed.
+            if let Some(ref mut session) = session {
+                if !TrackingArc::ptr_eq(&self.inner, &session.client().inner) {
+                    return Err(Error::invalid_argument(
+                        "the session provided to an operation must be created from the same \
+                         client as the collection/database on which the operation is being \
+                         performed",
+                    ));
+                }
+                if op
+                    .selection_criteria()
+                    .and_then(|sc| sc.as_read_pref())
+                    .is_some_and(|rp| rp != &ReadPreference::Primary)
+                    && session.in_transaction()
+                {
+                    return Err(ErrorKind::Transaction {
+                        message: "read preference in a transaction must be primary".into(),
+                    }
+                    .into());
+                }
+                // If the current transaction has been committed/aborted and it is not being
+                // re-committed/re-aborted, reset the transaction's state to None.
+                if matches!(
+                    session.transaction.state,
+                    TransactionState::Committed { .. }
+                ) && op.name() != CommitTransaction::NAME
+                    || session.transaction.state == TransactionState::Aborted
+                        && op.name() != AbortTransaction::NAME
+                {
+                    session.transaction.reset();
+                }
+            }
+
+            Box::pin(async {
+                self.execute_operation_with_retry(op, session)
+                    .with_current_context()
+                    .await
+            })
+            .with_current_context()
+            .await
+        })()
+        .with_context(ctx.clone())
+        .await;
+        #[cfg(feature = "opentelemetry")]
+        self.record_error(&ctx, &result);
+
+        result
     }
 
     /// Execute the given operation, returning the cursor created by the operation.
@@ -408,6 +429,7 @@ impl Client {
                     retryability,
                     effective_criteria,
                 )
+                .with_current_context()
                 .await
             {
                 Ok(output) => ExecutionDetails {
@@ -496,9 +518,21 @@ impl Client {
             let should_redact = cmd.should_redact();
             let cmd_name = cmd.name.clone();
             let target_db = cmd.target_db.clone();
+            #[cfg(feature = "opentelemetry")]
+            let cmd_attrs = crate::otel::CommandAttributes::new(&cmd);
 
             let mut message = Message::try_from(cmd)?;
             message.request_id = Some(request_id);
+
+            #[cfg(feature = "opentelemetry")]
+            let ctx = self.start_command_span(
+                op,
+                &connection_info,
+                connection.stream_description()?,
+                &message,
+                cmd_attrs,
+            );
+
             #[cfg(feature = "in-use-encryption")]
             {
                 let guard = self.inner.csfle.read().await;
@@ -629,6 +663,8 @@ impl Client {
                     }
                 }
             };
+            #[cfg(feature = "opentelemetry")]
+            self.record_command_result::<T>(&ctx, &result);
 
             if result
                 .as_ref()

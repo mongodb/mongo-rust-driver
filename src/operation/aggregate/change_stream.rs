@@ -135,4 +135,8 @@ impl OperationWithDefaults for ChangeStreamAggregate {
     fn retryability(&self) -> Retryability {
         self.inner.retryability()
     }
+
+    fn target(&self) -> crate::operation::OperationTarget<'_> {
+        self.inner.target()
+    }
 }

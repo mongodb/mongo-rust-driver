@@ -105,6 +105,14 @@ impl OperationWithDefaults for GetMore<'_> {
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.pinned_connection
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
+    }
+
+    fn cursor_id(&self) -> Option<i64> {
+        Some(self.cursor_id)
+    }
 }
 
 #[derive(Debug, Deserialize)]

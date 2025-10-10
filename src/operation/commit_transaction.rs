@@ -80,4 +80,8 @@ impl OperationWithDefaults for CommitTransaction {
             }
         }
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        super::OperationTarget::ADMIN
+    }
 }

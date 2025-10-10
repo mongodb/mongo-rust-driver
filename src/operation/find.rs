@@ -128,4 +128,12 @@ impl OperationWithDefaults for Find {
     fn retryability(&self) -> Retryability {
         Retryability::Read
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        (&self.ns).into()
+    }
+
+    fn output_cursor_id(output: &Self::O) -> Option<i64> {
+        Some(output.id())
+    }
 }

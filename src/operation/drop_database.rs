@@ -52,4 +52,8 @@ impl OperationWithDefaults for DropDatabase {
             .as_ref()
             .and_then(|opts| opts.write_concern.as_ref())
     }
+
+    fn target(&self) -> super::OperationTarget<'_> {
+        self.target_db.as_str().into()
+    }
 }
