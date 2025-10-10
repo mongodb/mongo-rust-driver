@@ -1713,6 +1713,45 @@ impl ConnectionString {
 
     /// Un-parses a [`ConnectionString`] struct back into a MongoDB connection string.
     fn to_uri_str(&self) -> String {
+        let ConnectionString {
+            host_info,
+            app_name,
+            tls,
+            heartbeat_frequency,
+            local_threshold,
+            read_concern,
+            replica_set,
+            write_concern,
+            server_selection_timeout,
+            max_pool_size,
+            min_pool_size,
+            max_connecting,
+            max_idle_time,
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
+            compressors,
+            connect_timeout,
+            retry_reads,
+            retry_writes,
+            server_monitoring_mode: _,
+            direct_connection,
+            credential,
+            default_database,
+            load_balanced,
+            socket_timeout,
+            read_preference,
+            uuid_representation,
+            srv_max_hosts,
+            srv_service_name: _,
+            wait_queue_timeout,
+            tls_insecure,
+            #[cfg(test)]
+                original_uri: _,
+        } = self;
+
         let mut res: String = String::new();
         let mut opts = String::new();
 
@@ -1722,7 +1761,7 @@ impl ConnectionString {
             res.push_str("mongodb://");
         }
 
-        if let Some(credential) = &self.credential {
+        if let Some(credential) = credential {
             if let Some(username) = &credential.username {
                 res.push_str(&percent_encode(username));
                 if let Some(password) = &credential.password {
@@ -1733,10 +1772,10 @@ impl ConnectionString {
         }
 
         if self.is_srv() {
-            if let HostInfo::DnsRecord(dns) = &self.host_info {
+            if let HostInfo::DnsRecord(dns) = host_info {
                 res.push_str(dns);
             }
-        } else if let HostInfo::HostIdentifiers(hosts) = &self.host_info {
+        } else if let HostInfo::HostIdentifiers(hosts) = host_info {
             res.push_str(
                 &hosts
                     .iter()
@@ -1748,19 +1787,19 @@ impl ConnectionString {
 
         res.push('/');
 
-        if let Some(authdb) = &self.default_database {
+        if let Some(authdb) = default_database {
             res.push_str(authdb);
         }
 
-        if let Some(replica_set) = &self.replica_set {
+        if let Some(replica_set) = replica_set {
             opts.push_str(&format!("&replicaSet={replica_set}"));
         }
 
-        if let Some(direct_connection) = self.direct_connection {
+        if let Some(direct_connection) = direct_connection {
             opts.push_str(&format!("&directConnection={direct_connection}"));
         }
 
-        if let Some(tls) = &self.tls {
+        if let Some(tls) = tls {
             match tls {
                 Tls::Enabled(options) => {
                     opts.push_str("&tls=true");
@@ -1799,7 +1838,7 @@ impl ConnectionString {
                         ));
                     }
 
-                    if let Some(tls_insecure) = self.tls_insecure {
+                    if let Some(tls_insecure) = tls_insecure {
                         opts.push_str(&format!("&tlsInsecure={tls_insecure}"));
                     }
                 }
@@ -1809,14 +1848,14 @@ impl ConnectionString {
             }
         }
 
-        if let Some(connect_timeout) = &self.connect_timeout {
+        if let Some(connect_timeout) = connect_timeout {
             opts.push_str(&format!(
                 "&connectTimeoutMS={}",
                 connect_timeout.as_millis()
             ));
         }
 
-        if let Some(socket_timeout) = &self.socket_timeout {
+        if let Some(socket_timeout) = socket_timeout {
             opts.push_str(&format!("&socketTimeoutMS={}", socket_timeout.as_millis()));
         }
 
@@ -1825,7 +1864,7 @@ impl ConnectionString {
             feature = "zlib-compression",
             feature = "snappy-compression"
         ))]
-        if let Some(compressors) = &self.compressors {
+        if let Some(compressors) = compressors {
             opts.push_str(&format!(
                 "&compressors={}",
                 compressors
@@ -1837,7 +1876,7 @@ impl ConnectionString {
         }
 
         #[cfg(feature = "zlib-compression")]
-        if let Some(compressors) = &self.compressors {
+        if let Some(compressors) = compressors {
             for compressor in compressors {
                 if let Compressor::Zlib { level: Some(level) } = compressor {
                     opts.push_str(&format!("&zlibCompressionLevel={level}"));
@@ -1845,30 +1884,30 @@ impl ConnectionString {
             }
         }
 
-        if let Some(max_pool_size) = &self.max_pool_size {
+        if let Some(max_pool_size) = max_pool_size {
             opts.push_str(&format!("&maxPoolSize={max_pool_size}"));
         }
 
-        if let Some(min_pool_size) = &self.min_pool_size {
+        if let Some(min_pool_size) = min_pool_size {
             opts.push_str(&format!("&minPoolSize={min_pool_size}"));
         }
 
-        if let Some(max_connecting) = &self.max_connecting {
+        if let Some(max_connecting) = max_connecting {
             opts.push_str(&format!("&maxConnecting={max_connecting}"));
         }
 
-        if let Some(max_idle_time) = &self.max_idle_time {
+        if let Some(max_idle_time) = max_idle_time {
             opts.push_str(&format!("&maxIdleTimeMS={}", max_idle_time.as_millis()));
         }
 
-        if let Some(wait_queue_timeout) = &self.wait_queue_timeout {
+        if let Some(wait_queue_timeout) = wait_queue_timeout {
             opts.push_str(&format!(
                 "&waitQueueTimeoutMS={}",
                 wait_queue_timeout.as_millis()
             ));
         }
 
-        if let Some(write_concern) = &self.write_concern {
+        if let Some(write_concern) = write_concern {
             if let Some(w) = &write_concern.w {
                 match w {
                     Acknowledgment::Nodes(i) => {
@@ -1892,14 +1931,14 @@ impl ConnectionString {
             }
         }
 
-        if let Some(read_concern) = &self.read_concern {
+        if let Some(read_concern) = read_concern {
             opts.push_str(&format!(
                 "&readConcernLevel={}",
                 read_concern.level.as_str()
             ));
         }
 
-        if let Some(read_preference) = &self.read_preference {
+        if let Some(read_preference) = read_preference {
             opts.push_str(&format!("&readPreference={}", read_preference.mode()));
 
             if let Some(max_staleness) = read_preference.max_staleness() {
@@ -1925,16 +1964,14 @@ impl ConnectionString {
             }
         }
 
-        if let Some(auth_source) = self
-            .credential
+        if let Some(auth_source) = credential
             .as_ref()
             .and_then(|c: &Credential| c.source.as_ref())
         {
             opts.push_str(&format!("&authSource={auth_source}"));
         }
 
-        if let Some(auth_mechanism) = self
-            .credential
+        if let Some(auth_mechanism) = credential
             .as_ref()
             .and_then(|c: &Credential| c.mechanism.as_ref())
         {
@@ -1944,8 +1981,7 @@ impl ConnectionString {
             ));
         }
 
-        if let Some(auth_mechanism_properties) = self
-            .credential
+        if let Some(auth_mechanism_properties) = credential
             .as_ref()
             .and_then(|c: &Credential| c.mechanism_properties.as_ref())
         {
@@ -1961,40 +1997,40 @@ impl ConnectionString {
             }
         }
 
-        if let Some(local_threshold) = &self.local_threshold {
+        if let Some(local_threshold) = local_threshold {
             opts.push_str(&format!(
                 "&localThresholdMS={}",
                 local_threshold.as_millis()
             ));
         }
 
-        if let Some(server_selection_timeout) = &self.server_selection_timeout {
+        if let Some(server_selection_timeout) = server_selection_timeout {
             opts.push_str(&format!(
                 "&serverSelectionTimeoutMS={}",
                 server_selection_timeout.as_millis()
             ));
         }
 
-        if let Some(heartbeat_frequency) = &self.heartbeat_frequency {
+        if let Some(heartbeat_frequency) = heartbeat_frequency {
             opts.push_str(&format!(
                 "&heartbeatFrequencyMS={}",
                 heartbeat_frequency.as_millis()
             ));
         }
 
-        if let Some(app_name) = &self.app_name {
+        if let Some(app_name) = app_name {
             opts.push_str(&format!("&appName={app_name}"));
         }
 
-        if let Some(retry_reads) = self.retry_reads {
+        if let Some(retry_reads) = retry_reads {
             opts.push_str(&format!("&retryReads={retry_reads}"));
         }
 
-        if let Some(retry_writes) = self.retry_writes {
+        if let Some(retry_writes) = retry_writes {
             opts.push_str(&format!("&retryWrites={retry_writes}"));
         }
 
-        if let Some(uuid_rep) = &self.uuid_representation {
+        if let Some(uuid_rep) = uuid_representation {
             let s = match uuid_rep {
                 UuidRepresentation::Standard => "standard",
                 UuidRepresentation::CSharpLegacy => "csharpLegacy",
@@ -2005,11 +2041,11 @@ impl ConnectionString {
             opts.push_str(&format!("&uuidRepresentation={s}"));
         }
 
-        if let Some(load_balanced) = self.load_balanced {
+        if let Some(load_balanced) = load_balanced {
             opts.push_str(&format!("&loadBalanced={load_balanced}"));
         }
 
-        if let Some(srv_max_hosts) = &self.srv_max_hosts {
+        if let Some(srv_max_hosts) = srv_max_hosts {
             opts.push_str(&format!("&srvMaxHosts={srv_max_hosts}"));
         }
 
