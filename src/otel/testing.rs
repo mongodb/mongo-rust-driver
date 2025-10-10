@@ -165,7 +165,21 @@ impl<'a> Matcher<'a> {
         }
         let mut actual_attrs = doc! {};
         for kv in &actual.attributes {
-            actual_attrs.insert(kv.key.as_str(), value_to_bson(&kv.value)?);
+            let key = kv.key.as_str();
+            let value = match key {
+                "db.mongodb.lsid" => match &kv.value {
+                    opentelemetry::Value::String(s) => {
+                        let doc: Bson = serde_json::from_str::<serde_json::Value>(s.as_str())
+                            .map_err(|e| format!("serde_json error: {}", e))?
+                            .try_into()
+                            .map_err(|e| format!("json value error: {}", e))?;
+                        doc
+                    }
+                    _ => return Err(format!("unexpected type for {:?}: {:?}", key, kv.value)),
+                },
+                _ => value_to_bson(&kv.value)?,
+            };
+            actual_attrs.insert(key, value);
         }
         for (k, expected_v) in &expected.attributes {
             if let Err(e) =
