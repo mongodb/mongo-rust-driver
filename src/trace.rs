@@ -1,6 +1,9 @@
 #[cfg(feature = "bson-3")]
 use crate::bson_compat::RawDocumentBufExt;
-use crate::client::options::{ServerAddress, DEFAULT_PORT};
+use crate::{
+    bson_util::{doc_to_json_str, truncate_on_char_boundary},
+    client::options::{ServerAddress, DEFAULT_PORT},
+};
 
 pub(crate) mod command;
 pub(crate) mod connection;
@@ -38,7 +41,7 @@ impl crate::error::Error {
         );
         if let Some(server_response) = self.server_response() {
             let server_response_string = match server_response.to_document() {
-                Ok(document) => serialize_command_or_reply(document, max_document_length),
+                Ok(document) => doc_to_json_str(document, max_document_length),
                 Err(_) => {
                     let mut hex_string = hex::encode(server_response.as_bytes());
                     truncate_on_char_boundary(&mut hex_string, max_document_length);
