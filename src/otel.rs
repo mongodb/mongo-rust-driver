@@ -163,6 +163,7 @@ impl Client {
                     KeyValue::new("network.transport", "tcp"),
                 ]);
             }
+            #[cfg(unix)]
             ServerAddress::Unix { path } => {
                 attrs.extend([
                     KeyValue::new("server.address", path.to_string_lossy().into_owned()),
