@@ -81,6 +81,7 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.name()
     }
 
+    #[cfg(feature = "opentelemetry")]
     fn log_name(&self) -> &str {
         self.0.log_name()
     }
@@ -90,10 +91,12 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.target()
     }
 
+    #[cfg(feature = "opentelemetry")]
     fn cursor_id(&self) -> Option<i64> {
         self.0.cursor_id()
     }
 
+    #[cfg(feature = "opentelemetry")]
     fn output_cursor_id(_output: &Self::O) -> Option<i64> {
         None
     }
