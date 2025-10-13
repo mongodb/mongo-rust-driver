@@ -95,7 +95,8 @@ impl OperationWithDefaults for RunCommand<'_> {
         self.pinned_connection
     }
 
-    fn target(&self) -> super::OperationTarget<'_> {
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
         self.db.as_str().into()
     }
 }

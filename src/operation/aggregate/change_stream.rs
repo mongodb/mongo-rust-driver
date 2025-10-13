@@ -136,7 +136,8 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         self.inner.retryability()
     }
 
-    fn target(&self) -> crate::operation::OperationTarget<'_> {
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
         self.inner.target()
     }
 }

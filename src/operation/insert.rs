@@ -178,7 +178,8 @@ impl OperationWithDefaults for Insert<'_> {
         Retryability::Write
     }
 
-    fn target(&self) -> super::OperationTarget<'_> {
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
         (&self.ns).into()
     }
 }

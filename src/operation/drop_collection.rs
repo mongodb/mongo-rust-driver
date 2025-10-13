@@ -61,11 +61,13 @@ impl OperationWithDefaults for DropCollection {
             .and_then(|opts| opts.write_concern.as_ref())
     }
 
+    #[cfg(feature = "opentelemetry")]
     fn log_name(&self) -> &str {
         "dropCollection"
     }
 
-    fn target(&self) -> super::OperationTarget<'_> {
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
         (&self.ns).into()
     }
 }

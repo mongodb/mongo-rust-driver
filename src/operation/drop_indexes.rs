@@ -52,7 +52,8 @@ impl OperationWithDefaults for DropIndexes {
             .and_then(|opts| opts.write_concern.as_ref())
     }
 
-    fn target(&self) -> super::OperationTarget<'_> {
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
         (&self.ns).into()
     }
 }

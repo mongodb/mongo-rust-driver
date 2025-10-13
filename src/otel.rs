@@ -15,10 +15,11 @@ use crate::{
     bson::Bson,
     cmap::{conn::wire::Message, Command, ConnectionInfo, StreamDescription},
     error::{ErrorKind, Result},
-    operation::Operation,
+    operation::{aggregate::AggregateTarget, Operation},
     options::{ClientOptions, ServerAddress, DEFAULT_PORT},
     Client,
     ClientSession,
+    Namespace,
 };
 
 #[cfg(test)]
@@ -303,3 +304,93 @@ impl CommandAttributes {
         }
     }
 }
+
+macro_rules! op_methods {
+    () => {
+        fn log_name(&self) -> &str;
+
+        fn target(&self) -> crate::otel::OperationTarget<'_>;
+
+        fn cursor_id(&self) -> Option<i64>;
+
+        fn output_cursor_id(output: &Self::O) -> Option<i64>;
+    };
+}
+pub(crate) use op_methods;
+
+#[allow(dead_code)]
+pub(crate) struct OperationTarget<'a> {
+    pub(crate) database: &'a str,
+    pub(crate) collection: Option<&'a str>,
+}
+
+impl OperationTarget<'static> {
+    pub(crate) const ADMIN: Self = OperationTarget {
+        database: "admin",
+        collection: None,
+    };
+}
+
+impl<'a> From<&'a str> for OperationTarget<'a> {
+    fn from(value: &'a str) -> Self {
+        OperationTarget {
+            database: value,
+            collection: None,
+        }
+    }
+}
+
+impl<'a> From<&'a Namespace> for OperationTarget<'a> {
+    fn from(value: &'a Namespace) -> Self {
+        OperationTarget {
+            database: &value.db,
+            collection: Some(&value.coll),
+        }
+    }
+}
+
+impl<'a> From<&'a AggregateTarget> for OperationTarget<'a> {
+    fn from(value: &'a AggregateTarget) -> Self {
+        match value {
+            AggregateTarget::Database(db) => db.as_str().into(),
+            AggregateTarget::Collection(ns) => ns.into(),
+        }
+    }
+}
+
+macro_rules! op_methods_defaults {
+    () => {
+        fn log_name(&self) -> &str {
+            crate::bson_compat::cstr_to_str(self.name())
+        }
+
+        fn target(&self) -> crate::otel::OperationTarget<'_>;
+
+        fn cursor_id(&self) -> Option<i64> {
+            None
+        }
+
+        fn output_cursor_id(_output: &Self::O) -> Option<i64> {
+            None
+        }
+    };
+}
+pub(crate) use op_methods_defaults;
+
+macro_rules! op_methods_default_impl {
+    () => {
+        fn log_name(&self) -> &str {
+            self.log_name()
+        }
+        fn target(&self) -> crate::otel::OperationTarget<'_> {
+            self.target()
+        }
+        fn cursor_id(&self) -> Option<i64> {
+            self.cursor_id()
+        }
+        fn output_cursor_id(output: &Self::O) -> Option<i64> {
+            Self::output_cursor_id(output)
+        }
+    };
+}
+pub(crate) use op_methods_default_impl;
