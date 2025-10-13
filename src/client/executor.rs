@@ -110,72 +110,78 @@ impl Client {
         op: &mut T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<ExecutionDetails<T>> {
-        let mut session = session.into();
+        let session = session.into();
         let ctx = self.start_operation_span(op, session.as_deref());
-        let result = (async move || {
-            // Validate inputs that can be checked before server selection and connection
-            // checkout.
-            if self.inner.shutdown.executed.load(Ordering::SeqCst) {
-                return Err(ErrorKind::Shutdown.into());
-            }
-            // TODO RUST-9: remove this validation
-            if !op.is_acknowledged() {
-                return Err(ErrorKind::InvalidArgument {
-                    message: "Unacknowledged write concerns are not supported".to_string(),
-                }
-                .into());
-            }
-            if let Some(write_concern) = op.write_concern() {
-                write_concern.validate()?;
-            }
-
-            // Validate the session and update its transaction status if needed.
-            if let Some(ref mut session) = session {
-                if !TrackingArc::ptr_eq(&self.inner, &session.client().inner) {
-                    return Err(Error::invalid_argument(
-                        "the session provided to an operation must be created from the same \
-                         client as the collection/database on which the operation is being \
-                         performed",
-                    ));
-                }
-                if op
-                    .selection_criteria()
-                    .and_then(|sc| sc.as_read_pref())
-                    .is_some_and(|rp| rp != &ReadPreference::Primary)
-                    && session.in_transaction()
-                {
-                    return Err(ErrorKind::Transaction {
-                        message: "read preference in a transaction must be primary".into(),
-                    }
-                    .into());
-                }
-                // If the current transaction has been committed/aborted and it is not being
-                // re-committed/re-aborted, reset the transaction's state to None.
-                if matches!(
-                    session.transaction.state,
-                    TransactionState::Committed { .. }
-                ) && op.name() != CommitTransaction::NAME
-                    || session.transaction.state == TransactionState::Aborted
-                        && op.name() != AbortTransaction::NAME
-                {
-                    session.transaction.reset();
-                }
-            }
-
-            Box::pin(async {
-                self.execute_operation_with_retry(op, session)
-                    .with_current_context()
-                    .await
-            })
-            .with_current_context()
-            .await
-        })()
-        .with_context(ctx.clone())
-        .await;
+        let result = self
+            .execute_operation_with_details_inner(op, session)
+            .with_context(ctx.clone())
+            .await;
         #[cfg(feature = "opentelemetry")]
         self.record_error(&ctx, &result);
 
         result
+    }
+
+    async fn execute_operation_with_details_inner<T: Operation>(
+        &self,
+        op: &mut T,
+        mut session: Option<&mut ClientSession>,
+    ) -> Result<ExecutionDetails<T>> {
+        // Validate inputs that can be checked before server selection and connection
+        // checkout.
+        if self.inner.shutdown.executed.load(Ordering::SeqCst) {
+            return Err(ErrorKind::Shutdown.into());
+        }
+        // TODO RUST-9: remove this validation
+        if !op.is_acknowledged() {
+            return Err(ErrorKind::InvalidArgument {
+                message: "Unacknowledged write concerns are not supported".to_string(),
+            }
+            .into());
+        }
+        if let Some(write_concern) = op.write_concern() {
+            write_concern.validate()?;
+        }
+
+        // Validate the session and update its transaction status if needed.
+        if let Some(ref mut session) = session {
+            if !TrackingArc::ptr_eq(&self.inner, &session.client().inner) {
+                return Err(Error::invalid_argument(
+                    "the session provided to an operation must be created from the same client as \
+                     the collection/database on which the operation is being performed",
+                ));
+            }
+            if op
+                .selection_criteria()
+                .and_then(|sc| sc.as_read_pref())
+                .is_some_and(|rp| rp != &ReadPreference::Primary)
+                && session.in_transaction()
+            {
+                return Err(ErrorKind::Transaction {
+                    message: "read preference in a transaction must be primary".into(),
+                }
+                .into());
+            }
+            // If the current transaction has been committed/aborted and it is not being
+            // re-committed/re-aborted, reset the transaction's state to None.
+            if matches!(
+                session.transaction.state,
+                TransactionState::Committed { .. }
+            ) && op.name() != CommitTransaction::NAME
+                || session.transaction.state == TransactionState::Aborted
+                    && op.name() != AbortTransaction::NAME
+            {
+                session.transaction.reset();
+            }
+        }
+
+        Box::pin(async {
+            self.execute_operation_with_retry(op, session)
+                .with_current_context()
+                .await
+        })
+        .with_current_context()
+        .await
     }
 
     /// Execute the given operation, returning the cursor created by the operation.

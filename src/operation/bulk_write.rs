@@ -486,7 +486,8 @@ where
         }
     }
 
-    fn target(&self) -> super::OperationTarget<'_> {
-        super::OperationTarget::ADMIN
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
+        crate::otel::OperationTarget::ADMIN
     }
 }

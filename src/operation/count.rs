@@ -76,7 +76,8 @@ impl OperationWithDefaults for Count {
         Retryability::Read
     }
 
-    fn target(&self) -> super::OperationTarget<'_> {
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
         (&self.ns).into()
     }
 }

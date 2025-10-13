@@ -85,7 +85,8 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.log_name()
     }
 
-    fn target(&self) -> super::OperationTarget<'_> {
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
         self.0.target()
     }
 

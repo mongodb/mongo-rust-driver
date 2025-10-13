@@ -106,10 +106,12 @@ impl OperationWithDefaults for GetMore<'_> {
         self.pinned_connection
     }
 
-    fn target(&self) -> super::OperationTarget<'_> {
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
         (&self.ns).into()
     }
 
+    #[cfg(feature = "opentelemetry")]
     fn cursor_id(&self) -> Option<i64> {
         Some(self.cursor_id)
     }

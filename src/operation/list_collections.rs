@@ -82,11 +82,13 @@ impl OperationWithDefaults for ListCollections {
         Retryability::Read
     }
 
+    #[cfg(feature = "opentelemetry")]
     fn output_cursor_id(output: &Self::O) -> Option<i64> {
         Some(output.id())
     }
 
-    fn target(&self) -> super::OperationTarget<'_> {
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
         self.db.as_str().into()
     }
 }

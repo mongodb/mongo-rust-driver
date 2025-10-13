@@ -177,49 +177,8 @@ pub(crate) trait Operation {
     /// The name of the server side command associated with this operation.
     fn name(&self) -> &CStr;
 
-    /// The name to use for telemetry purposes.
-    #[allow(dead_code)]
-    fn log_name(&self) -> &str;
-
-    #[allow(dead_code)]
-    fn target(&self) -> OperationTarget<'_>;
-
-    #[allow(dead_code)]
-    fn cursor_id(&self) -> Option<i64>;
-
-    #[allow(dead_code)]
-    fn output_cursor_id(output: &Self::O) -> Option<i64>;
-}
-
-#[allow(dead_code)]
-pub(crate) struct OperationTarget<'a> {
-    pub(crate) database: &'a str,
-    pub(crate) collection: Option<&'a str>,
-}
-
-impl OperationTarget<'static> {
-    pub(crate) const ADMIN: Self = OperationTarget {
-        database: "admin",
-        collection: None,
-    };
-}
-
-impl<'a> From<&'a str> for OperationTarget<'a> {
-    fn from(value: &'a str) -> Self {
-        OperationTarget {
-            database: value,
-            collection: None,
-        }
-    }
-}
-
-impl<'a> From<&'a Namespace> for OperationTarget<'a> {
-    fn from(value: &'a Namespace) -> Self {
-        OperationTarget {
-            database: &value.db,
-            collection: Some(&value.coll),
-        }
-    }
+    #[cfg(feature = "opentelemetry")]
+    crate::otel::op_methods!();
 }
 
 pub(crate) type OverrideCriteriaFn =
@@ -322,20 +281,8 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         Self::NAME
     }
 
-    /// The name to use for telemetry purposes.
-    fn log_name(&self) -> &str {
-        crate::bson_compat::cstr_to_str(self.name())
-    }
-
-    fn target(&self) -> OperationTarget<'_>;
-
-    fn cursor_id(&self) -> Option<i64> {
-        None
-    }
-
-    fn output_cursor_id(_output: &Self::O) -> Option<i64> {
-        None
-    }
+    #[cfg(feature = "opentelemetry")]
+    crate::otel::op_methods_defaults!();
 }
 
 impl<T: OperationWithDefaults> Operation for T
@@ -390,18 +337,8 @@ where
     fn name(&self) -> &CStr {
         self.name()
     }
-    fn log_name(&self) -> &str {
-        self.log_name()
-    }
-    fn target(&self) -> OperationTarget<'_> {
-        self.target()
-    }
-    fn cursor_id(&self) -> Option<i64> {
-        self.cursor_id()
-    }
-    fn output_cursor_id(output: &Self::O) -> Option<i64> {
-        Self::output_cursor_id(output)
-    }
+    #[cfg(feature = "opentelemetry")]
+    crate::otel::op_methods_default_impl!();
 }
 
 fn should_redact_body(body: &RawDocumentBuf) -> bool {

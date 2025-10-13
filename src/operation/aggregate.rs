@@ -154,11 +154,13 @@ impl OperationWithDefaults for Aggregate {
         }
     }
 
+    #[cfg(feature = "opentelemetry")]
     fn output_cursor_id(output: &Self::O) -> Option<i64> {
         Some(output.id())
     }
 
-    fn target(&self) -> super::OperationTarget<'_> {
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
         (&self.target).into()
     }
 }
@@ -207,14 +209,5 @@ impl From<Namespace> for AggregateTarget {
 impl From<String> for AggregateTarget {
     fn from(db_name: String) -> Self {
         AggregateTarget::Database(db_name)
-    }
-}
-
-impl<'a> From<&'a AggregateTarget> for super::OperationTarget<'a> {
-    fn from(value: &'a AggregateTarget) -> Self {
-        match value {
-            AggregateTarget::Database(db) => db.as_str().into(),
-            AggregateTarget::Collection(ns) => ns.into(),
-        }
     }
 }

@@ -129,10 +129,12 @@ impl OperationWithDefaults for Find {
         Retryability::Read
     }
 
-    fn target(&self) -> super::OperationTarget<'_> {
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
         (&self.ns).into()
     }
 
+    #[cfg(feature = "opentelemetry")]
     fn output_cursor_id(output: &Self::O) -> Option<i64> {
         Some(output.id())
     }

@@ -92,11 +92,13 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.name()
     }
 
+    #[cfg(feature = "opentelemetry")]
     fn log_name(&self) -> &str {
         self.run_command.log_name()
     }
 
-    fn target(&self) -> super::OperationTarget<'_> {
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
         self.run_command.target()
     }
 
@@ -128,10 +130,12 @@ impl Operation for RunCursorCommand<'_> {
         .boxed()
     }
 
+    #[cfg(feature = "opentelemetry")]
     fn cursor_id(&self) -> Option<i64> {
         self.run_command.cursor_id()
     }
 
+    #[cfg(feature = "opentelemetry")]
     fn output_cursor_id(output: &Self::O) -> Option<i64> {
         Some(output.id())
     }
