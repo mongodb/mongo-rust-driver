@@ -619,7 +619,8 @@ Using `client_encrypted` perform the following operations:
     `{ "_id": "encryption_exceeds_16mib", "unencrypted": < the string "a" repeated (16777216 - 2000) times > }` into
     `coll`.
 
-    Expect this to fail since encryption results in a document exceeding the `maxBsonObjectSize` limit.
+    Expect this to fail indicating the document exceeded the `maxBsonObjectSize` limit. If the write is sent to the
+    server (i.e. does not fail due to a driver-side check), expect a server error with code 2 or 10334.
 
 7. If using MongoDB 8.0+, use MongoClient.bulkWrite to insert the following into `coll2`:
 
@@ -3786,6 +3787,57 @@ class AutoEncryptionOpts {
 ```
 
 Assert that an error is thrown.
+
+#### Case 4: ClientEncryption with `credentialProviders` and valid environment variables.
+
+Ensure a valid `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are present in the environment.
+
+Create a MongoClient named `setupClient`.
+
+Create a [ClientEncryption](../client-side-encryption.md#clientencryption) object with the following options:
+
+```typescript
+class ClientEncryptionOpts {
+  keyVaultClient: <setupClient>,
+  keyVaultNamespace: "keyvault.datakeys",
+  kmsProviders: { "aws": {} },
+  credentialProviders: { "aws": <object/function that returns valid credentials from the secrets manager> }
+}
+```
+
+Use the client encryption to create a datakey using the "aws" KMS provider. This should successfully load and use the
+AWS credentials that were provided by the secrets manager for the remote provider. Assert the datakey was created and
+that the custom credential provider was called at least once.
+
+An example of this in Node.js:
+
+```typescript
+import { ClientEncryption, MongoClient } from 'mongodb';
+
+let calledCount = 0;
+const masterKey = {
+  region: '<aws region>',
+  key: '<key for arn>'
+};
+const keyVaultClient = new MongoClient(process.env.MONGODB_URI);
+const options = {
+  keyVaultNamespace: 'keyvault.datakeys',
+  kmsProviders: { aws: {} },
+  credentialProviders: {
+    aws: async () => {
+      calledCount++;
+      return {
+        accessKeyId: process.env.FLE_AWS_KEY,
+        secretAccessKey: process.env.FLE_AWS_SECRET
+      };
+    }
+  }
+};
+const clientEncryption = new ClientEncryption(keyVaultClient, options);
+const dk = await clientEncryption.createDataKey('aws', { masterKey });
+expect(dk).to.be.a(Binary);
+expect(calledCount).to.be.greaterThan(0);
+```
 
 ### 27. Text Explicit Encryption
 
