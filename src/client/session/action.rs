@@ -161,7 +161,9 @@ macro_rules! convenient_run {
 }
 
 impl StartTransaction<&mut ClientSession> {
-    /// Starts a transaction, runs the given callback, and commits or aborts the transaction.
+    /// Starts a transaction, runs the given callback, and commits or aborts the transaction.  In
+    /// most circumstances, [`and_run2`](StartTransaction::and_run2) will be more convenient.
+    ///
     /// Transient transaction errors will cause the callback or the commit to be retried;
     /// other errors will cause the transaction to be aborted and the error returned to the
     /// caller.  If the callback needs to provide its own error information, the
@@ -207,7 +209,6 @@ impl StartTransaction<&mut ClientSession> {
     /// # Ok(())
     /// # }
     /// ```
-    #[rustversion::attr(since(1.85), deprecated = "use and_run2")]
     pub async fn and_run<R, C, F>(self, mut context: C, mut callback: F) -> Result<R>
     where
         F: for<'b> FnMut(&'b mut ClientSession, &'b mut C) -> BoxFuture<'b, Result<R>>,
@@ -225,6 +226,7 @@ impl StartTransaction<&mut ClientSession> {
     }
 
     /// Starts a transaction, runs the given callback, and commits or aborts the transaction.
+    ///
     /// Transient transaction errors will cause the callback or the commit to be retried;
     /// other errors will cause the transaction to be aborted and the error returned to the
     /// caller.  If the callback needs to provide its own error information, the
@@ -242,6 +244,13 @@ impl StartTransaction<&mut ClientSession> {
     /// This version of the method uses an async closure, which means it's both more convenient and
     /// avoids the lifetime issues of `and_run`, but is only available in Rust versions 1.85 and
     /// above.
+    ///
+    /// In some circumstances, using this method can trigger a
+    /// [compiler bug](https://github.com/rust-lang/rust/issues/96865) that results in
+    /// `implementation of Send is not general enough` errors.  If this is encountered, we
+    /// recommend these workarounds:
+    ///   * Avoid capturing references in the transaction closure (e.g. by cloning)
+    ///   * Use the `context` parameter of [`and_run`](StartTransaction::and_run).
     ///
     /// Because the callback can be repeatedly executed, code within the callback cannot consume
     /// owned values, even values owned by the callback itself:
