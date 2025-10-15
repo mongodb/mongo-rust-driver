@@ -487,6 +487,11 @@ where
     }
 
     #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl<R: BulkWriteResult> crate::otel::OtelInfoDefaults for BulkWrite<'_, R> {
     fn target(&self) -> crate::otel::OperationTarget<'_> {
         crate::otel::OperationTarget::ADMIN
     }

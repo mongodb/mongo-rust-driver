@@ -82,22 +82,24 @@ impl<Op: Operation> Operation for RawOutput<Op> {
     }
 
     #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl<Op: Operation> crate::otel::OtelInfo for RawOutput<Op> {
     fn log_name(&self) -> &str {
-        self.0.log_name()
+        self.0.otel().log_name()
     }
 
-    #[cfg(feature = "opentelemetry")]
     fn target(&self) -> crate::otel::OperationTarget<'_> {
-        self.0.target()
+        self.0.otel().target()
     }
 
-    #[cfg(feature = "opentelemetry")]
     fn cursor_id(&self) -> Option<i64> {
-        self.0.cursor_id()
+        self.0.otel().cursor_id()
     }
 
-    #[cfg(feature = "opentelemetry")]
-    fn output_cursor_id(_output: &Self::O) -> Option<i64> {
+    fn output_cursor_id(_output: &<Self as Operation>::O) -> Option<i64> {
         None
     }
 }

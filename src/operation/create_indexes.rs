@@ -85,6 +85,11 @@ impl OperationWithDefaults for CreateIndexes {
     }
 
     #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for CreateIndexes {
     fn target(&self) -> crate::otel::OperationTarget<'_> {
         (&self.ns).into()
     }

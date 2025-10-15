@@ -120,6 +120,11 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
     }
 
     #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl<T: DeserializeOwned> crate::otel::OtelInfoDefaults for FindAndModify<T> {
     fn target(&self) -> crate::otel::OperationTarget<'_> {
         (&self.ns).into()
     }

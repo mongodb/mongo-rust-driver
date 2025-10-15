@@ -54,11 +54,15 @@ impl OperationWithDefaults for Create {
     }
 
     #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for Create {
     fn log_name(&self) -> &str {
         "createCollection"
     }
 
-    #[cfg(feature = "opentelemetry")]
     fn target(&self) -> crate::otel::OperationTarget<'_> {
         (&self.ns).into()
     }
