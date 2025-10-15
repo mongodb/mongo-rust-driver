@@ -111,6 +111,7 @@ impl Client {
         op: &impl Operation,
         session: Option<&ClientSession>,
     ) -> Context {
+        let op = op.otel();
         if !self.options().otel_enabled() {
             return Context::current();
         }
@@ -140,6 +141,7 @@ impl Client {
         message: &Message,
         cmd_attrs: CommandAttributes,
     ) -> Context {
+        let op = op.otel();
         if !self.options().otel_enabled() || cmd_attrs.should_redact {
             return Context::current();
         }
@@ -246,7 +248,7 @@ impl Client {
         if let Ok(out) = result {
             // tests don't match the spec here
             if false {
-                if let Some(cursor_id) = Op::output_cursor_id(out) {
+                if let Some(cursor_id) = <Op::Otel as OtelWitness>::output_cursor_id(out) {
                     let span = context.span();
                     span.set_attribute(KeyValue::new("db.mongodb.cursor_id", cursor_id));
                 }
@@ -256,7 +258,7 @@ impl Client {
     }
 }
 
-fn op_target(op: &impl Operation) -> String {
+fn op_target(op: &impl OtelInfo) -> String {
     let target = op.target();
     if let Some(coll) = target.collection {
         format!("{}.{}", target.database, coll)
@@ -265,7 +267,7 @@ fn op_target(op: &impl Operation) -> String {
     }
 }
 
-fn common_attrs(op: &impl Operation) -> Vec<KeyValue> {
+fn common_attrs(op: &impl OtelInfo) -> Vec<KeyValue> {
     let target = op.target();
     let mut attrs = vec![
         KeyValue::new("db.system", "mongodb"),
@@ -306,20 +308,68 @@ impl CommandAttributes {
     }
 }
 
-macro_rules! op_methods {
-    () => {
-        fn log_name(&self) -> &str;
-
-        fn target(&self) -> crate::otel::OperationTarget<'_>;
-
-        fn cursor_id(&self) -> Option<i64>;
-
-        fn output_cursor_id(output: &Self::O) -> Option<i64>;
-    };
+pub(crate) trait OtelWitness {
+    type Op: OtelInfo;
+    fn otel(op: &Self::Op) -> &impl OtelInfo {
+        op
+    }
+    fn output_cursor_id(output: &<Self::Op as Operation>::O) -> Option<i64> {
+        Self::Op::output_cursor_id(output)
+    }
 }
-pub(crate) use op_methods;
 
-#[allow(dead_code)]
+pub(crate) struct Witness<T: OtelInfo> {
+    _t: std::marker::PhantomData<T>,
+}
+
+impl<T: OtelInfo> OtelWitness for Witness<T> {
+    type Op = T;
+}
+
+pub(crate) trait OtelInfo: Operation {
+    fn log_name(&self) -> &str;
+
+    fn target(&self) -> crate::otel::OperationTarget<'_>;
+
+    fn cursor_id(&self) -> Option<i64>;
+
+    fn output_cursor_id(output: &<Self as Operation>::O) -> Option<i64>;
+}
+
+pub(crate) trait OtelInfoDefaults: Operation {
+    fn log_name(&self) -> &str {
+        crate::bson_compat::cstr_to_str(self.name())
+    }
+
+    fn target(&self) -> crate::otel::OperationTarget<'_>;
+
+    fn cursor_id(&self) -> Option<i64> {
+        None
+    }
+
+    fn output_cursor_id(_output: &<Self as Operation>::O) -> Option<i64> {
+        None
+    }
+}
+
+impl<T: OtelInfoDefaults> OtelInfo for T {
+    fn log_name(&self) -> &str {
+        self.log_name()
+    }
+
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
+        self.target()
+    }
+
+    fn cursor_id(&self) -> Option<i64> {
+        self.cursor_id()
+    }
+
+    fn output_cursor_id(output: &<Self as Operation>::O) -> Option<i64> {
+        T::output_cursor_id(output)
+    }
+}
+
 pub(crate) struct OperationTarget<'a> {
     pub(crate) database: &'a str,
     pub(crate) collection: Option<&'a str>,
@@ -358,40 +408,3 @@ impl<'a> From<&'a AggregateTarget> for OperationTarget<'a> {
         }
     }
 }
-
-macro_rules! op_methods_defaults {
-    () => {
-        fn log_name(&self) -> &str {
-            crate::bson_compat::cstr_to_str(self.name())
-        }
-
-        fn target(&self) -> crate::otel::OperationTarget<'_>;
-
-        fn cursor_id(&self) -> Option<i64> {
-            None
-        }
-
-        fn output_cursor_id(_output: &Self::O) -> Option<i64> {
-            None
-        }
-    };
-}
-pub(crate) use op_methods_defaults;
-
-macro_rules! op_methods_default_impl {
-    () => {
-        fn log_name(&self) -> &str {
-            self.log_name()
-        }
-        fn target(&self) -> crate::otel::OperationTarget<'_> {
-            self.target()
-        }
-        fn cursor_id(&self) -> Option<i64> {
-            self.cursor_id()
-        }
-        fn output_cursor_id(output: &Self::O) -> Option<i64> {
-            Self::output_cursor_id(output)
-        }
-    };
-}
-pub(crate) use op_methods_default_impl;

@@ -62,6 +62,11 @@ impl OperationWithDefaults for DropCollection {
     }
 
     #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for DropCollection {
     fn log_name(&self) -> &str {
         "dropCollection"
     }

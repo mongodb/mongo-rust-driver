@@ -112,6 +112,11 @@ impl OperationWithDefaults for CountDocuments {
     }
 
     #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for CountDocuments {
     fn target(&self) -> crate::otel::OperationTarget<'_> {
         self.aggregate.target()
     }

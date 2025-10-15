@@ -82,6 +82,11 @@ impl OperationWithDefaults for CommitTransaction {
     }
 
     #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for CommitTransaction {
     fn target(&self) -> crate::otel::OperationTarget<'_> {
         crate::otel::OperationTarget::ADMIN
     }

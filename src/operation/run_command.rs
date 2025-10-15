@@ -96,6 +96,11 @@ impl OperationWithDefaults for RunCommand<'_> {
     }
 
     #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for RunCommand<'_> {
     fn target(&self) -> crate::otel::OperationTarget<'_> {
         self.db.as_str().into()
     }

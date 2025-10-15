@@ -83,6 +83,11 @@ impl OperationWithDefaults for ListCollections {
     }
 
     #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for ListCollections {
     fn output_cursor_id(output: &Self::O) -> Option<i64> {
         Some(output.id())
     }

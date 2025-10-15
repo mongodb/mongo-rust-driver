@@ -92,16 +92,6 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.name()
     }
 
-    #[cfg(feature = "opentelemetry")]
-    fn log_name(&self) -> &str {
-        self.run_command.log_name()
-    }
-
-    #[cfg(feature = "opentelemetry")]
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        self.run_command.target()
-    }
-
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
@@ -131,12 +121,24 @@ impl Operation for RunCursorCommand<'_> {
     }
 
     #[cfg(feature = "opentelemetry")]
-    fn cursor_id(&self) -> Option<i64> {
-        self.run_command.cursor_id()
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfo for RunCursorCommand<'_> {
+    fn log_name(&self) -> &str {
+        self.run_command.otel().log_name()
     }
 
-    #[cfg(feature = "opentelemetry")]
-    fn output_cursor_id(output: &Self::O) -> Option<i64> {
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
+        self.run_command.otel().target()
+    }
+
+    fn cursor_id(&self) -> Option<i64> {
+        self.run_command.otel().cursor_id()
+    }
+
+    fn output_cursor_id(output: &<Self as Operation>::O) -> Option<i64> {
         Some(output.id())
     }
 }

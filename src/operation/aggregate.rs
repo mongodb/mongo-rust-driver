@@ -155,11 +155,15 @@ impl OperationWithDefaults for Aggregate {
     }
 
     #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for Aggregate {
     fn output_cursor_id(output: &Self::O) -> Option<i64> {
         Some(output.id())
     }
 
-    #[cfg(feature = "opentelemetry")]
     fn target(&self) -> crate::otel::OperationTarget<'_> {
         (&self.target).into()
     }

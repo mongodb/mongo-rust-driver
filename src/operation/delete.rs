@@ -101,6 +101,11 @@ impl OperationWithDefaults for Delete {
     }
 
     #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for Delete {
     fn target(&self) -> crate::otel::OperationTarget<'_> {
         (&self.ns).into()
     }
