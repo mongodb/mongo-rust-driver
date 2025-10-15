@@ -177,9 +177,6 @@ pub(crate) trait Operation {
     /// The name of the server side command associated with this operation.
     fn name(&self) -> &CStr;
 
-    //#[cfg(feature = "opentelemetry")]
-    //type Otel: crate::otel::OtelInfo<Op = Self>;
-
     #[cfg(feature = "opentelemetry")]
     type Otel: crate::otel::OtelWitness<Op = Self>;
 
