@@ -182,7 +182,7 @@ pub(crate) trait Operation {
 
     #[cfg(feature = "opentelemetry")]
     fn otel(&self) -> &impl crate::otel::OtelInfo {
-        <Self::Otel as crate::otel::OtelWitness>::otel(&self)
+        <Self::Otel as crate::otel::OtelWitness>::otel(self)
     }
 }
 
