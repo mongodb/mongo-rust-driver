@@ -407,6 +407,7 @@ const DEFAULT_MAX_MESSAGE_SIZE_BYTES: i32 = 48 * 1024 * 1024;
 
 bitflags! {
     /// Represents the bitwise flags for an OP_MSG as defined in the spec.
+    #[derive(Debug)]
     pub(crate) struct MessageFlags: u32 {
         const CHECKSUM_PRESENT = 0b_0000_0000_0000_0000_0000_0000_0000_0001;
         const MORE_TO_COME     = 0b_0000_0000_0000_0000_0000_0000_0000_0010;
