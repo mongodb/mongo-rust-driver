@@ -89,6 +89,16 @@ impl OperationWithDefaults for Distinct {
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
         true
     }
+
+    #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for Distinct {
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }
 
 #[derive(Debug, Deserialize)]

@@ -20,7 +20,7 @@ use super::{
 };
 use crate::{
     bson::oid::ObjectId,
-    cmap::PoolGeneration,
+    cmap::{PoolGeneration, StreamDescription},
     error::{Error, Result},
     event::cmap::{
         ConnectionCheckedInEvent,
@@ -274,6 +274,10 @@ impl PooledConnection {
     pub(crate) fn emit_closed_event(&self, reason: ConnectionClosedReason) {
         self.event_emitter
             .emit_event(|| self.closed_event(reason).into());
+    }
+
+    pub(crate) fn stream_description(&self) -> Result<&StreamDescription> {
+        self.connection.stream_description()
     }
 
     /// Whether the connection supports sessions.

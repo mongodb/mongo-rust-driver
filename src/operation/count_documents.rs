@@ -110,6 +110,16 @@ impl OperationWithDefaults for CountDocuments {
     fn supports_read_concern(&self, description: &StreamDescription) -> bool {
         self.aggregate.supports_read_concern(description)
     }
+
+    #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for CountDocuments {
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
+        self.aggregate.target()
+    }
 }
 
 #[derive(Debug, Deserialize)]

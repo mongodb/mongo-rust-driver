@@ -70,6 +70,8 @@ pub(crate) struct ClientEntity {
     observe_events: Option<Vec<ObserveEvent>>,
     ignore_command_names: Option<Vec<String>>,
     observe_sensitive_commands: bool,
+    #[cfg(feature = "opentelemetry")]
+    pub(crate) tracing: Option<crate::otel::testing::ClientTracing>,
 }
 
 #[derive(Debug)]
@@ -123,9 +125,21 @@ impl ClientEntity {
         observe_events: Option<Vec<ObserveEvent>>,
         ignore_command_names: Option<Vec<String>>,
         observe_sensitive_commands: bool,
+        #[cfg(feature = "opentelemetry")] observe_tracing_messages: Option<
+            &crate::otel::testing::ObserveTracingMessages,
+        >,
     ) -> Self {
         let events = EventBuffer::new();
         events.register(&mut client_options);
+        #[cfg(feature = "opentelemetry")]
+        let tracing = match observe_tracing_messages {
+            Some(observe) => {
+                let (tracing, options) = crate::otel::testing::ClientTracing::new(observe);
+                client_options.tracing = Some(options);
+                Some(tracing)
+            }
+            None => None,
+        };
         let client = Client::with_options(client_options).unwrap();
         let topology_id = client.topology().id;
         Self {
@@ -135,6 +149,8 @@ impl ClientEntity {
             observe_events,
             ignore_command_names,
             observe_sensitive_commands,
+            #[cfg(feature = "opentelemetry")]
+            tracing,
         }
     }
 

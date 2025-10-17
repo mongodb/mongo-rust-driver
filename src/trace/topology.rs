@@ -1,6 +1,7 @@
 use crate::bson::oid::ObjectId;
 
 use crate::{
+    bson_util::doc_to_json_str,
     event::sdam::{
         SdamEvent,
         ServerClosedEvent,
@@ -14,7 +15,6 @@ use crate::{
         TopologyDescriptionChangedEvent,
         TopologyOpeningEvent,
     },
-    trace::serialize_command_or_reply,
 };
 
 use super::{
@@ -175,7 +175,7 @@ impl TopologyTracingEventEmitter {
                 driverConnectionId = event.driver_connection_id,
                 serverConnectionId = event.server_connection_id,
                 awaited = event.awaited,
-                reply = serialize_command_or_reply(event.reply, self.max_document_length_bytes),
+                reply = doc_to_json_str(event.reply, self.max_document_length_bytes),
                 durationMS = event.duration.as_millis(),
                 "Server heartbeat succeeded"
             )

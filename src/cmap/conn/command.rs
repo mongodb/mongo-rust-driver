@@ -33,7 +33,7 @@ pub(crate) struct Command {
     #[serde(rename = "$db")]
     pub(crate) target_db: String,
 
-    lsid: Option<Document>,
+    pub(crate) lsid: Option<Document>,
 
     #[serde(rename = "$clusterTime")]
     cluster_time: Option<ClusterTime>,
@@ -44,7 +44,7 @@ pub(crate) struct Command {
     #[serde(rename = "$readPreference")]
     read_preference: Option<ReadPreference>,
 
-    txn_number: Option<i64>,
+    pub(crate) txn_number: Option<i64>,
 
     start_transaction: Option<bool>,
 

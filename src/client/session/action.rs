@@ -79,7 +79,11 @@ impl ClientSession {
                 }
 
                 self.increment_txn_number();
-                self.transaction.start(options);
+                self.transaction.start(
+                    options,
+                    #[cfg(feature = "opentelemetry")]
+                    self.client.start_transaction_span(),
+                );
                 Ok(())
             }
             _ => Err(ErrorKind::Transaction {
@@ -355,17 +359,21 @@ impl<'a> Action for CommitTransaction<'a> {
             .into()),
             TransactionState::Starting => {
                 self.session.transaction.commit(false);
+                self.session.transaction.drop_span();
                 Ok(())
             }
             TransactionState::InProgress => {
                 let commit_transaction =
                     operation::CommitTransaction::new(self.session.transaction.options.clone());
                 self.session.transaction.commit(true);
-                self.session
+                let out = self
+                    .session
                     .client
                     .clone()
-                    .execute_operation(commit_transaction, self.session)
-                    .await
+                    .execute_operation(commit_transaction, &mut *self.session)
+                    .await;
+                self.session.transaction.drop_span();
+                out
             }
             TransactionState::Committed {
                 data_committed: true,
@@ -406,6 +414,7 @@ impl<'a> Action for AbortTransaction<'a> {
             .into()),
             TransactionState::Starting => {
                 self.session.transaction.abort();
+                self.session.transaction.drop_span();
                 Ok(())
             }
             TransactionState::InProgress => {
@@ -428,6 +437,7 @@ impl<'a> Action for AbortTransaction<'a> {
                     .clone()
                     .execute_operation(abort_transaction, &mut *self.session)
                     .await;
+                self.session.transaction.drop_span();
                 Ok(())
             }
         }

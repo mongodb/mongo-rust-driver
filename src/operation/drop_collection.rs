@@ -60,4 +60,19 @@ impl OperationWithDefaults for DropCollection {
             .as_ref()
             .and_then(|opts| opts.write_concern.as_ref())
     }
+
+    #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for DropCollection {
+    fn log_name(&self) -> &str {
+        "dropCollection"
+    }
+
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }

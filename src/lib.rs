@@ -45,6 +45,10 @@ mod hello;
 pub(crate) mod id_set;
 mod index;
 mod operation;
+#[cfg(feature = "opentelemetry")]
+pub mod otel;
+#[cfg(not(feature = "opentelemetry"))]
+mod otel_stub;
 pub mod results;
 pub(crate) mod runtime;
 mod sdam;
@@ -68,6 +72,9 @@ pub use bson2 as bson;
 
 #[cfg(feature = "bson-3")]
 pub use bson3 as bson;
+
+#[cfg(not(feature = "opentelemetry"))]
+pub(crate) use otel_stub as otel;
 
 #[cfg(feature = "in-use-encryption")]
 pub use crate::client::csfle::client_encryption;
