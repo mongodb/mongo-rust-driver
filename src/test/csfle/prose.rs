@@ -13,6 +13,7 @@ use mongocrypt::ctx::Algorithm;
 use tokio::net::TcpListener;
 
 use crate::{
+    base64,
     bson::{
         doc,
         rawdoc,

@@ -9,6 +9,7 @@ use http::Request;
 use serde::Deserialize;
 
 use crate::{
+    base64,
     bson::{doc, spec::BinarySubtype, Binary, Bson, Document},
     client::{
         auth::{

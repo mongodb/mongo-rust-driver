@@ -26,6 +26,7 @@ use mongocrypt::ctx::{Algorithm, KmsProvider, KmsProviderType};
 use std::sync::LazyLock;
 
 use crate::{
+    base64,
     client_encryption::{ClientEncryption, EncryptKey},
     options::{CollectionOptions, ReadConcern, TlsOptions, WriteConcern},
     Client,
