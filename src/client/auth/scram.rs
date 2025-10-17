@@ -18,6 +18,7 @@ use std::sync::LazyLock;
 use tokio::sync::RwLock;
 
 use crate::{
+    base64,
     bson::{Bson, Document},
     bson_compat::cstr,
     client::{
