@@ -81,6 +81,9 @@ text-indexes-unstable = []
 # Enable support for opentelemetry instrumentation
 opentelemetry = ["dep:opentelemetry"]
 
+# Capture backtraces in errors.  This can be slow, memory intensive, and very verbose.
+error-backtrace = []
+
 [dependencies]
 base64 = "0.22"
 bitflags = "2"

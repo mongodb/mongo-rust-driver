@@ -278,8 +278,8 @@ fn record_error<T>(context: &Context, result: &Result<T>) {
     span.set_attributes([
         KeyValue::new("exception.message", error.to_string()),
         KeyValue::new("exception.type", error.kind.name()),
-        #[cfg(test)]
-        KeyValue::new("exception.stacktrace", error.bt.to_string()),
+        #[cfg(feature = "error-backtrace")]
+        KeyValue::new("exception.stacktrace", error.backtrace.to_string()),
     ]);
     if let ErrorKind::Command(cmd_err) = &*error.kind {
         span.set_attribute(KeyValue::new(
