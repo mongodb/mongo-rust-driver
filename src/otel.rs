@@ -6,7 +6,7 @@ use derive_where::derive_where;
 
 use opentelemetry::{
     global::{BoxedTracer, ObjectSafeTracerProvider},
-    trace::{Span, SpanKind, TraceContextExt, Tracer, TracerProvider},
+    trace::{SpanKind, TraceContextExt, Tracer, TracerProvider},
     Context,
     KeyValue,
 };
@@ -31,7 +31,7 @@ pub(crate) mod testing;
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct Options {
+pub struct OpentelemetryOptions {
     /// Enables or disables OpenTelemtry for this client instance.  If unset, will use the value of
     /// the `OTEL_RUST_INSTRUMENTATION_MONGODB_ENABLED` environment variable.
     pub enabled: Option<bool>,
@@ -46,7 +46,7 @@ pub struct Options {
         setter(
             fn transform<S, T, P>(provider: P) -> Option<Arc<dyn ObjectSafeTracerProvider + Send + Sync>>
                 where
-                    S: Span + Send + Sync + 'static,
+                    S: opentelemetry::trace::Span + Send + Sync + 'static,
                     T: Tracer<Span = S> + Send + Sync + 'static,
                     P: TracerProvider<Tracer = T> + Send + Sync + 'static,
             {
@@ -110,10 +110,13 @@ impl Client {
         &self,
         op: &impl Operation,
         session: Option<&ClientSession>,
-    ) -> Context {
+    ) -> OpSpan {
         let op = op.otel();
         if !self.options().otel_enabled() {
-            return Context::current();
+            return OpSpan {
+                context: Context::current(),
+                enabled: false,
+            };
         }
         let span_name = format!("{} {}", op.log_name(), op_target(op));
         let mut attrs = common_attrs(op);
@@ -126,10 +129,16 @@ impl Client {
             .span_builder(span_name)
             .with_kind(SpanKind::Client)
             .with_attributes(attrs);
-        if let Some(txn_ctx) = session.and_then(|s| s.transaction.otel_ctx.as_ref()) {
+        let context = if let Some(TxnSpan(txn_ctx)) =
+            session.and_then(|s| s.transaction.otel_span.as_ref())
+        {
             txn_ctx.with_span(builder.start_with_context(self.tracer(), txn_ctx))
         } else {
             Context::current_with_span(builder.start(self.tracer()))
+        };
+        OpSpan {
+            context,
+            enabled: true,
         }
     }
 
@@ -140,10 +149,13 @@ impl Client {
         stream_desc: &StreamDescription,
         message: &Message,
         cmd_attrs: CommandAttributes,
-    ) -> Context {
+    ) -> CmdSpan {
         let op = op.otel();
         if !self.options().otel_enabled() || cmd_attrs.should_redact {
-            return Context::current();
+            return CmdSpan {
+                context: Context::current(),
+                enabled: false,
+            };
         }
         let otel_driver_conn_id: i64 = conn_info.id.into();
         let mut attrs = common_attrs(op);
@@ -196,12 +208,15 @@ impl Client {
             .with_kind(SpanKind::Client)
             .with_attributes(attrs)
             .start(self.tracer());
-        Context::current_with_span(span)
+        CmdSpan {
+            context: Context::current_with_span(span),
+            enabled: true,
+        }
     }
 
-    pub(crate) fn start_transaction_span(&self) -> Context {
+    pub(crate) fn start_transaction_span(&self) -> TxnSpan {
         if !self.options().otel_enabled() {
-            return Context::current();
+            return TxnSpan(Context::current());
         }
         let span = self
             .tracer()
@@ -209,53 +224,73 @@ impl Client {
             .with_kind(SpanKind::Client)
             .with_attributes([KeyValue::new("db.system", "mongodb")])
             .start(self.tracer());
-        Context::current_with_span(span)
+        TxnSpan(Context::current_with_span(span))
     }
+}
 
-    pub(crate) fn record_error<T>(&self, context: &Context, result: &Result<T>) {
-        if !self.options().otel_enabled() {
+pub(crate) struct OpSpan {
+    pub(crate) context: Context,
+    enabled: bool,
+}
+
+impl OpSpan {
+    pub(crate) fn record_error<T>(&self, result: &Result<T>) {
+        if !self.enabled {
             return;
         }
-        if let Err(error) = result {
-            let span = context.span();
-            span.set_attributes([
-                KeyValue::new("exception.message", error.to_string()),
-                KeyValue::new("exception.type", error.kind.name()),
-                #[cfg(test)]
-                KeyValue::new("exception.stacktrace", error.bt.to_string()),
-            ]);
-            if let ErrorKind::Command(cmd_err) = &*error.kind {
-                span.set_attribute(KeyValue::new(
-                    "db.response.status_code",
-                    cmd_err.code.to_string(),
-                ));
-            }
-            span.record_error(error);
-            span.set_status(opentelemetry::trace::Status::Error {
-                description: error.to_string().into(),
-            });
-        }
+        record_error(&self.context, result);
     }
+}
 
-    pub(crate) fn record_command_result<Op: Operation>(
-        &self,
-        context: &Context,
-        result: &Result<Op::O>,
-    ) {
-        if !self.options().otel_enabled() {
+pub(crate) struct CmdSpan {
+    context: Context,
+    enabled: bool,
+}
+
+impl CmdSpan {
+    pub(crate) fn record_command_result<Op: Operation>(&self, result: &Result<Op::O>) {
+        if !self.enabled {
             return;
         }
         if let Ok(out) = result {
             // tests don't match the spec here
             if false {
                 if let Some(cursor_id) = <Op::Otel as OtelWitness>::output_cursor_id(out) {
-                    let span = context.span();
+                    let span = self.context.span();
                     span.set_attribute(KeyValue::new("db.mongodb.cursor_id", cursor_id));
                 }
             }
         }
-        self.record_error(context, result);
+        record_error(&self.context, result);
     }
+}
+
+#[derive(Debug)]
+pub(crate) struct TxnSpan(Context);
+
+fn record_error<T>(context: &Context, result: &Result<T>) {
+    let error = if let Err(error) = result {
+        error
+    } else {
+        return;
+    };
+    let span = context.span();
+    span.set_attributes([
+        KeyValue::new("exception.message", error.to_string()),
+        KeyValue::new("exception.type", error.kind.name()),
+        #[cfg(test)]
+        KeyValue::new("exception.stacktrace", error.bt.to_string()),
+    ]);
+    if let ErrorKind::Command(cmd_err) = &*error.kind {
+        span.set_attribute(KeyValue::new(
+            "db.response.status_code",
+            cmd_err.code.to_string(),
+        ));
+    }
+    span.record_error(error);
+    span.set_status(opentelemetry::trace::Status::Error {
+        description: error.to_string().into(),
+    });
 }
 
 fn op_target(op: &impl OtelInfo) -> String {

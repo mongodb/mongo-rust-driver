@@ -45,12 +45,12 @@ pub(crate) struct ClientTracing {
 }
 
 impl ClientTracing {
-    pub(crate) fn new(observe: &ObserveTracingMessages) -> (Self, super::Options) {
+    pub(crate) fn new(observe: &ObserveTracingMessages) -> (Self, super::OpentelemetryOptions) {
         let exporter = InMemorySpanExporterBuilder::new().build();
         let provider = SdkTracerProvider::builder()
             .with_span_processor(BatchSpanProcessor::builder(exporter.clone()).build())
             .build();
-        let mut options = super::Options::builder()
+        let mut options = super::OpentelemetryOptions::builder()
             .enabled(true)
             .tracer_provider(provider.clone())
             .build();

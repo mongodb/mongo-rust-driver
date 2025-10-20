@@ -614,7 +614,7 @@ pub struct ClientOptions {
 
     /// Configuration for opentelemetry.
     #[cfg(feature = "opentelemetry")]
-    pub tracing: Option<crate::otel::Options>,
+    pub tracing: Option<crate::otel::OpentelemetryOptions>,
 
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(setter(skip))]

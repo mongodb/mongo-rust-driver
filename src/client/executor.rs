@@ -111,13 +111,13 @@ impl Client {
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<ExecutionDetails<T>> {
         let session = session.into();
-        let ctx = self.start_operation_span(op, session.as_deref());
+        let span = self.start_operation_span(op, session.as_deref());
         let result = self
             .execute_operation_with_details_inner(op, session)
-            .with_context(ctx.clone())
+            .with_context(span.context.clone())
             .await;
         #[cfg(feature = "opentelemetry")]
-        self.record_error(&ctx, &result);
+        span.record_error(&result);
 
         result
     }
@@ -531,7 +531,7 @@ impl Client {
             message.request_id = Some(request_id);
 
             #[cfg(feature = "opentelemetry")]
-            let ctx = self.start_command_span(
+            let span = self.start_command_span(
                 op,
                 &connection_info,
                 connection.stream_description()?,
@@ -670,7 +670,7 @@ impl Client {
                 }
             };
             #[cfg(feature = "opentelemetry")]
-            self.record_command_result::<T>(&ctx, &result);
+            span.record_command_result::<T>(&result);
 
             if result
                 .as_ref()
