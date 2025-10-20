@@ -111,11 +111,12 @@ impl Client {
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<ExecutionDetails<T>> {
         let session = session.into();
+        #[cfg(feature = "opentelemetry")]
         let span = self.start_operation_span(op, session.as_deref());
-        let result = self
-            .execute_operation_with_details_inner(op, session)
-            .with_context(span.context.clone())
-            .await;
+        let inner = self.execute_operation_with_details_inner(op, session);
+        #[cfg(feature = "opentelemetry")]
+        let inner = inner.with_context(span.context.clone());
+        let result = inner.await;
         #[cfg(feature = "opentelemetry")]
         span.record_error(&result);
 
