@@ -55,7 +55,8 @@ pub(crate) async fn authenticate_stream(
         &properties.canonicalize_host_name,
         resolver_config,
     )
-    .await?;
+    .await
+    .unwrap_or_else(|_| hostname.clone());
 
     let user_principal = credential.username.clone();
     let service_principal = properties.service_principal_name(&hostname, user_principal.as_ref());

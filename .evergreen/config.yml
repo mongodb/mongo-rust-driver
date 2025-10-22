@@ -261,7 +261,7 @@ buildvariants:
     display_name: "GSSAPI Authentication - Linux"
     patchable: true
     run_on:
-      - ubuntu2204-small
+      - rhel87-small
     tasks:
       - test-gssapi-auth
 
@@ -278,7 +278,7 @@ buildvariants:
     display_name: "GSSAPI Authentication - Windows"
     patchable: true
     run_on:
-      - windows-vsCurrent-small
+      - windows-64-vs2017-small
     tasks:
       - test-gssapi-auth
 
