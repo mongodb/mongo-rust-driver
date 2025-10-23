@@ -176,6 +176,14 @@ pub(crate) trait Operation {
 
     /// The name of the server side command associated with this operation.
     fn name(&self) -> &CStr;
+
+    #[cfg(feature = "opentelemetry")]
+    type Otel: crate::otel::OtelWitness<Op = Self>;
+
+    #[cfg(feature = "opentelemetry")]
+    fn otel(&self) -> &impl crate::otel::OtelInfo {
+        <Self::Otel as crate::otel::OtelWitness>::otel(self)
+    }
 }
 
 pub(crate) type OverrideCriteriaFn =
@@ -277,6 +285,9 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     fn name(&self) -> &CStr {
         Self::NAME
     }
+
+    #[cfg(feature = "opentelemetry")]
+    type Otel: crate::otel::OtelWitness<Op = Self>;
 }
 
 impl<T: OperationWithDefaults> Operation for T
@@ -331,6 +342,8 @@ where
     fn name(&self) -> &CStr {
         self.name()
     }
+    #[cfg(feature = "opentelemetry")]
+    type Otel = <Self as OperationWithDefaults>::Otel;
 }
 
 fn should_redact_body(body: &RawDocumentBuf) -> bool {

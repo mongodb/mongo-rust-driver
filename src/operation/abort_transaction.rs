@@ -80,4 +80,14 @@ impl OperationWithDefaults for AbortTransaction {
         // The session must be "unpinned" before server selection for a retry.
         self.pinned = None;
     }
+
+    #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for AbortTransaction {
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
+        crate::otel::OperationTarget::ADMIN
+    }
 }

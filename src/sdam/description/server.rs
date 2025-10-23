@@ -57,6 +57,22 @@ pub enum ServerType {
     Unknown,
 }
 
+impl std::fmt::Display for ServerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ServerType::Standalone => write!(f, "Standalone"),
+            ServerType::Mongos => write!(f, "Mongos"),
+            ServerType::RsPrimary => write!(f, "RSPrimary"),
+            ServerType::RsSecondary => write!(f, "RSSecondary"),
+            ServerType::RsArbiter => write!(f, "RSArbiter"),
+            ServerType::RsOther => write!(f, "RSOther"),
+            ServerType::RsGhost => write!(f, "RSGhost"),
+            ServerType::LoadBalancer => write!(f, "LoadBalancer"),
+            ServerType::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
+
 impl ServerType {
     pub(crate) fn can_auth(self) -> bool {
         !matches!(self, ServerType::RsArbiter)

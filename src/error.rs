@@ -52,14 +52,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// cloned.
 #[derive(Clone, Debug, Error)]
 #[cfg_attr(
-    test,
+    feature = "error-backtrace",
     error(
-        "Kind: {kind}, labels: {labels:?}, source: {source:?}, backtrace: {bt}, server response: \
-         {server_response:?}"
+        "Kind: {kind}, labels: {labels:?}, source: {source:?}, server response: \
+         {server_response:?}, backtrace: {backtrace}"
     )
 )]
 #[cfg_attr(
-    not(test),
+    not(feature = "error-backtrace"),
     error(
         "Kind: {kind}, labels: {labels:?}, source: {source:?}, server response: \
          {server_response:?}"
@@ -79,8 +79,8 @@ pub struct Error {
 
     pub(crate) server_response: Option<Box<RawDocumentBuf>>,
 
-    #[cfg(test)]
-    bt: Arc<std::backtrace::Backtrace>,
+    #[cfg(feature = "error-backtrace")]
+    pub(crate) backtrace: Arc<std::backtrace::Backtrace>,
 }
 
 impl Error {
@@ -113,8 +113,8 @@ impl Error {
             wire_version: None,
             source: None,
             server_response: None,
-            #[cfg(test)]
-            bt: Arc::new(std::backtrace::Backtrace::capture()),
+            #[cfg(feature = "error-backtrace")]
+            backtrace: Arc::new(std::backtrace::Backtrace::capture()),
         }
     }
 
@@ -780,6 +780,38 @@ impl ErrorKind {
             }) => write_concern_error.as_ref(),
             ErrorKind::Write(WriteFailure::WriteConcernError(err)) => Some(err),
             _ => None,
+        }
+    }
+
+    #[cfg(feature = "opentelemetry")]
+    pub(crate) fn name(&self) -> &'static str {
+        match self {
+            ErrorKind::InvalidArgument { .. } => "InvalidArgument",
+            ErrorKind::Authentication { .. } => "Authentication",
+            ErrorKind::BsonDeserialization(..) => "BsonDeserialization",
+            ErrorKind::BsonSerialization(..) => "BsonSerialization",
+            #[cfg(feature = "bson-3")]
+            ErrorKind::Bson(..) => "Bson",
+            ErrorKind::InsertMany(..) => "InsertMany",
+            ErrorKind::BulkWrite(..) => "BulkWrite",
+            ErrorKind::Command(..) => "Command",
+            ErrorKind::DnsResolve { .. } => "DnsResolve",
+            ErrorKind::GridFs(..) => "GridFs",
+            ErrorKind::Internal { .. } => "Internal",
+            ErrorKind::Io(..) => "Io",
+            ErrorKind::ConnectionPoolCleared { .. } => "ConnectionPoolCleared",
+            ErrorKind::InvalidResponse { .. } => "InvalidResponse",
+            ErrorKind::ServerSelection { .. } => "ServerSelection",
+            ErrorKind::SessionsNotSupported => "SessionsNotSupported",
+            ErrorKind::InvalidTlsConfig { .. } => "InvalidTlsConfig",
+            ErrorKind::Write(..) => "Write",
+            ErrorKind::Transaction { .. } => "Transaction",
+            ErrorKind::IncompatibleServer { .. } => "IncompatibleServer",
+            ErrorKind::MissingResumeToken => "MissingResumeToken",
+            #[cfg(feature = "in-use-encryption")]
+            ErrorKind::Encryption(..) => "Encryption",
+            ErrorKind::Custom(..) => "Custom",
+            ErrorKind::Shutdown => "Shutdown",
         }
     }
 }

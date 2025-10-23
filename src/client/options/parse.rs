@@ -162,6 +162,8 @@ impl ClientOptions {
             tracing_max_document_length_bytes: None,
             srv_max_hosts: conn_str.srv_max_hosts,
             srv_service_name: conn_str.srv_service_name,
+            #[cfg(feature = "opentelemetry")]
+            tracing: None,
         }
     }
 }

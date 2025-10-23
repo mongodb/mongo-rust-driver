@@ -1,8 +1,9 @@
 use crate::bson::oid::ObjectId;
 
 use crate::{
+    bson_util::doc_to_json_str,
     event::command::CommandEvent,
-    trace::{serialize_command_or_reply, TracingRepresentation, COMMAND_TRACING_EVENT_TARGET},
+    trace::{TracingRepresentation, COMMAND_TRACING_EVENT_TARGET},
 };
 
 use super::DEFAULT_MAX_DOCUMENT_LENGTH_BYTES;
@@ -32,7 +33,7 @@ impl CommandTracingEventEmitter {
                 tracing::debug!(
                     target: COMMAND_TRACING_EVENT_TARGET,
                     topologyId = self.topology_id.tracing_representation(),
-                    command = serialize_command_or_reply(event.command, self.max_document_length_bytes),
+                    command = doc_to_json_str(event.command, self.max_document_length_bytes),
                     databaseName = event.db,
                     commandName = event.command_name,
                     requestId = event.request_id,
@@ -48,7 +49,7 @@ impl CommandTracingEventEmitter {
                 tracing::debug!(
                     target: COMMAND_TRACING_EVENT_TARGET,
                     topologyId = self.topology_id.tracing_representation(),
-                    reply = serialize_command_or_reply(event.reply, self.max_document_length_bytes),
+                    reply = doc_to_json_str(event.reply, self.max_document_length_bytes),
                     commandName = event.command_name,
                     requestId = event.request_id,
                     driverConnectionId = event.connection.id,

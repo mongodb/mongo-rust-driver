@@ -81,4 +81,19 @@ impl OperationWithDefaults for ListCollections {
     fn retryability(&self) -> Retryability {
         Retryability::Read
     }
+
+    #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for ListCollections {
+    fn output_cursor_id(output: &Self::O) -> Option<i64> {
+        Some(output.id())
+    }
+
+    #[cfg(feature = "opentelemetry")]
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
+        self.db.as_str().into()
+    }
 }

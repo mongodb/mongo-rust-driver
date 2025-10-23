@@ -1,7 +1,7 @@
 #[cfg(feature = "bson-3")]
 use crate::bson_compat::RawDocumentBufExt;
 use crate::{
-    bson::Bson,
+    bson_util::{doc_to_json_str, truncate_on_char_boundary},
     client::options::{ServerAddress, DEFAULT_PORT},
 };
 
@@ -41,7 +41,7 @@ impl crate::error::Error {
         );
         if let Some(server_response) = self.server_response() {
             let server_response_string = match server_response.to_document() {
-                Ok(document) => serialize_command_or_reply(document, max_document_length),
+                Ok(document) => doc_to_json_str(document, max_document_length),
                 Err(_) => {
                     let mut hex_string = hex::encode(server_response.as_bytes());
                     truncate_on_char_boundary(&mut hex_string, max_document_length);
@@ -66,36 +66,6 @@ impl ServerAddress {
             Self::Unix { .. } => None,
         }
     }
-}
-
-/// Truncates the given string at the closest UTF-8 character boundary >= the provided length.
-/// If the new length is >= the current length, does nothing.
-pub(crate) fn truncate_on_char_boundary(s: &mut String, new_len: usize) {
-    let original_len = s.len();
-    if original_len > new_len {
-        // to avoid generating invalid UTF-8, find the first index >= max_length_bytes that is
-        // the end of a character.
-        // TODO: RUST-1496 we should use ceil_char_boundary here but it's currently nightly-only.
-        // see: https://doc.rust-lang.org/std/string/struct.String.html#method.ceil_char_boundary
-        let mut truncate_index = new_len;
-        // is_char_boundary returns true when the provided value == the length of the string, so
-        // if we reach the end of the string this loop will terminate.
-        while !s.is_char_boundary(truncate_index) {
-            truncate_index += 1;
-        }
-        s.truncate(truncate_index);
-        // due to the "rounding up" behavior we might not actually end up truncating anything.
-        // if we did, spec requires we add a trailing "...".
-        if truncate_index < original_len {
-            s.push_str("...")
-        }
-    }
-}
-
-fn serialize_command_or_reply(doc: crate::bson::Document, max_length_bytes: usize) -> String {
-    let mut ext_json = Bson::Document(doc).into_relaxed_extjson().to_string();
-    truncate_on_char_boundary(&mut ext_json, max_length_bytes);
-    ext_json
 }
 
 /// We don't currently use all of these levels but they are included for completeness.

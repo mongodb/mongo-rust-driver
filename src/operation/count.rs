@@ -75,6 +75,16 @@ impl OperationWithDefaults for Count {
     fn retryability(&self) -> Retryability {
         Retryability::Read
     }
+
+    #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for Count {
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }
 
 #[derive(Debug, Deserialize)]

@@ -73,6 +73,16 @@ impl OperationWithDefaults for CreateSearchIndexes {
     fn supports_read_concern(&self, _description: &crate::cmap::StreamDescription) -> bool {
         false
     }
+
+    #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for CreateSearchIndexes {
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }
 
 #[derive(Debug)]
@@ -127,6 +137,16 @@ impl OperationWithDefaults for UpdateSearchIndex {
     fn supports_read_concern(&self, _description: &crate::cmap::StreamDescription) -> bool {
         false
     }
+
+    #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for UpdateSearchIndex {
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
+        (&self.ns).into()
+    }
 }
 
 #[derive(Debug)]
@@ -178,5 +198,15 @@ impl OperationWithDefaults for DropSearchIndex {
 
     fn supports_read_concern(&self, _description: &crate::cmap::StreamDescription) -> bool {
         false
+    }
+
+    #[cfg(feature = "opentelemetry")]
+    type Otel = crate::otel::Witness<Self>;
+}
+
+#[cfg(feature = "opentelemetry")]
+impl crate::otel::OtelInfoDefaults for DropSearchIndex {
+    fn target(&self) -> crate::otel::OperationTarget<'_> {
+        (&self.ns).into()
     }
 }

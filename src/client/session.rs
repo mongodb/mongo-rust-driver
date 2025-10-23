@@ -118,13 +118,23 @@ pub(crate) struct Transaction {
     pub(crate) options: Option<TransactionOptions>,
     pub(crate) pinned: Option<TransactionPin>,
     pub(crate) recovery_token: Option<Document>,
+    #[cfg(feature = "opentelemetry")]
+    pub(crate) otel_span: Option<crate::otel::TxnSpan>,
 }
 
 impl Transaction {
-    pub(crate) fn start(&mut self, options: Option<TransactionOptions>) {
+    pub(crate) fn start(
+        &mut self,
+        options: Option<TransactionOptions>,
+        #[cfg(feature = "opentelemetry")] otel_span: crate::otel::TxnSpan,
+    ) {
         self.state = TransactionState::Starting;
         self.options = options;
         self.recovery_token = None;
+        #[cfg(feature = "opentelemetry")]
+        {
+            self.otel_span = Some(otel_span);
+        }
     }
 
     pub(crate) fn commit(&mut self, data_committed: bool) {
@@ -142,6 +152,14 @@ impl Transaction {
         self.options = None;
         self.pinned = None;
         self.recovery_token = None;
+        self.drop_span();
+    }
+
+    pub(crate) fn drop_span(&mut self) {
+        #[cfg(feature = "opentelemetry")]
+        {
+            self.otel_span = None;
+        }
     }
 
     #[cfg(test)]
@@ -169,6 +187,8 @@ impl Transaction {
             options: self.options.take(),
             pinned: self.pinned.take(),
             recovery_token: self.recovery_token.take(),
+            #[cfg(feature = "opentelemetry")]
+            otel_span: self.otel_span.take(),
         }
     }
 }
@@ -180,6 +200,8 @@ impl Default for Transaction {
             options: None,
             pinned: None,
             recovery_token: None,
+            #[cfg(feature = "opentelemetry")]
+            otel_span: None,
         }
     }
 }
