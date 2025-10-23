@@ -74,14 +74,14 @@ async fn tcp_try_connect(address: &SocketAddr) -> Result<TcpStream> {
     let stream = TcpStream::connect(address).await?;
     stream.set_nodelay(true)?;
 
-    let socket = socket2::Socket::from(stream.into_std()?);
     #[cfg(not(target_os = "wasi"))]
     {
+        let sock_ref = socket2::SockRef::from(&stream);
         let conf = socket2::TcpKeepalive::new().with_time(KEEPALIVE_TIME);
-        socket.set_tcp_keepalive(&conf)?;
+        sock_ref.set_tcp_keepalive(&conf)?;
     }
-    let std_stream = std::net::TcpStream::from(socket);
-    Ok(TcpStream::from_std(std_stream)?)
+
+    Ok(stream)
 }
 
 pub(crate) async fn tcp_connect(resolved: Vec<SocketAddr>) -> Result<TcpStream> {
