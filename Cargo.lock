@@ -1996,7 +1996,7 @@ dependencies = [
  "sha1",
  "sha2",
  "snap",
- "socket2 0.5.10",
+ "socket2 0.6.0",
  "stringprep",
  "strsim",
  "take_mut",

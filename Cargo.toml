@@ -247,7 +247,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 all-features = true
 
 [target.'cfg(not(wasi))'.dependencies]
-socket2 = "0.5.5"
+socket2 = "0.6"
 
 # Target-specific dependencies for GSSAPI authentication
 [target.'cfg(not(windows))'.dependencies]
