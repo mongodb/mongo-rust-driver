@@ -633,7 +633,7 @@ pub(crate) enum FirstRound {
 }
 
 pub(crate) fn generate_nonce_bytes() -> [u8; 32] {
-    rand::thread_rng().gen()
+    rand::rng().random()
 }
 
 pub(crate) fn generate_nonce() -> String {

@@ -1979,7 +1979,7 @@ dependencies = [
  "percent-encoding",
  "pkcs8",
  "pretty_assertions",
- "rand 0.8.5",
+ "rand 0.9.1",
  "rayon",
  "regex",
  "reqwest",
