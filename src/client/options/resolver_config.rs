@@ -5,10 +5,39 @@ use hickory_resolver::config::ResolverConfig as HickoryResolverConfig;
 ///
 /// This is a thin wrapper around a `hickory_resolver::config::ResolverConfig` provided to ensure
 /// API stability.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
+#[cfg_attr(not(feature = "dns-resolver"), derive(PartialEq))]
 pub struct ResolverConfig {
     #[cfg(feature = "dns-resolver")]
     pub(crate) inner: HickoryResolverConfig,
+}
+
+#[cfg(feature = "dns-resolver")]
+impl PartialEq for ResolverConfig {
+    fn eq(&self, other: &Self) -> bool {
+        let (left, right) = (&self.inner, &other.inner);
+
+        if !(left.domain() == right.domain()
+            && left.search() == right.search()
+            && left.name_servers().len() == right.name_servers().len())
+        {
+            return false;
+        }
+
+        for (a, b) in std::iter::zip(left.name_servers(), right.name_servers()) {
+            if !(a.socket_addr == b.socket_addr
+                && a.protocol == b.protocol
+                && a.tls_dns_name == b.tls_dns_name
+                && a.http_endpoint == b.http_endpoint
+                && a.trust_negative_responses == b.trust_negative_responses
+                && a.bind_addr == b.bind_addr)
+            {
+                return false;
+            }
+        }
+
+        true
+    }
 }
 
 #[cfg(feature = "dns-resolver")]

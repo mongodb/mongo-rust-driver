@@ -98,8 +98,8 @@ futures-io = "0.3.21"
 futures-core = "0.3.14"
 futures-util = { version = "0.3.14", features = ["io"] }
 hex = "0.4.0"
-hickory-proto = { version = "0.24.2", optional = true }
-hickory-resolver = { version = "0.24.2", optional = true }
+hickory-proto = { version = "0.25", optional = true }
+hickory-resolver = { version = "0.25", optional = true }
 hmac = "0.12.1"
 log = { version = "0.4.17", optional = true }
 md-5 = "0.10.1"
