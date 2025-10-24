@@ -741,8 +741,8 @@ impl TopologyDescription {
 }
 
 pub(crate) fn choose_n<T>(values: &[T], n: usize) -> impl Iterator<Item = &T> {
-    use rand::{prelude::SliceRandom, SeedableRng};
-    values.choose_multiple(&mut rand::rngs::SmallRng::from_entropy(), n)
+    use rand::{seq::IndexedRandom, SeedableRng};
+    values.choose_multiple(&mut rand::rngs::SmallRng::from_os_rng(), n)
 }
 
 /// Enum representing whether transactions are supported by the topology.
