@@ -317,7 +317,7 @@ impl Error {
     }
 
     #[cfg(feature = "dns-resolver")]
-    pub(crate) fn from_resolve_error(error: hickory_resolver::error::ResolveError) -> Self {
+    pub(crate) fn from_resolve_error(error: hickory_resolver::ResolveError) -> Self {
         ErrorKind::DnsResolve {
             message: error.to_string(),
         }
@@ -325,7 +325,7 @@ impl Error {
     }
 
     #[cfg(feature = "dns-resolver")]
-    pub(crate) fn from_resolve_proto_error(error: hickory_proto::error::ProtoError) -> Self {
+    pub(crate) fn from_resolve_proto_error(error: hickory_proto::ProtoError) -> Self {
         ErrorKind::DnsResolve {
             message: error.to_string(),
         }
