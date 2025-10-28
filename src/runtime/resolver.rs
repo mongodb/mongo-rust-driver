@@ -1,7 +1,6 @@
 use crate::error::{Error, Result};
 use hickory_resolver::{
     config::ResolverConfig,
-    error::ResolveErrorKind,
     lookup::{SrvLookup, TxtLookup},
     Name,
 };
@@ -17,16 +16,19 @@ use std::net::IpAddr;
 
 /// An async runtime agnostic DNS resolver.
 pub(crate) struct AsyncResolver {
-    resolver: hickory_resolver::TokioAsyncResolver,
+    resolver: hickory_resolver::TokioResolver,
 }
 
 impl AsyncResolver {
     pub(crate) async fn new(config: Option<ResolverConfig>) -> Result<Self> {
         let resolver = match config {
-            Some(config) => hickory_resolver::TokioAsyncResolver::tokio(config, Default::default()),
-            None => hickory_resolver::TokioAsyncResolver::tokio_from_system_conf()
+            Some(config) => {
+                hickory_resolver::TokioResolver::builder_with_config(config, Default::default())
+            }
+            None => hickory_resolver::TokioResolver::builder_tokio()
                 .map_err(Error::from_resolve_error)?,
-        };
+        }
+        .build();
 
         Ok(Self { resolver })
     }
@@ -80,10 +82,8 @@ impl AsyncResolver {
         let lookup_result = self.resolver.txt_lookup(name).await;
         match lookup_result {
             Ok(lookup) => Ok(Some(lookup)),
-            Err(e) => match e.kind() {
-                ResolveErrorKind::NoRecordsFound { .. } => Ok(None),
-                _ => Err(Error::from_resolve_error(e)),
-            },
+            Err(e) if e.is_no_records_found() => Ok(None),
+            Err(e) => Err(Error::from_resolve_error(e)),
         }
     }
 }
