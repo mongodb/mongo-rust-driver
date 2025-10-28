@@ -91,7 +91,7 @@ chrono = { version = "0.4.32", default-features = false, features = [
     "now",
     "std",
 ] }
-derive_more = "0.99.17"
+derive_more = { version = "2", features = ["display", "from"] }
 derive-where = "1.2.7"
 flate2 = { version = "1.0", optional = true }
 futures-io = "0.3.21"
