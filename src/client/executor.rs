@@ -3,8 +3,6 @@ use crate::bson::RawDocumentBuf;
 use crate::bson::{doc, RawBsonRef, RawDocument, Timestamp};
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
-#[cfg(feature = "opentelemetry")]
-use opentelemetry::context::FutureExt;
 use serde::de::DeserializeOwned;
 use std::sync::LazyLock;
 
@@ -16,8 +14,6 @@ use std::{
 };
 
 use super::{options::ServerAddress, session::TransactionState, Client, ClientSession};
-#[cfg(not(feature = "opentelemetry"))]
-use crate::otel::OtelFutureStub as _;
 use crate::{
     bson::Document,
     change_stream::{
@@ -105,19 +101,30 @@ impl Client {
             .map(|details| details.output)
     }
 
+    #[cfg(not(feature = "opentelemetry"))]
     async fn execute_operation_with_details<T: Operation>(
         &self,
         op: &mut T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<ExecutionDetails<T>> {
+        self.execute_operation_with_details_inner(op, session.into())
+            .await
+    }
+
+    #[cfg(feature = "opentelemetry")]
+    async fn execute_operation_with_details<T: Operation>(
+        &self,
+        op: &mut T,
+        session: impl Into<Option<&mut ClientSession>>,
+    ) -> Result<ExecutionDetails<T>> {
+        use crate::otel::FutureExt as _;
+
         let session = session.into();
-        #[cfg(feature = "opentelemetry")]
         let span = self.start_operation_span(op, session.as_deref());
-        let inner = self.execute_operation_with_details_inner(op, session);
-        #[cfg(feature = "opentelemetry")]
-        let inner = inner.with_context(span.context.clone());
-        let result = inner.await;
-        #[cfg(feature = "opentelemetry")]
+        let result = self
+            .execute_operation_with_details_inner(op, session)
+            .with_span(&span)
+            .await;
         span.record_error(&result);
 
         result
@@ -176,13 +183,7 @@ impl Client {
             }
         }
 
-        Box::pin(async {
-            self.execute_operation_with_retry(op, session)
-                .with_current_context()
-                .await
-        })
-        .with_current_context()
-        .await
+        Box::pin(async { self.execute_operation_with_retry(op, session).await }).await
     }
 
     /// Execute the given operation, returning the cursor created by the operation.
@@ -436,7 +437,6 @@ impl Client {
                     retryability,
                     effective_criteria,
                 )
-                .with_current_context()
                 .await
             {
                 Ok(output) => ExecutionDetails {
