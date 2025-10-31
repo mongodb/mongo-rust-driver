@@ -1,6 +1,9 @@
 //! Support for OpenTelemetry.
 
-use std::sync::{Arc, LazyLock};
+use std::{
+    future::Future,
+    sync::{Arc, LazyLock},
+};
 
 use derive_where::derive_where;
 
@@ -229,7 +232,7 @@ impl Client {
 }
 
 pub(crate) struct OpSpan {
-    pub(crate) context: Context,
+    context: Context,
     enabled: bool,
 }
 
@@ -443,3 +446,12 @@ impl<'a> From<&'a AggregateTarget> for OperationTarget<'a> {
         }
     }
 }
+
+pub(crate) trait FutureExt: Future + Sized {
+    fn with_span(self, span: &OpSpan) -> impl Future<Output = Self::Output> {
+        use opentelemetry::context::FutureExt;
+        self.with_context(span.context.clone())
+    }
+}
+
+impl<T: Future> FutureExt for T {}
