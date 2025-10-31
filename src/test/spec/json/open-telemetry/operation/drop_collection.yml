@@ -1,5 +1,9 @@
 description: operation drop collection
 schemaVersion: '1.27'
+
+runOnRequirements:
+  - minServerVersion: "7.0"
+
 createEntities:
   - client:
       id: &client0 client0
@@ -34,6 +38,7 @@ tests:
               db.collection.name: test
               db.operation.name: dropCollection
               db.operation.summary: dropCollection operation-drop-collection.test
+
             nested:
               - name: drop
                 attributes:

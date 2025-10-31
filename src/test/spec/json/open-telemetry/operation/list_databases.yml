@@ -22,6 +22,8 @@ tests:
               db.namespace: admin
               db.operation.name: listDatabases
               db.operation.summary: listDatabases admin
+              db.collection.name: { $$exists: false }
+
             nested:
               - name: listDatabases
                 attributes:

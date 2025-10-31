@@ -32,7 +32,10 @@
                 "db.system": "mongodb",
                 "db.namespace": "admin",
                 "db.operation.name": "listDatabases",
-                "db.operation.summary": "listDatabases admin"
+                "db.operation.summary": "listDatabases admin",
+                "db.collection.name": {
+                  "$$exists": false
+                }
               },
               "nested": [
                 {

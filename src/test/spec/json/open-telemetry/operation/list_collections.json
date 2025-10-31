@@ -39,7 +39,10 @@
                 "db.system": "mongodb",
                 "db.namespace": "operation-list-collections",
                 "db.operation.name": "listCollections",
-                "db.operation.summary": "listCollections operation-list-collections"
+                "db.operation.summary": "listCollections operation-list-collections",
+                "db.collection.name": {
+                  "$$exists": false
+                }
               },
               "nested": [
                 {
@@ -47,11 +50,11 @@
                   "attributes": {
                     "db.system": "mongodb",
                     "db.namespace": "operation-list-collections",
-                    "db.command.name": "listCollections",
-                    "network.transport": "tcp",
-                    "db.mongodb.cursor_id": {
+                    "db.collection.name": {
                       "$$exists": false
                     },
+                    "db.command.name": "listCollections",
+                    "network.transport": "tcp",
                     "db.response.status_code": {
                       "$$exists": false
                     },
@@ -77,8 +80,7 @@
                     "db.query.text": {
                       "$$matchAsDocument": {
                         "$$matchAsRoot": {
-                          "listCollections": 1,
-                          "cursor": {}
+                          "listCollections": 1
                         }
                       }
                     },

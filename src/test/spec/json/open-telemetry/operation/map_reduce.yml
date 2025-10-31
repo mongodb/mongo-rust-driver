@@ -69,6 +69,7 @@ tests:
               db.collection.name: test
               db.operation.name: mapReduce
               db.operation.summary: mapReduce operation-map-reduce.test
+
             nested:
               - name: mapReduce
                 attributes:
@@ -84,7 +85,6 @@ tests:
                   exception.stacktrace: { $$exists: false }
                   server.address: { $$type: string }
                   server.port: { $$type: [ int, long ] }
-                  server.type: { $$type: string }
                   db.query.summary: mapReduce operation-map-reduce.test
                   db.query.text:
                     $$matchAsDocument:
