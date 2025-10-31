@@ -113,6 +113,7 @@
                         "db.system": "mongodb",
                         "db.namespace": "transaction-tests",
                         "db.collection.name": "test",
+                        "db.command.name": "insert",
                         "server.address": {
                           "$$type": "string"
                         },
@@ -122,14 +123,39 @@
                             "string"
                           ]
                         },
-                        "server.type": {
-                          "$$type": "string"
-                        },
                         "db.query.summary": "insert transaction-tests.test",
                         "db.mongodb.lsid": {
                           "$$sessionLsid": "session0"
                         },
                         "db.mongodb.txn_number": 1,
+                        "network.transport": "tcp",
+                        "db.mongodb.cursor_id": {
+                          "$$exists": false
+                        },
+                        "db.response.status_code": {
+                          "$$exists": false
+                        },
+                        "exception.message": {
+                          "$$exists": false
+                        },
+                        "exception.type": {
+                          "$$exists": false
+                        },
+                        "exception.stacktrace": {
+                          "$$exists": false
+                        },
+                        "db.mongodb.server_connection_id": {
+                          "$$type": [
+                            "int",
+                            "long"
+                          ]
+                        },
+                        "db.mongodb.driver_connection_id": {
+                          "$$type": [
+                            "int",
+                            "long"
+                          ]
+                        },
                         "db.query.text": {
                           "$$matchAsDocument": {
                             "$$matchAsRoot": {
@@ -158,7 +184,8 @@
                     "db.collection.name": {
                       "$$exists": false
                     },
-                    "db.operation.name": "commitTransaction"
+                    "db.operation.name": "commitTransaction",
+                    "db.operation.summary": "commitTransaction admin"
                   },
                   "nested": [
                     {
@@ -175,6 +202,43 @@
                           "$$sessionLsid": "session0"
                         },
                         "db.mongodb.txn_number": 1,
+                        "db.mongodb.cursor_id": {
+                          "$$exists": false
+                        },
+                        "db.response.status_code": {
+                          "$$exists": false
+                        },
+                        "exception.message": {
+                          "$$exists": false
+                        },
+                        "exception.type": {
+                          "$$exists": false
+                        },
+                        "exception.stacktrace": {
+                          "$$exists": false
+                        },
+                        "network.transport": "tcp",
+                        "server.address": {
+                          "$$type": "string"
+                        },
+                        "server.port": {
+                          "$$type": [
+                            "int",
+                            "long"
+                          ]
+                        },
+                        "db.mongodb.server_connection_id": {
+                          "$$type": [
+                            "int",
+                            "long"
+                          ]
+                        },
+                        "db.mongodb.driver_connection_id": {
+                          "$$type": [
+                            "int",
+                            "long"
+                          ]
+                        },
                         "db.query.text": {
                           "$$matchAsDocument": {
                             "$$matchAsRoot": {
@@ -216,8 +280,33 @@
                         "string"
                       ]
                     },
-                    "server.type": {
-                      "$$type": "string"
+                    "db.response.status_code": {
+                      "$$exists": false
+                    },
+                    "exception.message": {
+                      "$$exists": false
+                    },
+                    "exception.type": {
+                      "$$exists": false
+                    },
+                    "exception.stacktrace": {
+                      "$$exists": false
+                    },
+                    "network.transport": "tcp",
+                    "db.mongodb.server_connection_id": {
+                      "$$type": [
+                        "int",
+                        "long"
+                      ]
+                    },
+                    "db.mongodb.driver_connection_id": {
+                      "$$type": [
+                        "int",
+                        "long"
+                      ]
+                    },
+                    "db.query.text": {
+                      "$$exists": true
                     },
                     "db.query.summary": "find transaction-tests.test"
                   }
@@ -269,7 +358,19 @@
             {
               "name": "transaction",
               "attributes": {
-                "db.system": "mongodb"
+                "db.system": "mongodb",
+                "db.namespace": {
+                  "$$exists": false
+                },
+                "db.collection.name": {
+                  "$$exists": false
+                },
+                "db.operation.name": {
+                  "$$exists": false
+                },
+                "db.operation.summary": {
+                  "$$exists": false
+                }
               },
               "nested": [
                 {
@@ -288,6 +389,7 @@
                         "db.system": "mongodb",
                         "db.namespace": "transaction-tests",
                         "db.collection.name": "test",
+                        "db.command.name": "insert",
                         "server.address": {
                           "$$type": "string"
                         },
@@ -297,14 +399,39 @@
                             "string"
                           ]
                         },
-                        "server.type": {
-                          "$$type": "string"
-                        },
                         "db.query.summary": "insert transaction-tests.test",
                         "db.mongodb.lsid": {
                           "$$sessionLsid": "session0"
                         },
                         "db.mongodb.txn_number": 1,
+                        "db.mongodb.cursor_id": {
+                          "$$exists": false
+                        },
+                        "db.response.status_code": {
+                          "$$exists": false
+                        },
+                        "exception.message": {
+                          "$$exists": false
+                        },
+                        "exception.type": {
+                          "$$exists": false
+                        },
+                        "exception.stacktrace": {
+                          "$$exists": false
+                        },
+                        "network.transport": "tcp",
+                        "db.mongodb.server_connection_id": {
+                          "$$type": [
+                            "int",
+                            "long"
+                          ]
+                        },
+                        "db.mongodb.driver_connection_id": {
+                          "$$type": [
+                            "int",
+                            "long"
+                          ]
+                        },
                         "db.query.text": {
                           "$$matchAsDocument": {
                             "$$matchAsRoot": {
@@ -333,7 +460,8 @@
                     "db.collection.name": {
                       "$$exists": false
                     },
-                    "db.operation.name": "abortTransaction"
+                    "db.operation.name": "abortTransaction",
+                    "db.operation.summary": "abortTransaction admin"
                   },
                   "nested": [
                     {
@@ -350,6 +478,43 @@
                           "$$sessionLsid": "session0"
                         },
                         "db.mongodb.txn_number": 1,
+                        "db.mongodb.cursor_id": {
+                          "$$exists": false
+                        },
+                        "db.response.status_code": {
+                          "$$exists": false
+                        },
+                        "exception.message": {
+                          "$$exists": false
+                        },
+                        "exception.type": {
+                          "$$exists": false
+                        },
+                        "exception.stacktrace": {
+                          "$$exists": false
+                        },
+                        "network.transport": "tcp",
+                        "server.address": {
+                          "$$type": "string"
+                        },
+                        "server.port": {
+                          "$$type": [
+                            "int",
+                            "long"
+                          ]
+                        },
+                        "db.mongodb.server_connection_id": {
+                          "$$type": [
+                            "int",
+                            "long"
+                          ]
+                        },
+                        "db.mongodb.driver_connection_id": {
+                          "$$type": [
+                            "int",
+                            "long"
+                          ]
+                        },
                         "db.query.text": {
                           "$$matchAsDocument": {
                             "$$matchAsRoot": {

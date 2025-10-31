@@ -65,9 +65,6 @@
                     "db.collection.name": "test",
                     "db.command.name": "listIndexes",
                     "network.transport": "tcp",
-                    "db.mongodb.cursor_id": {
-                      "$$exists": false
-                    },
                     "db.response.status_code": {
                       "$$exists": false
                     },

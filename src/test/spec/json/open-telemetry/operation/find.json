@@ -70,9 +70,6 @@
                     "db.collection.name": "test",
                     "db.command.name": "find",
                     "network.transport": "tcp",
-                    "db.mongodb.cursor_id": {
-                      "$$exists": false
-                    },
                     "db.response.status_code": {
                       "$$exists": false
                     },
@@ -93,9 +90,6 @@
                         "int",
                         "long"
                       ]
-                    },
-                    "server.type": {
-                      "$$type": "string"
                     },
                     "db.query.summary": "find operation-find.test",
                     "db.query.text": {
@@ -208,9 +202,6 @@
                         "string"
                       ]
                     },
-                    "server.type": {
-                      "$$type": "string"
-                    },
                     "db.query.summary": "find operation-find.test",
                     "db.query.text": {
                       "$$matchAsDocument": {
@@ -244,9 +235,6 @@
                     "db.collection.name": "test",
                     "db.command.name": "find",
                     "network.transport": "tcp",
-                    "db.mongodb.cursor_id": {
-                      "$$exists": false
-                    },
                     "db.response.status_code": {
                       "$$exists": false
                     },
@@ -267,9 +255,6 @@
                         "int",
                         "long"
                       ]
-                    },
-                    "server.type": {
-                      "$$type": "string"
                     },
                     "db.query.summary": "find operation-find.test",
                     "db.query.text": {

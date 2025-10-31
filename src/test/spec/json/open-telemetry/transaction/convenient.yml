@@ -61,18 +61,29 @@ tests:
                   db.collection.name: *collectionName
                   db.operation.name: insert
                   db.operation.summary: insert convenient-transaction-tests.test
+
                 nested:
                   - name: insert
                     attributes:
                       db.system: mongodb
                       db.namespace: *databaseName
                       db.collection.name: *collectionName
+                      db.command.name: insert
                       server.address: { $$type: string }
-                      server.port: { $$type: [ 'long', 'string' ] }
-                      server.type: { $$type: string }
+                      server.port: { $$type: [ long, string ] }
                       db.query.summary: insert convenient-transaction-tests.test
                       db.mongodb.lsid: { $$sessionLsid: *session }
                       db.mongodb.txn_number: 1
+                      network.transport: tcp
+                      db.mongodb.cursor_id: { $$exists: false }
+                      db.response.status_code: { $$exists: false }
+                      exception.message: { $$exists: false }
+                      exception.type: { $$exists: false }
+                      exception.stacktrace: { $$exists: false }
+                      db.mongodb.server_connection_id:
+                        $$type: [ int, long ]
+                      db.mongodb.driver_connection_id:
+                        $$type: [ int, long ]
                       db.query.text:
                         $$matchAsDocument:
                           $$matchAsRoot:
@@ -89,6 +100,8 @@ tests:
                   db.namespace: admin
                   db.collection.name: { $$exists: false }
                   db.operation.name: commitTransaction
+                  db.operation.summary: commitTransaction admin
+
                 nested:
                   - name: commitTransaction
                     attributes:
@@ -99,6 +112,18 @@ tests:
                       db.command.name: commitTransaction
                       db.mongodb.lsid: { $$sessionLsid: *session }
                       db.mongodb.txn_number: 1
+                      db.mongodb.cursor_id: { $$exists: false }
+                      db.response.status_code: { $$exists: false }
+                      exception.message: { $$exists: false }
+                      exception.type: { $$exists: false }
+                      exception.stacktrace: { $$exists: false }
+                      network.transport: tcp
+                      server.address: { $$type: string }
+                      server.port: { $$type: [ int, long ] }
+                      db.mongodb.server_connection_id:
+                        $$type: [ int, long ]
+                      db.mongodb.driver_connection_id:
+                        $$type: [ int, long ]
                       db.query.text:
                         $$matchAsDocument:
                           $$matchAsRoot:
@@ -113,6 +138,7 @@ tests:
               db.collection.name: *collectionName
               db.operation.summary: find convenient-transaction-tests.test
               db.operation.name: find
+
             nested:
               - name: find
                 attributes:
@@ -120,10 +146,19 @@ tests:
                   db.namespace: *databaseName
                   db.collection.name: *collectionName
                   db.command.name: find
+                  network.transport: tcp
+                  db.response.status_code: { $$exists: false }
+                  exception.message: { $$exists: false }
+                  exception.type: { $$exists: false }
+                  exception.stacktrace: { $$exists: false }
                   server.address: { $$type: string }
-                  server.port: { $$type: [ 'long', 'string' ] }
-                  server.type: { $$type: string }
+                  server.port: { $$type: [ long, string ] }
+                  db.mongodb.server_connection_id:
+                    $$type: [ int, long ]
+                  db.mongodb.driver_connection_id:
+                    $$type: [ int, long ]
                   db.query.summary: find convenient-transaction-tests.test
+                  db.query.text: { $$exists: true }
 
     outcome:
       - collectionName: test

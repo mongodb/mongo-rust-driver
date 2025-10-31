@@ -21,7 +21,7 @@
       "database": {
         "id": "database0",
         "client": "client0",
-        "databaseName": "operation-find-retries"
+        "databaseName": "operation-retries"
       }
     },
     {
@@ -35,7 +35,7 @@
   "initialData": [
     {
       "collectionName": "test",
-      "databaseName": "operation-find-retries",
+      "databaseName": "operation-retries",
       "documents": []
     }
   ],
@@ -81,20 +81,20 @@
           "ignoreExtraSpans": true,
           "spans": [
             {
-              "name": "find operation-find-retries.test",
+              "name": "find operation-retries.test",
               "attributes": {
                 "db.system": "mongodb",
-                "db.namespace": "operation-find-retries",
+                "db.namespace": "operation-retries",
                 "db.collection.name": "test",
                 "db.operation.name": "find",
-                "db.operation.summary": "find operation-find-retries.test"
+                "db.operation.summary": "find operation-retries.test"
               },
               "nested": [
                 {
                   "name": "find",
                   "attributes": {
                     "db.system": "mongodb",
-                    "db.namespace": "operation-find-retries",
+                    "db.namespace": "operation-retries",
                     "db.collection.name": "test",
                     "db.command.name": "find",
                     "network.transport": "tcp",
@@ -103,13 +103,13 @@
                     },
                     "db.response.status_code": "89",
                     "exception.message": {
-                      "$$exists": true
+                      "$$type": "string"
                     },
                     "exception.type": {
-                      "$$exists": true
+                      "$$type": "string"
                     },
                     "exception.stacktrace": {
-                      "$$exists": true
+                      "$$type": "string"
                     },
                     "server.address": {
                       "$$type": "string"
@@ -120,7 +120,7 @@
                         "string"
                       ]
                     },
-                    "db.query.summary": "find operation-find-retries.test",
+                    "db.query.summary": "find operation-retries.test",
                     "db.query.text": {
                       "$$matchAsDocument": {
                         "$$matchAsRoot": {
@@ -149,13 +149,10 @@
                   "name": "find",
                   "attributes": {
                     "db.system": "mongodb",
-                    "db.namespace": "operation-find-retries",
+                    "db.namespace": "operation-retries",
                     "db.collection.name": "test",
                     "db.command.name": "find",
                     "network.transport": "tcp",
-                    "db.mongodb.cursor_id": {
-                      "$$exists": false
-                    },
                     "db.response.status_code": {
                       "$$exists": false
                     },
@@ -177,7 +174,7 @@
                         "long"
                       ]
                     },
-                    "db.query.summary": "find operation-find-retries.test",
+                    "db.query.summary": "find operation-retries.test",
                     "db.query.text": {
                       "$$matchAsDocument": {
                         "$$matchAsRoot": {
