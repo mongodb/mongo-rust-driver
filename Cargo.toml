@@ -41,7 +41,7 @@ dns-resolver = ["dep:hickory-resolver", "dep:hickory-proto"]
 cert-key-password = ["dep:pem", "dep:pkcs8"]
 
 # Enable support for MONGODB-AWS authentication.
-aws-auth = ["dep:aws-config", "dep:aws-credential-types", "dep:aws-sigv4", "dep:http"]
+aws-auth = ["dep:aws-config", "dep:aws-credential-types", "dep:aws-sigv4", "dep:chrono", "dep:http"]
 
 # Enable support for on-demand Azure KMS credentials.
 azure-kms = ["dep:reqwest"]
@@ -87,7 +87,7 @@ error-backtrace = []
 [dependencies]
 base64 = "0.22"
 bitflags = "2"
-chrono = { version = "0.4.32", default-features = false, features = [
+chrono = { version = "0.4.32", default-features = false, optional = true, features = [
     "now",
     "std",
 ] }
@@ -217,6 +217,7 @@ features = ["v4"]
 anyhow = { version = "1.0", features = ["backtrace"] }
 approx = "0.5.1"
 backtrace = { version = "0.3.68" }
+chrono = { version = "0.4.32", default-features = false, features = ["std"] }
 function_name = "0.2.1"
 futures = "0.3"
 hex = "0.4"
