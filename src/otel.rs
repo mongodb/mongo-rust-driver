@@ -256,12 +256,9 @@ impl CmdSpan {
             return;
         }
         if let Ok(out) = result {
-            // tests don't match the spec here
-            if false {
-                if let Some(cursor_id) = <Op::Otel as OtelWitness>::output_cursor_id(out) {
-                    let span = self.context.span();
-                    span.set_attribute(KeyValue::new("db.mongodb.cursor_id", cursor_id));
-                }
+            if let Some(cursor_id) = <Op::Otel as OtelWitness>::output_cursor_id(out) {
+                let span = self.context.span();
+                span.set_attribute(KeyValue::new("db.mongodb.cursor_id", cursor_id));
             }
         }
         record_error(&self.context, result);

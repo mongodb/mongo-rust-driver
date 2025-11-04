@@ -15,7 +15,7 @@
       "database": {
         "id": "database0",
         "client": "client0",
-        "databaseName": "operation-aggregate"
+        "databaseName": "operation-find-one-and-update"
       }
     },
     {
@@ -29,6 +29,11 @@
   "tests": [
     {
       "description": "findOneAndUpdate",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "4.4"
+        }
+      ],
       "operations": [
         {
           "name": "findOneAndUpdate",
@@ -54,20 +59,20 @@
           "ignoreExtraSpans": false,
           "spans": [
             {
-              "name": "findAndModify operation-aggregate.test",
+              "name": "findAndModify operation-find-one-and-update.test",
               "attributes": {
                 "db.system": "mongodb",
-                "db.namespace": "operation-aggregate",
+                "db.namespace": "operation-find-one-and-update",
                 "db.collection.name": "test",
                 "db.operation.name": "findAndModify",
-                "db.operation.summary": "findAndModify operation-aggregate.test"
+                "db.operation.summary": "findAndModify operation-find-one-and-update.test"
               },
               "nested": [
                 {
                   "name": "findAndModify",
                   "attributes": {
                     "db.system": "mongodb",
-                    "db.namespace": "operation-aggregate",
+                    "db.namespace": "operation-find-one-and-update",
                     "db.collection.name": "test",
                     "db.command.name": "findAndModify",
                     "network.transport": "tcp",
@@ -95,7 +100,7 @@
                         "long"
                       ]
                     },
-                    "db.query.summary": "findAndModify operation-aggregate.test",
+                    "db.query.summary": "findAndModify operation-find-one-and-update.test",
                     "db.query.text": {
                       "$$matchAsDocument": {
                         "$$matchAsRoot": {

@@ -1,6 +1,11 @@
 {
   "description": "operation drop collection",
   "schemaVersion": "1.27",
+  "runOnRequirements": [
+    {
+      "minServerVersion": "7.0"
+    }
+  ],
   "createEntities": [
     {
       "client": {

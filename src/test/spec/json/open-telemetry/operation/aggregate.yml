@@ -35,6 +35,7 @@ tests:
               db.collection.name: test
               db.operation.name: aggregate
               db.operation.summary: aggregate operation-aggregate.test
+
             nested:
               - name: aggregate
                 attributes:
@@ -43,7 +44,6 @@ tests:
                   db.collection.name: *collectionName0
                   db.command.name: aggregate
                   network.transport: tcp
-                  db.mongodb.cursor_id: { $$exists: false }
                   db.response.status_code: { $$exists: false }
                   exception.message: { $$exists: false }
                   exception.type: { $$exists: false }

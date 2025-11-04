@@ -136,9 +136,6 @@
                         "long"
                       ]
                     },
-                    "server.type": {
-                      "$$type": "string"
-                    },
                     "db.query.summary": "mapReduce operation-map-reduce.test",
                     "db.query.text": {
                       "$$matchAsDocument": {
