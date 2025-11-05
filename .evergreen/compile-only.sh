@@ -12,7 +12,7 @@ if [ "$RUST_VERSION" != "" ]; then
 
   # The MSRV resolver does not properly select an MSRV-compliant version
   # for this transient dependency.
-  cargo add aws-sdk-sts@1.73
+  cargo add --package mongodb aws-sdk-sts@1.73
 
   CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo +nightly -Zmsrv-policy generate-lockfile
 fi
