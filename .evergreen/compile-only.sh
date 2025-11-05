@@ -18,10 +18,10 @@ if [ "$RUST_VERSION" != "" ]; then
 fi
 
 # Test with default features.
-cargo $TOOLCHAIN build
+cargo $TOOLCHAIN build --package mongodb
 
 # Test with all features.
-cargo $TOOLCHAIN build --all-features
+cargo $TOOLCHAIN build --package mongodb --all-features
 
 # Test with no default features.
-cargo $TOOLCHAIN build --no-default-features --features compat-3-3-0,bson-3,rustls-tls
+cargo $TOOLCHAIN build --package mongodb --no-default-features --features compat-3-3-0,bson-3,rustls-tls
