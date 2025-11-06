@@ -52,6 +52,24 @@ ensure_cargo_cyclonedx() {
   fi
 }
 
+## ensure_cyclonedx_cli
+# Downloads CycloneDX CLI binary if not available.
+ensure_cyclonedx_cli() {
+  if [ ! -f /tmp/cyclonedx ]; then
+    log "Downloading CycloneDX CLI"
+    local arch
+    arch="$(uname -m)"
+    case "$arch" in
+      x86_64) arch="x64" ;;
+      aarch64) arch="arm64" ;;
+      *) log "Unsupported architecture for CycloneDX CLI: $arch"; exit 1 ;;
+    esac
+    local url="https://github.com/CycloneDX/cyclonedx-cli/releases/latest/download/cyclonedx-linux-${arch}"
+    curl -L -s -o /tmp/cyclonedx "$url" || { log "Failed to download CycloneDX CLI"; exit 1; }
+    chmod +x /tmp/cyclonedx || { log "Failed to make CycloneDX CLI executable"; exit 1; }
+  fi
+}
+
 ## generate_sbom
 # Executes cargo-cyclonedx to generate SBOM.
 generate_sbom() {
@@ -83,12 +101,29 @@ format_sbom() {
   mv "$OUT_JSON.tmp" "$OUT_JSON"
 }
 
+## verify_sbom
+# Verifies the SBOM is valid CycloneDX format using CycloneDX CLI.
+verify_sbom() {
+  log "Verifying SBOM validity with CycloneDX CLI"
+  local size
+  size=$(stat -c%s "$OUT_JSON" 2>/dev/null || echo 0)
+  if [ "$size" -lt 1000 ]; then
+    log "SBOM file too small (<1000 bytes)"; exit 1
+  fi
+  if ! /tmp/cyclonedx validate --input-file "$OUT_JSON" --fail-on-errors >/dev/null 2>&1; then
+    log "SBOM validation failed"; exit 1
+  fi
+  log "SBOM verified successfully"
+}
+
 main() {
   ensure_mise
   install_toolchains
   ensure_cargo_cyclonedx
+  ensure_cyclonedx_cli
   generate_sbom
   format_sbom
+  verify_sbom
 }
 
 main "$@"
