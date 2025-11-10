@@ -382,7 +382,7 @@ fn h_i<M: KeyInit + FixedOutput + Mac + Sync + Clone>(
     output_size: usize,
 ) -> Vec<u8> {
     let mut buf = vec![0u8; output_size];
-    pbkdf2::pbkdf2::<M>(str.as_bytes(), salt, iterations, buf.as_mut_slice());
+    pbkdf2::pbkdf2::<M>(str.as_bytes(), salt, iterations, buf.as_mut_slice()).unwrap();
     buf
 }
 

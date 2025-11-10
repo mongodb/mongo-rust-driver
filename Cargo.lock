@@ -1989,7 +1989,7 @@ dependencies = [
  "openssl-probe",
  "opentelemetry",
  "opentelemetry_sdk",
- "pbkdf2 0.11.0",
+ "pbkdf2",
  "pem",
  "percent-encoding",
  "pkcs8",
@@ -2231,15 +2231,6 @@ dependencies = [
 
 [[package]]
 name = "pbkdf2"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83a0692ec44e4cf1ef28ca317f14f8f07da2d95ec3fa01f86e4467b725e60917"
-dependencies = [
- "digest",
-]
-
-[[package]]
-name = "pbkdf2"
 version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
@@ -2306,7 +2297,7 @@ dependencies = [
  "cbc",
  "der",
  "des",
- "pbkdf2 0.12.2",
+ "pbkdf2",
  "scrypt",
  "sha1",
  "sha2",
@@ -2774,7 +2765,7 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0516a385866c09368f0b5bcd1caff3366aace790fcd46e2bb032697bb172fd1f"
 dependencies = [
- "pbkdf2 0.12.2",
+ "pbkdf2",
  "salsa20",
  "sha2",
 ]
