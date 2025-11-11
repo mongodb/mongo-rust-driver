@@ -12,6 +12,7 @@ pub mod insert_one;
 pub mod json_multi_export;
 pub mod json_multi_import;
 pub mod run_command;
+pub mod find_raw_batches;
 
 use std::{
     convert::TryInto,

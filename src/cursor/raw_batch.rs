@@ -133,6 +133,18 @@ impl Stream for RawBatchCursor {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // Yield initial batch first, if present.
         if let Some(initial) = self.state.initial_reply.take() {
+            // Prefetch the next getMore in the background, if applicable.
+            if !self.state.exhausted {
+                let info = self.info.clone();
+                let client = self.client.clone();
+                let pinned_owned = self
+                    .state
+                    .pinned_connection
+                    .handle()
+                    .map(|c| c.replicate());
+                let pinned_ref = pinned_owned.as_ref();
+                self.state.provider.start_execution(info, client, pinned_ref);
+            }
             return Poll::Ready(Some(Ok(RawBatch::new(initial))));
         }
 
@@ -179,6 +191,18 @@ impl Stream for RawBatchCursor {
         }
 
         if let Some(reply) = self.state.pending_reply.take() {
+            // Prefetch the next getMore before returning this batch, if applicable.
+            if !self.state.exhausted {
+                let info = self.info.clone();
+                let client = self.client.clone();
+                let pinned_owned = self
+                    .state
+                    .pinned_connection
+                    .handle()
+                    .map(|c| c.replicate());
+                let pinned_ref = pinned_owned.as_ref();
+                self.state.provider.start_execution(info, client, pinned_ref);
+            }
             return Poll::Ready(Some(Ok(RawBatch::new(reply))));
         }
 
@@ -341,6 +365,18 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // yield initial reply first
         if let Some(initial) = self.parent.initial_reply.take() {
+            // Prefetch the next getMore in the background, if applicable.
+            if !self.parent.exhausted {
+                let info = self.parent.info.clone();
+                let client = self.parent.client.clone();
+                let pinned_owned = self
+                    .parent
+                    .pinned_connection
+                    .handle()
+                    .map(|c| c.replicate());
+                let pinned_ref = pinned_owned.as_ref();
+                self.provider.start_execution(info, client, pinned_ref);
+            }
             return Poll::Ready(Some(Ok(RawBatch::new(initial))));
         }
 
@@ -373,6 +409,18 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
                     let exhausted_now = self.parent.exhausted;
                     self.provider
                         .clear_execution(get_more_out.session, exhausted_now);
+                    // Prefetch the next getMore before returning this batch, if applicable.
+                    if !self.parent.exhausted {
+                        let info = self.parent.info.clone();
+                        let client = self.parent.client.clone();
+                        let pinned_owned = self
+                            .parent
+                            .pinned_connection
+                            .handle()
+                            .map(|c| c.replicate());
+                        let pinned_ref = pinned_owned.as_ref();
+                        self.provider.start_execution(info, client, pinned_ref);
+                    }
                     return Poll::Ready(Some(Ok(RawBatch::new(out.raw_reply))));
                 }
                 Err(e) => {

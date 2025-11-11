@@ -89,35 +89,43 @@ impl OperationWithDefaults for GetMoreRaw<'_> {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        // Copy raw reply for the batch.
+        // Own the raw reply (single copy).
         let raw = RawDocumentBuf::from_bytes(response.as_bytes().to_vec())?;
 
-        // Parse minimal cursor fields from the raw reply.
-        #[derive(serde::Deserialize)]
-        struct HelperNs {
-            cursor: HelperCursor,
-        }
-        #[derive(serde::Deserialize)]
-        struct HelperCursor {
-            id: i64,
-            ns: String,
-            #[serde(rename = "postBatchResumeToken")]
-            post_batch_resume_token: Option<RawDocumentBuf>,
-        }
-        let helper: HelperNs = crate::bson_compat::deserialize_from_slice(response.as_bytes())?;
+        // Extract minimal cursor fields directly from the raw reply to avoid
+        // walking the batch array via serde.
+        let root = response.raw_body();
+        let cursor = root
+            .get("cursor")?
+            .and_then(crate::bson::RawBsonRef::as_document)
+            .ok_or_else(|| crate::error::Error::invalid_response("missing cursor subdocument"))?;
 
-        let exhausted = helper.cursor.id == 0;
-        let ns = Namespace::from_str(helper.cursor.ns.as_str()).unwrap();
-        let token = crate::change_stream::event::ResumeToken::from_raw(
-            helper.cursor.post_batch_resume_token,
-        );
+        let id = cursor
+            .get("id")?
+            .and_then(crate::bson::RawBsonRef::as_i64)
+            .ok_or_else(|| crate::error::Error::invalid_response("missing cursor id"))?;
+
+        let ns_str = cursor
+            .get("ns")?
+            .and_then(crate::bson::RawBsonRef::as_str)
+            .ok_or_else(|| crate::error::Error::invalid_response("missing cursor ns"))?;
+        let ns = Namespace::from_str(ns_str)
+            .ok_or_else(|| crate::error::Error::invalid_response("invalid cursor ns"))?;
+
+        let token_raw = cursor
+            .get("postBatchResumeToken")?
+            .and_then(crate::bson::RawBsonRef::as_document)
+            .map(|d| RawDocumentBuf::from_bytes(d.as_bytes().to_vec()))
+            .transpose()?;
+        let post_batch_resume_token =
+            crate::change_stream::event::ResumeToken::from_raw(token_raw);
 
         Ok(GetMoreRawResult {
             raw_reply: raw,
-            exhausted,
-            post_batch_resume_token: token,
+            exhausted: id == 0,
+            post_batch_resume_token,
             ns,
-            id: helper.cursor.id,
+            id,
         })
     }
 
