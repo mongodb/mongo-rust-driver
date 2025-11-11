@@ -5,7 +5,6 @@ use std::{
     time::Duration,
 };
 
-use crate::bson::{rawdoc, Document, RawDocument, RawDocumentBuf};
 use futures_util::{stream, TryStreamExt};
 use mongocrypt::ctx::{Ctx, KmsCtx, KmsProviderType, State};
 use rayon::ThreadPool;
@@ -15,10 +14,11 @@ use tokio::{
 };
 
 use crate::{
+    bson::{rawdoc, Document, RawDocument, RawDocumentBuf},
     client::{csfle::options::KmsProvidersTlsOptions, options::ServerAddress, WeakClient},
     error::{Error, Result},
     operation::{raw_output::RawOutput, run_command::RunCommand},
-    options::ReadConcern,
+    options::{ReadConcern, Socks5Proxy},
     runtime::{process::Process, AsyncStream, TlsConfig},
     Client,
     Namespace,
@@ -37,6 +37,7 @@ pub(crate) struct CryptExecutor {
     metadata_client: Option<WeakClient>,
     #[cfg(feature = "azure-kms")]
     azure: azure::ExecutorState,
+    proxy: Option<Socks5Proxy>,
 }
 
 impl CryptExecutor {
@@ -60,6 +61,7 @@ impl CryptExecutor {
             metadata_client: None,
             #[cfg(feature = "azure-kms")]
             azure: azure::ExecutorState::new()?,
+            proxy: None,
         })
     }
 
@@ -70,6 +72,7 @@ impl CryptExecutor {
         mongocryptd_opts: Option<MongocryptdOptions>,
         mongocryptd_client: Option<Client>,
         metadata_client: Option<WeakClient>,
+        proxy: Option<Socks5Proxy>,
     ) -> Result<Self> {
         let mongocryptd = match mongocryptd_opts {
             Some(opts) => Some(Mongocryptd::new(opts).await?),
@@ -79,6 +82,7 @@ impl CryptExecutor {
         exec.mongocryptd = mongocryptd;
         exec.mongocryptd_client = mongocryptd_client;
         exec.metadata_client = metadata_client;
+        exec.proxy = proxy;
         Ok(exec)
     }
 
@@ -180,6 +184,7 @@ impl CryptExecutor {
                     async fn execute(
                         kms_ctx: &mut KmsCtx<'_>,
                         tls_options: Option<&KmsProvidersTlsOptions>,
+                        proxy: Option<&Socks5Proxy>,
                     ) -> Result<()> {
                         let endpoint = kms_ctx.endpoint()?;
                         let addr = ServerAddress::parse(endpoint)?;
@@ -189,7 +194,8 @@ impl CryptExecutor {
                             .cloned()
                             .unwrap_or_default();
                         let mut stream =
-                            AsyncStream::connect(addr, Some(&TlsConfig::new(tls_options)?)).await?;
+                            AsyncStream::connect(addr, Some(&TlsConfig::new(tls_options)?), proxy)
+                                .await?;
                         stream.write_all(kms_ctx.message()?).await?;
                         let mut buf = vec![0];
                         while kms_ctx.bytes_needed() > 0 {
@@ -220,8 +226,12 @@ impl CryptExecutor {
                                     tokio::time::sleep(Duration::from_micros(sleep_micros)).await;
                                 }
 
-                                if let Err(error) =
-                                    execute(&mut kms_ctx, self.kms_providers.tls_options()).await
+                                if let Err(error) = execute(
+                                    &mut kms_ctx,
+                                    self.kms_providers.tls_options(),
+                                    self.proxy.as_ref(),
+                                )
+                                .await
                                 {
                                     if !kms_ctx.retry_failure() {
                                         return Err(error);

@@ -1020,3 +1020,120 @@ fn server_address_from_socket_addr_ipv6() {
         _ => panic!("ServerAddress should have been Tcp variant"),
     }
 }
+
+#[tokio::test]
+#[cfg(feature = "socks5-proxy")]
+async fn socks5_proxy_skip_ci() {
+    use crate::{
+        error::Result,
+        options::{ClientOptions, Tls},
+    };
+
+    async fn test_hello(uri: String) -> Result<Document> {
+        let mut options = ClientOptions::parse(uri).await.unwrap();
+        // error cases will spin for serverSelectionTimeoutMS while trying to create a connection
+        options.server_selection_timeout = Some(Duration::from_secs(2));
+        let client = Client::with_options(options).unwrap();
+        client.database("db").run_command(doc! { "hello": 1 }).await
+    }
+
+    let options = get_client_options().await;
+    let mapped_host = "localhost:12345";
+    let all_hosts = options
+        .hosts
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<String>>()
+        .join(",");
+    let tls = if let Some(Tls::Enabled(ref tls)) = options.tls {
+        let ca_file = tls.ca_file_path.as_ref().unwrap().to_string_lossy();
+        format!("&tls=true&tlsCAFile={ca_file}")
+    } else {
+        String::new()
+    };
+
+    // fast_socks5 parses "localhost" into an IPV6 address, which is not accepted by the mock server
+    // used by the tests
+    let ipv4_localhost = std::net::Ipv4Addr::LOCALHOST.to_string();
+
+    test_hello(format!(
+        "mongodb://{mapped_host}/?proxyHost={ipv4_localhost}&proxyPort=1080&\
+         directConnection=true{tls}"
+    ))
+    .await
+    .unwrap_err();
+    test_hello(format!(
+        "mongodb://{mapped_host}/?proxyHost={ipv4_localhost}&proxyPort=1081&\
+         directConnection=true{tls}"
+    ))
+    .await
+    .unwrap();
+    test_hello(format!(
+        "mongodb://{all_hosts}/?proxyHost={ipv4_localhost}&proxyPort=1080{tls}"
+    ))
+    .await
+    .unwrap_err();
+    test_hello(format!(
+        "mongodb://{all_hosts}/?proxyHost={ipv4_localhost}&proxyPort=1081{tls}"
+    ))
+    .await
+    .unwrap();
+    test_hello(format!(
+        "mongodb://{mapped_host}/?proxyHost={ipv4_localhost}&proxyPort=1080&\
+         proxyUsername=nonexistentuser&proxyPassword=badauth&directConnection=true{tls}"
+    ))
+    .await
+    .unwrap_err();
+    test_hello(format!(
+        "mongodb://{mapped_host}/?proxyHost={ipv4_localhost}&proxyPort=1081&\
+         proxyUsername=nonexistentuser&proxyPassword=badauth&directConnection=true{tls}"
+    ))
+    .await
+    .unwrap();
+    test_hello(format!(
+        "mongodb://{all_hosts}/?proxyHost={ipv4_localhost}&proxyPort=1081&\
+         proxyUsername=nonexistentuser&proxyPassword=badauth{tls}"
+    ))
+    .await
+    .unwrap();
+    test_hello(format!(
+        "mongodb://{mapped_host}/?proxyHost={ipv4_localhost}&proxyPort=1080&\
+         proxyUsername=username&proxyPassword=p4ssw0rd&directConnection=true{tls}"
+    ))
+    .await
+    .unwrap();
+    test_hello(format!(
+        "mongodb://{mapped_host}/?proxyHost={ipv4_localhost}&proxyPort=1081&\
+         directConnection=true{tls}"
+    ))
+    .await
+    .unwrap();
+    test_hello(format!(
+        "mongodb://{all_hosts}/?proxyHost={ipv4_localhost}&proxyPort=1080&proxyUsername=username&\
+         proxyPassword=p4ssw0rd{tls}"
+    ))
+    .await
+    .unwrap();
+    test_hello(format!(
+        "mongodb://{all_hosts}/?proxyHost={ipv4_localhost}&proxyPort=1081{tls}"
+    ))
+    .await
+    .unwrap();
+
+    // From the spec: Drivers MUST verify for at least one of the connection strings marked
+    // (succeeds) that command monitoring events do not reference the SOCKS5 proxy host where the
+    // MongoDB service server/port are referenced.
+    let uri = format!(
+        "mongodb://{mapped_host}/?proxyHost={ipv4_localhost}&proxyPort=1081&\
+         directConnection=true{tls}"
+    );
+    let options = ClientOptions::parse(uri).await.unwrap();
+    let client = Client::for_test().options(options).monitor_events().await;
+    client
+        .database("db")
+        .run_command(doc! { "ping": 1 })
+        .await
+        .unwrap();
+    let (started, _) = client.events.get_successful_command_execution("ping");
+    assert_eq!(&started.connection.address.to_string(), mapped_host);
+}

@@ -578,6 +578,8 @@ impl Error {
             | ErrorKind::Custom(_)
             | ErrorKind::Shutdown
             | ErrorKind::GridFs(_) => {}
+            #[cfg(feature = "socks5-proxy")]
+            ErrorKind::ProxyConnect { .. } => {}
             #[cfg(feature = "in-use-encryption")]
             ErrorKind::Encryption(_) => {}
             #[cfg(feature = "bson-3")]
@@ -766,6 +768,12 @@ pub enum ErrorKind {
     /// A method was called on a client that was shut down.
     #[error("Client has been shut down")]
     Shutdown,
+
+    /// An error occurred when connecting to a proxy host.
+    #[error("An error occurred when connecting to a proxy host: {message}")]
+    #[non_exhaustive]
+    #[cfg(feature = "socks5-proxy")]
+    ProxyConnect { message: String },
 }
 
 impl ErrorKind {
@@ -812,6 +820,8 @@ impl ErrorKind {
             ErrorKind::Encryption(..) => "Encryption",
             ErrorKind::Custom(..) => "Custom",
             ErrorKind::Shutdown => "Shutdown",
+            #[cfg(feature = "socks5-proxy")]
+            ErrorKind::ProxyConnect { .. } => "ProxyConnect",
         }
     }
 }

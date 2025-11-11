@@ -59,6 +59,10 @@ const TLS_INSECURE: &str = "tlsinsecure";
 const TLS_ALLOW_INVALID_CERTIFICATES: &str = "tlsallowinvalidcertificates";
 #[cfg(feature = "openssl-tls")]
 const TLS_ALLOW_INVALID_HOSTNAMES: &str = "tlsallowinvalidhostnames";
+const PROXY_HOST: &str = "proxyhost";
+const PROXY_PORT: &str = "proxyport";
+const PROXY_USERNAME: &str = "proxyusername";
+const PROXY_PASSWORD: &str = "proxypassword";
 const URI_OPTIONS: &[&str] = &[
     "appname",
     "authmechanism",
@@ -75,6 +79,10 @@ const URI_OPTIONS: &[&str] = &[
     "maxpoolsize",
     "minpoolsize",
     "maxconnecting",
+    PROXY_HOST,
+    PROXY_PORT,
+    PROXY_USERNAME,
+    PROXY_PASSWORD,
     "readconcernlevel",
     "readpreference",
     "readpreferencetags",
@@ -407,6 +415,59 @@ pub struct ServerApi {
     pub deprecation_errors: Option<bool>,
 }
 
+/// Configuration for connecting to a SOCKS5 proxy.
+#[cfg(feature = "socks5-proxy")]
+#[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct Socks5Proxy {
+    /// The hostname or IP address on which the proxy is listening.
+    pub host: String,
+
+    /// The port on which the proxy is listening. Defaults to 1080 if unset.
+    pub port: Option<u16>,
+
+    /// A username/password pair to authenticate to the proxy.
+    pub authentication: Option<(String, String)>,
+}
+
+/// Dummy struct for internal use.
+#[cfg(not(feature = "socks5-proxy"))]
+#[derive(Clone, Debug)]
+pub(crate) struct Socks5Proxy;
+
+#[cfg(feature = "socks5-proxy")]
+impl Socks5Proxy {
+    fn serialize<S>(
+        proxy: &Option<Socks5Proxy>,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Helper<'a> {
+            proxy_host: &'a String,
+            proxy_port: Option<u16>,
+            proxy_username: Option<&'a String>,
+            proxy_password: Option<&'a String>,
+        }
+
+        if let Some(proxy) = proxy.as_ref() {
+            let helper = Helper {
+                proxy_host: &proxy.host,
+                proxy_port: proxy.port,
+                proxy_username: proxy.authentication.as_ref().map(|auth| &auth.0),
+                proxy_password: proxy.authentication.as_ref().map(|auth| &auth.1),
+            };
+            helper.serialize(serializer)
+        } else {
+            serializer.serialize_none()
+        }
+    }
+}
+
 /// Contains the options that can be used to create a new [`Client`](../struct.Client.html).
 #[derive(Clone, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
@@ -616,6 +677,10 @@ pub struct ClientOptions {
     #[cfg(feature = "opentelemetry")]
     pub tracing: Option<crate::otel::OpentelemetryOptions>,
 
+    /// Configuration for connecting to a SOCKS5 proxy.
+    #[cfg(feature = "socks5-proxy")]
+    pub socks5_proxy: Option<Socks5Proxy>,
+
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(setter(skip))]
     #[serde(skip)]
@@ -748,6 +813,10 @@ impl Serialize for ClientOptions {
             srvmaxhosts: Option<i32>,
 
             srvservicename: &'a Option<String>,
+
+            #[cfg(feature = "socks5-proxy")]
+            #[serde(flatten, serialize_with = "Socks5Proxy::serialize")]
+            socks5proxy: &'a Option<Socks5Proxy>,
         }
 
         let client_options = ClientOptionsHelper {
@@ -782,6 +851,8 @@ impl Serialize for ClientOptions {
                 .transpose()
                 .map_err(serde::ser::Error::custom)?,
             srvservicename: &self.srv_service_name,
+            #[cfg(feature = "socks5-proxy")]
+            socks5proxy: &self.socks5_proxy,
         };
 
         client_options.serialize(serializer)
@@ -977,6 +1048,11 @@ pub struct ConnectionString {
     /// Overrides the default "mongodb" service name for SRV lookup in both discovery and polling
     pub srv_service_name: Option<String>,
 
+    /// Configuration for connecting to a SOCKS5 proxy.
+    #[cfg(feature = "socks5-proxy")]
+    #[serde(serialize_with = "Socks5Proxy::serialize")]
+    pub socks5_proxy: Option<Socks5Proxy>,
+
     #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
     wait_queue_timeout: Option<Duration>,
     tls_insecure: Option<bool>,
@@ -995,6 +1071,14 @@ struct ConnectionStringParts {
     auth_mechanism_properties: Option<Document>,
     zlib_compression: Option<i32>,
     auth_source: Option<String>,
+    #[cfg(feature = "socks5-proxy")]
+    proxy_host: Option<String>,
+    #[cfg(feature = "socks5-proxy")]
+    proxy_port: Option<u16>,
+    #[cfg(feature = "socks5-proxy")]
+    proxy_username: Option<String>,
+    #[cfg(feature = "socks5-proxy")]
+    proxy_password: Option<String>,
 }
 
 /// Specification for mongodb server connections.
@@ -1314,6 +1398,29 @@ impl ClientOptions {
                 s.ends_with(".docdb.amazonaws.com") || s.ends_with(".docdb-elastic.amazonaws.com")
             }) {
                 tracing::info!("You appear to be connected to a DocumentDB cluster. For more information regarding feature compatibility and support please visit https://www.mongodb.com/supportability/documentdb");
+            }
+        }
+
+        #[cfg(feature = "socks5-proxy")]
+        {
+            if let Some(proxy) = self.socks5_proxy.as_ref() {
+                if self
+                    .hosts
+                    .iter()
+                    .any(|address| !matches!(address, ServerAddress::Tcp { .. }))
+                {
+                    return Err(Error::invalid_argument(
+                        "cannot specify a non-TCP address when connected to a proxy host",
+                    ));
+                }
+
+                if let Some((username, password)) = proxy.authentication.as_ref() {
+                    if username.is_empty() || password.is_empty() {
+                        return Err(Error::invalid_argument(
+                            "cannot specify an empty username or password for proxy host",
+                        ));
+                    }
+                }
             }
         }
 
@@ -1664,6 +1771,44 @@ impl ConnectionString {
             conn_str.tls = Some(Tls::Enabled(Default::default()));
         }
 
+        #[cfg(feature = "socks5-proxy")]
+        {
+            if let Some(host) = parts.proxy_host {
+                let mut proxy = Socks5Proxy::builder().host(host).build();
+                if let Some(port) = parts.proxy_port {
+                    proxy.port = Some(port);
+                }
+                match (parts.proxy_username, parts.proxy_password) {
+                    (Some(username), Some(password)) => {
+                        proxy.authentication = Some((username, password))
+                    }
+                    (None, None) => {}
+                    _ => {
+                        return Err(Error::invalid_argument(
+                            "proxy username and password must both be specified as nonempty \
+                             strings or unset",
+                        ));
+                    }
+                }
+                conn_str.socks5_proxy = Some(proxy);
+            } else {
+                let error = |option: &str| {
+                    Error::invalid_argument(format!(
+                        "{option} cannot be set if {PROXY_HOST} is unspecified"
+                    ))
+                };
+                if parts.proxy_port.is_some() {
+                    return Err(error(PROXY_PORT));
+                }
+                if parts.proxy_username.is_some() {
+                    return Err(error(PROXY_USERNAME));
+                }
+                if parts.proxy_password.is_some() {
+                    return Err(error(PROXY_PASSWORD));
+                }
+            }
+        }
+
         Ok(conn_str)
     }
 
@@ -1704,6 +1849,8 @@ impl ConnectionString {
             srv_service_name: _,
             wait_queue_timeout,
             tls_insecure,
+            #[cfg(feature = "socks5-proxy")]
+            socks5_proxy,
             #[cfg(test)]
                 original_uri: _,
         } = self;
@@ -2003,6 +2150,19 @@ impl ConnectionString {
 
         if let Some(srv_max_hosts) = srv_max_hosts {
             opts.push_str(&format!("&srvMaxHosts={srv_max_hosts}"));
+        }
+
+        #[cfg(feature = "socks5-proxy")]
+        if let Some(proxy) = socks5_proxy {
+            opts.push_str(&format!("&proxyHost={}", proxy.host));
+            if let Some(port) = proxy.port {
+                opts.push_str(&format!("&proxyPort={port}"));
+            }
+            if let Some((username, password)) = proxy.authentication.as_ref() {
+                opts.push_str(&format!(
+                    "&proxyUsername={username}&proxyPassword={password}"
+                ));
+            }
         }
 
         if !opts.is_empty() {
@@ -2582,6 +2742,24 @@ impl ConnectionString {
                 }
 
                 parts.zlib_compression = Some(i);
+            }
+            #[cfg(feature = "socks5-proxy")]
+            PROXY_HOST => parts.proxy_host = Some(value.to_string()),
+            #[cfg(feature = "socks5-proxy")]
+            PROXY_PORT => {
+                let port = u16::from_str(value)
+                    .map_err(|_| Error::invalid_argument(format!("invalid proxy port: {value}")))?;
+                parts.proxy_port = Some(port);
+            }
+            #[cfg(feature = "socks5-proxy")]
+            PROXY_USERNAME if !value.is_empty() => parts.proxy_username = Some(value.to_string()),
+            #[cfg(feature = "socks5-proxy")]
+            PROXY_PASSWORD if !value.is_empty() => parts.proxy_password = Some(value.to_string()),
+            #[cfg(not(feature = "socks5-proxy"))]
+            PROXY_HOST | PROXY_PORT | PROXY_USERNAME | PROXY_PASSWORD => {
+                return Err(Error::invalid_argument(format!(
+                    "cannot specify {key} if socks5-proxy feature is not enabled"
+                )));
             }
 
             other => {
