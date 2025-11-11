@@ -145,6 +145,35 @@ async fn find() {
 
 #[tokio::test]
 #[function_name::named]
+async fn find_raw_batches_one() {
+    let client = Client::for_test().await;
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+
+    coll.insert_one(doc! { "x": 1 }).await.unwrap();
+
+    let mut batches = coll
+        .find_raw_batches(doc! { "x": 1 })
+        .limit(-1)
+        .await
+        .unwrap();
+
+    // get the first (and only) server batch due to limit -1
+    let mut found_one = false;
+    while let Some(batch_res) = batches.next().await {
+        let batch = batch_res.unwrap();
+        let mut iter = batch.doc_slices().unwrap().into_iter();
+        let first = iter.next().unwrap().unwrap();
+        let doc = Document::try_from(first.as_document().unwrap()).unwrap();
+        assert_eq!(doc.get_i32("x").unwrap(), 1);
+        found_one = true;
+    }
+    assert!(found_one);
+}
+
+#[tokio::test]
+#[function_name::named]
 async fn update() {
     let client = Client::for_test().await;
     let coll = client

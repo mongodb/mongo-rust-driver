@@ -211,6 +211,61 @@ impl Client {
         .await
     }
 
+    pub(crate) async fn execute_raw_batch_cursor_operation<Op>(
+        &self,
+        mut op: impl BorrowMut<Op>,
+    ) -> Result<crate::cursor::raw_batch::RawBatchCursor>
+    where
+        Op: Operation<O = crate::cursor::raw_batch::RawBatchCursorSpecification>,
+    {
+        Box::pin(async {
+            let mut details = self
+                .execute_operation_with_details(op.borrow_mut(), None)
+                .await?;
+            // Mirror pinning logic without a CursorSpecification.
+            let pinned = if self.is_load_balanced() && details.output.info.id != 0 {
+                Some(details.connection.pin()?)
+            } else {
+                None
+            };
+            Ok(crate::cursor::raw_batch::RawBatchCursor::new(
+                self.clone(),
+                details.output,
+                details.implicit_session,
+                pinned,
+            ))
+        })
+        .await
+    }
+
+    pub(crate) async fn execute_session_raw_batch_cursor_operation<Op>(
+        &self,
+        mut op: impl BorrowMut<Op>,
+        session: &mut ClientSession,
+    ) -> Result<crate::cursor::raw_batch::SessionRawBatchCursor>
+    where
+        Op: Operation<O = crate::cursor::raw_batch::RawBatchCursorSpecification>,
+    {
+        let mut details = self
+            .execute_operation_with_details(op.borrow_mut(), &mut *session)
+            .await?;
+
+        // Prefer the transaction's pinned connection if present; otherwise mirror load-balanced
+        // pinning.
+        let pinned = if let Some(handle) = session.transaction.pinned_connection() {
+            Some(handle.replicate())
+        } else if self.is_load_balanced() && details.output.info.id != 0 {
+            Some(details.connection.pin()?)
+        } else {
+            None
+        };
+        Ok(crate::cursor::raw_batch::SessionRawBatchCursor::new(
+            self.clone(),
+            details.output,
+            pinned,
+        ))
+    }
+
     pub(crate) async fn execute_session_cursor_operation<Op, T>(
         &self,
         mut op: impl BorrowMut<Op>,

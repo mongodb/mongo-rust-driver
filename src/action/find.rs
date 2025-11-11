@@ -22,6 +22,7 @@ use super::{
     export_doc,
     option_setters,
     options_doc,
+    CollRef,
     ExplicitSession,
     ImplicitSession,
 };
@@ -36,6 +37,21 @@ impl<T: Send + Sync> Collection<T> {
     pub fn find(&self, filter: Document) -> Find<'_, T> {
         Find {
             coll: self,
+            filter,
+            options: None,
+            session: ImplicitSession,
+        }
+    }
+
+    /// Finds the documents and returns raw server batches.
+    ///
+    /// `await` will return d[`Result<crate::cursor::raw_batch::RawBatchCursor>`] (or
+    /// d[`Result<crate::cursor::raw_batch::SessionRawBatchCursor>`] if a session is provided).
+    #[deeplink]
+    #[options_doc(find)]
+    pub fn find_raw_batches(&self, filter: Document) -> FindRawBatches<'_> {
+        FindRawBatches {
+            cr: CollRef::new(self),
             filter,
             options: None,
             session: ImplicitSession,
@@ -138,6 +154,72 @@ impl<'a, T: Send + Sync> Action for Find<'a, T, ExplicitSession<'a>> {
         self.coll
             .client()
             .execute_session_cursor_operation(find, self.session.0)
+            .await
+    }
+}
+
+#[must_use]
+pub struct FindRawBatches<'a, Session = ImplicitSession> {
+    cr: CollRef<'a>,
+    filter: Document,
+    options: Option<FindOptions>,
+    session: Session,
+}
+
+#[option_setters(crate::coll::options::FindOptions)]
+#[export_doc(find_raw_batches)]
+impl<'a, Session> FindRawBatches<'a, Session> {
+    pub fn session<'s>(
+        self,
+        value: impl Into<&'s mut ClientSession>,
+    ) -> FindRawBatches<'a, ExplicitSession<'s>> {
+        FindRawBatches {
+            cr: self.cr,
+            filter: self.filter,
+            options: self.options,
+            session: ExplicitSession(value.into()),
+        }
+    }
+}
+
+#[action_impl]
+impl<'a> Action for FindRawBatches<'a, ImplicitSession> {
+    type Future = FindRawBatchesFuture;
+
+    async fn execute(mut self) -> Result<crate::cursor::raw_batch::RawBatchCursor> {
+        resolve_options!(self.cr, self.options, [read_concern, selection_criteria]);
+        let op = crate::operation::find_raw::FindRaw::new(
+            self.cr.namespace(),
+            self.filter,
+            self.options,
+        );
+        self.cr
+            .client()
+            .execute_raw_batch_cursor_operation(op)
+            .await
+    }
+}
+
+#[action_impl]
+impl<'a> Action for FindRawBatches<'a, ExplicitSession<'a>> {
+    type Future = FindRawBatchesSessionFuture;
+
+    async fn execute(mut self) -> Result<crate::cursor::raw_batch::SessionRawBatchCursor> {
+        resolve_read_concern_with_session!(self.cr, self.options, Some(&mut *self.session.0))?;
+        resolve_selection_criteria_with_session!(
+            self.cr,
+            self.options,
+            Some(&mut *self.session.0)
+        )?;
+
+        let op = crate::operation::find_raw::FindRaw::new(
+            self.cr.namespace(),
+            self.filter,
+            self.options,
+        );
+        self.cr
+            .client()
+            .execute_session_raw_batch_cursor_operation(op, self.session.0)
             .await
     }
 }
