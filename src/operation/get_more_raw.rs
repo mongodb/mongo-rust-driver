@@ -56,6 +56,14 @@ impl OperationWithDefaults for GetMoreRaw<'_> {
 
     const NAME: &'static CStr = cstr!("getMore");
 
+    fn handle_response<'a>(
+        &'a self,
+        _response: &'a RawCommandResponse,
+        _context: ExecutionContext<'a>,
+    ) -> Result<Self::O> {
+        unimplemented!("GetMoreRaw must be handled via owned response path")
+    }
+
     fn wants_owned_response(&self) -> bool {
         true
     }
@@ -129,14 +137,6 @@ impl OperationWithDefaults for GetMoreRaw<'_> {
         }
 
         Ok(Command::new(Self::NAME, &self.ns.db, body))
-    }
-
-    fn handle_response<'a>(
-        &'a self,
-        _response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
-    ) -> Result<Self::O> {
-        unimplemented!("should call handle_response_owned")
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

@@ -37,6 +37,14 @@ impl OperationWithDefaults for FindRaw {
     type O = RawBatchCursorSpecification;
     const NAME: &'static CStr = cstr!("find");
 
+    fn handle_response<'a>(
+        &'a self,
+        _response: &'a RawCommandResponse,
+        _context: ExecutionContext<'a>,
+    ) -> Result<Self::O> {
+        unimplemented!("FindRaw must be handled via owned response path")
+    }
+
     fn wants_owned_response(&self) -> bool {
         true
     }
@@ -154,63 +162,7 @@ impl OperationWithDefaults for FindRaw {
         CursorBody::extract_at_cluster_time(response)
     }
 
-    fn handle_response<'a>(
-        &'a self,
-        response: &'a RawCommandResponse,
-        context: ExecutionContext<'a>,
-    ) -> Result<Self::O> {
-        // Build initial spec using minimal parsing and copy of raw reply.
-        let raw = RawDocumentBuf::from_bytes(response.as_bytes().to_vec())?;
-
-        // Parse minimal fields via raw to avoid per-doc copies.
-        let raw_root = response.raw_body();
-        let cursor_doc = raw_root
-            .get("cursor")?
-            .and_then(crate::bson::RawBsonRef::as_document)
-            .ok_or_else(|| Error::invalid_response("missing cursor in response"))?;
-
-        let id = cursor_doc
-            .get("id")?
-            .and_then(crate::bson::RawBsonRef::as_i64)
-            .ok_or_else(|| Error::invalid_response("missing cursor id"))?;
-
-        let ns_str = cursor_doc
-            .get("ns")?
-            .and_then(crate::bson::RawBsonRef::as_str)
-            .ok_or_else(|| Error::invalid_response("missing cursor ns"))?;
-        let ns = Namespace::from_str(ns_str)
-            .ok_or_else(|| Error::invalid_response("invalid cursor ns"))?;
-
-        let post_token_raw = cursor_doc
-            .get("postBatchResumeToken")?
-            .and_then(crate::bson::RawBsonRef::as_document)
-            .map(|d| RawDocumentBuf::from_bytes(d.as_bytes().to_vec()))
-            .transpose()?;
-        let post_batch_resume_token =
-            crate::change_stream::event::ResumeToken::from_raw(post_token_raw);
-
-        let description = context.connection.stream_description()?;
-        let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
-            None
-        } else {
-            self.options.as_ref().and_then(|opts| opts.comment.clone())
-        };
-
-        let info = CursorInformation {
-            ns,
-            id,
-            address: description.server_address.clone(),
-            batch_size: self.options.as_ref().and_then(|opts| opts.batch_size),
-            max_time: self.options.as_ref().and_then(|opts| opts.max_await_time),
-            comment,
-        };
-
-        Ok(RawBatchCursorSpecification {
-            info,
-            initial_reply: raw,
-            post_batch_resume_token,
-        })
-    }
+    // borrowed handle_response intentionally unimplemented above
 
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
         true

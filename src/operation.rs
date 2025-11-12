@@ -40,25 +40,15 @@ use crate::{
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     cmap::{
         conn::{pooled::PooledConnection, PinnedConnectionHandle},
-        Command,
-        RawCommandResponse,
-        StreamDescription,
+        Command, RawCommandResponse, StreamDescription,
     },
     error::{
-        CommandError,
-        Error,
-        ErrorKind,
-        IndexedWriteError,
-        InsertManyError,
-        Result,
-        WriteConcernError,
-        WriteFailure,
+        CommandError, Error, ErrorKind, IndexedWriteError, InsertManyError, Result,
+        WriteConcernError, WriteFailure,
     },
     options::{ClientOptions, WriteConcern},
     selection_criteria::SelectionCriteria,
-    BoxFuture,
-    ClientSession,
-    Namespace,
+    BoxFuture, ClientSession, Namespace,
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
@@ -153,16 +143,13 @@ pub(crate) trait Operation {
     }
 
     /// Interprets the server response taking ownership of the body to enable zero-copy handling.
-    /// By default, delegates to the borrowed handle_response path.
+    /// Is only ever called if wants_owned_response returns True
     fn handle_response_owned<'a>(
         &'a self,
-        response: RawCommandResponse,
-        context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>>
-    where
-        Self: Sync,
-    {
-        async move { self.handle_response(&response, context).await }.boxed()
+        _response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
+        unimplemented!()
     }
 
     /// Interpret an error encountered while sending the built command to the server, potentially
@@ -274,10 +261,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         &'a self,
         response: RawCommandResponse,
         context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>>
-    where
-        Self: Sync,
-    {
+    ) -> BoxFuture<'a, Result<Self::O>> {
         async move { self.handle_response_owned(response, context) }.boxed()
     }
 

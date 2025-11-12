@@ -21,10 +21,7 @@ use crate::otel::OtelFutureStub as _;
 use crate::{
     bson::Document,
     change_stream::{
-        event::ChangeStreamEvent,
-        session::SessionChangeStream,
-        ChangeStream,
-        ChangeStreamData,
+        event::ChangeStreamEvent, session::SessionChangeStream, ChangeStream, ChangeStreamData,
         WatchArgs,
     },
     cmap::{
@@ -33,33 +30,20 @@ use crate::{
             wire::{next_request_id, Message},
             PinnedConnectionHandle,
         },
-        ConnectionPool,
-        RawCommandResponse,
-        StreamDescription,
+        ConnectionPool, RawCommandResponse, StreamDescription,
     },
     cursor::{session::SessionCursor, Cursor, CursorSpecification},
     error::{
-        Error,
-        ErrorKind,
-        Result,
-        RETRYABLE_WRITE_ERROR,
-        TRANSIENT_TRANSACTION_ERROR,
+        Error, ErrorKind, Result, RETRYABLE_WRITE_ERROR, TRANSIENT_TRANSACTION_ERROR,
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
     event::command::{
-        CommandEvent,
-        CommandFailedEvent,
-        CommandStartedEvent,
-        CommandSucceededEvent,
+        CommandEvent, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
     },
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
         aggregate::{change_stream::ChangeStreamAggregate, AggregateTarget},
-        AbortTransaction,
-        CommandErrorBody,
-        CommitTransaction,
-        ExecutionContext,
-        Operation,
+        AbortTransaction, CommandErrorBody, CommitTransaction, ExecutionContext, Operation,
         Retryability,
     },
     options::{ChangeStreamOptions, SelectionCriteria},
@@ -95,7 +79,7 @@ impl Client {
     /// Server selection will performed using the criteria specified on the operation, if any, and
     /// an implicit session will be created if the operation and write concern are compatible with
     /// sessions and an explicit session is not provided.
-    pub(crate) async fn execute_operation<T: Operation + Sync>(
+    pub(crate) async fn execute_operation<T: Operation>(
         &self,
         mut op: impl BorrowMut<T>,
         session: impl Into<Option<&mut ClientSession>>,
@@ -105,7 +89,7 @@ impl Client {
             .map(|details| details.output)
     }
 
-    async fn execute_operation_with_details<T: Operation + Sync>(
+    async fn execute_operation_with_details<T: Operation>(
         &self,
         op: &mut T,
         session: impl Into<Option<&mut ClientSession>>,
@@ -123,7 +107,7 @@ impl Client {
         result
     }
 
-    async fn execute_operation_with_details_inner<T: Operation + Sync>(
+    async fn execute_operation_with_details_inner<T: Operation>(
         &self,
         op: &mut T,
         mut session: Option<&mut ClientSession>,
@@ -193,7 +177,7 @@ impl Client {
         mut op: impl BorrowMut<Op>,
     ) -> Result<Cursor<T>>
     where
-        Op: Operation<O = CursorSpecification> + Sync,
+        Op: Operation<O = CursorSpecification>,
     {
         Box::pin(async {
             let mut details = self
@@ -216,7 +200,7 @@ impl Client {
         mut op: impl BorrowMut<Op>,
     ) -> Result<crate::cursor::raw_batch::RawBatchCursor>
     where
-        Op: Operation<O = crate::cursor::raw_batch::RawBatchCursorSpecification> + Sync,
+        Op: Operation<O = crate::cursor::raw_batch::RawBatchCursorSpecification>,
     {
         Box::pin(async {
             let mut details = self
@@ -244,7 +228,7 @@ impl Client {
         session: &mut ClientSession,
     ) -> Result<crate::cursor::raw_batch::SessionRawBatchCursor>
     where
-        Op: Operation<O = crate::cursor::raw_batch::RawBatchCursorSpecification> + Sync,
+        Op: Operation<O = crate::cursor::raw_batch::RawBatchCursorSpecification>,
     {
         let mut details = self
             .execute_operation_with_details(op.borrow_mut(), &mut *session)
@@ -272,7 +256,7 @@ impl Client {
         session: &mut ClientSession,
     ) -> Result<SessionCursor<T>>
     where
-        Op: Operation<O = CursorSpecification> + Sync,
+        Op: Operation<O = CursorSpecification>,
     {
         let mut details = self
             .execute_operation_with_details(op.borrow_mut(), &mut *session)
@@ -384,7 +368,7 @@ impl Client {
     /// Selects a server and executes the given operation on it, optionally using a provided
     /// session. Retries the operation upon failure if retryability is supported or after
     /// reauthenticating if reauthentication is required.
-    async fn execute_operation_with_retry<T: Operation + Sync>(
+    async fn execute_operation_with_retry<T: Operation>(
         &self,
         op: &mut T,
         mut session: Option<&mut ClientSession>,
@@ -556,7 +540,7 @@ impl Client {
     }
 
     /// Executes an operation on a given connection, optionally using a provided session.
-    pub(crate) async fn execute_operation_on_connection<T: Operation + Sync>(
+    pub(crate) async fn execute_operation_on_connection<T: Operation>(
         &self,
         op: &mut T,
         connection: &mut PooledConnection,
