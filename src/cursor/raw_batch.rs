@@ -131,157 +131,16 @@ impl Stream for RawBatchCursor {
     type Item = Result<RawBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // Yield initial batch first, if present.
-        if let Some(initial) = self.state.initial_reply.take() {
-            // Prefetch the next getMore in the background, if applicable.
-            if !self.state.exhausted {
-                let info = self.info.clone();
-                let client = self.client.clone();
-                let pinned_owned = self.state.pinned_connection.handle().map(|c| c.replicate());
-                let pinned_ref = pinned_owned.as_ref();
-                self.state
-                    .provider
-                    .start_execution(info, client, pinned_ref);
-                // Immediately poll once to register waker; if already ready, buffer the result.
-                if let Some(f) = self.state.provider.executing_future() {
-                    match Pin::new(f).poll(cx) {
-                        Poll::Pending => {}
-                        Poll::Ready(get_more_out) => {
-                            match get_more_out.result {
-                                Ok(out) => {
-                                    self.state.pending_reply = Some(out.raw_reply);
-                                    self.state.post_batch_resume_token =
-                                        out.post_batch_resume_token;
-                                    if out.exhausted {
-                                        self.mark_exhausted();
-                                    }
-                                    if out.id != 0 {
-                                        self.info.id = out.id;
-                                    }
-                                    self.info.ns = out.ns;
-                                }
-                                Err(e) => {
-                                    if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                                    {
-                                        self.mark_exhausted();
-                                    }
-                                }
-                            }
-                            let exhausted_now = self.state.exhausted;
-                            self.state
-                                .provider
-                                .clear_execution(get_more_out.session, exhausted_now);
-                        }
-                    }
-                }
-            }
-            return Poll::Ready(Some(Ok(RawBatch::new(initial))));
-        }
-
-        // If a getMore is in flight, poll it.
-        let mut ready = None;
-        {
-            let provider = &mut self.state.provider;
-            if let Some(f) = provider.executing_future() {
-                match Pin::new(f).poll(cx) {
-                    Poll::Pending => return Poll::Pending,
-                    Poll::Ready(g) => ready = Some(g),
-                }
-            }
-        }
-        if let Some(get_more_out) = ready {
-            match get_more_out.result {
-                Ok(out) => {
-                    self.state.pending_reply = Some(out.raw_reply);
-                    self.state.post_batch_resume_token = out.post_batch_resume_token;
-                    if out.exhausted {
-                        self.mark_exhausted();
-                    }
-                    if out.id != 0 {
-                        self.info.id = out.id;
-                    }
-                    self.info.ns = out.ns;
-                }
-                Err(e) => {
-                    if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                    {
-                        self.mark_exhausted();
-                    }
-                    let exhausted_now = self.state.exhausted;
-                    self.state
-                        .provider
-                        .clear_execution(get_more_out.session, exhausted_now);
-                    return Poll::Ready(Some(Err(e)));
-                }
-            }
-            let exhausted_now = self.state.exhausted;
-            self.state
-                .provider
-                .clear_execution(get_more_out.session, exhausted_now);
-        }
-
-        if let Some(reply) = self.state.pending_reply.take() {
-            // Prefetch the next getMore before returning this batch, if applicable.
-            if !self.state.exhausted {
-                let info = self.info.clone();
-                let client = self.client.clone();
-                let pinned_owned = self.state.pinned_connection.handle().map(|c| c.replicate());
-                let pinned_ref = pinned_owned.as_ref();
-                self.state
-                    .provider
-                    .start_execution(info, client, pinned_ref);
-                // Immediately poll once to register waker; if already ready, buffer the result.
-                if let Some(f) = self.state.provider.executing_future() {
-                    match Pin::new(f).poll(cx) {
-                        Poll::Pending => {}
-                        Poll::Ready(get_more_out) => {
-                            match get_more_out.result {
-                                Ok(out) => {
-                                    self.state.pending_reply = Some(out.raw_reply);
-                                    self.state.post_batch_resume_token =
-                                        out.post_batch_resume_token;
-                                    if out.exhausted {
-                                        self.mark_exhausted();
-                                    }
-                                    if out.id != 0 {
-                                        self.info.id = out.id;
-                                    }
-                                    self.info.ns = out.ns;
-                                }
-                                Err(e) => {
-                                    if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                                    {
-                                        self.mark_exhausted();
-                                    }
-                                }
-                            }
-                            let exhausted_now = self.state.exhausted;
-                            self.state
-                                .provider
-                                .clear_execution(get_more_out.session, exhausted_now);
-                        }
-                    }
-                }
-            }
-            return Poll::Ready(Some(Ok(RawBatch::new(reply))));
-        }
-
-        if !self.state.exhausted {
-            let info = self.info.clone();
-            let client = self.client.clone();
-            let state = &mut self.state;
-            state
-                .provider
-                .start_execution(info, client, state.pinned_connection.handle());
-            // Immediately poll the newly-started getMore once to register the waker.
-            if let Some(f) = state.provider.executing_future() {
-                match Pin::new(f).poll(cx) {
+        loop {
+            // If a getMore is in flight, poll it and update state.
+            if let Some(future) = self.state.provider.executing_future() {
+                match Pin::new(future).poll(cx) {
                     Poll::Pending => return Poll::Pending,
                     Poll::Ready(get_more_out) => {
                         match get_more_out.result {
                             Ok(out) => {
-                                state.pending_reply = Some(out.raw_reply);
-                                state.post_batch_resume_token = out.post_batch_resume_token;
+                                self.state.pending_reply = Some(out.raw_reply);
+                                self.state.post_batch_resume_token = out.post_batch_resume_token;
                                 if out.exhausted {
                                     self.mark_exhausted();
                                 }
@@ -291,8 +150,7 @@ impl Stream for RawBatchCursor {
                                 self.info.ns = out.ns;
                             }
                             Err(e) => {
-                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                                {
+                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237) {
                                     self.mark_exhausted();
                                 }
                                 let exhausted_now = self.state.exhausted;
@@ -306,21 +164,36 @@ impl Stream for RawBatchCursor {
                         self.state
                             .provider
                             .clear_execution(get_more_out.session, exhausted_now);
-                        if let Some(reply) = self.state.pending_reply.take() {
-                            return Poll::Ready(Some(Ok(RawBatch::new(reply))));
-                        } else if self.state.exhausted {
-                            return Poll::Ready(None);
-                        } else {
-                            return Poll::Pending;
-                        }
                     }
                 }
-            } else {
-                return Poll::Pending;
             }
-        }
 
-        Poll::Ready(None)
+            // Yield any buffered reply (initial or pending).
+            if let Some(reply) = self
+                .state
+                .initial_reply
+                .take()
+                .or_else(|| self.state.pending_reply.take())
+            {
+                return Poll::Ready(Some(Ok(RawBatch::new(reply))));
+            }
+
+            // If not exhausted and the connection is valid, start a getMore and iterate.
+            if !self.state.exhausted
+                && !matches!(self.state.pinned_connection, PinnedConnection::Invalid(_))
+            {
+                let info = self.info.clone();
+                let client = self.client.clone();
+                let state = &mut self.state;
+                state
+                    .provider
+                    .start_execution(info, client, state.pinned_connection.handle());
+                continue;
+            }
+
+            // Otherwise, we're done.
+            return Poll::Ready(None);
+        }
     }
 }
 
@@ -423,10 +296,51 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
     type Item = Result<RawBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // yield initial reply first
-        if let Some(initial) = self.parent.initial_reply.take() {
-            // Prefetch the next getMore in the background, if applicable.
-            if !self.parent.exhausted {
+        loop {
+            // If a getMore is in flight, poll it and update state.
+            if let Some(future) = self.provider.executing_future() {
+                match Pin::new(future).poll(cx) {
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(get_more_out) => {
+                        match get_more_out.result {
+                            Ok(out) => {
+                                if out.exhausted {
+                                    self.parent.exhausted = true;
+                                }
+                                if out.id != 0 {
+                                    self.parent.info.id = out.id;
+                                }
+                                self.parent.info.ns = out.ns;
+                                self.parent.post_batch_resume_token = out.post_batch_resume_token;
+                                // Buffer next reply to yield on following polls.
+                                self.parent.initial_reply = Some(out.raw_reply);
+                            }
+                            Err(e) => {
+                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237) {
+                                    self.parent.exhausted = true;
+                                }
+                                let exhausted_now = self.parent.exhausted;
+                                self.provider
+                                    .clear_execution(get_more_out.session, exhausted_now);
+                                return Poll::Ready(Some(Err(e)));
+                            }
+                        }
+                        let exhausted_now = self.parent.exhausted;
+                        self.provider
+                            .clear_execution(get_more_out.session, exhausted_now);
+                    }
+                }
+            }
+
+            // Yield any buffered reply (initial).
+            if let Some(reply) = self.parent.initial_reply.take() {
+                return Poll::Ready(Some(Ok(RawBatch::new(reply))));
+            }
+
+            // If not exhausted and the connection is valid, start a getMore and iterate.
+            if !self.parent.exhausted
+                && !matches!(self.parent.pinned_connection, PinnedConnection::Invalid(_))
+            {
                 let info = self.parent.info.clone();
                 let client = self.parent.client.clone();
                 let pinned_owned = self
@@ -436,142 +350,12 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
                     .map(|c| c.replicate());
                 let pinned_ref = pinned_owned.as_ref();
                 self.provider.start_execution(info, client, pinned_ref);
-                // Immediately poll once to register waker; if already ready, buffer the result
-                // into initial_reply for the next poll.
-                if let Some(f) = self.provider.executing_future() {
-                    match Pin::new(f).poll(cx) {
-                        Poll::Pending => {}
-                        Poll::Ready(get_more_out) => {
-                            match get_more_out.result {
-                                Ok(out) => {
-                                    if out.exhausted {
-                                        self.parent.exhausted = true;
-                                    }
-                                    if out.id != 0 {
-                                        self.parent.info.id = out.id;
-                                    }
-                                    self.parent.info.ns = out.ns;
-                                    self.parent.post_batch_resume_token =
-                                        out.post_batch_resume_token;
-                                    // Buffer next reply to yield on the following poll.
-                                    self.parent.initial_reply = Some(out.raw_reply);
-                                }
-                                Err(e) => {
-                                    if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                                    {
-                                        self.parent.exhausted = true;
-                                    }
-                                }
-                            }
-                            let exhausted_now = self.parent.exhausted;
-                            self.provider
-                                .clear_execution(get_more_out.session, exhausted_now);
-                        }
-                    }
-                }
+                continue;
             }
-            return Poll::Ready(Some(Ok(RawBatch::new(initial))));
-        }
 
-        if self.parent.exhausted {
+            // Otherwise, we're done.
             return Poll::Ready(None);
         }
-
-        // If a getMore is in flight, poll it.
-        let mut ready = None;
-        {
-            let provider = &mut self.provider;
-            if let Some(f) = provider.executing_future() {
-                match Pin::new(f).poll(cx) {
-                    Poll::Pending => return Poll::Pending,
-                    Poll::Ready(g) => ready = Some(g),
-                }
-            }
-        }
-        if let Some(get_more_out) = ready {
-            match get_more_out.result {
-                Ok(out) => {
-                    if out.exhausted {
-                        self.parent.exhausted = true;
-                    }
-                    if out.id != 0 {
-                        self.parent.info.id = out.id;
-                    }
-                    self.parent.info.ns = out.ns;
-                    self.parent.post_batch_resume_token = out.post_batch_resume_token;
-                    let exhausted_now = self.parent.exhausted;
-                    self.provider
-                        .clear_execution(get_more_out.session, exhausted_now);
-                    // Prefetch the next getMore before returning this batch, if applicable.
-                    if !self.parent.exhausted {
-                        let info = self.parent.info.clone();
-                        let client = self.parent.client.clone();
-                        let pinned_owned = self
-                            .parent
-                            .pinned_connection
-                            .handle()
-                            .map(|c| c.replicate());
-                        let pinned_ref = pinned_owned.as_ref();
-                        self.provider.start_execution(info, client, pinned_ref);
-                        // Immediately poll once to register waker; if already ready, buffer the
-                        // result into initial_reply for the next poll.
-                        if let Some(f) = self.provider.executing_future() {
-                            match Pin::new(f).poll(cx) {
-                                Poll::Pending => {}
-                                Poll::Ready(get_more_out2) => {
-                                    match get_more_out2.result {
-                                        Ok(out2) => {
-                                            if out2.exhausted {
-                                                self.parent.exhausted = true;
-                                            }
-                                            if out2.id != 0 {
-                                                self.parent.info.id = out2.id;
-                                            }
-                                            self.parent.info.ns = out2.ns;
-                                            self.parent.post_batch_resume_token =
-                                                out2.post_batch_resume_token;
-                                            self.parent.initial_reply = Some(out2.raw_reply);
-                                        }
-                                        Err(e) => {
-                                            if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                                            {
-                                                self.parent.exhausted = true;
-                                            }
-                                        }
-                                    }
-                                    let exhausted_now2 = self.parent.exhausted;
-                                    self.provider
-                                        .clear_execution(get_more_out2.session, exhausted_now2);
-                                }
-                            }
-                        }
-                    }
-                    return Poll::Ready(Some(Ok(RawBatch::new(out.raw_reply))));
-                }
-                Err(e) => {
-                    if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                    {
-                        self.parent.exhausted = true;
-                    }
-                    let exhausted_now = self.parent.exhausted;
-                    self.provider
-                        .clear_execution(get_more_out.session, exhausted_now);
-                    return Poll::Ready(Some(Err(e)));
-                }
-            }
-        }
-
-        // Start a getMore if needed.
-        let info = self.parent.info.clone();
-        let client = self.parent.client.clone();
-        let pinned_owned = self
-            .parent
-            .pinned_connection
-            .handle()
-            .map(|c| c.replicate());
-        let pinned_ref = pinned_owned.as_ref();
-        self.provider.start_execution(info, client, pinned_ref);
-        Poll::Pending
     }
 }
 pub struct GetMoreRawResultAndSession<S> {
