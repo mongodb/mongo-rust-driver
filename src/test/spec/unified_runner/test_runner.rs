@@ -257,7 +257,7 @@ impl TestRunner {
             for operation in &test_case.operations {
                 self.sync_workers().await;
                 operation.execute(self, &test_case.description).await;
-                // This test (in src/test/spec/json/sessions/server-support.json) runs two
+                // This test (in spec/sessions/server-support.json) runs two
                 // operations with implicit sessions in sequence and then checks to see if they
                 // used the same lsid. We delay for one second to ensure that the
                 // implicit session used in the first operation is returned to the pool before
