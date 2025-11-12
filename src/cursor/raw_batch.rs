@@ -54,14 +54,6 @@ impl RawBatch {
         docs.as_array()
             .ok_or_else(|| Error::invalid_response("missing firstBatch/nextBatch"))
     }
-
-    pub fn raw_reply(&self) -> &RawDocument {
-        self.reply.as_ref()
-    }
-
-    pub fn into_raw_reply(self) -> RawDocumentBuf {
-        self.reply
-    }
 }
 
 pub struct RawBatchCursor {
@@ -150,7 +142,8 @@ impl Stream for RawBatchCursor {
                                 self.info.ns = out.ns;
                             }
                             Err(e) => {
-                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237) {
+                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
+                                {
                                     self.mark_exhausted();
                                 }
                                 let exhausted_now = self.state.exhausted;
@@ -359,7 +352,8 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
                                 self.parent.initial_reply = Some(out.raw_reply);
                             }
                             Err(e) => {
-                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237) {
+                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
+                                {
                                     self.parent.exhausted = true;
                                 }
                                 let exhausted_now = self.parent.exhausted;
@@ -384,7 +378,11 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
                     let info = self.parent.info.clone();
                     let client = self.parent.client.clone();
                     // Avoid borrow conflicts by replicating the handle into a temporary owner.
-                    let pinned_owned = self.parent.pinned_connection.handle().map(|c| c.replicate());
+                    let pinned_owned = self
+                        .parent
+                        .pinned_connection
+                        .handle()
+                        .map(|c| c.replicate());
                     let pinned_ref = pinned_owned.as_ref();
                     self.provider.start_execution(info, client, pinned_ref);
                     // Immediately poll once to register the waker and opportunistically buffer.
