@@ -150,7 +150,8 @@ impl Stream for RawBatchCursor {
                                 self.info.ns = out.ns;
                             }
                             Err(e) => {
-                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237) {
+                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
+                                {
                                     self.mark_exhausted();
                                 }
                                 let exhausted_now = self.state.exhausted;
@@ -316,7 +317,8 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
                                 self.parent.initial_reply = Some(out.raw_reply);
                             }
                             Err(e) => {
-                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237) {
+                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
+                                {
                                     self.parent.exhausted = true;
                                 }
                                 let exhausted_now = self.parent.exhausted;
@@ -410,29 +412,6 @@ impl<'s, S: ClientSessionHandle<'s>> GetMoreRawProvider<'s, S> {
                 this
             }
         })
-    }
-}
-
-pub struct RawDocumentStream<R> {
-    inner: R,
-}
-
-impl RawBatchCursor {
-    pub fn into_raw_documents(self) -> RawDocumentStream<Self> {
-        RawDocumentStream { inner: self }
-    }
-}
-
-impl Stream for RawDocumentStream<RawBatchCursor> {
-    type Item = Result<RawBatch>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match Pin::new(&mut self.inner).poll_next(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
-            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
-            Poll::Ready(None) => Poll::Ready(None),
-        }
     }
 }
 
