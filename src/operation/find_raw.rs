@@ -7,9 +7,7 @@ use crate::{
     cursor::{raw_batch::RawBatchCursorSpecification, CursorInformation},
     error::{Error, Result},
     operation::{
-        append_options_to_raw_document,
-        CursorBody,
-        OperationWithDefaults,
+        append_options_to_raw_document, CursorBody, OperationWithDefaults,
         SERVER_4_4_0_WIRE_VERSION,
     },
     options::{CursorType, FindOptions, SelectionCriteria},

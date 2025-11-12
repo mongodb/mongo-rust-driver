@@ -117,8 +117,7 @@ impl OperationWithDefaults for GetMoreRaw<'_> {
             .and_then(crate::bson::RawBsonRef::as_document)
             .map(|d| RawDocumentBuf::from_bytes(d.as_bytes().to_vec()))
             .transpose()?;
-        let post_batch_resume_token =
-            crate::change_stream::event::ResumeToken::from_raw(token_raw);
+        let post_batch_resume_token = crate::change_stream::event::ResumeToken::from_raw(token_raw);
 
         Ok(GetMoreRawResult {
             raw_reply: raw,
