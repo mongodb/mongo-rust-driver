@@ -37,6 +37,68 @@ impl OperationWithDefaults for FindRaw {
     type O = RawBatchCursorSpecification;
     const NAME: &'static CStr = cstr!("find");
 
+    fn wants_owned_response(&self) -> bool {
+        true
+    }
+
+    fn handle_response_owned<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        context: ExecutionContext<'a>,
+    ) -> Result<Self::O> {
+        // Parse minimal fields via raw to avoid per-doc copies.
+        let raw_root = response.raw_body();
+        let cursor_doc = raw_root
+            .get("cursor")?
+            .and_then(crate::bson::RawBsonRef::as_document)
+            .ok_or_else(|| Error::invalid_response("missing cursor in response"))?;
+
+        let id = cursor_doc
+            .get("id")?
+            .and_then(crate::bson::RawBsonRef::as_i64)
+            .ok_or_else(|| Error::invalid_response("missing cursor id"))?;
+
+        let ns_str = cursor_doc
+            .get("ns")?
+            .and_then(crate::bson::RawBsonRef::as_str)
+            .ok_or_else(|| Error::invalid_response("missing cursor ns"))?;
+        let ns = Namespace::from_str(ns_str)
+            .ok_or_else(|| Error::invalid_response("invalid cursor ns"))?;
+
+        let post_token_raw = cursor_doc
+            .get("postBatchResumeToken")?
+            .and_then(crate::bson::RawBsonRef::as_document)
+            .map(|d| RawDocumentBuf::from_bytes(d.as_bytes().to_vec()))
+            .transpose()?;
+        let post_batch_resume_token =
+            crate::change_stream::event::ResumeToken::from_raw(post_token_raw);
+
+        let description = context.connection.stream_description()?;
+        let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
+            None
+        } else {
+            self.options.as_ref().and_then(|opts| opts.comment.clone())
+        };
+
+        let info = CursorInformation {
+            ns,
+            id,
+            address: description.server_address.clone(),
+            batch_size: self.options.as_ref().and_then(|opts| opts.batch_size),
+            max_time: self.options.as_ref().and_then(|opts| opts.max_await_time),
+            comment,
+        };
+
+        // Take ownership of the raw reply with zero copies.
+        let raw = response.into_raw_document_buf();
+
+        Ok(RawBatchCursorSpecification {
+            info,
+            initial_reply: raw,
+            post_batch_resume_token,
+        })
+    }
+
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.ns.coll.clone(),

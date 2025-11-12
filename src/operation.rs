@@ -145,6 +145,26 @@ pub(crate) trait Operation {
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>>;
 
+    /// Whether this operation prefers to take ownership of the server response body for
+    /// zero-copy handling.
+    /// Defaults to false; operations can override via OperationWithDefaults.
+    fn wants_owned_response(&self) -> bool {
+        false
+    }
+
+    /// Interprets the server response taking ownership of the body to enable zero-copy handling.
+    /// By default, delegates to the borrowed handle_response path.
+    fn handle_response_owned<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>>
+    where
+        Self: Sync,
+    {
+        async move { self.handle_response(&response, context).await }.boxed()
+    }
+
     /// Interpret an error encountered while sending the built command to the server, potentially
     /// recovering.
     fn handle_error(&self, error: Error) -> Result<Self::O>;
@@ -232,6 +252,35 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         async move { self.handle_response(response, context) }.boxed()
     }
 
+    /// Whether this operation prefers to take ownership of the server response body for
+    /// zero-copy handling.
+    fn wants_owned_response(&self) -> bool {
+        false
+    }
+
+    /// Interprets the server response taking ownership of the body to enable zero-copy handling.
+    fn handle_response_owned<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        context: ExecutionContext<'a>,
+    ) -> Result<Self::O> {
+        // By default, delegate to borrowed path by re-borrowing.
+        // Note: default impls that want zero-copy should override this.
+        self.handle_response(&response, context)
+    }
+
+    /// Async wrapper for owned-response handling.
+    fn handle_response_owned_async<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>>
+    where
+        Self: Sync,
+    {
+        async move { self.handle_response_owned(response, context) }.boxed()
+    }
+
     /// Interpret an error encountered while sending the built command to the server, potentially
     /// recovering.
     fn handle_error(&self, error: Error) -> Result<Self::O> {
@@ -310,6 +359,16 @@ where
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         self.handle_response_async(response, context)
+    }
+    fn wants_owned_response(&self) -> bool {
+        self.wants_owned_response()
+    }
+    fn handle_response_owned<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
+        self.handle_response_owned_async(response, context)
     }
     fn handle_error(&self, error: Error) -> Result<Self::O> {
         self.handle_error(error)

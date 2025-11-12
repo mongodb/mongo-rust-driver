@@ -56,6 +56,53 @@ impl OperationWithDefaults for GetMoreRaw<'_> {
 
     const NAME: &'static CStr = cstr!("getMore");
 
+    fn wants_owned_response(&self) -> bool {
+        true
+    }
+
+    fn handle_response_owned<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
+    ) -> Result<Self::O> {
+        // Extract minimal fields directly from the raw reply to avoid walking the batch via serde.
+        let root = response.raw_body();
+        let cursor = root
+            .get("cursor")?
+            .and_then(crate::bson::RawBsonRef::as_document)
+            .ok_or_else(|| crate::error::Error::invalid_response("missing cursor subdocument"))?;
+
+        let id = cursor
+            .get("id")?
+            .and_then(crate::bson::RawBsonRef::as_i64)
+            .ok_or_else(|| crate::error::Error::invalid_response("missing cursor id"))?;
+
+        let ns_str = cursor
+            .get("ns")?
+            .and_then(crate::bson::RawBsonRef::as_str)
+            .ok_or_else(|| crate::error::Error::invalid_response("missing cursor ns"))?;
+        let ns = Namespace::from_str(ns_str)
+            .ok_or_else(|| crate::error::Error::invalid_response("invalid cursor ns"))?;
+
+        let token_raw = cursor
+            .get("postBatchResumeToken")?
+            .and_then(crate::bson::RawBsonRef::as_document)
+            .map(|d| RawDocumentBuf::from_bytes(d.as_bytes().to_vec()))
+            .transpose()?;
+        let post_batch_resume_token = crate::change_stream::event::ResumeToken::from_raw(token_raw);
+
+        // Take ownership of the raw bytes without copying.
+        let raw = response.into_raw_document_buf();
+
+        Ok(GetMoreRawResult {
+            raw_reply: raw,
+            exhausted: id == 0,
+            post_batch_resume_token,
+            ns,
+            id,
+        })
+    }
+
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.cursor_id,
@@ -86,46 +133,10 @@ impl OperationWithDefaults for GetMoreRaw<'_> {
 
     fn handle_response<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        _response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        // Own the raw reply (single copy).
-        let raw = RawDocumentBuf::from_bytes(response.as_bytes().to_vec())?;
-
-        // Extract minimal cursor fields directly from the raw reply to avoid
-        // walking the batch array via serde.
-        let root = response.raw_body();
-        let cursor = root
-            .get("cursor")?
-            .and_then(crate::bson::RawBsonRef::as_document)
-            .ok_or_else(|| crate::error::Error::invalid_response("missing cursor subdocument"))?;
-
-        let id = cursor
-            .get("id")?
-            .and_then(crate::bson::RawBsonRef::as_i64)
-            .ok_or_else(|| crate::error::Error::invalid_response("missing cursor id"))?;
-
-        let ns_str = cursor
-            .get("ns")?
-            .and_then(crate::bson::RawBsonRef::as_str)
-            .ok_or_else(|| crate::error::Error::invalid_response("missing cursor ns"))?;
-        let ns = Namespace::from_str(ns_str)
-            .ok_or_else(|| crate::error::Error::invalid_response("invalid cursor ns"))?;
-
-        let token_raw = cursor
-            .get("postBatchResumeToken")?
-            .and_then(crate::bson::RawBsonRef::as_document)
-            .map(|d| RawDocumentBuf::from_bytes(d.as_bytes().to_vec()))
-            .transpose()?;
-        let post_batch_resume_token = crate::change_stream::event::ResumeToken::from_raw(token_raw);
-
-        Ok(GetMoreRawResult {
-            raw_reply: raw,
-            exhausted: id == 0,
-            post_batch_resume_token,
-            ns,
-            id,
-        })
+        unimplemented!("should call handle_response_owned")
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

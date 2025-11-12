@@ -95,7 +95,7 @@ impl Client {
     /// Server selection will performed using the criteria specified on the operation, if any, and
     /// an implicit session will be created if the operation and write concern are compatible with
     /// sessions and an explicit session is not provided.
-    pub(crate) async fn execute_operation<T: Operation>(
+    pub(crate) async fn execute_operation<T: Operation + Sync>(
         &self,
         mut op: impl BorrowMut<T>,
         session: impl Into<Option<&mut ClientSession>>,
@@ -105,7 +105,7 @@ impl Client {
             .map(|details| details.output)
     }
 
-    async fn execute_operation_with_details<T: Operation>(
+    async fn execute_operation_with_details<T: Operation + Sync>(
         &self,
         op: &mut T,
         session: impl Into<Option<&mut ClientSession>>,
@@ -123,7 +123,7 @@ impl Client {
         result
     }
 
-    async fn execute_operation_with_details_inner<T: Operation>(
+    async fn execute_operation_with_details_inner<T: Operation + Sync>(
         &self,
         op: &mut T,
         mut session: Option<&mut ClientSession>,
@@ -193,7 +193,7 @@ impl Client {
         mut op: impl BorrowMut<Op>,
     ) -> Result<Cursor<T>>
     where
-        Op: Operation<O = CursorSpecification>,
+        Op: Operation<O = CursorSpecification> + Sync,
     {
         Box::pin(async {
             let mut details = self
@@ -216,7 +216,7 @@ impl Client {
         mut op: impl BorrowMut<Op>,
     ) -> Result<crate::cursor::raw_batch::RawBatchCursor>
     where
-        Op: Operation<O = crate::cursor::raw_batch::RawBatchCursorSpecification>,
+        Op: Operation<O = crate::cursor::raw_batch::RawBatchCursorSpecification> + Sync,
     {
         Box::pin(async {
             let mut details = self
@@ -244,7 +244,7 @@ impl Client {
         session: &mut ClientSession,
     ) -> Result<crate::cursor::raw_batch::SessionRawBatchCursor>
     where
-        Op: Operation<O = crate::cursor::raw_batch::RawBatchCursorSpecification>,
+        Op: Operation<O = crate::cursor::raw_batch::RawBatchCursorSpecification> + Sync,
     {
         let mut details = self
             .execute_operation_with_details(op.borrow_mut(), &mut *session)
@@ -272,7 +272,7 @@ impl Client {
         session: &mut ClientSession,
     ) -> Result<SessionCursor<T>>
     where
-        Op: Operation<O = CursorSpecification>,
+        Op: Operation<O = CursorSpecification> + Sync,
     {
         let mut details = self
             .execute_operation_with_details(op.borrow_mut(), &mut *session)
@@ -384,7 +384,7 @@ impl Client {
     /// Selects a server and executes the given operation on it, optionally using a provided
     /// session. Retries the operation upon failure if retryability is supported or after
     /// reauthenticating if reauthentication is required.
-    async fn execute_operation_with_retry<T: Operation>(
+    async fn execute_operation_with_retry<T: Operation + Sync>(
         &self,
         op: &mut T,
         mut session: Option<&mut ClientSession>,
@@ -556,7 +556,7 @@ impl Client {
     }
 
     /// Executes an operation on a given connection, optionally using a provided session.
-    pub(crate) async fn execute_operation_on_connection<T: Operation>(
+    pub(crate) async fn execute_operation_on_connection<T: Operation + Sync>(
         &self,
         op: &mut T,
         connection: &mut PooledConnection,
@@ -712,15 +712,30 @@ impl Client {
                         effective_criteria: effective_criteria.clone(),
                     };
 
-                    match op.handle_response(&response, context).await {
-                        Ok(response) => Ok(response),
-                        Err(mut err) => {
-                            err.add_labels_and_update_pin(
-                                Some(connection.stream_description()?),
-                                session,
-                                Some(retryability),
-                            );
-                            Err(err.with_server_response(&response))
+                    if op.wants_owned_response() {
+                        match op.handle_response_owned(response, context).await {
+                            Ok(output) => Ok(output),
+                            Err(mut err) => {
+                                err.add_labels_and_update_pin(
+                                    Some(connection.stream_description()?),
+                                    session,
+                                    Some(retryability),
+                                );
+                                // Cannot attach server response; it was moved.
+                                Err(err)
+                            }
+                        }
+                    } else {
+                        match op.handle_response(&response, context).await {
+                            Ok(output) => Ok(output),
+                            Err(mut err) => {
+                                err.add_labels_and_update_pin(
+                                    Some(connection.stream_description()?),
+                                    session,
+                                    Some(retryability),
+                                );
+                                Err(err.with_server_response(&response))
+                            }
                         }
                     }
                 }

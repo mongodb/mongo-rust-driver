@@ -150,8 +150,7 @@ impl Stream for RawBatchCursor {
                                 self.info.ns = out.ns;
                             }
                             Err(e) => {
-                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                                {
+                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237) {
                                     self.mark_exhausted();
                                 }
                                 let exhausted_now = self.state.exhausted;
@@ -176,6 +175,49 @@ impl Stream for RawBatchCursor {
                 .take()
                 .or_else(|| self.state.pending_reply.take())
             {
+                // Prefetch the next getMore before returning this batch, if applicable.
+                if !self.state.exhausted
+                    && !matches!(self.state.pinned_connection, PinnedConnection::Invalid(_))
+                {
+                    let info = self.info.clone();
+                    let client = self.client.clone();
+                    let state = &mut self.state;
+                    state
+                        .provider
+                        .start_execution(info, client, state.pinned_connection.handle());
+                    // Immediately poll once to register the waker and opportunistically buffer.
+                    if let Some(fut) = state.provider.executing_future() {
+                        match Pin::new(fut).poll(cx) {
+                            Poll::Pending => {}
+                            Poll::Ready(get_more_out) => {
+                                match get_more_out.result {
+                                    Ok(out) => {
+                                        state.pending_reply = Some(out.raw_reply);
+                                        state.post_batch_resume_token = out.post_batch_resume_token;
+                                        if out.exhausted {
+                                            self.mark_exhausted();
+                                        }
+                                        if out.id != 0 {
+                                            self.info.id = out.id;
+                                        }
+                                        self.info.ns = out.ns;
+                                    }
+                                    Err(e) => {
+                                        if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
+                                        {
+                                            self.mark_exhausted();
+                                        }
+                                        // Intentionally do not surface the error here; clear and continue.
+                                    }
+                                }
+                                let exhausted_now = self.state.exhausted;
+                                self.state
+                                    .provider
+                                    .clear_execution(get_more_out.session, exhausted_now);
+                            }
+                        }
+                    }
+                }
                 return Poll::Ready(Some(Ok(RawBatch::new(reply))));
             }
 
@@ -317,8 +359,7 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
                                 self.parent.initial_reply = Some(out.raw_reply);
                             }
                             Err(e) => {
-                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                                {
+                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237) {
                                     self.parent.exhausted = true;
                                 }
                                 let exhausted_now = self.parent.exhausted;
@@ -336,6 +377,50 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
 
             // Yield any buffered reply (initial).
             if let Some(reply) = self.parent.initial_reply.take() {
+                // Prefetch the next getMore before returning this batch, if applicable.
+                if !self.parent.exhausted
+                    && !matches!(self.parent.pinned_connection, PinnedConnection::Invalid(_))
+                {
+                    let info = self.parent.info.clone();
+                    let client = self.parent.client.clone();
+                    // Avoid borrow conflicts by replicating the handle into a temporary owner.
+                    let pinned_owned = self.parent.pinned_connection.handle().map(|c| c.replicate());
+                    let pinned_ref = pinned_owned.as_ref();
+                    self.provider.start_execution(info, client, pinned_ref);
+                    // Immediately poll once to register the waker and opportunistically buffer.
+                    if let Some(fut) = self.provider.executing_future() {
+                        match Pin::new(fut).poll(cx) {
+                            Poll::Pending => {}
+                            Poll::Ready(get_more_out) => {
+                                match get_more_out.result {
+                                    Ok(out) => {
+                                        if out.exhausted {
+                                            self.parent.exhausted = true;
+                                        }
+                                        if out.id != 0 {
+                                            self.parent.info.id = out.id;
+                                        }
+                                        self.parent.info.ns = out.ns;
+                                        self.parent.post_batch_resume_token =
+                                            out.post_batch_resume_token;
+                                        // buffer for the next poll
+                                        self.parent.initial_reply = Some(out.raw_reply);
+                                    }
+                                    Err(e) => {
+                                        if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
+                                        {
+                                            self.parent.exhausted = true;
+                                        }
+                                        // Intentionally do not surface the error here; clear and continue.
+                                    }
+                                }
+                                let exhausted_now = self.parent.exhausted;
+                                self.provider
+                                    .clear_execution(get_more_out.session, exhausted_now);
+                            }
+                        }
+                    }
+                }
                 return Poll::Ready(Some(Ok(RawBatch::new(reply))));
             }
 
@@ -412,6 +497,29 @@ impl<'s, S: ClientSessionHandle<'s>> GetMoreRawProvider<'s, S> {
                 this
             }
         })
+    }
+}
+
+pub struct RawDocumentStream<R> {
+    inner: R,
+}
+
+impl RawBatchCursor {
+    pub fn into_raw_documents(self) -> RawDocumentStream<Self> {
+        RawDocumentStream { inner: self }
+    }
+}
+
+impl Stream for RawDocumentStream<RawBatchCursor> {
+    type Item = Result<RawBatch>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match Pin::new(&mut self.inner).poll_next(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
+            Poll::Ready(None) => Poll::Ready(None),
+        }
     }
 }
 
