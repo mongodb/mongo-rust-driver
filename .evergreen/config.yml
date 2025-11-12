@@ -419,6 +419,19 @@ buildvariants:
       #- name: .8.0
       #- name: .7.0
 
+  - name: "verify-sbom"
+    display_name: "Verify SBOM Changes Needed"
+    run_on: ubuntu2204-small
+    # Only trigger when dependency manifests or the SBOM itself change.
+    paths:
+      - "*.toml"
+      - "*.lock"
+      - "**/*.toml"
+      - "**/*.lock"
+      - "sbom.json"
+    tasks:
+      - name: "verify-sbom-task"
+
 ###############
 # Task Groups #
 ###############
@@ -1245,6 +1258,20 @@ tasks:
           - .evergreen/run-happy-eyeballs-tests.sh
         include_expansions_in_env:
           - PROJECT_DIRECTORY
+
+  - name: "verify-sbom-task"
+    allowed_requesters: ["patch", "github_pr"]
+    tags: [ "sbom" ]
+    commands:
+      - command: shell.exec
+        type: "test"
+        params:
+          working_dir: "src"
+          shell: "bash"
+          script: |
+            ${PREPARE_SHELL}
+            echo "Verifying SBOM files"
+            bash .evergreen/verify-sbom.sh
 
 #############
 # Functions #
