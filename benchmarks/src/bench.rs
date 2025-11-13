@@ -27,8 +27,8 @@ use mongodb::{
     options::{Acknowledgment, ClientOptions, SelectionCriteria, WriteConcern},
     Client,
 };
-use std::sync::LazyLock;
 use serde_json::Value;
+use std::sync::LazyLock;
 
 use crate::fs::{BufReader, File};
 
@@ -39,19 +39,19 @@ static DATABASE_NAME: LazyLock<String> = LazyLock::new(|| {
 });
 static COLL_NAME: LazyLock<String> =
     LazyLock::new(|| option_env!("COLL_NAME").unwrap_or("corpus").to_string());
-    static MAX_EXECUTION_TIME: LazyLock<u64> = LazyLock::new(|| {
+static MAX_EXECUTION_TIME: LazyLock<u64> = LazyLock::new(|| {
     option_env!("MAX_EXECUTION_TIME")
         .unwrap_or("300")
         .parse::<u64>()
         .expect("invalid MAX_EXECUTION_TIME")
 });
-    static MIN_EXECUTION_TIME: LazyLock<u64> = LazyLock::new(|| {
+static MIN_EXECUTION_TIME: LazyLock<u64> = LazyLock::new(|| {
     option_env!("MIN_EXECUTION_TIME")
         .unwrap_or("60")
         .parse::<u64>()
         .expect("invalid MIN_EXECUTION_TIME")
 });
-    pub static TARGET_ITERATION_COUNT: LazyLock<usize> = LazyLock::new(|| {
+pub static TARGET_ITERATION_COUNT: LazyLock<usize> = LazyLock::new(|| {
     option_env!("TARGET_ITERATION_COUNT")
         .unwrap_or("100")
         .parse::<usize>()
