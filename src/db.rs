@@ -151,7 +151,7 @@ impl Database {
     /// `await` will return [`Result<crate::cursor::raw_batch::RawBatchCursor>`] (or
     /// [`Result<crate::cursor::raw_batch::SessionRawBatchCursor>`] if a session is provided).
     ///
-    /// See the [`raw_batch`](crate::cursor::raw_batch) module documentation for usage guidance.
+    /// See the `cursor::raw_batch` module documentation for usage guidance.
     pub fn find_raw_batches(
         &self,
         collection: impl Into<String>,

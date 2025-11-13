@@ -71,7 +71,7 @@ pub(crate) struct RawBatchCursorSpecification {
 
 /// A raw batch response returned by the server for a cursor getMore/find.
 ///
-/// This provides zero-copy access to the server's batch array via [`doc_slices`].
+/// This provides zero-copy access to the server's batch array via [`doc_slices`](RawBatch::doc_slices).
 #[derive(Debug)]
 pub struct RawBatch {
     reply: RawDocumentBuf,
@@ -86,7 +86,7 @@ impl RawBatch {
     ///
     /// This lets callers iterate over [`crate::bson::RawDocument`] items directly for maximal
     /// performance.
-    pub fn doc_slices<'a>(&'a self) -> Result<&'a RawArray> {
+    pub fn doc_slices(&self) -> Result<&RawArray> {
         let root = self.reply.as_ref();
         let cursor = root
             .get("cursor")?
