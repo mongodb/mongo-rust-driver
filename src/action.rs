@@ -44,7 +44,7 @@ pub use delete::Delete;
 pub use distinct::Distinct;
 pub use drop::{DropCollection, DropDatabase};
 pub use drop_index::DropIndex;
-pub use find::{Find, FindOne};
+pub use find::{Find, FindOne, FindRawBatches};
 pub use find_and_modify::{FindOneAndDelete, FindOneAndReplace, FindOneAndUpdate};
 pub use insert_many::InsertMany;
 pub use insert_one::InsertOne;
@@ -69,7 +69,7 @@ pub struct ListNames;
 #[allow(missing_docs)]
 pub struct ImplicitSession;
 #[allow(missing_docs)]
-pub struct ExplicitSession<'a>(&'a mut crate::ClientSession);
+pub struct ExplicitSession<'a>(pub(crate) &'a mut crate::ClientSession);
 
 #[allow(missing_docs)]
 pub struct Single;

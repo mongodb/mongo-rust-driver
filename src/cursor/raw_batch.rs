@@ -1,9 +1,49 @@
+//! Raw batch cursor API for zero-copy document processing.
+//!
+//! This module provides a high-performance alternative to the standard cursor API when you need
+//! direct access to server response batches without per-document deserialization overhead.
+//!
+//! # When to Use
+//!
+//! **Use `find_raw_batches()` when:**
+//! - Processing high-volume queries where deserialization is a bottleneck
+//! - Implementing custom batch-level logic (e.g., batch transformation, filtering)
+//! - Inspecting raw BSON structure without a known schema
+//! - Forwarding documents without modification (e.g., proxying, caching)
+//!
+//! **Use regular `find()` when:**
+//! - Working with strongly-typed `Deserialize` documents
+//! - Iterating one document at a time
+//! - Deserialization overhead is acceptable for your use case
+//!
+//! # Example
+//!
+//! ```no_run
+//! # use mongodb::{Client, bson::doc};
+//! # async fn example() -> mongodb::error::Result<()> {
+//! # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
+//! # let db = client.database("db");
+//! use futures::stream::StreamExt;
+//!
+//! let mut cursor = db.find_raw_batches("coll", doc! {}).await?;
+//! while let Some(batch) = cursor.next().await {
+//!     let batch = batch?;
+//!     // Zero-copy access to documents in this batch
+//!     for doc_result in batch.doc_slices()? {
+//!         let doc = doc_result?;
+//!         // Process raw document
+//!     }
+//! }
+//! # Ok(())
+//! # }
+//! ```
+
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
 
-use crate::bson::{RawArray, RawBsonRef};
+use crate::bson::{RawArray, RawBsonRef, RawDocument};
 use futures_core::{future::BoxFuture, Future, Stream};
 
 use crate::{
@@ -60,6 +100,14 @@ impl RawBatch {
 
         docs.as_array()
             .ok_or_else(|| Error::invalid_response("missing firstBatch/nextBatch"))
+    }
+
+    /// Returns a reference to the full server response document.
+    ///
+    /// This provides access to all fields in the server's response, including cursor metadata,
+    /// for debugging or custom parsing.
+    pub fn as_raw_document(&self) -> &RawDocument {
+        self.reply.as_ref()
     }
 }
 

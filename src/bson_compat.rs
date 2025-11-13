@@ -37,6 +37,7 @@ pub(crate) trait RawDocumentBufExt: Sized {
         value: impl Into<crate::bson::raw::RawBsonRef<'a>> + 'a,
     );
 
+    #[cfg(any(feature = "tracing-unstable", feature = "opentelemetry"))]
     fn to_document(&self) -> crate::error::Result<crate::bson::Document>;
 }
 
@@ -50,6 +51,7 @@ impl RawDocumentBufExt for crate::bson::RawDocumentBuf {
         self.append(key, value);
     }
 
+    #[cfg(any(feature = "tracing-unstable", feature = "opentelemetry"))]
     fn to_document(&self) -> crate::error::Result<crate::bson::Document> {
         self.try_into().map_err(Into::into)
     }

@@ -142,4 +142,27 @@ impl Database {
     pub fn gridfs_bucket(&self, options: impl Into<Option<GridFsBucketOptions>>) -> GridFsBucket {
         GridFsBucket::new(self.clone(), options.into().unwrap_or_default())
     }
+
+    /// Finds the documents in a collection and returns raw server batches.
+    ///
+    /// This method returns raw BSON batches without deserializing individual documents,
+    /// providing zero-copy access for high-performance scenarios.
+    ///
+    /// `await` will return [`Result<crate::cursor::raw_batch::RawBatchCursor>`] (or
+    /// [`Result<crate::cursor::raw_batch::SessionRawBatchCursor>`] if a session is provided).
+    ///
+    /// See the [`raw_batch`](crate::cursor::raw_batch) module documentation for usage guidance.
+    pub fn find_raw_batches(
+        &self,
+        collection: impl Into<String>,
+        filter: crate::bson::Document,
+    ) -> crate::action::FindRawBatches<'_> {
+        crate::action::FindRawBatches {
+            db: self,
+            collection: collection.into(),
+            filter,
+            options: None,
+            session: crate::action::ImplicitSession,
+        }
+    }
 }

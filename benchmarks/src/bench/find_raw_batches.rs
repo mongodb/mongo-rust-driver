@@ -2,14 +2,13 @@ use anyhow::Result;
 use futures::stream::StreamExt;
 use mongodb::{
     bson::{doc, Document},
-    Client, Collection, Database,
+    Client, Database,
 };
 
 use crate::bench::{drop_database, Benchmark, COLL_NAME, DATABASE_NAME};
 
 pub struct FindRawBatchesBenchmark {
     db: Database,
-    coll: Collection<Document>,
     uri: String,
 }
 
@@ -30,19 +29,18 @@ impl Benchmark for FindRawBatchesBenchmark {
         let db = client.database(&DATABASE_NAME);
         drop_database(options.uri.as_str(), DATABASE_NAME.as_str()).await?;
 
-        let coll = db.collection(&COLL_NAME);
+        let coll = db.collection::<Document>(&COLL_NAME);
         let docs = vec![options.doc.clone(); options.num_iter];
         coll.insert_many(docs).await?;
 
         Ok(FindRawBatchesBenchmark {
             db,
-            coll,
             uri: options.uri,
         })
     }
 
     async fn do_task(&self, _state: Self::TaskState) -> Result<()> {
-        let mut batches = self.coll.find_raw_batches(doc! {}).await?;
+        let mut batches = self.db.find_raw_batches(COLL_NAME.as_str(), doc! {}).await?;
         while let Some(batch_res) = batches.next().await {
             batch_res?;
         }

@@ -153,8 +153,9 @@ async fn find_raw_batches_one() {
 
     coll.insert_one(doc! { "x": 1 }).await.unwrap();
 
-    let mut batches = coll
-        .find_raw_batches(doc! { "x": 1 })
+    let db = client.database(function_name!());
+    let mut batches = db
+        .find_raw_batches(function_name!(), doc! { "x": 1 })
         .limit(-1)
         .await
         .unwrap();
