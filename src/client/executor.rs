@@ -696,7 +696,6 @@ impl Client {
                         effective_criteria: effective_criteria.clone(),
                     };
 
-                    // Owned path: we move the server response into the handler for zero-copy parsing.
                     if op.wants_owned_response() {
                         match op.handle_response_owned(response, context).await {
                             Ok(output) => Ok(output),
