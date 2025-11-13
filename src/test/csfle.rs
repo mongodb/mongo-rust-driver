@@ -302,7 +302,7 @@ async fn validate_roundtrip(
 fn load_testdata_raw(name: &str) -> Result<String> {
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
-        "src/test/spec/json/testdata/client-side-encryption",
+        "spec/testdata/client-side-encryption",
         name,
     ]
     .iter()
