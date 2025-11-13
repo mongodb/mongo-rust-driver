@@ -1,23 +1,17 @@
 [package]
-authors = [
-    "Saghm Rossi <saghmrossi@gmail.com>",
-    "Patrick Freed <patrick.freed@mongodb.com>",
-    "Isabel Atkinson <isabel.atkinson@mongodb.com>",
-    "Abraham Egnor <abraham.egnor@mongodb.com>",
-    "Kaitlin Mahar <kaitlin.mahar@mongodb.com>",
-    "Patrick Meredith <pmeredit@protonmail.com>",
-]
 description = "The official MongoDB driver for Rust"
-edition = "2021"
 keywords = ["mongo", "mongodb", "database", "bson", "nosql"]
 categories = ["asynchronous", "database", "web-programming"]
-repository = "https://github.com/mongodb/mongo-rust-driver"
 homepage = "https://www.mongodb.com/docs/drivers/rust/"
-license = "Apache-2.0"
-readme = "README.md"
+readme = "../README.md"
 name = "mongodb"
 version = "3.3.0"
-rust-version = "1.83"
+
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 exclude = [
     "etc/**",

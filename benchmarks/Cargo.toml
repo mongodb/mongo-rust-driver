@@ -1,8 +1,12 @@
 [package]
 name = "rust-driver-bench"
 version = "0.1.0"
-authors = ["benjirewis <ben.rewis98@gmail.com>"]
-edition = "2018"
+
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 mongodb = { path = "../driver" }

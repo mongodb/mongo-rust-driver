@@ -1,4 +1,17 @@
 [workspace]
 resolver = "2"
 members = ["driver", "macros", "benchmarks"]
-default-members = ["driver"]
+
+[workspace.package]
+authors = [
+    "Saghm Rossi <saghmrossi@gmail.com>",
+    "Patrick Freed <patrick.freed@mongodb.com>",
+    "Isabel Atkinson <isabel.atkinson@mongodb.com>",
+    "Abraham Egnor <abraham.egnor@mongodb.com>",
+    "Kaitlin Mahar <kaitlin.mahar@mongodb.com>",
+    "Patrick Meredith <pmeredit@protonmail.com>",
+]
+license = "Apache-2.0"
+edition = "2021"
+repository = "https://github.com/mongodb/mongo-rust-driver"
+rust-version = "1.83"

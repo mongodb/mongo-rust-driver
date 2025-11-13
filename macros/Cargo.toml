@@ -2,8 +2,12 @@
 name = "mongodb-internal-macros"
 version = "3.3.0"
 description = "Internal macros for the mongodb crate"
-edition = "2021"
-license = "Apache-2.0"
+
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
