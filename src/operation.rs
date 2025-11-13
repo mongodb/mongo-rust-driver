@@ -40,15 +40,25 @@ use crate::{
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     cmap::{
         conn::{pooled::PooledConnection, PinnedConnectionHandle},
-        Command, RawCommandResponse, StreamDescription,
+        Command,
+        RawCommandResponse,
+        StreamDescription,
     },
     error::{
-        CommandError, Error, ErrorKind, IndexedWriteError, InsertManyError, Result,
-        WriteConcernError, WriteFailure,
+        CommandError,
+        Error,
+        ErrorKind,
+        IndexedWriteError,
+        InsertManyError,
+        Result,
+        WriteConcernError,
+        WriteFailure,
     },
     options::{ClientOptions, WriteConcern},
     selection_criteria::SelectionCriteria,
-    BoxFuture, ClientSession, Namespace,
+    BoxFuture,
+    ClientSession,
+    Namespace,
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
@@ -137,19 +147,30 @@ pub(crate) trait Operation {
 
     /// Whether this operation prefers to take ownership of the server response body for
     /// zero-copy handling.
-    /// Defaults to false; operations can override via OperationWithDefaults.
+    ///
+    /// Operations that parse raw batches (e.g. raw find/getMore) should return `true` and implement
+    /// [`handle_response_owned`] to avoid cloning the server reply bytes.
     fn wants_owned_response(&self) -> bool {
         false
     }
 
     /// Interprets the server response taking ownership of the body to enable zero-copy handling.
-    /// Is only ever called if wants_owned_response returns True
+    ///
+    /// Default behavior delegates to the borrowed [`handle_response`]; operations that return
+    /// `true` from [`wants_owned_response`] should override this to consume the response.
     fn handle_response_owned<'a>(
         &'a self,
-        _response: RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        response: RawCommandResponse,
+        context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
-        unimplemented!()
+        // Default: owned path not implemented. Return a Send future that does not capture `self`.
+        async move {
+            Err(ErrorKind::Internal {
+                message: format!("owned response handling not implemented for {}", Self::NAME),
+            }
+            .into())
+        }
+        .boxed()
     }
 
     /// Interpret an error encountered while sending the built command to the server, potentially
@@ -241,11 +262,15 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
 
     /// Whether this operation prefers to take ownership of the server response body for
     /// zero-copy handling.
+    ///
+    /// Override to `true` for operations that can consume the response without cloning it.
     fn wants_owned_response(&self) -> bool {
         false
     }
 
     /// Interprets the server response taking ownership of the body to enable zero-copy handling.
+    ///
+    /// Default implementation defers to the borrowed handler; override for true zero-copy handling.
     fn handle_response_owned<'a>(
         &'a self,
         response: RawCommandResponse,

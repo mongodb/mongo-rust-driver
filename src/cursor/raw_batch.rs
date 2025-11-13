@@ -7,7 +7,7 @@ use crate::bson::{RawArray, RawBsonRef};
 use futures_core::{future::BoxFuture, Future, Stream};
 
 use crate::{
-    bson::{RawDocument, RawDocumentBuf},
+    bson::{RawDocumentBuf},
     change_stream::event::ResumeToken,
     client::{options::ServerAddress, AsyncDropToken},
     cmap::conn::PinnedConnectionHandle,
@@ -29,6 +29,9 @@ pub(crate) struct RawBatchCursorSpecification {
     pub(crate) post_batch_resume_token: Option<ResumeToken>,
 }
 
+/// A raw batch response returned by the server for a cursor getMore/find.
+///
+/// This provides zero-copy access to the server's batch array via [`doc_slices`].
 #[derive(Debug)]
 pub struct RawBatch {
     reply: RawDocumentBuf,
@@ -39,6 +42,10 @@ impl RawBatch {
         Self { reply }
     }
 
+    /// Returns a borrowed view of the batch array (`firstBatch` or `nextBatch`) without copying.
+    ///
+    /// This lets callers iterate over [`crate::bson::RawDocument`] items directly for maximal
+    /// performance.
     pub fn doc_slices<'a>(&'a self) -> Result<&'a RawArray> {
         let root = self.reply.as_ref();
         let cursor = root
@@ -142,8 +149,7 @@ impl Stream for RawBatchCursor {
                                 self.info.ns = out.ns;
                             }
                             Err(e) => {
-                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                                {
+                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237) {
                                     self.mark_exhausted();
                                 }
                                 let exhausted_now = self.state.exhausted;
@@ -352,8 +358,7 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
                                 self.parent.initial_reply = Some(out.raw_reply);
                             }
                             Err(e) => {
-                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                                {
+                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237) {
                                     self.parent.exhausted = true;
                                 }
                                 let exhausted_now = self.parent.exhausted;
@@ -378,11 +383,7 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
                     let info = self.parent.info.clone();
                     let client = self.parent.client.clone();
                     // Avoid borrow conflicts by replicating the handle into a temporary owner.
-                    let pinned_owned = self
-                        .parent
-                        .pinned_connection
-                        .handle()
-                        .map(|c| c.replicate());
+                    let pinned_owned = self.parent.pinned_connection.handle().map(|c| c.replicate());
                     let pinned_ref = pinned_owned.as_ref();
                     self.provider.start_execution(info, client, pinned_ref);
                     // Immediately poll once to register the waker and opportunistically buffer.
