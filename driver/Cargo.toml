@@ -103,7 +103,7 @@ hickory-resolver = { version = "0.25", optional = true }
 hmac = "0.12.1"
 log = { version = "0.4.17", optional = true }
 md-5 = "0.10.1"
-mongodb-internal-macros = { path = "macros", version = "3.3.0" }
+mongodb-internal-macros = { path = "../macros", version = "3.3.0" }
 num_cpus = { version = "1.13.1", optional = true }
 openssl = { version = "0.10.38", optional = true }
 openssl-probe = { version = "0.1.5", optional = true }
