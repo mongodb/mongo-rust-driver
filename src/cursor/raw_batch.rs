@@ -7,7 +7,7 @@ use crate::bson::{RawArray, RawBsonRef};
 use futures_core::{future::BoxFuture, Future, Stream};
 
 use crate::{
-    bson::{RawDocumentBuf},
+    bson::RawDocumentBuf,
     change_stream::event::ResumeToken,
     client::{options::ServerAddress, AsyncDropToken},
     cmap::conn::PinnedConnectionHandle,
@@ -149,7 +149,8 @@ impl Stream for RawBatchCursor {
                                 self.info.ns = out.ns;
                             }
                             Err(e) => {
-                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237) {
+                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
+                                {
                                     self.mark_exhausted();
                                 }
                                 let exhausted_now = self.state.exhausted;
@@ -358,7 +359,8 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
                                 self.parent.initial_reply = Some(out.raw_reply);
                             }
                             Err(e) => {
-                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237) {
+                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
+                                {
                                     self.parent.exhausted = true;
                                 }
                                 let exhausted_now = self.parent.exhausted;
@@ -383,7 +385,11 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
                     let info = self.parent.info.clone();
                     let client = self.parent.client.clone();
                     // Avoid borrow conflicts by replicating the handle into a temporary owner.
-                    let pinned_owned = self.parent.pinned_connection.handle().map(|c| c.replicate());
+                    let pinned_owned = self
+                        .parent
+                        .pinned_connection
+                        .handle()
+                        .map(|c| c.replicate());
                     let pinned_ref = pinned_owned.as_ref();
                     self.provider.start_execution(info, client, pinned_ref);
                     // Immediately poll once to register the waker and opportunistically buffer.
@@ -496,29 +502,6 @@ impl<'s, S: ClientSessionHandle<'s>> GetMoreRawProvider<'s, S> {
                 this
             }
         })
-    }
-}
-
-pub struct RawDocumentStream<R> {
-    inner: R,
-}
-
-impl RawBatchCursor {
-    pub fn into_raw_documents(self) -> RawDocumentStream<Self> {
-        RawDocumentStream { inner: self }
-    }
-}
-
-impl Stream for RawDocumentStream<RawBatchCursor> {
-    type Item = Result<RawBatch>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match Pin::new(&mut self.inner).poll_next(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
-            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
-            Poll::Ready(None) => Poll::Ready(None),
-        }
     }
 }
 

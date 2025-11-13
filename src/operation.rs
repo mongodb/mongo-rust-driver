@@ -40,25 +40,15 @@ use crate::{
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     cmap::{
         conn::{pooled::PooledConnection, PinnedConnectionHandle},
-        Command,
-        RawCommandResponse,
-        StreamDescription,
+        Command, RawCommandResponse, StreamDescription,
     },
     error::{
-        CommandError,
-        Error,
-        ErrorKind,
-        IndexedWriteError,
-        InsertManyError,
-        Result,
-        WriteConcernError,
-        WriteFailure,
+        CommandError, Error, ErrorKind, IndexedWriteError, InsertManyError, Result,
+        WriteConcernError, WriteFailure,
     },
     options::{ClientOptions, WriteConcern},
     selection_criteria::SelectionCriteria,
-    BoxFuture,
-    ClientSession,
-    Namespace,
+    BoxFuture, ClientSession, Namespace,
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
@@ -160,17 +150,10 @@ pub(crate) trait Operation {
     /// `true` from [`wants_owned_response`] should override this to consume the response.
     fn handle_response_owned<'a>(
         &'a self,
-        response: RawCommandResponse,
-        context: ExecutionContext<'a>,
+        _response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
-        // Default: owned path not implemented. Return a Send future that does not capture `self`.
-        async move {
-            Err(ErrorKind::Internal {
-                message: format!("owned response handling not implemented for {}", Self::NAME),
-            }
-            .into())
-        }
-        .boxed()
+        unimplemented!()
     }
 
     /// Interpret an error encountered while sending the built command to the server, potentially
