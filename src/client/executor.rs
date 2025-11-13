@@ -697,8 +697,6 @@ impl Client {
                     };
 
                     // Owned path: we move the server response into the handler for zero-copy parsing.
-                    // Note: since the response is moved, we must not attempt to attach it to errors
-                    // (e.g. via with_server_response) after this branch.
                     if op.wants_owned_response() {
                         match op.handle_response_owned(response, context).await {
                             Ok(output) => Ok(output),
