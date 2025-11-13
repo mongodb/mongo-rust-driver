@@ -72,7 +72,7 @@ pub fn options_doc(
 /// Parse an identifier with a specific expected value.
 fn parse_name(input: ParseStream, name: &str) -> syn::Result<Ident> {
     let ident = input.parse::<Ident>()?;
-    if ident.to_string() != name {
+    if ident != name {
         return Err(Error::new(
             ident.span(),
             format!("expected '{}', got '{}'", name, ident),

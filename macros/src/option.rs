@@ -191,7 +191,7 @@ fn path_eq(path: &Path, segments: &[&str]) -> bool {
     if path.segments.len() != segments.len() {
         return false;
     }
-    for (actual, expected) in path.segments.iter().zip(segments.into_iter()) {
+    for (actual, expected) in path.segments.iter().zip(segments.iter()) {
         if actual.ident != expected {
             return false;
         }

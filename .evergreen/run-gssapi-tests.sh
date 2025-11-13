@@ -21,6 +21,7 @@ set +o errexit
 # is similar to but distinct from (KRB5) GSSAPI. Therefore, we only
 # run the following steps if we are not on Windows.
 if [[ "cygwin" != "$OSTYPE" ]]; then
+  pushd driver
   # Create a krb5 config file with relevant
   touch krb5.conf
   echo "[realms]
@@ -45,6 +46,7 @@ if [[ "cygwin" != "$OSTYPE" ]]; then
   echo "Authenticating $PRINCIPAL"
   echo "$SASL_PASS" | kinit -p $PRINCIPAL
   klist
+  popd
 fi
 
 # Run end-to-end auth tests for "$PRINCIPAL" user
@@ -52,6 +54,7 @@ TEST_OPTIONS+=("--skip with_service_realm_and_host_options")
 cargo_test test::auth::gssapi_skip_local
 
 if [[ "cygwin" != "$OSTYPE" ]]; then
+  pushd driver
   # Unauthenticate
   echo "Unauthenticating $PRINCIPAL"
   kdestroy
@@ -60,15 +63,18 @@ if [[ "cygwin" != "$OSTYPE" ]]; then
   echo "Authenticating $PRINCIPAL_CROSS"
   echo "$SASL_PASS_CROSS" | kinit -p $PRINCIPAL_CROSS
   klist
+  popd
 fi
 
 TEST_OPTIONS=()
 cargo_test test::auth::gssapi_skip_local::with_service_realm_and_host_options
 
 if [[ "cygwin" != "$OSTYPE" ]]; then
+  pushd driver
   # Unauthenticate
   echo "Unauthenticating $PRINCIPAL_CROSS"
   kdestroy
+  popd
 fi
 
 # Run remaining tests

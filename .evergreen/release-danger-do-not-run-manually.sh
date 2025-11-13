@@ -26,13 +26,9 @@ if [[ "${DRY_RUN}" == "yes" ]]; then
 fi
 
 if [[ "${PACKAGE_ONLY}" == "yes" ]]; then
-  pushd macros
-  cargo package --no-verify --allow-dirty
-  popd
-  cargo package --no-verify --allow-dirty
+  cargo package --package mongodb-internal-macros --no-verify --allow-dirty
+  cargo package --package mongodb --no-verify --allow-dirty
 else
-  pushd macros
-  cargo publish ${EXTRA}
-  popd
-  cargo publish ${EXTRA}
+  cargo publish --package mongodb-internal-macros ${EXTRA}
+  cargo publish --package mongodb ${EXTRA}
 fi

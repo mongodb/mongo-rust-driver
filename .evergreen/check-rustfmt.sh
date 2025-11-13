@@ -3,5 +3,4 @@
 set -o errexit
 
 source ./.evergreen/env.sh
-rustfmt +nightly --unstable-features --check src/**/*.rs
-rustfmt +nightly --unstable-features --check src/*.rs
+cargo +nightly fmt --check -- --unstable-features

@@ -87,7 +87,7 @@ fn text_link(text: &str) -> String {
         .flat_map(|s| {
             if s == "<" || s == ">" {
                 vec![s]
-            } else if let Some(sub) = s.strip_suffix(&['<', '>']) {
+            } else if let Some(sub) = s.strip_suffix(['<', '>']) {
                 vec![sub, &s[sub.len()..]]
             } else {
                 vec![s]
