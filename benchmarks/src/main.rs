@@ -15,7 +15,7 @@ mod score;
 use std::{collections::HashSet, convert::TryFrom, path::PathBuf};
 
 use anyhow::Result;
-use clap::{App, Arg, ArgMatches};
+use clap::{Arg, ArgMatches, Command};
 use futures::{Future, FutureExt};
 use mongodb::options::ClientOptions;
 
@@ -564,8 +564,8 @@ async fn run_benchmarks(
 }
 
 fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
-    let mut ids: HashSet<BenchmarkId> = match matches.value_of("ids") {
-        Some("all") => (1..=MAX_ID)
+    let mut ids: HashSet<BenchmarkId> = match matches.get_one::<String>("ids") {
+        Some(s) if s == "all" => (1..=MAX_ID)
             .map(|id| BenchmarkId::try_from(id).unwrap())
             .collect(),
         Some(id_list) => id_list
@@ -580,14 +580,14 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         None => HashSet::new(),
     };
 
-    if matches.is_present("single") {
+    if matches.contains_id("single") {
         ids.insert(BenchmarkId::RunCommand);
         ids.insert(BenchmarkId::RunCommandColdStart);
         ids.insert(BenchmarkId::FindOneById);
         ids.insert(BenchmarkId::SmallDocInsertOne);
         ids.insert(BenchmarkId::LargeDocInsertOne);
     }
-    if matches.is_present("multi") {
+    if matches.contains_id("multi") {
         ids.insert(BenchmarkId::FindManyRawBson);
         ids.insert(BenchmarkId::SmallDocInsertMany);
         ids.insert(BenchmarkId::LargeDocInsertMany);
@@ -597,14 +597,14 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         ids.insert(BenchmarkId::LargeDocInsertBulkWrite);
         ids.insert(BenchmarkId::MixedBulkWrite);
     }
-    if matches.is_present("parallel") {
+    if matches.contains_id("parallel") {
         ids.insert(BenchmarkId::LdJsonMultiFileImport);
         ids.insert(BenchmarkId::LdJsonMultiFileExport);
         ids.insert(BenchmarkId::GridFsMultiDownload);
         // TODO RUST-2010 Re-enable this benchmark
         //ids.insert(BenchmarkId::GridFsMultiUpload);
     }
-    if matches.is_present("bson") {
+    if matches.contains_id("bson") {
         ids.insert(BenchmarkId::BsonFlatDocumentDecode);
         ids.insert(BenchmarkId::BsonFlatDocumentEncode);
         ids.insert(BenchmarkId::BsonDeepDocumentDecode);
@@ -612,7 +612,7 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         ids.insert(BenchmarkId::BsonFullDocumentDecode);
         ids.insert(BenchmarkId::BsonFullDocumentEncode);
     }
-    if matches.is_present("driver") {
+    if matches.contains_id("driver") {
         ids.insert(BenchmarkId::RunCommand);
         ids.insert(BenchmarkId::RunCommandColdStart);
         ids.insert(BenchmarkId::FindOneById);
@@ -662,67 +662,69 @@ async fn main() {
     }
     id_help.push_str("    all: All benchmarks\n                    ");
 
-    let matches = App::new("RustDriverBenchmark")
+    let matches = Command::new("RustDriverBenchmark")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Runs performance micro-bench")
         .author("benjirewis")
         .arg(
-            Arg::with_name("single")
-                .short("s")
+            Arg::new("single")
+                .short('s')
                 .long("single")
                 .help("Run single document benchmarks"),
         )
         .arg(
-            Arg::with_name("multi")
-                .short("m")
+            Arg::new("multi")
+                .short('m')
                 .long("multi")
                 .help("Run multi document benchmarks"),
         )
         .arg(
-            Arg::with_name("parallel")
-                .short("p")
+            Arg::new("parallel")
+                .short('p')
                 .long("parallel")
                 .help("Run parallel document benchmarks"),
         )
         .arg(
-            Arg::with_name("bson")
-                .short("b")
+            Arg::new("bson")
+                .short('b')
                 .long("bson")
                 .help("Run BSON-only benchmarks"),
         )
         .arg(
-            Arg::with_name("driver")
-                .short("d")
+            Arg::new("driver")
+                .short('d')
                 .long("driver")
                 .help("Run driver-only benchmarks"),
         )
         .arg(
-            Arg::with_name("verbose")
-                .short("v")
+            Arg::new("verbose")
+                .short('v')
                 .long("verbose")
                 .help("Print test information verbosely"),
         )
         .arg(
-            Arg::with_name("ids")
-                .short("i")
+            Arg::new("ids")
+                .short('i')
                 .long("ids")
-                .takes_value(true)
+                .value_name("ID_LIST")
                 .help("Run benchmarks by id number (comma-separated)")
                 .long_help(&id_help),
         )
         .arg(
-            Arg::with_name("output")
-                .short("o")
+            Arg::new("output")
+                .short('o')
                 .long("output")
-                .takes_value(true)
+                .value_name("FILE")
                 .help("Output file to contain the JSON data to be ingested by Evergreen"),
         )
         .get_matches();
 
     let uri = option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017");
 
-    let verbose = matches.is_present("verbose");
-    let output_file = matches.value_of("output").map(|p| PathBuf::new().join(p));
+    let verbose = matches.contains_id("verbose");
+    let output_file = matches
+        .get_one::<String>("output")
+        .map(|p| PathBuf::new().join(p));
 
     println!(
         "Running tests{}...\n",
