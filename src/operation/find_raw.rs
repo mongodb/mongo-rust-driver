@@ -97,12 +97,9 @@ impl OperationWithDefaults for FindRaw {
             comment,
         };
 
-        // Take ownership of the raw reply with zero copies.
-        let raw = response.into_raw_document_buf();
-
         Ok(RawBatchCursorSpecification {
             info,
-            initial_reply: raw,
+            initial_reply: response.into_raw_document_buf(),
             post_batch_resume_token,
         })
     }
@@ -161,8 +158,6 @@ impl OperationWithDefaults for FindRaw {
     ) -> Result<Option<crate::bson::Timestamp>> {
         CursorBody::extract_at_cluster_time(response)
     }
-
-    // borrowed handle_response intentionally unimplemented above
 
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
         true
