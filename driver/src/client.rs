@@ -550,10 +550,12 @@ impl Client {
 
                         watcher.request_immediate_check();
 
-                        let change_occurred = start_time.elapsed() < timeout
-                            && watcher
-                                .wait_for_update(timeout - start_time.elapsed())
-                                .await;
+                        let elapsed = start_time.elapsed();
+                        let change_occurred = elapsed < timeout
+                            && match timeout.checked_sub(elapsed) {
+                                Some(remaining) => watcher.wait_for_update(remaining).await,
+                                None => false,
+                            };
                         if !change_occurred {
                             let error: Error = ErrorKind::ServerSelection {
                                 message: state
