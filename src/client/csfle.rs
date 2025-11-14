@@ -101,7 +101,8 @@ impl ClientState {
             .use_need_kms_credentials_state()
             .retry_kms(true)?
             .use_range_v2()?
-            .use_need_mongo_collinfo_with_db_state();
+            .use_need_mongo_collinfo_with_db_state()
+            .enable_multiple_collinfo()?;
         if let Some(m) = &opts.schema_map {
             builder = builder.schema_map(&crate::bson_compat::serialize_to_document(m)?)?;
         }
