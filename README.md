@@ -60,6 +60,10 @@ features = ["sync"]
 | `text-indexes-unstable` | Enables support for text indexes in explicit encryption. This feature is in preview and should be used for experimental workloads only. This feature is unstable and its security is not guaranteed until released as Generally Available (GA). The GA version of this feature may not be backwards compatible with the preview version. |
 | `error-backtrace`    | Capture backtraces in `Error` values.  This can be slow, memory intensive, and very verbose. |
 | `bson-3`             | Use version 3.x of the `bson` crate; for backwards compatibility, without this feature enabled `bson` 2.x is used. |
+| `bson3-chrono`       | Enable extra [`chrono`](https://docs.rs/chrono/latest/chrono/) APIs for `bson3` |
+| `bson3-jiff`         | Enable extra [`jiff`](https://docs.rs/jiff/latest/jiff/) APIs for `bson3` |
+| `bson3-uuid`         | Enable extra [`uuid`](https://docs.rs/uuid/latest/uuid/) APIs for `bson3` |
+| `bson3-serde-with`   | Enable extra [`serde-with`](https://docs.rs/serde_with/latest/serde_with/) helpers for `bson3` |
 
 ## Web Framework Examples
 

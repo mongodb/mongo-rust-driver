@@ -67,6 +67,17 @@ in-use-encryption = ["dep:mongocrypt", "dep:rayon", "dep:num_cpus"]
 # The in-use encryption API is stable; this is for backwards compatibility.
 in-use-encryption-unstable = ["in-use-encryption"]
 
+# Enables extra chrono interfaces for the bson crate.
+bson3-chrono = ["bson3/chrono-0_4"]
+# Enables extra jiff interfaces for the bson crate.
+bson3-jiff = ["bson3/jiff-0_2"]
+# Enables extra time interfaces for the bson crate.
+# bson3-time = ["bson3/time"]
+# Enables extra uuid interfaces for the bson crate.
+bson3-uuid = ["bson3/uuid-1"]
+# Enables extra serde-with interfaces for the bson crate (chrono/uuid)
+bson3-serde-with = ["bson3/serde", "bson3/serde_with-3"]
+
 # Enables support for emitting tracing events.
 # The tracing API is unstable and may have backwards-incompatible changes in minor version updates.
 # TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.
