@@ -550,9 +550,12 @@ impl Client {
 
                         watcher.request_immediate_check();
 
-                        let change_occurred = start_time.elapsed() < timeout
+                        let elapsed = start_time.elapsed();
+                        let change_occurred = elapsed < timeout
                             && watcher
-                                .wait_for_update(timeout - start_time.elapsed())
+                                .wait_for_update(
+                                    timeout.checked_sub(elapsed).unwrap_or(Duration::ZERO),
+                                )
                                 .await;
                         if !change_occurred {
                             let error: Error = ErrorKind::ServerSelection {
@@ -613,10 +616,10 @@ impl Client {
             if let Some(desc) = topology.description.primary() {
                 return Some(desc.clone());
             }
-            if !watcher
-                .wait_for_update(timeout - start_time.elapsed())
-                .await
-            {
+            let remaining = timeout
+                .checked_sub(start_time.elapsed())
+                .unwrap_or(Duration::ZERO);
+            if !watcher.wait_for_update(remaining).await {
                 return None;
             }
         }
