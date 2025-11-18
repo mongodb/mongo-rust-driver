@@ -122,7 +122,7 @@ pub async fn run_benchmark<B: Benchmark + Send + Sync>(
             .template(
                 "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>2}/{len:2} \
                  ({eta})",
-            )
+            )?
             .progress_chars("#>-"),
     );
 
