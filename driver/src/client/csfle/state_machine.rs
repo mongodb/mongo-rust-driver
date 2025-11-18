@@ -116,7 +116,7 @@ impl CryptExecutor {
                         Error::internal("db required for NeedMongoCollinfo state")
                     })?);
                     let mut cursor = db.list_collections().filter(filter).await?;
-                    if cursor.advance().await? {
+                    while cursor.advance().await? {
                         ctx.mongo_feed(cursor.current())?;
                     }
                     ctx.mongo_done()?;
