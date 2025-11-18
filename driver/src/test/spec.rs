@@ -32,7 +32,7 @@ use std::{
     ffi::OsStr,
     fs::{read_dir, File},
     future::Future,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use serde::{de::DeserializeOwned, Deserialize};
@@ -56,7 +56,7 @@ pub(crate) fn deserialize_spec_tests<T: DeserializeOwned>(
     spec: &[&str],
     skipped_files: Option<&[&str]>,
 ) -> Vec<(T, PathBuf)> {
-    let mut path = Path::new(env!("CARGO_MANIFEST_DIR")).join("spec");
+    let mut path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "..", "spec"].iter().collect();
     path.extend(spec);
     deserialize_spec_tests_common(path, skipped_files)
 }

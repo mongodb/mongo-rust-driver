@@ -12,11 +12,11 @@ source ./.evergreen/env.sh
 # build process.
 
 # build with all available features to ensure all optional dependencies are brought in too.
-cargo +nightly build --all-features
+cargo +nightly build --package mongodb --all-features
 cargo clean
 
 chmod -R 555 ${CARGO_HOME}/registry/src
 
 # this invocation mirrors the way docs.rs builds our documentation (see the [package.metadata.docs.rs] section
 # in Cargo.toml).
-cargo +nightly rustdoc --all-features -- -D warnings --cfg docsrs
+cargo +nightly rustdoc --package mongodb --all-features -- -D warnings --cfg docsrs
