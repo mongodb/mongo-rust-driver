@@ -12,7 +12,7 @@ rust-version.workspace = true
 mongodb = { path = "../driver" }
 serde_json = "1.0.59"
 clap = "4.5"
-indicatif = "0.15.0"
+indicatif = "0.18"
 async-trait = "0.1.41"
 tokio = { version = "1.6", features = ["sync", "fs"] }
 tokio-util = "0.7"
