@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["driver", "macros", "benchmarks"]
+members = ["driver", "macros", "benchmarks", "etc/update_version"]
 
 [workspace.package]
 authors = [

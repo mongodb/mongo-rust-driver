@@ -29,10 +29,14 @@ impl PendingUpdates {
     }
 
     fn apply(&mut self, location: &Location, update: &str) {
-        let text = self
-            .files
-            .entry(location.path)
-            .or_insert_with(|| std::fs::read_to_string(location.path).unwrap());
+        let text = self.files.entry(location.path).or_insert_with(|| {
+            std::fs::read_to_string(location.path).expect(
+                std::path::absolute(location.path)
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
+            )
+        });
 
         if !location.pattern.is_match(text) {
             panic!("no match for {:?}", location);
@@ -81,19 +85,19 @@ fn main() {
     // nosemgrep: current-exe
     let zero = std::env::current_exe().unwrap();
     let self_dir = zero.parent().unwrap();
-    let main_dir = self_dir.join("../../../..");
+    let main_dir = self_dir.join("..").join("..");
     std::env::set_current_dir(main_dir).unwrap();
 
     let args: Args = argh::from_env();
 
     let version_locs = vec![
         Location::new(
-            "Cargo.toml",
+            "driver/Cargo.toml",
             r#"name = "mongodb"\nversion = "(?<target>.*?)"\n"#,
         ),
         Location::new(
-            "Cargo.toml",
-            r#"mongodb-internal-macros = \{ path = "macros", version = "(?<target>.*?)" \}\n"#,
+            "driver/Cargo.toml",
+            r#"mongodb-internal-macros = \{ path = "../macros", version = "(?<target>.*?)" \}\n"#,
         ),
         Location::new(
             "macros/Cargo.toml",
@@ -105,7 +109,7 @@ fn main() {
             r#"\[dependencies.mongodb\]\nversion = "(?<target>.*?)"\n"#,
         ),
         Location::new(
-            "src/lib.rs",
+            "driver/src/lib.rs",
             r#"html_root_url = "https://docs.rs/mongodb/(?<target>.*?)""#,
         ),
     ];
@@ -116,7 +120,7 @@ fn main() {
 
     if let Some(bson2) = args.bson2 {
         let bson_version_loc = Location::new(
-            "Cargo.toml",
+            "driver/Cargo.toml",
             r#"\[dependencies.bson2\]\nversion = "(?<target>.*?)"\n"#,
         );
         pending.apply(&bson_version_loc, &bson2);
@@ -124,7 +128,7 @@ fn main() {
 
     if let Some(bson3) = args.bson3 {
         let bson_version_loc = Location::new(
-            "Cargo.toml",
+            "driver/Cargo.toml",
             r#"\[dependencies.bson3\]\nversion = "(?<target>.*?)"\n"#,
         );
         pending.apply(&bson_version_loc, &bson3);
@@ -132,7 +136,7 @@ fn main() {
 
     if let Some(mongocrypt) = args.mongocrypt {
         let mongocrypt_version_loc = Location::new(
-            "Cargo.toml",
+            "driver/Cargo.toml",
             r#"\[dependencies.mongocrypt\]\nversion = "(?<target>.*?)".*"#,
         );
         pending.apply(&mongocrypt_version_loc, &mongocrypt);
