@@ -3,7 +3,7 @@ description = "The official MongoDB driver for Rust"
 keywords = ["mongo", "mongodb", "database", "bson", "nosql"]
 categories = ["asynchronous", "database", "web-programming"]
 homepage = "https://www.mongodb.com/docs/drivers/rust/"
-readme = "../README.md"
+readme = "README.md"
 name = "mongodb"
 version = "3.4.0"
 

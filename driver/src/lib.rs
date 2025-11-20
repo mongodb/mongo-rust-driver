@@ -1,4 +1,4 @@
-#![doc = include_str!("../../README.md")]
+#![doc = include_str!("../README.md")]
 #![warn(
     missing_docs,
     rustdoc::missing_crate_level_docs,
