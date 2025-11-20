@@ -1,4 +1,4 @@
-#![doc = include_str!("../../README.md")]
+#![doc = include_str!("../README.md")]
 #![warn(
     missing_docs,
     rustdoc::missing_crate_level_docs,
@@ -15,7 +15,7 @@
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]
-#![doc(html_root_url = "https://docs.rs/mongodb/3.4.0")]
+#![doc(html_root_url = "https://docs.rs/mongodb/3.4.1")]
 
 #[macro_use]
 pub mod options;
