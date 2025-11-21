@@ -43,8 +43,16 @@ jobs:
 
       - name: Generate SBOM
         run: |
-          cargo cyclonedx --manifest-path driver/Cargo.toml -vv --format json --override-filename sbom
+          cargo cyclonedx --manifest-path driver/Cargo.toml --spec-version 1.5 -vv --format json --override-filename sbom
           cp driver/sbom.json sbom.json
+
+      - name: Download CycloneDX CLI
+        run: |
+          curl -L -s -o /tmp/cyclonedx "https://github.com/CycloneDX/cyclonedx-cli/releases/download/v0.29.1/cyclonedx-linux-x64"
+          chmod +x /tmp/cyclonedx
+
+      - name: Validate SBOM
+        run: /tmp/cyclonedx validate --input-file sbom.json --fail-on-errors
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
