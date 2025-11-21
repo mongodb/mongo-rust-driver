@@ -45,6 +45,8 @@ jobs:
         run: |
           cargo cyclonedx --manifest-path driver/Cargo.toml --spec-version 1.5 -vv --format json --override-filename sbom
           cp driver/sbom.json sbom.json
+          # Clean up workspace member SBOMs - we only want the driver SBOM
+          rm -f driver/sbom.json macros/sbom.json benchmarks/sbom.json etc/update_version/sbom.json
 
       - name: Download CycloneDX CLI
         run: |
