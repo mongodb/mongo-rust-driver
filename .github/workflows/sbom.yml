@@ -1,0 +1,85 @@
+name: Generate SBOM
+
+# This workflow uses cargo-cyclonedx and publishes an sbom.json artifact.
+# It runs on manual trigger or when Cargo files change on main branch,
+# and creates a PR with the updated SBOM.
+# Internal documentation: go/sbom-scope
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: ['main']
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'driver/Cargo.toml'
+      - 'macros/Cargo.toml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sbom:
+    name: Generate SBOM and Create PR
+    runs-on: ubuntu-latest
+    concurrency:
+      group: sbom-${{ github.ref }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx
+
+      - name: Generate SBOM
+        run: |
+          cargo cyclonedx --manifest-path driver/Cargo.toml -vv --format json --override-filename sbom
+          cp driver/sbom.json sbom.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          if-no-files-found: error
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@b4733b9419fd47bbfa1807b15627e17cd70b5b22
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: Update SBOM after dependency changes'
+          branch: auto-update-sbom-${{ github.run_id }}
+          delete-branch: true
+          title: 'chore: Update SBOM'
+          body: |
+            ## Automated SBOM Update
+
+            This PR was automatically generated because dependency manifest files changed.
+
+            ### Changes
+            - Updated `sbom.json` to reflect current dependencies
+
+            ### Verification
+            The SBOM was generated using cargo-cyclonedx with the current Rust workspace.
+
+            ### Triggered by
+            - Commit: ${{ github.sha }}
+            - Workflow run: ${{ github.run_id }}
+
+            ---
+            _This PR was created automatically by the [SBOM workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})_
+          labels: |
+            sbom
+            automated
+            dependencies
+
