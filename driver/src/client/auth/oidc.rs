@@ -57,6 +57,7 @@ const DEFAULT_ALLOWED_HOSTS: &[&str] = &[
     "localhost",
     "127.0.0.1",
     "::1",
+    "*.mongo.com",
 ];
 
 /// The callback to use for OIDC authentication.
