@@ -56,7 +56,9 @@ pub(crate) fn deserialize_spec_tests<T: DeserializeOwned>(
     spec: &[&str],
     skipped_files: Option<&[&str]>,
 ) -> Vec<(T, PathBuf)> {
-    let mut path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "..", "spec"].iter().collect();
+    let mut path: PathBuf = [&std::env::var("CARGO_MANIFEST_DIR").unwrap(), "..", "spec"]
+        .iter()
+        .collect();
     path.extend(spec);
     deserialize_spec_tests_common(path, skipped_files)
 }

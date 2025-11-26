@@ -83,7 +83,7 @@ where
     /// # let mut session = client.start_session().await?;
     /// let mut cs = coll.watch().session(&mut session).await?;
     /// while let Some(event) = cs.next(&mut session).await? {
-    ///     let id = bson::to_bson(&event.id)?;
+    ///     let id = bson::serialize_to_bson(&event.id)?;
     ///     other_coll.insert_one(doc! { "id": id }).session(&mut session).await?;
     /// }
     /// # Ok::<(), mongodb::error::Error>(())

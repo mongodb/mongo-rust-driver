@@ -54,7 +54,7 @@ buildvariants:
   - name: compile
     display_name: "Compile Only"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
       - name: compile-on-latest
       - name: compile-on-msrv
@@ -62,25 +62,28 @@ buildvariants:
   - name: lint
     display_name: "Lint"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
+    expansions:
+      LIBMONGOCRYPT_OS: rhel-80-64-bit
     tasks:
       - name: .lint
 
   - name: cargo-deny
     display_name: "Cargo Deny"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
       - name: check-cargo-deny
 
   - name: rhel-8
     display_name: "RHEL 8"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       AUTH: auth
       SSL: ssl
     tasks:
+      - name: build-nextest-archive
       - name: .standalone
       - name: .replicaset
       - name: .sharded
@@ -93,6 +96,7 @@ buildvariants:
       AUTH: auth
       SSL: ssl
     tasks:
+      - name: build-nextest-archive
       # Ubuntu 22.04 does not support MongoDB versions below 6.0.
       - name: .standalone !.4.2 !.4.4 !.5.0
       - name: .replicaset !.4.2 !.4.4 !.5.0
@@ -106,6 +110,7 @@ buildvariants:
       AUTH: auth
       SSL: ssl
     tasks:
+      - name: build-nextest-archive
       - name: .standalone
       - name: .replicaset
       - name: .sharded
@@ -118,6 +123,7 @@ buildvariants:
       AUTH: auth
       SSL: ssl
     tasks:
+      - name: build-nextest-archive
       - name: .standalone
       - name: .replicaset
       - name: .sharded
@@ -125,12 +131,13 @@ buildvariants:
   - name: openssl-rhel
     display_name: "OpenSSL (RHEL)"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       OPENSSL: true
       AUTH: auth
       SSL: ssl
     tasks:
+      - name: build-nextest-archive
       - name: .rapid .replicaset
 
   - name: openssl-ubuntu
@@ -143,6 +150,7 @@ buildvariants:
       AUTH: auth
       SSL: ssl
     tasks:
+      - name: build-nextest-archive
       - name: .rapid .replicaset
 
   - name: openssl-macos
@@ -155,6 +163,7 @@ buildvariants:
       AUTH: auth
       SSL: ssl
     tasks:
+      - name: build-nextest-archive
       - name: .rapid .replicaset
 
   - name: openssl-windows
@@ -167,20 +176,22 @@ buildvariants:
       AUTH: auth
       SSL: ssl
     tasks:
+      - name: build-nextest-archive
       - name: .rapid .replicaset
 
   - name: no-auth-tls
     display_name: "No Auth/TLS"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
+      - name: build-nextest-archive
       - .rapid .replicaset
 
   - name: compression
     display_name: "Compression"
     patchable: false
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       AUTH: auth
       SSL: ssl
@@ -191,13 +202,14 @@ buildvariants:
     display_name: "Stable API V1"
     patchable: false
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       REQUIRE_API_VERSION: true
       MONGODB_API_VERSION: 1
       AUTH: auth
       # Configuring SSL: ssl causes errors in bootstrap mongo-orchestration.
     tasks:
+      - name: build-nextest-archive
       # The Stable API was introduced in MongoDB version 5.0. Drivers Evergreen Tools only supports
       # setting REQUIRE_API_VERSION on standalones and sharded clusters.
       - .standalone !.4.2 !.4.4
@@ -206,7 +218,7 @@ buildvariants:
   - name: sync-api
     display_name: "Sync API"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       AUTH: auth
       SSL: ssl
@@ -217,7 +229,7 @@ buildvariants:
     display_name: "Atlas Connectivity"
     patchable: false
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
       - test-atlas-connectivity
 
@@ -261,7 +273,7 @@ buildvariants:
     display_name: "GSSAPI Authentication - Linux"
     patchable: true
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
       - test-gssapi-auth
 
@@ -286,7 +298,7 @@ buildvariants:
     display_name: "x509 Authentication"
     patchable: false
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       AUTH: auth
       SSL: ssl
@@ -341,6 +353,7 @@ buildvariants:
       AUTH: auth
       SSL: ssl
     tasks:
+      - name: build-nextest-archive
       - .in-use-encryption
 
   - name: in-use-encryption-disable-crypt-shared
@@ -354,6 +367,7 @@ buildvariants:
       SSL: ssl
       DISABLE_CRYPT_SHARED: true
     tasks:
+      - name: build-nextest-archive
       - .in-use-encryption
 
   - name: in-use-encryption-openssl
@@ -366,20 +380,22 @@ buildvariants:
       SSL: ssl
       OPENSSL: true
     tasks:
-      - test-in-use-encryption-openssl
+      - name: build-nextest-archive
+      - test-in-use-encryption-rapid
 
   - name: load-balancer
     display_name: "Load Balancer"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
+      - name: build-nextest-archive
       - .load-balancer
 
   - name: search-index
     display_name: "Search Index Helpers"
     patchable: false
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
       - name: search-index-task-group
 
@@ -444,6 +460,7 @@ buildvariants:
     run_on:
       - amazon2023-arm64-latest-large-m8g
     tasks:
+      - name: build-nextest-archive
       - name: .latest
       #- name: .8.0
       #- name: .7.0
@@ -831,27 +848,81 @@ tasks:
 
   - name: check-cargo-deny
     commands:
-      - func: "check cargo deny"
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          include_expansions_in_env: [PROJECT_DIRECTORY]
+          binary: bash
+          args: [.evergreen/check-cargo-deny.sh]
 
   - name: check-rustfmt
     tags: [lint]
     commands:
-      - func: "check rustfmt"
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          include_expansions_in_env: [PROJECT_DIRECTORY]
+          binary: bash
+          args: [.evergreen/check-rustfmt.sh]
 
   - name: check-clippy
     tags: [lint]
     commands:
-      - func: "check clippy"
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          include_expansions_in_env: [PROJECT_DIRECTORY]
+          binary: bash
+          script: [.evergreen/check-clippy.sh]
 
   - name: check-semgrep
     tags: [lint]
     commands:
-      - func: "check semgrep"
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          include_expansions_in_env:
+            - DRIVERS_TOOLS
+            - PROJECT_DIRECTORY
+            - MONGOCRYPT_LIB_DIR
+          binary: bash
+          args:
+            - .evergreen/check-semgrep.sh
 
   - name: check-rustdoc
     tags: [lint]
     commands:
-      - func: "check rustdoc"
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          include_expansions_in_env:
+            - PROJECT_DIRECTORY
+            - MONGOCRYPT_LIB_DIR
+            - LD_LIBRARY_PATH
+          binary: bash
+          args: [.evergreen/check-rustdoc.sh]
+
+  - name: test-rustdoc
+    tags: [lint]
+    commands:
+      - func: "install libmongocrypt"
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          include_expansions_in_env:
+            - DRIVERS_TOOLS
+            - PROJECT_DIRECTORY
+            - MONGOCRYPT_LIB_DIR
+            - LD_LIBRARY_PATH
+          binary: bash
+          args:
+            - .evergreen/run-rustdoc-tests.sh
 
   # Driver test suite runs for the full set of versions and topologies are in
   # suite-tasks.yml, generated by .evergreen/generate_tasks.
@@ -1035,7 +1106,10 @@ tasks:
 
   - name: test-in-use-encryption-4.2
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -1046,7 +1120,10 @@ tasks:
 
   - name: test-in-use-encryption-4.4
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -1057,7 +1134,10 @@ tasks:
 
   - name: test-in-use-encryption-5.0
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -1068,7 +1148,10 @@ tasks:
 
   - name: test-in-use-encryption-6.0
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -1079,7 +1162,10 @@ tasks:
 
   - name: test-in-use-encryption-7.0
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -1090,7 +1176,10 @@ tasks:
 
   - name: test-in-use-encryption-rapid
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -1101,7 +1190,10 @@ tasks:
 
   - name: test-in-use-encryption-latest
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -1110,19 +1202,12 @@ tasks:
       - func: "start csfle servers"
       - func: "run csfle tests"
 
-  - name: test-in-use-encryption-openssl
-    commands:
-      - func: "install libmongocrypt"
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          MONGODB_VERSION: rapid
-          TOPOLOGY: replica_set
-      - func: "start csfle servers"
-      - func: "run csfle tests"
-
   - name: test-load-balancer-5.0
     tags: [load-balancer]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: bootstrap mongo-orchestration
         vars:
           MONGODB_VERSION: 5.0
@@ -1133,7 +1218,10 @@ tasks:
 
   - name: test-load-balancer-6.0
     tags: [load-balancer]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: bootstrap mongo-orchestration
         vars:
           MONGODB_VERSION: 6.0
@@ -1144,7 +1232,10 @@ tasks:
 
   - name: test-load-balancer-7.0
     tags: [load-balancer]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: bootstrap mongo-orchestration
         vars:
           MONGODB_VERSION: 7.0
@@ -1155,7 +1246,10 @@ tasks:
 
   - name: test-load-balancer-rapid
     tags: [load-balancer]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: bootstrap mongo-orchestration
         vars:
           MONGODB_VERSION: rapid
@@ -1166,7 +1260,10 @@ tasks:
 
   - name: test-load-balancer-latest
     tags: [load-balancer]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: bootstrap mongo-orchestration
         vars:
           MONGODB_VERSION: latest
@@ -1294,6 +1391,36 @@ tasks:
           - DRIVERS_TOOLS
           - PYTHON3
           - OPENSSL
+
+  - name: build-nextest-archive
+    commands:
+    - command: subprocess.exec
+      type: setup
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/build-nextest-archive.sh
+        include_expansions_in_env:
+          - PROJECT_DIRECTORY
+          - OPENSSL
+          - ZSTD
+          - ZLIB
+          - SNAPPY
+          - MONGOCRYPT_LIB_DIR
+          - LD_LIBRARY_PATH
+          - LIBMONGOCRYPT_OS
+    - command: s3.put
+      type: setup
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/nextest-archive.tar.zst
+        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/zstd
+        display_name: nextest-archive.tar.zst
 
 #############
 # Functions #
@@ -1547,6 +1674,7 @@ functions:
 
   "bootstrap mongo-orchestration":
     - command: subprocess.exec
+      type: setup
       params:
         binary: sh
         args:
@@ -1578,6 +1706,12 @@ functions:
     - command: expansions.update
       params:
         file: src/uri-expansions.yml
+    # The server needs some time after startup otherwise it won't include things like
+    # cluster time in replies.
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args: ["-c", "sleep 30"]
 
   "run driver test suite":
     - command: subprocess.exec
@@ -1789,59 +1923,6 @@ functions:
           ${PREPARE_SHELL}
           RUST_VERSION=${RUST_VERSION} .evergreen/compile-only.sh
 
-  "check cargo deny":
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${PREPARE_SHELL}
-          .evergreen/check-cargo-deny.sh
-
-  "check rustfmt":
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${PREPARE_SHELL}
-          .evergreen/check-rustfmt.sh
-
-  "check clippy":
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${PREPARE_SHELL}
-          .evergreen/check-clippy.sh
-
-  "check semgrep":
-    - command: subprocess.exec
-      type: test
-      params:
-        working_dir: src
-        include_expansions_in_env:
-          - DRIVERS_TOOLS
-          - PROJECT_DIRECTORY
-          - MONGOCRYPT_LIB_DIR
-        binary: bash
-        args:
-          - .evergreen/check-semgrep.sh
-
-  "check rustdoc":
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${PREPARE_SHELL}
-          .evergreen/check-rustdoc.sh
-
   "upload-mo-artifacts":
     - command: shell.exec
       params:
@@ -2012,3 +2093,14 @@ functions:
         - AWS_ACCESS_KEY_ID
         - AWS_SECRET_ACCESS_KEY
         - AWS_SESSION_TOKEN
+  
+  "fetch nextest archive":
+  - command: s3.get
+    type: setup
+    params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+        bucket: mciuploads
+        local_file: src/nextest-archive.tar.zst
+        optional: true

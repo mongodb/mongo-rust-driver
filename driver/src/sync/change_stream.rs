@@ -190,7 +190,7 @@ where
     /// # let mut session = client.start_session().run()?;
     /// let mut cs = coll.watch().session(&mut session).run()?;
     /// while let Some(event) = cs.next(&mut session)? {
-    ///     let id = bson::to_bson(&event.id)?;
+    ///     let id = bson::serialize_to_bson(&event.id)?;
     ///     other_coll.insert_one(doc! { "id": id }).session(&mut session).run()?;
     /// }
     /// # Ok::<(), mongodb::error::Error>(())

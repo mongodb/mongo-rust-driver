@@ -10,12 +10,7 @@ set -o xtrace
 
 export CSFLE_TLS_CERT_DIR="${DRIVERS_TOOLS}/.evergreen/x509gen"
 
-FEATURE_FLAGS+=("in-use-encryption" "azure-kms" "text-indexes-unstable")
 CARGO_OPTIONS+=("--ignore-default-filter")
-
-if [[ "$OPENSSL" = true ]]; then
-  FEATURE_FLAGS+=("openssl-tls")
-fi
 
 if [ "$OS" = "Windows_NT" ]; then
   export CSFLE_TLS_CERT_DIR=$(cygpath ${CSFLE_TLS_CERT_DIR} --windows)
@@ -28,16 +23,16 @@ fi
 # Add mongodb binaries to path for mongocryptd
 PATH=${PATH}:${DRIVERS_TOOLS}/mongodb/bin
 
+set -o xtrace
 set +o errexit
 
+TEST_OPTIONS=("--skip" "on_demand_aws::failure")
 cargo_test test::csfle
-
-FEATURE_FLAGS+=("aws-auth")
-cargo_test on_demand_aws::success
 
 # Unset variables for on-demand credential failure tests.
 unset AWS_ACCESS_KEY_ID
 unset AWS_SECRET_ACCESS_KEY
+TEST_OPTIONS=()
 cargo_test on_demand_aws::failure
 
 exit ${CARGO_RESULT}
