@@ -19,18 +19,9 @@ tasks:"
                 "
   - name: test-{version}-{top_name}
     tags: [{version}, {top_name}]
-    commands:
-      - func: \"bootstrap mongo-orchestration\"
-        type: setup
-        vars:
-          MONGODB_VERSION: {version}
-          TOPOLOGY: {topology}
-      - func: \"run driver test suite\"
-
-  - name: test-{version}-{top_name}-archive
-    tags: [{version}, {top_name}, archive]
     depends_on:
       - name: build-nextest-archive
+        patch_optional: true
     commands:
       - command: s3.get
         type: setup
@@ -42,6 +33,7 @@ tasks:"
                  ${{build_id}}-nextest-archive.tar.zst
             bucket: mciuploads
             local_file: src/nextest-archive.tar.zst
+            optional: true
       - func: \"bootstrap mongo-orchestration\"
         type: setup
         vars:

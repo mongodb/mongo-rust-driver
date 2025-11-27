@@ -76,16 +76,16 @@ buildvariants:
   - name: rhel-8
     display_name: "RHEL 8"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       AUTH: auth
       SSL: ssl
-      ARCHIVE_FILE: "nextest-archive.tar.zst"
+      USE_NEXTEST_ARCHIVE: true
     tasks:
       - name: build-nextest-archive
-      - name: .standalone .archive
-      - name: .replicaset .archive
-      - name: .sharded .archive
+      - name: .standalone
+      - name: .replicaset
+      - name: .sharded
 
   - name: ubuntu-22.04-arm64
     display_name: "Ubuntu 22.04 (ARM64)"
@@ -1261,18 +1261,17 @@ tasks:
           - .evergreen/build-nextest-archive.sh
         include_expansions_in_env:
           - PROJECT_DIRECTORY
-          - ARCHIVE_FILE
     - command: s3.put
       type: setup
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/${ARCHIVE_FILE}
-        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-${ARCHIVE_FILE}
+        local_file: src/nextest-archive.tar.zst
+        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
         bucket: mciuploads
         permissions: public-read
         content_type: application/zstd
-        display_name: ${ARCHIVE_FILE}
+        display_name: nextest-archive.tar.zst
 
 #############
 # Functions #
@@ -1578,7 +1577,7 @@ functions:
           - ZSTD
           - ZLIB
           - SNAPPY
-          - ARCHIVE_FILE
+          - USE_NEXTEST_ARCHIVE
 
   "run sync tests":
     - command: subprocess.exec

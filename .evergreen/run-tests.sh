@@ -24,10 +24,10 @@ if [ "$SNAPPY" = true ]; then
   FEATURE_FLAGS+=("snappy-compression")
 fi
 
-if [[ "${ARCHIVE_FILE}" != "" ]]; then
+if [ "$USE_NEXTEST_ARCHIVE" = true ]; then
   # Feature flags are set when the archive is built
   FEATURE_FLAGS=()
-  CARGO_OPTIONS+=("--archive-file" "${ARCHIVE_FILE}" "--workspace-remap" "$(pwd)")
+  CARGO_OPTIONS+=("--archive-file" "nextest-archive.tar.zst" "--workspace-remap" "$(pwd)")
 fi
 
 echo "cargo test options: $(cargo_test_options)"
@@ -39,6 +39,7 @@ if [ "Windows_NT" == "$OS" ]; then
   export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
 fi
 
+sleep 60s
 cargo_test ""
 
 # cargo-nextest doesn't support doc tests
