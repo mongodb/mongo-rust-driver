@@ -2,25 +2,12 @@
 
 CARGO_OPTIONS=()
 TEST_OPTIONS=()
-FEATURE_FLAGS=()
 CARGO_RESULT=0
 
-join_by() {
-  local IFS="$1"
-  shift
-  echo "$*"
-}
+. .evergreen/features.sh
 
 cargo_test_options() {
-  local FILTERED=()
-  for FEAT in "${FEATURE_FLAGS[@]}"; do
-    [[ "${FEAT}" != "" ]] && FILTERED+=("${FEAT}")
-  done
-  local FEATURE_OPTION=""
-  if ((${#FILTERED[@]} != 0)); then
-    FEATURE_OPTION="--features $(join_by , "${FILTERED[@]}")"
-  fi
-  echo $1 ${CARGO_OPTIONS[@]} ${FEATURE_OPTION} -- ${TEST_OPTIONS[@]}
+  echo $1 ${CARGO_OPTIONS[@]} ${features_option} -- ${TEST_OPTIONS[@]}
 }
 
 cargo_test() {

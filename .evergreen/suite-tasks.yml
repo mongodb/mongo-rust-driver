@@ -7,6 +7,27 @@ tasks:
     tags: [4.2, standalone]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 4.2
+          TOPOLOGY: server
+      - func: "run driver test suite"
+
+  - name: test-4.2-standalone-archive
+    tags: [4.2, standalone, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: server
@@ -16,6 +37,27 @@ tasks:
     tags: [4.4, standalone]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 4.4
+          TOPOLOGY: server
+      - func: "run driver test suite"
+
+  - name: test-4.4-standalone-archive
+    tags: [4.4, standalone, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: server
@@ -25,6 +67,27 @@ tasks:
     tags: [5.0, standalone]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 5.0
+          TOPOLOGY: server
+      - func: "run driver test suite"
+
+  - name: test-5.0-standalone-archive
+    tags: [5.0, standalone, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: server
@@ -34,6 +97,27 @@ tasks:
     tags: [6.0, standalone]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 6.0
+          TOPOLOGY: server
+      - func: "run driver test suite"
+
+  - name: test-6.0-standalone-archive
+    tags: [6.0, standalone, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: server
@@ -43,6 +127,27 @@ tasks:
     tags: [7.0, standalone]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 7.0
+          TOPOLOGY: server
+      - func: "run driver test suite"
+
+  - name: test-7.0-standalone-archive
+    tags: [7.0, standalone, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: server
@@ -52,6 +157,27 @@ tasks:
     tags: [8.0, standalone]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 8.0
+          TOPOLOGY: server
+      - func: "run driver test suite"
+
+  - name: test-8.0-standalone-archive
+    tags: [8.0, standalone, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 8.0
           TOPOLOGY: server
@@ -61,6 +187,27 @@ tasks:
     tags: [rapid, standalone]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: rapid
+          TOPOLOGY: server
+      - func: "run driver test suite"
+
+  - name: test-rapid-standalone-archive
+    tags: [rapid, standalone, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: server
@@ -70,6 +217,27 @@ tasks:
     tags: [latest, standalone]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: latest
+          TOPOLOGY: server
+      - func: "run driver test suite"
+
+  - name: test-latest-standalone-archive
+    tags: [latest, standalone, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: server
@@ -79,6 +247,27 @@ tasks:
     tags: [4.2, replicaset]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 4.2
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+
+  - name: test-4.2-replicaset-archive
+    tags: [4.2, replicaset, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: replica_set
@@ -88,6 +277,27 @@ tasks:
     tags: [4.4, replicaset]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 4.4
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+
+  - name: test-4.4-replicaset-archive
+    tags: [4.4, replicaset, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: replica_set
@@ -97,6 +307,27 @@ tasks:
     tags: [5.0, replicaset]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 5.0
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+
+  - name: test-5.0-replicaset-archive
+    tags: [5.0, replicaset, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: replica_set
@@ -106,6 +337,27 @@ tasks:
     tags: [6.0, replicaset]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 6.0
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+
+  - name: test-6.0-replicaset-archive
+    tags: [6.0, replicaset, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: replica_set
@@ -115,6 +367,27 @@ tasks:
     tags: [7.0, replicaset]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 7.0
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+
+  - name: test-7.0-replicaset-archive
+    tags: [7.0, replicaset, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: replica_set
@@ -124,6 +397,27 @@ tasks:
     tags: [8.0, replicaset]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 8.0
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+
+  - name: test-8.0-replicaset-archive
+    tags: [8.0, replicaset, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 8.0
           TOPOLOGY: replica_set
@@ -133,6 +427,27 @@ tasks:
     tags: [rapid, replicaset]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: rapid
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+
+  - name: test-rapid-replicaset-archive
+    tags: [rapid, replicaset, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
@@ -142,6 +457,27 @@ tasks:
     tags: [latest, replicaset]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: latest
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+
+  - name: test-latest-replicaset-archive
+    tags: [latest, replicaset, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: replica_set
@@ -151,6 +487,27 @@ tasks:
     tags: [4.2, sharded]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 4.2
+          TOPOLOGY: sharded_cluster
+      - func: "run driver test suite"
+
+  - name: test-4.2-sharded-archive
+    tags: [4.2, sharded, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: sharded_cluster
@@ -160,6 +517,27 @@ tasks:
     tags: [4.4, sharded]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 4.4
+          TOPOLOGY: sharded_cluster
+      - func: "run driver test suite"
+
+  - name: test-4.4-sharded-archive
+    tags: [4.4, sharded, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: sharded_cluster
@@ -169,6 +547,27 @@ tasks:
     tags: [5.0, sharded]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 5.0
+          TOPOLOGY: sharded_cluster
+      - func: "run driver test suite"
+
+  - name: test-5.0-sharded-archive
+    tags: [5.0, sharded, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: sharded_cluster
@@ -178,6 +577,27 @@ tasks:
     tags: [6.0, sharded]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 6.0
+          TOPOLOGY: sharded_cluster
+      - func: "run driver test suite"
+
+  - name: test-6.0-sharded-archive
+    tags: [6.0, sharded, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: sharded_cluster
@@ -187,6 +607,27 @@ tasks:
     tags: [7.0, sharded]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 7.0
+          TOPOLOGY: sharded_cluster
+      - func: "run driver test suite"
+
+  - name: test-7.0-sharded-archive
+    tags: [7.0, sharded, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: sharded_cluster
@@ -196,6 +637,27 @@ tasks:
     tags: [8.0, sharded]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 8.0
+          TOPOLOGY: sharded_cluster
+      - func: "run driver test suite"
+
+  - name: test-8.0-sharded-archive
+    tags: [8.0, sharded, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 8.0
           TOPOLOGY: sharded_cluster
@@ -205,6 +667,27 @@ tasks:
     tags: [rapid, sharded]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: rapid
+          TOPOLOGY: sharded_cluster
+      - func: "run driver test suite"
+
+  - name: test-rapid-sharded-archive
+    tags: [rapid, sharded, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: sharded_cluster
@@ -214,6 +697,27 @@ tasks:
     tags: [latest, sharded]
     commands:
       - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: latest
+          TOPOLOGY: sharded_cluster
+      - func: "run driver test suite"
+
+  - name: test-latest-sharded-archive
+    tags: [latest, sharded, archive]
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - command: s3.get
+        type: setup
+        params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+            bucket: mciuploads
+            local_file: src/nextest-archive.tar.zst
+      - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: sharded_cluster

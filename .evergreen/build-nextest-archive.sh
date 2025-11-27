@@ -4,5 +4,8 @@ set -o errexit
 set -o pipefail
 
 source .evergreen/env.sh
+source .evergreen/features.sh
 
-cargo nextest archive --workspace --all-features --archive-file nextest-archive.tar.zst
+FEATURE_FLAGS+=("${STANDARD_FEATURES[@]}")
+
+cargo nextest archive --workspace $(features_option) --archive-file ${ARCHIVE_FILE}

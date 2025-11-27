@@ -80,10 +80,12 @@ buildvariants:
     expansions:
       AUTH: auth
       SSL: ssl
+      ARCHIVE_FILE: "nextest-archive.tar.zst"
     tasks:
-      - name: .standalone
-      - name: .replicaset
-      - name: .sharded
+      - name: build-nextest-archive
+      - name: .standalone .archive
+      - name: .replicaset .archive
+      - name: .sharded .archive
 
   - name: ubuntu-22.04-arm64
     display_name: "Ubuntu 22.04 (ARM64)"
@@ -418,16 +420,6 @@ buildvariants:
       - name: .latest
       #- name: .8.0
       #- name: .7.0
-
-  - name: binary-cache-wip
-    display_name: "Binary Caching WIP"
-    run_on:
-      - rhel87-small
-    expansions:
-      LIBMONGOCRYPT_OS: rhel-80-64-bit
-    tasks:
-      - build-nextest-archive
-      - run-nextest-archive
 
 ###############
 # Task Groups #
@@ -1269,53 +1261,18 @@ tasks:
           - .evergreen/build-nextest-archive.sh
         include_expansions_in_env:
           - PROJECT_DIRECTORY
-          - MONGOCRYPT_LIB_DIR
+          - ARCHIVE_FILE
     - command: s3.put
       type: setup
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/nextest-archive.tar.zst
-        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+        local_file: src/${ARCHIVE_FILE}
+        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-${ARCHIVE_FILE}
         bucket: mciuploads
         permissions: public-read
         content_type: application/zstd
-        display_name: nextest-archive.tar.zst
-  
-  - name: run-nextest-archive
-    depends_on:
-      - name: build-nextest-archive
-    commands:
-    - command: s3.get
-      type: setup
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
-        bucket: mciuploads
-        local_file: src/nextest-archive.tar.zst
-    - func: "install libmongocrypt"
-      type: setup
-    - func: "bootstrap mongo-orchestration"
-      type: setup
-      vars:
-        MONGODB_VERSION: latest
-        TOPOLOGY: server
-    - command: subprocess.exec
-      type: test
-      params:
-        working_dir: src
-        binary: bash
-        args:
-          - .evergreen/run-nextest-archive.sh
-        include_expansions_in_env:
-          - DRIVERS_TOOLS
-          - PROJECT_DIRECTORY
-          - SINGLE_MONGOS_LB_URI
-          - MULTI_MONGOS_LB_URI
-          - MONGODB_URI
-          - PATH
-          - LD_LIBRARY_PATH
+        display_name: ${ARCHIVE_FILE}
 
 #############
 # Functions #
@@ -1621,6 +1578,7 @@ functions:
           - ZSTD
           - ZLIB
           - SNAPPY
+          - ARCHIVE_FILE
 
   "run sync tests":
     - command: subprocess.exec
