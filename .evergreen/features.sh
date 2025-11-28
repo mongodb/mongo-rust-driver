@@ -19,3 +19,21 @@ features_option() {
         echo "--features $(_join_by , "${FILTERED[@]}")"
     fi
 }
+
+add_conditional_features() {
+    if [ "$OPENSSL" = true ]; then
+        FEATURE_FLAGS+=("openssl-tls")
+    fi
+
+    if [ "$ZSTD" = true ]; then
+        FEATURE_FLAGS+=("zstd-compression")
+    fi
+
+    if [ "$ZLIB" = true ]; then
+        FEATURE_FLAGS+=("zlib-compression")
+    fi
+
+    if [ "$SNAPPY" = true ]; then
+        FEATURE_FLAGS+=("snappy-compression")
+    fi
+}

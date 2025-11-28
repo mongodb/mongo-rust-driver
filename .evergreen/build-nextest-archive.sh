@@ -8,4 +8,6 @@ source .evergreen/features.sh
 
 FEATURE_FLAGS+=("${STANDARD_FEATURES[@]}")
 
+add_conditional_features
+
 cargo nextest archive --workspace $(features_option) --archive-file nextest-archive.tar.zst

@@ -8,26 +8,16 @@ source .evergreen/cargo-test.sh
 
 FEATURE_FLAGS+=("${STANDARD_FEATURES[@]}")
 
-if [ "$OPENSSL" = true ]; then
-  FEATURE_FLAGS+=("openssl-tls")
-fi
-
-if [ "$ZSTD" = true ]; then
-  FEATURE_FLAGS+=("zstd-compression")
-fi
-
-if [ "$ZLIB" = true ]; then
-  FEATURE_FLAGS+=("zlib-compression")
-fi
-
-if [ "$SNAPPY" = true ]; then
-  FEATURE_FLAGS+=("snappy-compression")
-fi
+add_conditional_features
 
 if [ "$USE_NEXTEST_ARCHIVE" = true ]; then
   # Feature flags are set when the archive is built
+  WORKSPACE_ROOT="$(pwd)"
+  if [ "Windows_NT" == "$OS" ]; then
+    WORKSPACE_ROOT="$(cygpath -w ${WORKSPACE_ROOT})"
+  fi
   FEATURE_FLAGS=()
-  CARGO_OPTIONS+=("--archive-file" "nextest-archive.tar.zst" "--workspace-remap" "$(pwd)")
+  CARGO_OPTIONS+=("--archive-file" "nextest-archive.tar.zst" "--workspace-remap" "${WORKSPACE_ROOT}")
 fi
 
 echo "cargo test options: $(cargo_test_options)"

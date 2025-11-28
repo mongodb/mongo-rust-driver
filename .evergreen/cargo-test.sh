@@ -7,7 +7,7 @@ CARGO_RESULT=0
 . .evergreen/features.sh
 
 cargo_test_options() {
-  echo $1 ${CARGO_OPTIONS[@]} ${features_option} -- ${TEST_OPTIONS[@]}
+  echo $1 ${CARGO_OPTIONS[@]} $(features_option) -- ${TEST_OPTIONS[@]}
 }
 
 cargo_test() {

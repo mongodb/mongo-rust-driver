@@ -54,7 +54,7 @@ buildvariants:
   - name: compile
     display_name: "Compile Only"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
       - name: compile-on-latest
       - name: compile-on-msrv
@@ -62,14 +62,14 @@ buildvariants:
   - name: lint
     display_name: "Lint"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
       - name: .lint
 
   - name: cargo-deny
     display_name: "Cargo Deny"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
       - name: check-cargo-deny
 
@@ -94,7 +94,9 @@ buildvariants:
     expansions:
       AUTH: auth
       SSL: ssl
+      USE_NEXTEST_ARCHIVE: true
     tasks:
+      - name: build-nextest-archive
       # Ubuntu 22.04 does not support MongoDB versions below 6.0.
       - name: .standalone !.4.2 !.4.4 !.5.0
       - name: .replicaset !.4.2 !.4.4 !.5.0
@@ -107,7 +109,9 @@ buildvariants:
     expansions:
       AUTH: auth
       SSL: ssl
+      USE_NEXTEST_ARCHIVE: true
     tasks:
+      - name: build-nextest-archive
       - name: .standalone
       - name: .replicaset
       - name: .sharded
@@ -119,7 +123,9 @@ buildvariants:
     expansions:
       AUTH: auth
       SSL: ssl
+      USE_NEXTEST_ARCHIVE: true
     tasks:
+      - name: build-nextest-archive
       - name: .standalone
       - name: .replicaset
       - name: .sharded
@@ -127,12 +133,14 @@ buildvariants:
   - name: openssl-rhel
     display_name: "OpenSSL (RHEL)"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       OPENSSL: true
       AUTH: auth
       SSL: ssl
+      USE_NEXTEST_ARCHIVE: true
     tasks:
+      - name: build-nextest-archive
       - name: .rapid .replicaset
 
   - name: openssl-ubuntu
@@ -144,7 +152,9 @@ buildvariants:
       OPENSSL: true
       AUTH: auth
       SSL: ssl
+      USE_NEXTEST_ARCHIVE: true
     tasks:
+      - name: build-nextest-archive
       - name: .rapid .replicaset
 
   - name: openssl-macos
@@ -156,7 +166,9 @@ buildvariants:
       OPENSSL: true
       AUTH: auth
       SSL: ssl
+      USE_NEXTEST_ARCHIVE: true
     tasks:
+      - name: build-nextest-archive
       - name: .rapid .replicaset
 
   - name: openssl-windows
@@ -168,21 +180,26 @@ buildvariants:
       OPENSSL: true
       AUTH: auth
       SSL: ssl
+      USE_NEXTEST_ARCHIVE: true
     tasks:
+      - name: build-nextest-archive
       - name: .rapid .replicaset
 
   - name: no-auth-tls
     display_name: "No Auth/TLS"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
+    expansions:
+      USE_NEXTEST_ARCHIVE: true
     tasks:
+      - name: build-nextest-archive
       - .rapid .replicaset
 
   - name: compression
     display_name: "Compression"
     patchable: false
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       AUTH: auth
       SSL: ssl
@@ -193,13 +210,15 @@ buildvariants:
     display_name: "Stable API V1"
     patchable: false
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       REQUIRE_API_VERSION: true
       MONGODB_API_VERSION: 1
       AUTH: auth
+      USE_NEXTEST_ARCHIVE: true
       # Configuring SSL: ssl causes errors in bootstrap mongo-orchestration.
     tasks:
+      - name: build-nextest-archive
       # The Stable API was introduced in MongoDB version 5.0. Drivers Evergreen Tools only supports
       # setting REQUIRE_API_VERSION on standalones and sharded clusters.
       - .standalone !.4.2 !.4.4
@@ -208,7 +227,7 @@ buildvariants:
   - name: sync-api
     display_name: "Sync API"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       AUTH: auth
       SSL: ssl
@@ -219,7 +238,7 @@ buildvariants:
     display_name: "Atlas Connectivity"
     patchable: false
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
       - test-atlas-connectivity
 
@@ -263,7 +282,7 @@ buildvariants:
     display_name: "GSSAPI Authentication - Linux"
     patchable: true
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
       - test-gssapi-auth
 
@@ -288,7 +307,7 @@ buildvariants:
     display_name: "x509 Authentication"
     patchable: false
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       AUTH: auth
       SSL: ssl
@@ -373,7 +392,7 @@ buildvariants:
   - name: load-balancer
     display_name: "Load Balancer"
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
       - .load-balancer
 
@@ -381,7 +400,7 @@ buildvariants:
     display_name: "Search Index Helpers"
     patchable: false
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
       - name: search-index-task-group
 
@@ -1250,8 +1269,6 @@ tasks:
 
   - name: build-nextest-archive
     commands:
-    - func: "install libmongocrypt"
-      type: setup
     - command: subprocess.exec
       type: setup
       params:
@@ -1261,6 +1278,10 @@ tasks:
           - .evergreen/build-nextest-archive.sh
         include_expansions_in_env:
           - PROJECT_DIRECTORY
+          - OPENSSL
+          - ZSTD
+          - ZLIB
+          - SNAPPY
     - command: s3.put
       type: setup
       params:
