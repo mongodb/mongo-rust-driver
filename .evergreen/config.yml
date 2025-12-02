@@ -122,6 +122,7 @@ buildvariants:
     expansions:
       AUTH: auth
       SSL: ssl
+      LIBMONGOCRYPT_OS: windows-test
     tasks:
       - name: build-nextest-archive
       - name: .standalone
@@ -352,7 +353,7 @@ buildvariants:
       LIBMONGOCRYPT_OS: rhel-80-64-bit
       AUTH: auth
       SSL: ssl
-      IN_USE_ENCRYPTION: true
+      ARCHIVE_IN_USE_ENCRYPTION: true
     tasks:
       - name: build-nextest-archive
       - .in-use-encryption
@@ -367,7 +368,7 @@ buildvariants:
       AUTH: auth
       SSL: ssl
       DISABLE_CRYPT_SHARED: true
-      IN_USE_ENCRYPTION: true
+      ARCHIVE_IN_USE_ENCRYPTION: true
     tasks:
       - name: build-nextest-archive
       - .in-use-encryption
@@ -381,7 +382,7 @@ buildvariants:
       AUTH: auth
       SSL: ssl
       OPENSSL: true
-      IN_USE_ENCRYPTION: true
+      ARCHIVE_IN_USE_ENCRYPTION: true
     tasks:
       - name: build-nextest-archive
       - test-in-use-encryption-rapid
@@ -1349,7 +1350,7 @@ tasks:
 
   - name: build-nextest-archive
     commands:
-    - func: "install libmongocrypt"
+    - func: "optional install libmongocrypt"
     - command: subprocess.exec
       type: setup
       params:
@@ -1363,7 +1364,7 @@ tasks:
           - ZSTD
           - ZLIB
           - SNAPPY
-          - IN_USE_ENCRYPTION
+          - ARCHIVE_IN_USE_ENCRYPTION
           - MONGOCRYPT_LIB_DIR
           - LD_LIBRARY_PATH
     - command: s3.put
@@ -1612,6 +1613,16 @@ functions:
         ${PREPARE_SHELL}
         .evergreen/install-dependencies.sh libmongocrypt
 
+  "optional install libmongocrypt":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        ${PREPARE_SHELL}
+        if [[ "${ARCHIVE_IN_USE_ENCRYPTION}" == "true" ]]; then
+          .evergreen/install-dependencies.sh libmongocrypt
+        fi
+
   "install junit dependencies":
     command: shell.exec
     params:
@@ -1667,7 +1678,7 @@ functions:
     - command: subprocess.exec
       params:
         binary: bash
-        args: ["-c", "sleep 30s"]
+        args: ["-c", "sleep 30"]
 
   "run driver test suite":
     - command: subprocess.exec

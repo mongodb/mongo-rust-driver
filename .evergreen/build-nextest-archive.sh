@@ -10,7 +10,7 @@ FEATURE_FLAGS+=("${STANDARD_FEATURES[@]}")
 
 add_conditional_features
 
-if [[ "$IN_USE_ENCRYPTION" = true ]]; then
+if [[ "$ARCHIVE_IN_USE_ENCRYPTION" = true ]]; then
     FEATURE_FLAGS+=("in-use-encryption" "azure-kms" "text-indexes-unstable" "aws-auth")
 fi
 
