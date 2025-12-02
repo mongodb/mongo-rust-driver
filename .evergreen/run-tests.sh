@@ -29,11 +29,6 @@ if [ "Windows_NT" == "$OS" ]; then
   export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
 fi
 
-sleep 60s
 cargo_test ""
-
-# cargo-nextest doesn't support doc tests
-#RUST_BACKTRACE=1 cargo test --doc $(cargo_test_options)
-#((CARGO_RESULT = ${CARGO_RESULT} || $?))
 
 exit $CARGO_RESULT
