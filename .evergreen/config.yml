@@ -82,7 +82,6 @@ buildvariants:
     expansions:
       AUTH: auth
       SSL: ssl
-      USE_NEXTEST_ARCHIVE: true
     tasks:
       - name: build-nextest-archive
       - name: .standalone
@@ -96,7 +95,6 @@ buildvariants:
     expansions:
       AUTH: auth
       SSL: ssl
-      USE_NEXTEST_ARCHIVE: true
     tasks:
       - name: build-nextest-archive
       # Ubuntu 22.04 does not support MongoDB versions below 6.0.
@@ -111,7 +109,6 @@ buildvariants:
     expansions:
       AUTH: auth
       SSL: ssl
-      USE_NEXTEST_ARCHIVE: true
     tasks:
       - name: build-nextest-archive
       - name: .standalone
@@ -125,7 +122,6 @@ buildvariants:
     expansions:
       AUTH: auth
       SSL: ssl
-      USE_NEXTEST_ARCHIVE: true
     tasks:
       - name: build-nextest-archive
       - name: .standalone
@@ -140,7 +136,6 @@ buildvariants:
       OPENSSL: true
       AUTH: auth
       SSL: ssl
-      USE_NEXTEST_ARCHIVE: true
     tasks:
       - name: build-nextest-archive
       - name: .rapid .replicaset
@@ -154,7 +149,6 @@ buildvariants:
       OPENSSL: true
       AUTH: auth
       SSL: ssl
-      USE_NEXTEST_ARCHIVE: true
     tasks:
       - name: build-nextest-archive
       - name: .rapid .replicaset
@@ -168,7 +162,6 @@ buildvariants:
       OPENSSL: true
       AUTH: auth
       SSL: ssl
-      USE_NEXTEST_ARCHIVE: true
     tasks:
       - name: build-nextest-archive
       - name: .rapid .replicaset
@@ -182,7 +175,6 @@ buildvariants:
       OPENSSL: true
       AUTH: auth
       SSL: ssl
-      USE_NEXTEST_ARCHIVE: true
     tasks:
       - name: build-nextest-archive
       - name: .rapid .replicaset
@@ -191,15 +183,13 @@ buildvariants:
     display_name: "No Auth/TLS"
     run_on:
       - rhel8-latest-small
-    expansions:
-      USE_NEXTEST_ARCHIVE: true
     tasks:
       - name: build-nextest-archive
       - .rapid .replicaset
 
   - name: compression
     display_name: "Compression"
-    patchable: false
+    #patchable: false
     run_on:
       - rhel8-latest-small
     expansions:
@@ -217,7 +207,6 @@ buildvariants:
       REQUIRE_API_VERSION: true
       MONGODB_API_VERSION: 1
       AUTH: auth
-      USE_NEXTEST_ARCHIVE: true
       # Configuring SSL: ssl causes errors in bootstrap mongo-orchestration.
     tasks:
       - name: build-nextest-archive
@@ -402,6 +391,7 @@ buildvariants:
     run_on:
       - rhel8-latest-small
     tasks:
+      - name: build-nextest-archive
       - .load-balancer
 
   - name: search-index
@@ -444,6 +434,7 @@ buildvariants:
     run_on:
       - amazon2023-arm64-latest-large-m8g
     tasks:
+      - name: build-nextest-archive
       - name: .latest
       #- name: .8.0
       #- name: .7.0
@@ -1188,7 +1179,10 @@ tasks:
 
   - name: test-load-balancer-5.0
     tags: [load-balancer]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: bootstrap mongo-orchestration
         vars:
           MONGODB_VERSION: 5.0
@@ -1199,7 +1193,10 @@ tasks:
 
   - name: test-load-balancer-6.0
     tags: [load-balancer]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: bootstrap mongo-orchestration
         vars:
           MONGODB_VERSION: 6.0
@@ -1210,7 +1207,10 @@ tasks:
 
   - name: test-load-balancer-7.0
     tags: [load-balancer]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: bootstrap mongo-orchestration
         vars:
           MONGODB_VERSION: 7.0
@@ -1221,7 +1221,10 @@ tasks:
 
   - name: test-load-balancer-rapid
     tags: [load-balancer]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: bootstrap mongo-orchestration
         vars:
           MONGODB_VERSION: rapid
@@ -1232,7 +1235,10 @@ tasks:
 
   - name: test-load-balancer-latest
     tags: [load-balancer]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: bootstrap mongo-orchestration
         vars:
           MONGODB_VERSION: latest
@@ -1683,7 +1689,6 @@ functions:
           - ZSTD
           - ZLIB
           - SNAPPY
-          - USE_NEXTEST_ARCHIVE
 
   "run sync tests":
     - command: subprocess.exec
@@ -1757,8 +1762,6 @@ functions:
         binary: bash
         args:
           - .evergreen/run-csfle-tests.sh
-        env:
-          USE_NEXTEST_ARCHIVE: "true"
         include_expansions_in_env:
           - DRIVERS_TOOLS
           - PROJECT_DIRECTORY
