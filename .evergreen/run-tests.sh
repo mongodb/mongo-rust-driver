@@ -10,16 +10,6 @@ FEATURE_FLAGS+=("${STANDARD_FEATURES[@]}")
 
 add_conditional_features
 
-if [ "$USE_NEXTEST_ARCHIVE" = true ]; then
-  # Feature flags are set when the archive is built
-  WORKSPACE_ROOT="$(pwd)"
-  if [ "Windows_NT" == "$OS" ]; then
-    WORKSPACE_ROOT="$(cygpath -w ${WORKSPACE_ROOT})"
-  fi
-  FEATURE_FLAGS=()
-  CARGO_OPTIONS+=("--archive-file" "nextest-archive.tar.zst" "--workspace-remap" "${WORKSPACE_ROOT}")
-fi
-
 echo "cargo test options: $(cargo_test_options)"
 
 set +o errexit

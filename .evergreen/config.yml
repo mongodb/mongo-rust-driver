@@ -363,7 +363,9 @@ buildvariants:
       LIBMONGOCRYPT_OS: rhel-80-64-bit
       AUTH: auth
       SSL: ssl
+      IN_USE_ENCRYPTION: true
     tasks:
+      - name: build-nextest-archive
       - .in-use-encryption
 
   - name: in-use-encryption-disable-crypt-shared
@@ -376,7 +378,9 @@ buildvariants:
       AUTH: auth
       SSL: ssl
       DISABLE_CRYPT_SHARED: true
+      IN_USE_ENCRYPTION: true
     tasks:
+      - name: build-nextest-archive
       - .in-use-encryption
 
   - name: in-use-encryption-openssl
@@ -388,8 +392,10 @@ buildvariants:
       AUTH: auth
       SSL: ssl
       OPENSSL: true
+      IN_USE_ENCRYPTION: true
     tasks:
-      - test-in-use-encryption-openssl
+      - name: build-nextest-archive
+      - test-in-use-encryption-rapid
 
   - name: load-balancer
     display_name: "Load Balancer"
@@ -1084,7 +1090,10 @@ tasks:
 
   - name: test-in-use-encryption-4.2
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -1095,7 +1104,10 @@ tasks:
 
   - name: test-in-use-encryption-4.4
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -1106,7 +1118,10 @@ tasks:
 
   - name: test-in-use-encryption-5.0
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -1117,7 +1132,10 @@ tasks:
 
   - name: test-in-use-encryption-6.0
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -1128,7 +1146,10 @@ tasks:
 
   - name: test-in-use-encryption-7.0
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -1139,7 +1160,10 @@ tasks:
 
   - name: test-in-use-encryption-rapid
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
@@ -1150,21 +1174,14 @@ tasks:
 
   - name: test-in-use-encryption-latest
     tags: [in-use-encryption]
+    depends_on:
+      - name: build-nextest-archive
     commands:
+      - func: "fetch nextest archive"
       - func: "install libmongocrypt"
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: latest
-          TOPOLOGY: replica_set
-      - func: "start csfle servers"
-      - func: "run csfle tests"
-
-  - name: test-in-use-encryption-openssl
-    commands:
-      - func: "install libmongocrypt"
-      - func: "bootstrap mongo-orchestration"
-        vars:
-          MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
       - func: "start csfle servers"
       - func: "run csfle tests"
@@ -1326,6 +1343,7 @@ tasks:
 
   - name: build-nextest-archive
     commands:
+    - func: "install libmongocrypt"
     - command: subprocess.exec
       type: setup
       params:
@@ -1339,6 +1357,9 @@ tasks:
           - ZSTD
           - ZLIB
           - SNAPPY
+          - IN_USE_ENCRYPTION
+          - MONGOCRYPT_LIB_DIR
+          - LD_LIBRARY_PATH
     - command: s3.put
       type: setup
       params:
@@ -1603,6 +1624,7 @@ functions:
 
   "bootstrap mongo-orchestration":
     - command: subprocess.exec
+      type: setup
       params:
         binary: sh
         args:
@@ -1735,6 +1757,8 @@ functions:
         binary: bash
         args:
           - .evergreen/run-csfle-tests.sh
+        env:
+          USE_NEXTEST_ARCHIVE: "true"
         include_expansions_in_env:
           - DRIVERS_TOOLS
           - PROJECT_DIRECTORY
@@ -2022,3 +2046,14 @@ functions:
         - AWS_ACCESS_KEY_ID
         - AWS_SECRET_ACCESS_KEY
         - AWS_SESSION_TOKEN
+  
+  "fetch nextest archive":
+  - command: s3.get
+    type: setup
+    params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${build_id}-nextest-archive.tar.zst
+        bucket: mciuploads
+        local_file: src/nextest-archive.tar.zst
+        optional: true

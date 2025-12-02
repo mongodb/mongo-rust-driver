@@ -23,17 +23,7 @@ tasks:"
       - name: build-nextest-archive
         patch_optional: true
     commands:
-      - command: s3.get
-        type: setup
-        params:
-            aws_key: ${{aws_key}}
-            aws_secret: ${{aws_secret}}
-            remote_file: \
-                 ${{UPLOAD_BUCKET}}/${{build_variant}}/${{revision}}/\
-                 ${{build_id}}-nextest-archive.tar.zst
-            bucket: mciuploads
-            local_file: src/nextest-archive.tar.zst
-            optional: true
+      - func: \"fetch nextest archive\"
       - func: \"bootstrap mongo-orchestration\"
         type: setup
         vars:

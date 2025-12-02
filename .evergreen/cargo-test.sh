@@ -6,8 +6,22 @@ CARGO_RESULT=0
 
 . .evergreen/features.sh
 
+if [[ "$USE_NEXTEST_ARCHIVE" = true ]]; then
+  WORKSPACE_ROOT="$(pwd)"
+  if [[ "Windows_NT" = "$OS" ]]; then
+    WORKSPACE_ROOT="$(cygpath -w ${WORKSPACE_ROOT})"
+  fi
+  CARGO_OPTIONS+=("--archive-file" "nextest-archive.tar.zst" "--workspace-remap" "${WORKSPACE_ROOT}")
+fi
+
+
 cargo_test_options() {
-  echo $1 ${CARGO_OPTIONS[@]} $(features_option) -- ${TEST_OPTIONS[@]}
+  FEATURES="$(features_option)"
+  if [[ "$USE_NEXTEST_ARCHIVE" = true ]]; then
+    # Feature flags are set when the archive is built
+    FEATURES=""
+  fi
+  echo $1 ${CARGO_OPTIONS[@]} "${FEATURES}" -- ${TEST_OPTIONS[@]}
 }
 
 cargo_test() {
