@@ -34,7 +34,7 @@ cargo_test() {
     mv results.xml previous.xml
     merge-junit -o results.xml previous.xml target/nextest/ci/junit.xml
   else
-    mv target/nextest/ci/junit.xml results.xml || true
+    mv target/nextest/ci/junit.xml results.xml
   fi
   kill ${TAIL_PID}
   rm ${LOG_PATH}
