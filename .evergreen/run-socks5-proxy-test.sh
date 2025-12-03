@@ -22,6 +22,7 @@ NOAUTH_PID=$!
 set +o errexit
 
 cargo_test socks5_proxy
+cargo_test run_uri_options_spec_tests
 
 kill $AUTH_PID
 kill $NOAUTH_PID

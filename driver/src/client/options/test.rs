@@ -218,11 +218,10 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
 
 #[tokio::test]
 async fn run_uri_options_spec_tests() {
-    let mut skipped_files = vec![
-        "single-threaded-options.json",
-        // TODO RUST-1054 unskip this file
-        "proxy-options.json",
-    ];
+    let mut skipped_files = vec!["single-threaded-options.json"];
+    if cfg!(not(feature = "socks5-proxy")) {
+        skipped_files.push("proxy-options.json");
+    }
     if cfg!(not(feature = "gssapi-auth")) {
         skipped_files.push("auth-options.json");
     }
