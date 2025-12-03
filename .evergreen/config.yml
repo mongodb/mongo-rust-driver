@@ -1350,7 +1350,6 @@ tasks:
 
   - name: build-nextest-archive
     commands:
-    - func: "optional install libmongocrypt"
     - command: subprocess.exec
       type: setup
       params:
@@ -1364,9 +1363,9 @@ tasks:
           - ZSTD
           - ZLIB
           - SNAPPY
-          - ARCHIVE_IN_USE_ENCRYPTION
           - MONGOCRYPT_LIB_DIR
           - LD_LIBRARY_PATH
+          - ARCHIVE_IN_USE_ENCRYPTION
     - command: s3.put
       type: setup
       params:
@@ -1612,16 +1611,6 @@ functions:
       script: |
         ${PREPARE_SHELL}
         .evergreen/install-dependencies.sh libmongocrypt
-
-  "optional install libmongocrypt":
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        ${PREPARE_SHELL}
-        if [[ "${ARCHIVE_IN_USE_ENCRYPTION}" == "true" ]]; then
-          .evergreen/install-dependencies.sh libmongocrypt
-        fi
 
   "install junit dependencies":
     command: shell.exec
