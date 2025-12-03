@@ -122,7 +122,6 @@ buildvariants:
     expansions:
       AUTH: auth
       SSL: ssl
-      LIBMONGOCRYPT_OS: windows-test
     tasks:
       - name: build-nextest-archive
       - name: .standalone
@@ -353,7 +352,6 @@ buildvariants:
       LIBMONGOCRYPT_OS: rhel-80-64-bit
       AUTH: auth
       SSL: ssl
-      ARCHIVE_IN_USE_ENCRYPTION: true
     tasks:
       - name: build-nextest-archive
       - .in-use-encryption
@@ -368,7 +366,6 @@ buildvariants:
       AUTH: auth
       SSL: ssl
       DISABLE_CRYPT_SHARED: true
-      ARCHIVE_IN_USE_ENCRYPTION: true
     tasks:
       - name: build-nextest-archive
       - .in-use-encryption
@@ -382,7 +379,6 @@ buildvariants:
       AUTH: auth
       SSL: ssl
       OPENSSL: true
-      ARCHIVE_IN_USE_ENCRYPTION: true
     tasks:
       - name: build-nextest-archive
       - test-in-use-encryption-rapid
@@ -1365,7 +1361,7 @@ tasks:
           - SNAPPY
           - MONGOCRYPT_LIB_DIR
           - LD_LIBRARY_PATH
-          - ARCHIVE_IN_USE_ENCRYPTION
+          - LIBMONGOCRYPT_OS
     - command: s3.put
       type: setup
       params:

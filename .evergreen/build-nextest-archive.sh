@@ -10,7 +10,7 @@ FEATURE_FLAGS+=("${STANDARD_FEATURES[@]}")
 
 add_conditional_features
 
-if [[ "$ARCHIVE_IN_USE_ENCRYPTION" = true ]]; then
+if [[ "$LIBMONGOCRYPT_OS" != "" ]]; then
     FEATURE_FLAGS+=("in-use-encryption" "azure-kms" "text-indexes-unstable" "aws-auth")
     .evergreen/install-dependencies.sh libmongocrypt
 fi
