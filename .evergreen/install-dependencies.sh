@@ -32,8 +32,7 @@ for arg; do
 
     # This file is not created by default on Windows
     echo 'export PATH="$PATH:${CARGO_HOME}/bin"' >>${CARGO_HOME}/env
-    echo "export CARGO_NET_GIT_FETCH_WITH_CLI=true" >>${CARGO_HOME}/env
-
+    
     source .evergreen/env.sh
     rustup toolchain install nightly -c rustfmt
   elif [ $arg == "junit-dependencies" ]; then

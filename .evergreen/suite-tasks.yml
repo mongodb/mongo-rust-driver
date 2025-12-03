@@ -5,8 +5,13 @@ tasks:
 
   - name: test-4.2-standalone
     tags: [4.2, standalone]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: server
@@ -14,8 +19,13 @@ tasks:
 
   - name: test-4.4-standalone
     tags: [4.4, standalone]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: server
@@ -23,8 +33,13 @@ tasks:
 
   - name: test-5.0-standalone
     tags: [5.0, standalone]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: server
@@ -32,8 +47,13 @@ tasks:
 
   - name: test-6.0-standalone
     tags: [6.0, standalone]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: server
@@ -41,8 +61,13 @@ tasks:
 
   - name: test-7.0-standalone
     tags: [7.0, standalone]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: server
@@ -50,8 +75,13 @@ tasks:
 
   - name: test-8.0-standalone
     tags: [8.0, standalone]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 8.0
           TOPOLOGY: server
@@ -59,8 +89,13 @@ tasks:
 
   - name: test-rapid-standalone
     tags: [rapid, standalone]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: server
@@ -68,8 +103,13 @@ tasks:
 
   - name: test-latest-standalone
     tags: [latest, standalone]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: server
@@ -77,8 +117,13 @@ tasks:
 
   - name: test-4.2-replicaset
     tags: [4.2, replicaset]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: replica_set
@@ -86,8 +131,13 @@ tasks:
 
   - name: test-4.4-replicaset
     tags: [4.4, replicaset]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: replica_set
@@ -95,8 +145,13 @@ tasks:
 
   - name: test-5.0-replicaset
     tags: [5.0, replicaset]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: replica_set
@@ -104,8 +159,13 @@ tasks:
 
   - name: test-6.0-replicaset
     tags: [6.0, replicaset]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: replica_set
@@ -113,8 +173,13 @@ tasks:
 
   - name: test-7.0-replicaset
     tags: [7.0, replicaset]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: replica_set
@@ -122,8 +187,13 @@ tasks:
 
   - name: test-8.0-replicaset
     tags: [8.0, replicaset]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 8.0
           TOPOLOGY: replica_set
@@ -131,8 +201,13 @@ tasks:
 
   - name: test-rapid-replicaset
     tags: [rapid, replicaset]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
@@ -140,8 +215,13 @@ tasks:
 
   - name: test-latest-replicaset
     tags: [latest, replicaset]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: replica_set
@@ -149,8 +229,13 @@ tasks:
 
   - name: test-4.2-sharded
     tags: [4.2, sharded]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 4.2
           TOPOLOGY: sharded_cluster
@@ -158,8 +243,13 @@ tasks:
 
   - name: test-4.4-sharded
     tags: [4.4, sharded]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: sharded_cluster
@@ -167,8 +257,13 @@ tasks:
 
   - name: test-5.0-sharded
     tags: [5.0, sharded]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: sharded_cluster
@@ -176,8 +271,13 @@ tasks:
 
   - name: test-6.0-sharded
     tags: [6.0, sharded]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: sharded_cluster
@@ -185,8 +285,13 @@ tasks:
 
   - name: test-7.0-sharded
     tags: [7.0, sharded]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: sharded_cluster
@@ -194,8 +299,13 @@ tasks:
 
   - name: test-8.0-sharded
     tags: [8.0, sharded]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: 8.0
           TOPOLOGY: sharded_cluster
@@ -203,8 +313,13 @@ tasks:
 
   - name: test-rapid-sharded
     tags: [rapid, sharded]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: sharded_cluster
@@ -212,8 +327,13 @@ tasks:
 
   - name: test-latest-sharded
     tags: [latest, sharded]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: "fetch nextest archive"
       - func: "bootstrap mongo-orchestration"
+        type: setup
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: sharded_cluster
