@@ -337,6 +337,10 @@ impl Error {
     }
 
     pub(crate) fn is_network_error(&self) -> bool {
+        #[cfg(feature = "socks5-proxy")]
+        if matches!(self.kind.as_ref(), ErrorKind::ProxyConnect { .. }) {
+            return true;
+        }
         matches!(
             self.kind.as_ref(),
             ErrorKind::Io(..) | ErrorKind::ConnectionPoolCleared { .. }
