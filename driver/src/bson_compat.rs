@@ -37,6 +37,7 @@ pub(crate) trait RawDocumentBufExt: Sized {
         value: impl Into<crate::bson::raw::RawBsonRef<'a>> + 'a,
     );
 
+    #[allow(unused)]
     fn to_document(&self) -> crate::error::Result<crate::bson::Document>;
 }
 
