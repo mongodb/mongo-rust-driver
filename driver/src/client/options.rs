@@ -422,6 +422,7 @@ pub struct ServerApi {
 #[non_exhaustive]
 pub struct Socks5Proxy {
     /// The hostname or IP address on which the proxy is listening.
+    #[builder(!default)]
     pub host: String,
 
     /// The port on which the proxy is listening. Defaults to 1080 if unset.
