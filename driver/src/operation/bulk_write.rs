@@ -175,6 +175,12 @@ where
                 n_modified,
                 upserted,
             } => {
+                // small optimization for SERVER-113344: if the server unexpectedly returns a
+                // success response for an errors-only bulk write, skip deserializing the individual
+                // response, as the call to add_*_result will be a no-op
+                if R::errors_only() {
+                    return Ok(());
+                }
                 let model = self.get_model(response.index)?;
                 match model.operation_type() {
                     OperationType::Insert => {
