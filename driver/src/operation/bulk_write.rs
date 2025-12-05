@@ -183,12 +183,8 @@ where
                         result.add_insert_result(index, insert_result);
                     }
                     OperationType::Update => {
-                        let modified_count =
-                            n_modified.ok_or_else(|| ErrorKind::InvalidResponse {
-                                message: "nModified value not returned for update bulkWrite \
-                                          operation"
-                                    .into(),
-                            })?;
+                        // default to 0 as a workaround for SERVER-113026
+                        let modified_count = n_modified.unwrap_or(0);
                         let update_result = UpdateResult {
                             matched_count: n,
                             modified_count,
