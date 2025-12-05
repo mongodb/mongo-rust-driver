@@ -399,6 +399,35 @@ buildvariants:
     tasks:
       - happy-eyeballs-task-group
 
+  - name: socks5-proxy-no-tls
+    display_name: "SOCKS5 Proxy (No TLS)"
+    # patchable: false
+    run_on:
+      - rhel87-small
+    tasks:
+      - test-socks5-proxy
+
+  - name: socks5-proxy-tls
+    display_name: "SOCKS5 Proxy (TLS)"
+    # patchable: false
+    run_on:
+      - rhel87-small
+    expansions:
+      SSL: ssl
+    tasks:
+      - test-socks5-proxy
+
+  - name: socks5-proxy-openssl
+    display_name: "SOCKS5 Proxy (OpenSSL)"
+    # patchable: false
+    run_on:
+      - rhel87-small
+    expansions:
+      SSL: ssl
+      OPENSSL: true
+    tasks:
+      - test-socks5-proxy
+
   #- name: graviton-legacy
   #  display_name: "Graviton (legacy versions)"
   #  run_on:
@@ -1245,6 +1274,26 @@ tasks:
           - .evergreen/run-happy-eyeballs-tests.sh
         include_expansions_in_env:
           - PROJECT_DIRECTORY
+
+  - name: test-socks5-proxy
+    commands:
+    - func: bootstrap mongo-orchestration
+      vars:
+        MONGODB_VERSION: rapid
+        TOPOLOGY: replica_set
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/run-socks5-proxy-test.sh
+        include_expansions_in_env:
+          - PROJECT_DIRECTORY
+          - MONGODB_URI
+          - DRIVERS_TOOLS
+          - PYTHON3
+          - OPENSSL
 
 #############
 # Functions #

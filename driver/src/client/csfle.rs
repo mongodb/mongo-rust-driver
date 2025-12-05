@@ -72,6 +72,10 @@ impl ClientState {
             mongocryptd_opts,
             mongocryptd_client,
             aux_clients.metadata_client,
+            #[cfg(feature = "socks5-proxy")]
+            client.options().socks5_proxy.clone(),
+            #[cfg(not(feature = "socks5-proxy"))]
+            None,
         )
         .await?;
 

@@ -4,7 +4,7 @@ use openssl::{
     error::ErrorStack,
     ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode},
 };
-use tokio::net::TcpStream;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_openssl::SslStream;
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
 };
 
-pub(super) type TlsStream = SslStream<TcpStream>;
+pub(super) type TlsStream<T> = SslStream<T>;
 
 /// Configuration required to use TLS. Creating this is expensive, so its best to cache this value
 /// and reuse it for multiple connections.
@@ -40,11 +40,11 @@ impl TlsConfig {
     }
 }
 
-pub(super) async fn tls_connect(
+pub(super) async fn tls_connect<T: AsyncRead + AsyncWrite + Unpin>(
     host: &str,
-    tcp_stream: TcpStream,
+    tcp_stream: T,
     cfg: &TlsConfig,
-) -> Result<TlsStream> {
+) -> Result<TlsStream<T>> {
     let mut stream = make_ssl_stream(host, tcp_stream, cfg).map_err(|err| {
         Error::from(ErrorKind::InvalidTlsConfig {
             message: err.to_string(),
@@ -120,11 +120,11 @@ fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
     Ok(builder.build())
 }
 
-fn make_ssl_stream(
+fn make_ssl_stream<T: AsyncRead + AsyncWrite>(
     host: &str,
-    tcp_stream: TcpStream,
+    tcp_stream: T,
     cfg: &TlsConfig,
-) -> std::result::Result<SslStream<TcpStream>, ErrorStack> {
+) -> std::result::Result<SslStream<T>, ErrorStack> {
     let ssl = cfg
         .connector
         .configure()?
