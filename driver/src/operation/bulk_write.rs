@@ -175,6 +175,12 @@ where
                 n_modified,
                 upserted,
             } => {
+                // small optimization for SERVER-113344: if the server unexpectedly returns a
+                // success response for an errors-only bulk write, skip deserializing the individual
+                // response, as the call to add_*_result will be a no-op
+                if R::errors_only() {
+                    return Ok(());
+                }
                 let model = self.get_model(response.index)?;
                 match model.operation_type() {
                     OperationType::Insert => {
@@ -183,12 +189,8 @@ where
                         result.add_insert_result(index, insert_result);
                     }
                     OperationType::Update => {
-                        let modified_count =
-                            n_modified.ok_or_else(|| ErrorKind::InvalidResponse {
-                                message: "nModified value not returned for update bulkWrite \
-                                          operation"
-                                    .into(),
-                            })?;
+                        // default to 0 as a workaround for SERVER-113026
+                        let modified_count = n_modified.unwrap_or(0);
                         let update_result = UpdateResult {
                             matched_count: n,
                             modified_count,
