@@ -6,7 +6,7 @@ use semver::Version;
 use serde::{Deserialize, Deserializer};
 use tokio::sync::oneshot;
 
-use super::{results_match, ExpectedEvent, ObserveEvent, Operation};
+use super::{results_match, EntityMap, ExpectedEvent, ObserveEvent, Operation};
 
 #[cfg(feature = "bson-3")]
 use crate::bson_compat::RawDocumentBufExt;
@@ -28,6 +28,8 @@ use crate::{
         ReadConcern,
         ReadPreference,
         SelectionCriteria,
+        SessionOptions,
+        TransactionOptions,
         WriteConcern,
     },
     serde_util,
@@ -375,7 +377,40 @@ pub(crate) struct Collection {
 pub(crate) struct Session {
     pub(crate) id: String,
     pub(crate) client: String,
-    pub(crate) session_options: Option<crate::client::options::SessionOptions>,
+    pub(crate) session_options: Option<TestFileSessionOptions>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct TestFileSessionOptions {
+    default_transaction_options: Option<TransactionOptions>,
+    causal_consistency: Option<bool>,
+    snapshot: Option<bool>,
+    snapshot_time: Option<String>, // the id of the entity to be retrieved from the map
+}
+
+impl TestFileSessionOptions {
+    pub(crate) fn as_session_options(&self, entities: &EntityMap) -> SessionOptions {
+        let snapshot_time = match self.snapshot_time {
+            Some(ref id) => {
+                let entity = entities
+                    .get(id)
+                    .unwrap_or_else(|| panic!("missing entity for id {id}"));
+                let bson = entity.as_bson();
+                let timestamp = bson
+                    .as_timestamp()
+                    .unwrap_or_else(|| panic!("expected timestamp for id {id}, got {bson}"));
+                Some(timestamp)
+            }
+            None => None,
+        };
+        SessionOptions {
+            default_transaction_options: self.default_transaction_options.clone(),
+            causal_consistency: self.causal_consistency,
+            snapshot: self.snapshot,
+            snapshot_time,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

@@ -605,11 +605,15 @@ impl TestRunner {
                 TestFileEntity::Session(session) => {
                     let id = session.id.clone();
                     let client = self.get_client(&session.client).await;
-                    let mut client_session = client
-                        .start_session()
-                        .with_options(session.session_options.clone())
-                        .await
-                        .unwrap();
+                    let options = match session.session_options {
+                        Some(ref options) => {
+                            let entities = self.entities.read().await;
+                            Some(options.as_session_options(&entities))
+                        }
+                        None => None,
+                    };
+                    let mut client_session =
+                        client.start_session().with_options(options).await.unwrap();
                     if let Some(time) = &*self.cluster_time.read().await {
                         client_session.advance_cluster_time(time);
                     }

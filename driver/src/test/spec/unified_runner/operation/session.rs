@@ -1,4 +1,5 @@
 use crate::{
+    bson::Bson,
     client::session::TransactionState,
     error::Result,
     test::spec::unified_runner::{
@@ -197,6 +198,30 @@ impl TestOperation for AssertSessionNotDirty {
             })
             .await;
             assert!(!dirty);
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct GetSnapshotTime {}
+
+impl TestOperation for GetSnapshotTime {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            with_mut_session!(test_runner, id, |session| {
+                async move {
+                    session
+                        .snapshot_time()
+                        .map(|option| option.map(|ts| Bson::Timestamp(ts).into()))
+                }
+            })
+            .await
         }
         .boxed()
     }
