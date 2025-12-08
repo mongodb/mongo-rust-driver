@@ -1,4 +1,5 @@
 use crate::{
+    bson::Timestamp,
     client::options::{SessionOptions, TransactionOptions},
     error::Result,
     Client,

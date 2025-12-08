@@ -16,6 +16,7 @@ use uuid::Uuid;
 use crate::{
     bson::{doc, spec::BinarySubtype, Binary, Bson, Document, Timestamp},
     cmap::conn::PinnedConnectionHandle,
+    error::{Error, Result},
     operation::Retryability,
     options::{SessionOptions, TransactionOptions},
     sdam::ServerInfo,
@@ -236,6 +237,7 @@ impl ClientSession {
     ) -> Self {
         let timeout = client.inner.topology.watcher().logical_session_timeout();
         let server_session = client.inner.session_pool.check_out(timeout).await;
+        let snapshot_time = options.as_ref().and_then(|o| o.snapshot_time);
         Self {
             drop_token: client.register_async_drop(),
             client,
@@ -244,7 +246,7 @@ impl ClientSession {
             is_implicit,
             options,
             transaction: Default::default(),
-            snapshot_time: None,
+            snapshot_time,
             operation_time: None,
             #[cfg(test)]
             convenient_transaction_timeout: None,
@@ -304,6 +306,23 @@ impl ClientSession {
     /// The operation time returned by the last operation executed in this session.
     pub fn operation_time(&self) -> Option<Timestamp> {
         self.operation_time
+    }
+
+    /// The snapshot time for a snapshot session. This will return `None` if `snapshot_time` was not
+    /// provided and the server has not yet responded with a snapshot time. It is an error to call
+    /// this method on a non-snapshot session.
+    pub fn snapshot_time(&self) -> Result<Option<Timestamp>> {
+        if !self
+            .options
+            .as_ref()
+            .and_then(|o| o.snapshot)
+            .unwrap_or(false)
+        {
+            return Err(Error::invalid_argument(
+                "cannot access snapshot time on a non-snapshot session",
+            ));
+        }
+        Ok(self.snapshot_time)
     }
 
     pub(crate) fn causal_consistency(&self) -> bool {
