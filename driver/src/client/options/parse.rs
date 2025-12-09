@@ -164,6 +164,8 @@ impl ClientOptions {
             srv_service_name: conn_str.srv_service_name,
             #[cfg(feature = "opentelemetry")]
             tracing: None,
+            #[cfg(feature = "socks5-proxy")]
+            socks5_proxy: conn_str.socks5_proxy,
         }
     }
 }

@@ -2,7 +2,21 @@ pub(crate) mod handshake;
 
 use std::time::{Duration, Instant};
 
-use self::handshake::{Handshaker, HandshakerOptions};
+#[cfg(test)]
+use crate::options::ClientOptions;
+use crate::{
+    client::{
+        auth::Credential,
+        options::{ServerAddress, TlsOptions},
+    },
+    error::{Error as MongoError, ErrorKind, Result},
+    hello::HelloReply,
+    options::Socks5Proxy,
+    runtime,
+    runtime::{stream::DEFAULT_CONNECT_TIMEOUT, AsyncStream, TlsConfig},
+    sdam::{topology::TopologySpec, HandshakePhase},
+};
+
 use super::{
     conn::{
         pooled::PooledConnection,
@@ -13,18 +27,8 @@ use super::{
     Connection,
     PoolGeneration,
 };
-#[cfg(test)]
-use crate::options::ClientOptions;
-use crate::{
-    client::{
-        auth::Credential,
-        options::{ServerAddress, TlsOptions},
-    },
-    error::{Error as MongoError, ErrorKind, Result},
-    hello::HelloReply,
-    runtime::{self, stream::DEFAULT_CONNECT_TIMEOUT, AsyncStream, TlsConfig},
-    sdam::{topology::TopologySpec, HandshakePhase},
-};
+
+use handshake::{Handshaker, HandshakerOptions};
 
 /// Contains the logic to establish a connection, including handshaking, authenticating, and
 /// potentially more.
@@ -38,6 +42,8 @@ pub(crate) struct ConnectionEstablisher {
 
     connect_timeout: Duration,
 
+    proxy: Option<Socks5Proxy>,
+
     #[cfg(test)]
     test_patch_reply: Option<fn(&mut Result<HelloReply>)>,
 }
@@ -46,6 +52,8 @@ pub(crate) struct EstablisherOptions {
     handshake_options: HandshakerOptions,
     tls_options: Option<TlsOptions>,
     connect_timeout: Option<Duration>,
+    #[allow(unused)]
+    proxy: Option<Socks5Proxy>,
     #[cfg(test)]
     pub(crate) test_patch_reply: Option<fn(&mut Result<HelloReply>)>,
 }
@@ -58,6 +66,10 @@ impl From<&TopologySpec> for EstablisherOptions {
             connect_timeout: spec.options.connect_timeout,
             #[cfg(test)]
             test_patch_reply: None,
+            #[cfg(feature = "socks5-proxy")]
+            proxy: spec.options.socks5_proxy.clone(),
+            #[cfg(not(feature = "socks5-proxy"))]
+            proxy: None,
         }
     }
 }
@@ -92,13 +104,17 @@ impl ConnectionEstablisher {
             connect_timeout,
             #[cfg(test)]
             test_patch_reply: options.test_patch_reply,
+            #[cfg(feature = "socks5-proxy")]
+            proxy: options.proxy,
+            #[cfg(not(feature = "socks5-proxy"))]
+            proxy: None,
         })
     }
 
     async fn make_stream(&self, address: ServerAddress) -> Result<AsyncStream> {
         runtime::timeout(
             self.connect_timeout,
-            AsyncStream::connect(address, self.tls_config.as_ref()),
+            AsyncStream::connect(address, self.tls_config.as_ref(), self.proxy.as_ref()),
         )
         .await?
     }

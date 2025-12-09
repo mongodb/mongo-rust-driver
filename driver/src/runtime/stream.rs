@@ -6,11 +6,14 @@ use std::{
     time::Duration,
 };
 
-use tokio::{io::AsyncWrite, net::TcpStream};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::TcpStream,
+};
 
 use crate::{
     error::{Error, ErrorKind, Result},
-    options::ServerAddress,
+    options::{ServerAddress, Socks5Proxy},
     runtime,
 };
 
@@ -33,20 +36,82 @@ pub(crate) enum AsyncStream {
     Tcp(TcpStream),
 
     /// A TLS connection over TCP.
-    Tls(TlsStream),
+    Tls(TlsStream<TcpStream>),
 
     /// A Unix domain socket connection.
     #[cfg(unix)]
     Unix(tokio::net::UnixStream),
+
+    /// A connection to a SOCKS5 proxy.
+    #[cfg(feature = "socks5-proxy")]
+    Socks5(fast_socks5::client::Socks5Stream<TcpStream>),
+
+    /// A TLS connection to a SOCKS5 proxy.
+    #[cfg(feature = "socks5-proxy")]
+    Socks5Tls(TlsStream<fast_socks5::client::Socks5Stream<TcpStream>>),
 }
 
+#[cfg(feature = "socks5-proxy")]
+impl Socks5Proxy {
+    async fn connect(
+        &self,
+        host: String,
+        port: Option<u16>,
+    ) -> Result<fast_socks5::client::Socks5Stream<TcpStream>> {
+        use crate::options::DEFAULT_PORT;
+        use fast_socks5::{
+            client::{Config, Socks5Stream},
+            SocksError,
+        };
+
+        let proxy_address = format!("{}:{}", self.host, self.port.unwrap_or(1080));
+        let port = port.unwrap_or(DEFAULT_PORT);
+
+        let stream = if let Some((username, password)) = self.authentication.as_ref() {
+            Socks5Stream::connect_with_password(
+                proxy_address,
+                host,
+                port,
+                username.clone(),
+                password.clone(),
+                Config::default(),
+            )
+            .await
+        } else {
+            Socks5Stream::connect(proxy_address, host, port, Config::default()).await
+        }
+        .map_err(|error| {
+            if let SocksError::Io(io_error) = error {
+                ErrorKind::Io(std::sync::Arc::new(io_error))
+            } else {
+                ErrorKind::ProxyConnect {
+                    message: error.to_string(),
+                }
+            }
+        })?;
+        Ok(stream)
+    }
+}
 impl AsyncStream {
     pub(crate) async fn connect(
         address: ServerAddress,
         tls_cfg: Option<&TlsConfig>,
+        #[allow(unused)] proxy: Option<&Socks5Proxy>,
     ) -> Result<Self> {
         match &address {
-            ServerAddress::Tcp { host, .. } => {
+            #[allow(unused)] // port is unused when socks5-proxy is not enabled
+            ServerAddress::Tcp { host, port } => {
+                #[cfg(feature = "socks5-proxy")]
+                if let Some(proxy) = proxy {
+                    let inner = proxy.connect(host.clone(), *port).await?;
+                    return match tls_cfg {
+                        Some(cfg) => {
+                            Ok(AsyncStream::Socks5Tls(tls_connect(host, inner, cfg).await?))
+                        }
+                        None => Ok(AsyncStream::Socks5(inner)),
+                    };
+                }
+
                 let resolved: Vec<_> = runtime::resolve_address(&address).await?.collect();
                 if resolved.is_empty() {
                     return Err(ErrorKind::DnsResolve {
@@ -163,7 +228,7 @@ fn interleave<T>(left: Vec<T>, right: Vec<T>) -> Vec<T> {
     out
 }
 
-impl tokio::io::AsyncRead for AsyncStream {
+impl AsyncRead for AsyncStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -171,10 +236,14 @@ impl tokio::io::AsyncRead for AsyncStream {
     ) -> Poll<std::io::Result<()>> {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(())),
-            Self::Tcp(ref mut inner) => tokio::io::AsyncRead::poll_read(Pin::new(inner), cx, buf),
-            Self::Tls(ref mut inner) => tokio::io::AsyncRead::poll_read(Pin::new(inner), cx, buf),
+            Self::Tcp(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
+            Self::Tls(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
             #[cfg(unix)]
-            Self::Unix(ref mut inner) => tokio::io::AsyncRead::poll_read(Pin::new(inner), cx, buf),
+            Self::Unix(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
+            #[cfg(feature = "socks5-proxy")]
+            Self::Socks5(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
+            #[cfg(feature = "socks5-proxy")]
+            Self::Socks5Tls(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
         }
     }
 }
@@ -191,6 +260,10 @@ impl AsyncWrite for AsyncStream {
             Self::Tls(ref mut inner) => Pin::new(inner).poll_write(cx, buf),
             #[cfg(unix)]
             Self::Unix(ref mut inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
+            #[cfg(feature = "socks5-proxy")]
+            Self::Socks5(ref mut inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
+            #[cfg(feature = "socks5-proxy")]
+            Self::Socks5Tls(ref mut inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
         }
     }
 
@@ -201,6 +274,10 @@ impl AsyncWrite for AsyncStream {
             Self::Tls(ref mut inner) => Pin::new(inner).poll_flush(cx),
             #[cfg(unix)]
             Self::Unix(ref mut inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
+            #[cfg(feature = "socks5-proxy")]
+            Self::Socks5(ref mut inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
+            #[cfg(feature = "socks5-proxy")]
+            Self::Socks5Tls(ref mut inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
         }
     }
 
@@ -211,6 +288,10 @@ impl AsyncWrite for AsyncStream {
             Self::Tls(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
             #[cfg(unix)]
             Self::Unix(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
+            #[cfg(feature = "socks5-proxy")]
+            Self::Socks5(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
+            #[cfg(feature = "socks5-proxy")]
+            Self::Socks5Tls(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
         }
     }
 
@@ -225,6 +306,10 @@ impl AsyncWrite for AsyncStream {
             Self::Tls(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
             #[cfg(unix)]
             Self::Unix(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
+            #[cfg(feature = "socks5-proxy")]
+            Self::Socks5(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
+            #[cfg(feature = "socks5-proxy")]
+            Self::Socks5Tls(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
         }
     }
 
@@ -235,6 +320,10 @@ impl AsyncWrite for AsyncStream {
             Self::Tls(ref inner) => inner.is_write_vectored(),
             #[cfg(unix)]
             Self::Unix(ref inner) => inner.is_write_vectored(),
+            #[cfg(feature = "socks5-proxy")]
+            Self::Socks5(ref inner) => inner.is_write_vectored(),
+            #[cfg(feature = "socks5-proxy")]
+            Self::Socks5Tls(ref inner) => inner.is_write_vectored(),
         }
     }
 }
