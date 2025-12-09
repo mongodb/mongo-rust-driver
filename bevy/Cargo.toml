@@ -1,0 +1,23 @@
+[package]
+name = "bevy-mongodb-asset"
+version = "0.1.0"
+authors = ["Abraham Egnor <abraham.egnor@mongodb.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/mongodb/mongo-rust-driver"
+edition = "2024"
+
+[workspace]
+
+[dependencies.bevy]
+version = "0.17.3"
+default-features = false
+features = ["bevy_asset"]
+
+[dependencies.mongodb]
+version = "3.4.1"
+path = "../driver"
+default-features = false
+features = ["compat-3-3-0", "bson-3", "rustls-tls"]
+
+[dev-dependencies]
+tokio = "1.48.0"
