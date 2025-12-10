@@ -417,7 +417,7 @@ buildvariants:
 
   - name: socks5-proxy-no-tls
     display_name: "SOCKS5 Proxy (No TLS)"
-    # patchable: false
+    patchable: false
     run_on:
       - rhel87-small
     tasks:
@@ -425,7 +425,7 @@ buildvariants:
 
   - name: socks5-proxy-tls
     display_name: "SOCKS5 Proxy (TLS)"
-    # patchable: false
+    patchable: false
     run_on:
       - rhel87-small
     expansions:
@@ -435,7 +435,7 @@ buildvariants:
 
   - name: socks5-proxy-openssl
     display_name: "SOCKS5 Proxy (OpenSSL)"
-    # patchable: false
+    patchable: false
     run_on:
       - rhel87-small
     expansions:
