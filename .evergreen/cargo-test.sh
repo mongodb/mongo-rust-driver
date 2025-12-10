@@ -2,25 +2,26 @@
 
 CARGO_OPTIONS=()
 TEST_OPTIONS=()
-FEATURE_FLAGS=()
 CARGO_RESULT=0
 
-join_by() {
-  local IFS="$1"
-  shift
-  echo "$*"
-}
+. .evergreen/features.sh
+
+if [[ -f nextest-archive.tar.zst ]]; then
+  WORKSPACE_ROOT="$(pwd)"
+  if [[ "Windows_NT" = "$OS" ]]; then
+    WORKSPACE_ROOT="$(cygpath -w ${WORKSPACE_ROOT})"
+  fi
+  CARGO_OPTIONS+=("--archive-file" "nextest-archive.tar.zst" "--workspace-remap" "${WORKSPACE_ROOT}")
+fi
+
 
 cargo_test_options() {
-  local FILTERED=()
-  for FEAT in "${FEATURE_FLAGS[@]}"; do
-    [[ "${FEAT}" != "" ]] && FILTERED+=("${FEAT}")
-  done
-  local FEATURE_OPTION=""
-  if ((${#FILTERED[@]} != 0)); then
-    FEATURE_OPTION="--features $(join_by , "${FILTERED[@]}")"
+  FEATURES="$(features_option)"
+  if [[ -f nextest-archive.tar.zst ]]; then
+    # Feature flags are set when the archive is built
+    FEATURES=""
   fi
-  echo $1 ${CARGO_OPTIONS[@]} ${FEATURE_OPTION} -- ${TEST_OPTIONS[@]}
+  echo $1 ${CARGO_OPTIONS[@]} "${FEATURES}" -- ${TEST_OPTIONS[@]}
 }
 
 cargo_test() {

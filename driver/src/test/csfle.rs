@@ -301,7 +301,7 @@ async fn validate_roundtrip(
 
 fn load_testdata_raw(name: &str) -> Result<String> {
     let path: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
+        &std::env::var("CARGO_MANIFEST_DIR").unwrap(),
         "../spec/testdata/client-side-encryption",
         name,
     ]

@@ -19,8 +19,13 @@ tasks:"
                 "
   - name: test-{version}-{top_name}
     tags: [{version}, {top_name}]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
     commands:
+      - func: \"fetch nextest archive\"
       - func: \"bootstrap mongo-orchestration\"
+        type: setup
         vars:
           MONGODB_VERSION: {version}
           TOPOLOGY: {topology}
