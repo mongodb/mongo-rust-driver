@@ -19,5 +19,7 @@ path = "../driver"
 default-features = false
 features = ["compat-3-3-0", "bson-3", "rustls-tls"]
 
-[dev-dependencies]
-tokio = "1.48.0"
+[dependencies.tokio]
+version = "1.48.0"
+default-features = false
+features = ["sync"]
