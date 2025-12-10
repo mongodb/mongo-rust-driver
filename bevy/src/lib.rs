@@ -1,12 +1,10 @@
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{path::Path, sync::Arc};
 
 use bevy::asset::{
     AssetApp as _,
     io::{AssetReaderError, PathStream, Reader, VecReader},
 };
+use mongodb::bson::doc;
 use tokio::sync::{mpsc, oneshot};
 
 pub struct MongodbAssetPlugin(mpsc::Sender<AssetMessage>);
@@ -18,7 +16,10 @@ impl MongodbAssetPlugin {
         tokio::spawn(async move {
             let mut rx = rx;
             while let Some(message) = rx.recv().await {
-                tokio::spawn(message.process(client.clone()));
+                let client = client.clone();
+                tokio::spawn(async move {
+                    let _ = message.response.send(message.request.process(client).await);
+                });
             }
         });
         Self(tx)
@@ -26,10 +27,95 @@ impl MongodbAssetPlugin {
 }
 
 enum AssetRequest {
-    Read { path: PathBuf, is_meta: bool },
+    Read { path: AssetPath, is_meta: bool },
 }
 
-type AssetResponse = mongodb::error::Result<Vec<u8>>;
+impl AssetRequest {
+    async fn process(self, client: mongodb::Client) -> AssetResponse {
+        match self {
+            AssetRequest::Read { path, is_meta } => {
+                let coll = client
+                    .database(&path.namespace.db)
+                    .collection::<mongodb::bson::RawDocumentBuf>(&path.namespace.coll);
+
+                let not_found = |text: &str| -> AssetResponse {
+                    Err(Arc::new(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("{} (meta = {}): {}", path, is_meta, text),
+                    )))
+                };
+
+                let query = doc! { "name": { "$eq": &path.name }, "meta": { "$eq": is_meta } };
+                let Some(doc) = coll.find_one(query).await.map_err(mdb_io_error)? else {
+                    return not_found("no document found");
+                };
+                let Some(data) = doc.get("data").map_err(std::io::Error::other)? else {
+                    return not_found("no document 'data' field");
+                };
+                let Some(bin) = data.as_binary() else {
+                    return Err(Arc::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!(
+                            "{} (meta = {}): invalid 'data' field, expected binary, got {:?}",
+                            path,
+                            is_meta,
+                            data.element_type()
+                        ),
+                    )));
+                };
+                return Ok(bin.bytes.to_owned());
+            }
+        }
+    }
+}
+
+fn mdb_io_error(err: mongodb::error::Error) -> Arc<std::io::Error> {
+    match *err.kind {
+        mongodb::error::ErrorKind::Io(inner) => inner,
+        _ => Arc::new(std::io::Error::other(err)),
+    }
+}
+
+struct AssetPath {
+    namespace: mongodb::Namespace,
+    name: String,
+}
+
+impl AssetPath {
+    fn parse(path: &Path) -> std::io::Result<Self> {
+        let Some(parts) = path.iter().map(|p| p.to_str()).collect::<Option<Vec<_>>>() else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidFilename,
+                "non-utf8 path",
+            ));
+        };
+        return match parts.as_slice() {
+            ["document", db, coll, name] => Ok(Self {
+                namespace: mongodb::Namespace::new(*db, *coll),
+                name: name.to_string(),
+            }),
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidFilename,
+                format!(
+                    "expected \"document/<database>/<collection>/<asset>\", got {:?}",
+                    path
+                ),
+            )),
+        };
+    }
+}
+
+impl std::fmt::Display for AssetPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "document/{}/{}/{}",
+            self.namespace.db, self.namespace.coll, self.name
+        )
+    }
+}
+
+type AssetResponse = std::result::Result<Vec<u8>, Arc<std::io::Error>>;
 
 struct AssetMessage {
     request: AssetRequest,
@@ -41,8 +127,6 @@ impl AssetMessage {
         let (response, receiver) = oneshot::channel();
         (Self { request, response }, receiver)
     }
-
-    async fn process(self, client: mongodb::Client) {}
 }
 
 impl bevy::app::Plugin for MongodbAssetPlugin {
@@ -61,8 +145,11 @@ struct MongodbAssetReader(mpsc::Sender<AssetMessage>);
 impl MongodbAssetReader {
     async fn send_request(&self, request: AssetRequest) -> Result<VecReader, AssetReaderError> {
         let (message, response) = AssetMessage::new(request);
-        self.0.send(message).await.map_err(io_error)?;
-        let bytes = response.await.map_err(io_error)?.map_err(io_error)?;
+        self.0.send(message).await.map_err(std::io::Error::other)?;
+        let bytes = response
+            .await
+            .map_err(std::io::Error::other)?
+            .map_err(AssetReaderError::Io)?;
         Ok(VecReader::new(bytes))
     }
 }
@@ -70,7 +157,7 @@ impl MongodbAssetReader {
 impl bevy::asset::io::AssetReader for MongodbAssetReader {
     async fn read<'a>(&'a self, path: &'a Path) -> Result<impl Reader + 'a, AssetReaderError> {
         self.send_request(AssetRequest::Read {
-            path: path.to_owned(),
+            path: AssetPath::parse(path)?,
             is_meta: false,
         })
         .await
@@ -78,7 +165,7 @@ impl bevy::asset::io::AssetReader for MongodbAssetReader {
 
     async fn read_meta<'a>(&'a self, path: &'a Path) -> Result<impl Reader + 'a, AssetReaderError> {
         self.send_request(AssetRequest::Read {
-            path: path.to_owned(),
+            path: AssetPath::parse(path)?,
             is_meta: true,
         })
         .await
@@ -94,11 +181,4 @@ impl bevy::asset::io::AssetReader for MongodbAssetReader {
     ) -> Result<Box<PathStream>, AssetReaderError> {
         Err(AssetReaderError::NotFound(path.to_owned()))
     }
-}
-
-fn io_error<E>(err: E) -> AssetReaderError
-where
-    E: Into<Box<dyn std::error::Error + Send + Sync>>,
-{
-    AssetReaderError::Io(Arc::new(std::io::Error::other(err)))
 }
