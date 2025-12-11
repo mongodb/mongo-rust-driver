@@ -182,3 +182,22 @@ impl bevy::asset::io::AssetReader for MongodbAssetReader {
         Err(AssetReaderError::NotFound(path.to_owned()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::MongodbAssetPlugin;
+
+    #[test]
+    fn use_plugin() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let plugin = rt.block_on(async {
+            let client = mongodb::Client::with_uri_str("mongodb://localhost:27017")
+                .await
+                .unwrap();
+
+            MongodbAssetPlugin::new(&client).await
+        });
+
+        bevy::app::App::new().add_plugins(plugin).run();
+    }
+}

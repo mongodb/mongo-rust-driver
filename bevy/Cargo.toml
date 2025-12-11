@@ -23,3 +23,8 @@ features = ["compat-3-3-0", "bson-3", "rustls-tls"]
 version = "1.48.0"
 default-features = false
 features = ["sync"]
+
+[dev-dependencies.tokio]
+version = "*"
+default-features = false
+features = ["rt-multi-thread"]
