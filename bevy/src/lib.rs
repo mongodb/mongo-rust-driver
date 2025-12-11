@@ -203,11 +203,7 @@ mod tests {
 
     #[test]
     fn load_image() {
-        static PNM_IMAGE_DATA: &[u8] = &[
-            0x50, 0x34, // ASCII "P4", magic number format identifier
-            0x01, 0x01, // dimensions: 1x1
-            0x00, // pixel value (white)
-        ];
+        static PNM_IMAGE_DATA: &[u8] = b"P1\n1 1\n0";
 
         static MAX_FRAMES: u32 = 60 * 60 * 5;
 
@@ -249,12 +245,12 @@ mod tests {
                 "meta": false,
             };
 
-            client
+            let coll = client
                 .database("bevy_test")
-                .collection::<mongodb::bson::RawDocumentBuf>("images")
-                .insert_one(doc)
-                .await
-                .unwrap();
+                .collection::<mongodb::bson::RawDocumentBuf>("images");
+            coll.drop().await.unwrap();
+
+            coll.insert_one(doc).await.unwrap();
 
             MongodbAssetPlugin::new(&client).await
         });
