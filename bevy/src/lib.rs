@@ -21,7 +21,7 @@ impl MongodbAssetPlugin {
             while let Some(message) = rx.recv().await {
                 let client = client.clone();
                 tokio::spawn(async move {
-                    let _ = message.response.send(message.request.process(client).await);
+                    let _ = dbg!(message.response.send(message.request.process(client).await));
                 });
             }
         });
@@ -40,12 +40,14 @@ impl bevy::app::Plugin for MongodbAssetPlugin {
     }
 }
 
+#[derive(Debug)]
 enum AssetRequest {
     Read { path: PathBuf, is_meta: bool },
 }
 
 impl AssetRequest {
     async fn process(self, client: mongodb::Client) -> AssetResponse {
+        dbg!(&self);
         match self {
             AssetRequest::Read { path, is_meta } => {
                 let asset_path =
@@ -57,7 +59,7 @@ impl AssetRequest {
 
                 let query =
                     doc! { "name": { "$eq": &asset_path.name }, "meta": { "$eq": is_meta } };
-                let Some(doc) = coll.find_one(query).await.map_err(mdb_io_error)? else {
+                let Some(doc) = dbg!(coll.find_one(query).await).map_err(mdb_io_error)? else {
                     return Err(AssetReaderError::NotFound(path));
                 };
                 let bin = doc.get_binary("data").map_err(std::io::Error::other)?;
@@ -132,8 +134,8 @@ struct MongodbAssetReader(mpsc::Sender<AssetMessage>);
 impl MongodbAssetReader {
     async fn send_request(&self, request: AssetRequest) -> Result<VecReader, AssetReaderError> {
         let (message, response) = AssetMessage::new(request);
-        self.0.send(message).await.map_err(std::io::Error::other)?;
-        let bytes = response.await.map_err(std::io::Error::other)??;
+        dbg!(self.0.send(message).await).map_err(std::io::Error::other)?;
+        let bytes = dbg!(response.await).map_err(std::io::Error::other)??;
         Ok(VecReader::new(bytes))
     }
 }
@@ -169,11 +171,11 @@ impl bevy::asset::io::AssetReader for MongodbAssetReader {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZero;
+    use std::{num::NonZero, time::Duration};
 
     use crate::MongodbAssetPlugin;
     use bevy::{
-        app::AppExit,
+        app::{AppExit, PluginGroup, ScheduleRunnerPlugin},
         asset::{AssetServer, Handle, LoadState},
         diagnostic::FrameCount,
         ecs::{
@@ -207,7 +209,7 @@ mod tests {
             0x00, // pixel value (white)
         ];
 
-        static MAX_FRAMES: u32 = 10;
+        static MAX_FRAMES: u32 = 60 * 60 * 5;
 
         #[derive(Debug)]
         #[repr(u8)]
@@ -228,12 +230,18 @@ mod tests {
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         let plugin = rt.block_on(async {
-            let client = mongodb::Client::with_uri_str("mongodb://localhost:27017")
+            let options = mongodb::options::ClientOptions::parse("mongodb://localhost:27017")
                 .await
                 .unwrap();
+            /*
+            options.command_event_handler = Some(EventHandler::callback(|cev| {
+                dbg!(cev);
+            }));
+            */
+            let client = mongodb::Client::with_options(options).unwrap();
 
             let doc = rawdoc! {
-                "name": "pixel.pnm",
+                "name": "pixel.pbm",
                 "data": mongodb::bson::Binary {
                     subtype: mongodb::bson::spec::BinarySubtype::Generic,
                     bytes: PNM_IMAGE_DATA.to_owned(),
@@ -256,7 +264,7 @@ mod tests {
 
         fn load_image(mut commands: Commands, asset_server: Res<AssetServer>) {
             let handle =
-                asset_server.load::<Image>("mongodb://document/bevy_test/images/pixel.pnm");
+                asset_server.load::<Image>("mongodb://document/bevy_test/images/pixel.pbm");
             commands.insert_resource(TestImage(handle));
         }
 
@@ -271,11 +279,9 @@ mod tests {
                     exit_writer.write(Failure::NotLoaded.into());
                 }
                 LoadState::Loading => {
-                    /*
                     if frames.0 > MAX_FRAMES {
                         exit_writer.write(Failure::TimedOut.into());
                     }
-                    */
                 }
                 LoadState::Loaded => {
                     dbg!(frames.0);
@@ -290,8 +296,11 @@ mod tests {
 
         let status = bevy::app::App::new()
             .add_plugins(plugin)
-            .add_plugins(bevy::MinimalPlugins)
+            .add_plugins(bevy::MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(
+                Duration::from_secs_f64(1.0 / 60.0), // run 60 updates per second
+            )))
             .add_plugins(bevy::asset::AssetPlugin::default())
+            .add_plugins(bevy::render::texture::TexturePlugin)
             .add_plugins(bevy::image::ImagePlugin::default())
             .add_systems(bevy::app::Startup, load_image)
             .add_systems(bevy::app::Update, wait_for_image)

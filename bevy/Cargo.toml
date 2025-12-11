@@ -32,4 +32,4 @@ features = ["rt-multi-thread"]
 [dev-dependencies.bevy]
 version = "*"
 default-features = false
-features = ["debug", "pnm"]
+features = ["debug", "bevy_render", "pnm"]
