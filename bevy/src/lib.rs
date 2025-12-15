@@ -1,20 +1,22 @@
+use bevy::asset::AssetApp;
+
 mod reader;
 
 pub struct MongodbAssetPlugin {
-    rf: reader::Factory,
+    read_worker: reader::Worker,
 }
 
 impl MongodbAssetPlugin {
     pub async fn new(client: &mongodb::Client) -> Self {
         Self {
-            rf: reader::Factory::new(client).await,
+            read_worker: reader::Worker::new(client).await,
         }
     }
 }
 
 impl bevy::app::Plugin for MongodbAssetPlugin {
     fn build(&self, app: &mut bevy::app::App) {
-        self.rf.register(app);
+        app.register_asset_source("mongodb", self.read_worker.asset_source());
     }
 }
 
@@ -78,11 +80,6 @@ mod tests {
             let options = mongodb::options::ClientOptions::parse("mongodb://localhost:27017")
                 .await
                 .unwrap();
-            /*
-            options.command_event_handler = Some(EventHandler::callback(|cev| {
-                dbg!(cev);
-            }));
-            */
             let client = mongodb::Client::with_options(options).unwrap();
 
             let doc = rawdoc! {

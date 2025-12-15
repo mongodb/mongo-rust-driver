@@ -227,6 +227,7 @@ name = "bevy-mongodb-asset"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "futures-util",
  "mongodb",
  "tokio",
 ]

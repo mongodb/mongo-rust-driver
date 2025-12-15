@@ -24,6 +24,11 @@ version = "1.48.0"
 default-features = false
 features = ["sync"]
 
+[dependencies.futures-util]
+version = "0.3.31"
+default-features = false
+features = ["io"]
+
 [dev-dependencies.tokio]
 version = "*"
 default-features = false
