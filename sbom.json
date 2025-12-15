@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:09b1f703-1602-4c45-b804-7151826b5563",
+  "serialNumber": "urn:uuid:a44101d6-88a2-4203-89b7-ccf6c1edbc05",
   "metadata": {
-    "timestamp": "2025-12-09T17:18:08.837047997Z",
+    "timestamp": "2025-12-15T11:28:29.260334410Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -1866,16 +1866,16 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#icu_properties@2.1.1",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#icu_properties@2.1.2",
       "author": "The ICU4X Project Developers",
       "name": "icu_properties",
-      "version": "2.1.1",
+      "version": "2.1.2",
       "description": "Definitions for Unicode properties",
       "scope": "required",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "e93fcd3157766c0c8da2f8cff6ce651a31f0810eaa1c51ec363ef790bbb5fb99"
+          "content": "020bfc02fe870ec3a66d93e677ccca0562506e5872c650f893269e08615d74ec"
         }
       ],
       "licenses": [
@@ -1883,7 +1883,7 @@
           "expression": "Unicode-3.0"
         }
       ],
-      "purl": "pkg:cargo/icu_properties@2.1.1",
+      "purl": "pkg:cargo/icu_properties@2.1.2",
       "externalReferences": [
         {
           "type": "website",
@@ -1897,16 +1897,16 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#icu_properties_data@2.1.1",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#icu_properties_data@2.1.2",
       "author": "The ICU4X Project Developers",
       "name": "icu_properties_data",
-      "version": "2.1.1",
+      "version": "2.1.2",
       "description": "Data for the icu_properties crate",
       "scope": "required",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "02845b3647bb045f1100ecd6480ff52f34c35f82d9880e029d329c21d1054899"
+          "content": "616c294cf8d725c6afcd8f55abc17c56464ef6211f9ed59cccffe534129c77af"
         }
       ],
       "licenses": [
@@ -1914,7 +1914,7 @@
           "expression": "Unicode-3.0"
         }
       ],
-      "purl": "pkg:cargo/icu_properties_data@2.1.1",
+      "purl": "pkg:cargo/icu_properties_data@2.1.2",
       "externalReferences": [
         {
           "type": "website",
@@ -5842,7 +5842,7 @@
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#icu_collections@2.1.1",
         "registry+https://github.com/rust-lang/crates.io-index#icu_normalizer_data@2.1.1",
-        "registry+https://github.com/rust-lang/crates.io-index#icu_properties@2.1.1",
+        "registry+https://github.com/rust-lang/crates.io-index#icu_properties@2.1.2",
         "registry+https://github.com/rust-lang/crates.io-index#icu_provider@2.1.1",
         "registry+https://github.com/rust-lang/crates.io-index#smallvec@1.15.0",
         "registry+https://github.com/rust-lang/crates.io-index#zerovec@0.11.5"
@@ -5853,18 +5853,18 @@
       "dependsOn": []
     },
     {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#icu_properties@2.1.1",
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#icu_properties@2.1.2",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#icu_collections@2.1.1",
         "registry+https://github.com/rust-lang/crates.io-index#icu_locale_core@2.1.1",
-        "registry+https://github.com/rust-lang/crates.io-index#icu_properties_data@2.1.1",
+        "registry+https://github.com/rust-lang/crates.io-index#icu_properties_data@2.1.2",
         "registry+https://github.com/rust-lang/crates.io-index#icu_provider@2.1.1",
         "registry+https://github.com/rust-lang/crates.io-index#zerotrie@0.2.3",
         "registry+https://github.com/rust-lang/crates.io-index#zerovec@0.11.5"
       ]
     },
     {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#icu_properties_data@2.1.1",
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#icu_properties_data@2.1.2",
       "dependsOn": []
     },
     {
@@ -5895,7 +5895,7 @@
       "ref": "registry+https://github.com/rust-lang/crates.io-index#idna_adapter@1.2.1",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#icu_normalizer@2.1.1",
-        "registry+https://github.com/rust-lang/crates.io-index#icu_properties@2.1.1"
+        "registry+https://github.com/rust-lang/crates.io-index#icu_properties@2.1.2"
       ]
     },
     {
