@@ -110,7 +110,7 @@ pkcs8 = { version = "0.10.2", features = ["encryption", "pkcs5"], optional = tru
 rand = { version = "0.9", features = ["small_rng"] }
 rayon = { version = "1.5.3", optional = true }
 rustc_version_runtime = "0.3.0"
-serde_with = { version = "3.8.1", default-features = false, features = ["macros"] }
+serde_with = { version = "3.8.1", default-features = false, features = ["macros", "indexmap_2"] }
 sha1 = "0.10.0"
 sha2 = "0.10.2"
 snap = { version = "1.0.5", optional = true }
