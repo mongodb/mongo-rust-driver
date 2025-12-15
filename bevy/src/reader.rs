@@ -49,7 +49,7 @@ impl MongodbAssetReader {
 
 impl bevy::asset::io::AssetReader for MongodbAssetReader {
     async fn read<'a>(&'a self, path: &'a Path) -> Result<impl Reader + 'a, AssetReaderError> {
-        self.send_request(AssetRequest::Read {
+        self.send_request(AssetRequest {
             path: path.to_owned(),
             is_meta: false,
         })
@@ -57,7 +57,7 @@ impl bevy::asset::io::AssetReader for MongodbAssetReader {
     }
 
     async fn read_meta<'a>(&'a self, path: &'a Path) -> Result<impl Reader + 'a, AssetReaderError> {
-        self.send_request(AssetRequest::Read {
+        self.send_request(AssetRequest {
             path: path.to_owned(),
             is_meta: true,
         })
@@ -77,68 +77,86 @@ impl bevy::asset::io::AssetReader for MongodbAssetReader {
 }
 
 #[derive(Debug)]
-enum AssetRequest {
-    Read { path: PathBuf, is_meta: bool },
+struct AssetRequest {
+    path: PathBuf,
+    is_meta: bool,
 }
 
 impl AssetRequest {
     async fn process(self, client: mongodb::Client) -> AssetResponse {
-        match self {
-            AssetRequest::Read { path, is_meta } => {
-                let asset_path =
-                    AssetPath::parse(&path).map_err(|e| AssetReaderError::Io(Arc::new(e)))?;
-
-                match asset_path {
-                    AssetPath::Document { namespace, name } => {
-                        let coll = client
-                            .database(&namespace.db)
-                            .collection::<mongodb::bson::RawDocumentBuf>(&namespace.coll);
-
-                        let query = doc! { "name": { "$eq": &name }, "meta": { "$eq": is_meta } };
-                        let Some(doc) = coll.find_one(query).await.map_err(mdb_io_error)? else {
-                            return Err(AssetReaderError::NotFound(path));
-                        };
-
-                        let bin = doc.get_binary("data").map_err(std::io::Error::other)?;
-                        Ok(bin.bytes.to_owned())
-                    }
-                    AssetPath::GridFs { db, bucket, name } => {
-                        use futures_util::io::AsyncReadExt;
-
-                        let bucket = client.database(&db).gridfs_bucket(
-                            GridFsBucketOptions::builder().bucket_name(bucket).build(),
-                        );
-                        let name = if is_meta {
-                            format!("{name}.meta")
-                        } else {
-                            name
-                        };
-
-                        let mut stream =
-                            bucket
-                                .open_download_stream_by_name(name)
-                                .await
-                                .map_err(|e| {
-                                    if matches!(
-                                        &*e.kind,
-                                        MdbErrorKind::GridFs(
-                                            GridFsErrorKind::FileNotFound { .. }
-                                                | GridFsErrorKind::RevisionNotFound { .. },
-                                        )
-                                    ) {
-                                        AssetReaderError::NotFound(path)
-                                    } else {
-                                        mdb_io_error(e)
-                                    }
-                                })?;
-                        let mut bytes = Vec::new();
-                        stream.read_to_end(&mut bytes).await?;
-
-                        Ok(bytes)
-                    }
-                }
+        let asset_path =
+            AssetPath::parse(&self.path).map_err(|e| AssetReaderError::Io(Arc::new(e)))?;
+        match asset_path {
+            AssetPath::Document { namespace, name } => {
+                self.process_document(client, namespace, name).await
+            }
+            AssetPath::GridFs { db, bucket, name } => {
+                self.process_gridfs(client, db, bucket, name).await
             }
         }
+    }
+
+    async fn process_document(
+        self,
+        client: mongodb::Client,
+        namespace: mongodb::Namespace,
+        name: String,
+    ) -> AssetResponse {
+        let Self { path, is_meta } = self;
+
+        let coll = client
+            .database(&namespace.db)
+            .collection::<mongodb::bson::RawDocumentBuf>(&namespace.coll);
+
+        let query = doc! { "name": { "$eq": &name }, "meta": { "$eq": is_meta } };
+        let Some(doc) = coll.find_one(query).await.map_err(mdb_io_error)? else {
+            return Err(AssetReaderError::NotFound(path));
+        };
+
+        let bin = doc.get_binary("data").map_err(std::io::Error::other)?;
+        Ok(bin.bytes.to_owned())
+    }
+
+    async fn process_gridfs(
+        self,
+        client: mongodb::Client,
+        db: String,
+        bucket: String,
+        name: String,
+    ) -> AssetResponse {
+        use futures_util::io::AsyncReadExt;
+
+        let Self { path, is_meta } = self;
+
+        let bucket = client
+            .database(&db)
+            .gridfs_bucket(GridFsBucketOptions::builder().bucket_name(bucket).build());
+        let name = if is_meta {
+            format!("{name}.meta")
+        } else {
+            name
+        };
+
+        let mut stream = bucket
+            .open_download_stream_by_name(name)
+            .await
+            .map_err(|e| {
+                if matches!(
+                    &*e.kind,
+                    MdbErrorKind::GridFs(
+                        GridFsErrorKind::FileNotFound { .. }
+                            | GridFsErrorKind::RevisionNotFound { .. },
+                    )
+                ) {
+                    AssetReaderError::NotFound(path)
+                } else {
+                    mdb_io_error(e)
+                }
+            })?;
+        let mut bytes = Vec::new();
+        stream.read_to_end(&mut bytes).await?;
+
+        Ok(bytes)
     }
 }
 
