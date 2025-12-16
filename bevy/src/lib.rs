@@ -27,7 +27,7 @@ mod tests {
     use crate::MongodbAssetPlugin;
     use bevy::{
         app::{AppExit, PluginGroup, ScheduleRunnerPlugin},
-        asset::{AssetServer, Handle, LoadState},
+        asset::{AssetServer, AsyncWriteExt, Handle, LoadState},
         diagnostic::FrameCount,
         ecs::{
             message::MessageWriter,
@@ -36,7 +36,7 @@ mod tests {
         },
         image::Image,
     };
-    use mongodb::bson::rawdoc;
+    use mongodb::{bson::rawdoc, options::GridFsBucketOptions};
 
     #[test]
     fn use_plugin() {
@@ -52,35 +52,55 @@ mod tests {
         bevy::app::App::new().add_plugins(plugin).run();
     }
 
+    static PNM_IMAGE_DATA: &[u8] = b"P1\n1 1\n0";
+
     #[test]
-    fn load_image() {
-        static PNM_IMAGE_DATA: &[u8] = b"P1\n1 1\n0";
-
-        static MAX_FRAMES: u32 = 60 * 60 * 5;
-
-        #[derive(Debug)]
-        #[repr(u8)]
-        enum Failure {
-            NotLoaded = 1u8,
-            LoadFailed,
-            TimedOut,
-            Max,
-        }
-
-        static FAILURE_MAX: NonZero<u8> = NonZero::new(Failure::Max as u8).unwrap();
-
-        impl Into<AppExit> for Failure {
-            fn into(self) -> AppExit {
-                AppExit::Error(NonZero::new(self as u8).unwrap())
-            }
-        }
-
+    fn load_image_document() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let plugin = rt.block_on(async {
-            let options = mongodb::options::ClientOptions::parse("mongodb://localhost:27017")
+            let client = mongodb::Client::with_uri_str("mongodb://localhost:27017")
                 .await
                 .unwrap();
-            let client = mongodb::Client::with_options(options).unwrap();
+
+            let doc = rawdoc! {
+                "name": "pixel.pbm",
+                "data": mongodb::bson::Binary {
+                    subtype: mongodb::bson::spec::BinarySubtype::Generic,
+                    bytes: PNM_IMAGE_DATA.to_owned(),
+                },
+                "meta": false,
+            };
+
+            let coll = client
+                .database("bevy_test")
+                .collection::<mongodb::bson::RawDocumentBuf>("doc_images");
+            coll.drop().await.unwrap();
+
+            coll.insert_one(doc).await.unwrap();
+
+            MongodbAssetPlugin::new(&client).await
+        });
+
+        load_image(plugin, "mongodb://document/bevy_test/doc_images/pixel.pbm");
+    }
+
+    #[test]
+    fn load_image_gridfs() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let plugin = rt.block_on(async {
+            let client = mongodb::Client::with_uri_str("mongodb://localhost:27017")
+                .await
+                .unwrap();
+
+            let bucket = client.database("bevy_test").gridfs_bucket(
+                GridFsBucketOptions::builder()
+                    .bucket_name("gridfs_images".to_owned())
+                    .build(),
+            );
+            bucket.drop().await.unwrap();
+            let mut upload = bucket.open_upload_stream("pixel.pbm").await.unwrap();
+            upload.write_all(PNM_IMAGE_DATA).await.unwrap();
+            upload.close().await.unwrap();
 
             let doc = rawdoc! {
                 "name": "pixel.pbm",
@@ -101,14 +121,39 @@ mod tests {
             MongodbAssetPlugin::new(&client).await
         });
 
+        load_image(
+            plugin,
+            "mongodb://document/bevy_test/gridfs_images/pixel.pbm",
+        );
+    }
+
+    fn load_image(plugin: MongodbAssetPlugin, path: &'static str) {
+        static MAX_FRAMES: u32 = 60 * 60 * 5;
+
+        #[derive(Debug)]
+        #[repr(u8)]
+        enum Failure {
+            NotLoaded = 1u8,
+            LoadFailed,
+            TimedOut,
+            Max,
+        }
+
+        static FAILURE_MAX: NonZero<u8> = NonZero::new(Failure::Max as u8).unwrap();
+
+        impl Into<AppExit> for Failure {
+            fn into(self) -> AppExit {
+                AppExit::Error(NonZero::new(self as u8).unwrap())
+            }
+        }
+
         #[derive(Resource)]
         struct TestImage(Handle<Image>);
 
-        fn load_image(mut commands: Commands, asset_server: Res<AssetServer>) {
-            let handle =
-                asset_server.load::<Image>("mongodb://document/bevy_test/images/pixel.pbm");
+        let load_image = move |mut commands: Commands, asset_server: Res<AssetServer>| {
+            let handle = asset_server.load::<Image>(path);
             commands.insert_resource(TestImage(handle));
-        }
+        };
 
         fn wait_for_image(
             mut exit_writer: MessageWriter<AppExit>,
@@ -126,11 +171,10 @@ mod tests {
                     }
                 }
                 LoadState::Loaded => {
-                    dbg!(frames.0);
                     exit_writer.write(AppExit::Success);
                 }
                 LoadState::Failed(err) => {
-                    dbg!(err);
+                    eprintln!("{err:?}");
                     exit_writer.write(Failure::LoadFailed.into());
                 }
             }
