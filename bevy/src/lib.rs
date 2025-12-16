@@ -121,10 +121,7 @@ mod tests {
             MongodbAssetPlugin::new(&client).await
         });
 
-        load_image(
-            plugin,
-            "mongodb://document/bevy_test/gridfs_images/pixel.pbm",
-        );
+        load_image(plugin, "mongodb://gridfs/bevy_test/gridfs_images/pixel.pbm");
     }
 
     fn load_image(plugin: MongodbAssetPlugin, path: &'static str) {
