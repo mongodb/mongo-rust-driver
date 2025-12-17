@@ -108,7 +108,12 @@ impl AssetRequest {
             .database(&namespace.db)
             .collection::<mongodb::bson::RawDocumentBuf>(&namespace.coll);
 
-        let query = doc! { "name": { "$eq": &name }, "meta": { "$eq": is_meta } };
+        let meta_query = if is_meta {
+            doc! { "$eq": true }
+        } else {
+            doc! { "$exists": false }
+        };
+        let query = doc! { "name": { "$eq": &name }, "meta": meta_query };
         let Some(doc) = coll.find_one(query).await.map_err(mdb_io_error)? else {
             return Err(AssetReaderError::NotFound(path));
         };

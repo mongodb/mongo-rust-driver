@@ -1,5 +1,5 @@
 [package]
-name = "bevy-mongodb-asset"
+name = "bevy_mongodb_asset"
 version = "0.1.0"
 authors = ["Abraham Egnor <abraham.egnor@mongodb.com>"]
 license = "Apache-2.0"

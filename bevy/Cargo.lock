@@ -223,16 +223,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy-mongodb-asset"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "futures-util",
- "mongodb",
- "tokio",
-]
-
-[[package]]
 name = "bevy_a11y"
 version = "0.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -693,6 +683,16 @@ name = "bevy_mikktspace"
 version = "0.17.0-dev"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ef8e4b7e61dfe7719bb03c884dc270cd46a82efb40f93e9933b990c5c190c59"
+
+[[package]]
+name = "bevy_mongodb_asset"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "futures-util",
+ "mongodb",
+ "tokio",
+]
 
 [[package]]
 name = "bevy_platform"

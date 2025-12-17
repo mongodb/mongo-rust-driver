@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use bevy::asset::AssetApp;
 
 mod reader;
@@ -66,7 +68,6 @@ mod tests {
                     subtype: mongodb::bson::spec::BinarySubtype::Generic,
                     bytes: PNM_IMAGE_DATA.to_owned(),
                 },
-                "meta": false,
             };
 
             let coll = client
@@ -97,22 +98,6 @@ mod tests {
             let mut upload = bucket.open_upload_stream("pixel.pbm").await.unwrap();
             upload.write_all(PNM_IMAGE_DATA).await.unwrap();
             upload.close().await.unwrap();
-
-            let doc = rawdoc! {
-                "name": "pixel.pbm",
-                "data": mongodb::bson::Binary {
-                    subtype: mongodb::bson::spec::BinarySubtype::Generic,
-                    bytes: PNM_IMAGE_DATA.to_owned(),
-                },
-                "meta": false,
-            };
-
-            let coll = client
-                .database("bevy_test")
-                .collection::<mongodb::bson::RawDocumentBuf>("images");
-            coll.drop().await.unwrap();
-
-            coll.insert_one(doc).await.unwrap();
 
             MongodbAssetPlugin::new(&client).await
         });
