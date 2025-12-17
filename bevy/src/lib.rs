@@ -176,6 +176,7 @@ mod tests {
             .run();
 
         let failure = match status {
+            // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
             AppExit::Error(code) if code < FAILURE_MAX => unsafe {
                 std::mem::transmute::<u8, Failure>(code.into())
             },
