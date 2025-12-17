@@ -22,7 +22,7 @@ impl bevy::app::Plugin for MongodbAssetPlugin {
 
 #[cfg(test)]
 mod tests {
-    use std::{num::NonZero, time::Duration};
+    use std::{cell::LazyCell, num::NonZero, time::Duration};
 
     use crate::MongodbAssetPlugin;
     use bevy::{
@@ -38,13 +38,13 @@ mod tests {
     };
     use mongodb::{bson::rawdoc, options::GridFsBucketOptions};
 
+    const MONGODB_URI: LazyCell<String> = LazyCell::new(|| std::env::var("MONGODB_URI").unwrap());
+
     #[test]
     fn use_plugin() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let plugin = rt.block_on(async {
-            let client = mongodb::Client::with_uri_str("mongodb://localhost:27017")
-                .await
-                .unwrap();
+            let client = mongodb::Client::with_uri_str(&*MONGODB_URI).await.unwrap();
 
             MongodbAssetPlugin::new(&client).await
         });
@@ -58,9 +58,7 @@ mod tests {
     fn load_image_document() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let plugin = rt.block_on(async {
-            let client = mongodb::Client::with_uri_str("mongodb://localhost:27017")
-                .await
-                .unwrap();
+            let client = mongodb::Client::with_uri_str(&*MONGODB_URI).await.unwrap();
 
             let doc = rawdoc! {
                 "name": "pixel.pbm",
@@ -88,9 +86,7 @@ mod tests {
     fn load_image_gridfs() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let plugin = rt.block_on(async {
-            let client = mongodb::Client::with_uri_str("mongodb://localhost:27017")
-                .await
-                .unwrap();
+            let client = mongodb::Client::with_uri_str(&*MONGODB_URI).await.unwrap();
 
             let bucket = client.database("bevy_test").gridfs_bucket(
                 GridFsBucketOptions::builder()
