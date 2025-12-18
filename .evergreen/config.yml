@@ -347,7 +347,7 @@ buildvariants:
   - name: in-use-encryption
     display_name: "In-Use Encryption"
     run_on:
-      - rhel80-small
+      - rhel8-latest-small
     expansions:
       LIBMONGOCRYPT_OS: rhel-80-64-bit
       AUTH: auth
@@ -360,7 +360,7 @@ buildvariants:
     display_name: "In-Use Encryption (disable crypt_shared)"
     patchable: false
     run_on:
-      - rhel80-small
+      - rhel8-latest-small
     expansions:
       LIBMONGOCRYPT_OS: rhel-80-64-bit
       AUTH: auth
@@ -373,7 +373,7 @@ buildvariants:
   - name: in-use-encryption-openssl
     display_name: "In-Use Encryption (OpenSSL)"
     run_on:
-      - rhel80-small
+      - rhel8-latest-small
     expansions:
       LIBMONGOCRYPT_OS: rhel-80-64-bit
       AUTH: auth
@@ -419,7 +419,7 @@ buildvariants:
     display_name: "SOCKS5 Proxy (No TLS)"
     patchable: false
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     tasks:
       - test-socks5-proxy
 
@@ -427,7 +427,7 @@ buildvariants:
     display_name: "SOCKS5 Proxy (TLS)"
     patchable: false
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       SSL: ssl
     tasks:
@@ -437,7 +437,7 @@ buildvariants:
     display_name: "SOCKS5 Proxy (OpenSSL)"
     patchable: false
     run_on:
-      - rhel87-small
+      - rhel8-latest-small
     expansions:
       SSL: ssl
       OPENSSL: true
