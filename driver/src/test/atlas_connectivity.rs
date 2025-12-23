@@ -42,17 +42,6 @@ async fn atlas_free_tier_repl_set_srv() {
 }
 
 #[tokio::test]
-async fn atlas_serverless() {
-    run_test("ATLAS_SERVERLESS", None).await;
-}
-
-#[tokio::test]
-async fn atlas_serverless_srv() {
-    run_test("ATLAS_SRV_SERVERLESS", None).await;
-    run_test("ATLAS_SRV_SERVERLESS", Some(ResolverConfig::cloudflare())).await;
-}
-
-#[tokio::test]
 async fn atlas_repl_set() {
     run_test("ATLAS_REPL", None).await;
 }
