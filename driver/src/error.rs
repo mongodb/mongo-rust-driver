@@ -43,6 +43,10 @@ pub const TRANSIENT_TRANSACTION_ERROR: &str = "TransientTransactionError";
 /// error, network error, write-retryable error, MaxTimeMSExpired error, or write concern
 /// failed/timeout during a commitTransaction.
 pub const UNKNOWN_TRANSACTION_COMMIT_RESULT: &str = "UnknownTransactionCommitResult";
+/// isabeltodo
+pub const SYSTEM_OVERLOADED_ERROR: &str = "SystemOverloadedError";
+/// isabeltodo
+pub const RETRYABLE_ERROR: &str = "RetryableError";
 
 /// The result type for all methods that can return an error in the `mongodb` crate.
 pub type Result<T> = std::result::Result<T, Error>;

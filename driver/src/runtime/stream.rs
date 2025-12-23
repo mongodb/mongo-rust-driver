@@ -12,7 +12,7 @@ use tokio::{
 };
 
 use crate::{
-    error::{Error, ErrorKind, Result},
+    error::{Error, ErrorKind, Result, RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
     options::{ServerAddress, Socks5Proxy},
     runtime,
 };
@@ -136,7 +136,15 @@ impl AsyncStream {
 }
 
 async fn tcp_try_connect(address: &SocketAddr) -> Result<TcpStream> {
-    let stream = TcpStream::connect(address).await?;
+    let stream = match TcpStream::connect(address).await {
+        Ok(stream) => stream,
+        Err(io_error) => {
+            let mut error = Error::from(io_error);
+            error.add_label(SYSTEM_OVERLOADED_ERROR);
+            error.add_label(RETRYABLE_ERROR);
+            return Err(error);
+        }
+    };
     stream.set_nodelay(true)?;
 
     #[cfg(not(target_os = "wasi"))]
