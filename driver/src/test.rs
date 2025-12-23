@@ -22,6 +22,7 @@ pub(crate) mod csfle_skip_local; // see modules for requirements
 mod cursor;
 mod db;
 mod documentation_examples;
+mod error;
 #[path = "test/happy_eyeballs.rs"]
 mod happy_eyeballs_skip_ci; // requires happy eyeballs server
 mod index_management;
