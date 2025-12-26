@@ -766,7 +766,7 @@ pub enum ErrorKind {
     Encryption(mongocrypt::error::Error),
 
     /// A custom value produced by user code.
-    #[error("Custom user error")]
+    #[error("Custom user error{string}", string = display_custom(.0))]
     Custom(Arc<dyn Any + Send + Sync>),
 
     /// A method was called on a client that was shut down.
@@ -778,6 +778,14 @@ pub enum ErrorKind {
     #[non_exhaustive]
     #[cfg(feature = "socks5-proxy")]
     ProxyConnect { message: String },
+}
+
+fn display_custom(custom: &Arc<dyn Any + Send + Sync>) -> String {
+    if let Some(string) = custom.downcast_ref::<String>() {
+        format!(": {string}")
+    } else {
+        String::new()
+    }
 }
 
 impl ErrorKind {
