@@ -17,7 +17,6 @@ use std::{
     time::Duration,
 };
 
-use crate::bson::UuidRepresentation;
 use derive_where::derive_where;
 use macro_magic::export_tokens;
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize, Serializer};
@@ -35,7 +34,7 @@ use crate::options::Compressor;
 #[cfg(test)]
 use crate::srv::LookupHosts;
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, Bson, Document, Timestamp, UuidRepresentation},
     client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{Error, ErrorKind, Result},
@@ -3223,6 +3222,10 @@ pub struct SessionOptions {
     /// If true, all read operations performed using this client session will share the same
     /// snapshot.  Defaults to false.
     pub snapshot: Option<bool>,
+
+    /// The snapshot time to use for a snapshot session. This option can only be set if `snapshot`
+    /// is set to true.
+    pub snapshot_time: Option<Timestamp>,
 }
 
 impl SessionOptions {
@@ -3230,11 +3233,15 @@ impl SessionOptions {
         if let (Some(causal_consistency), Some(snapshot)) = (self.causal_consistency, self.snapshot)
         {
             if causal_consistency && snapshot {
-                return Err(ErrorKind::InvalidArgument {
-                    message: "snapshot and causal consistency are mutually exclusive".to_string(),
-                }
-                .into());
+                return Err(Error::invalid_argument(
+                    "snapshot and causal consistency are mutually exclusive",
+                ));
             }
+        }
+        if self.snapshot_time.is_some() && self.snapshot != Some(true) {
+            return Err(Error::invalid_argument(
+                "cannot set snapshot_time without setting snapshot to true",
+            ));
         }
         Ok(())
     }
