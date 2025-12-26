@@ -232,7 +232,7 @@ async fn search_index_update() {
     let dynamic = found["latestDefinition"]["mappings"]["dynamic"]
         .as_bool()
         .unwrap();
-    assert!(!dynamic);
+    assert!(dynamic);
 }
 
 /// Search Index Case 5: dropSearchIndex suppresses namespace not found errors
