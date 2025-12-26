@@ -16,7 +16,7 @@ set +o errexit
 mkdir -p .secrets
 chmod 700 .secrets
 echo "${ATLAS_X509_DEV_CERT_BASE64}" | base64 --decode > .secrets/clientcert.pem
-ATLAS_X509_DEV_WITH_CERT="${ATLAS_X509_DEV}&tlsCertificateKeyFile=.secrets/clientcert.pem"
+ATLAS_X509_DEV_WITH_CERT="${ATLAS_X509_DEV}&tlsCertificateKeyFile=../.secrets/clientcert.pem"
 export ATLAS_X509_DEV_WITH_CERT
 
 cargo_test test::atlas_connectivity
