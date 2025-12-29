@@ -17,7 +17,7 @@ use mongodb::{
     options::GridFsBucketOptions,
 };
 
-const MONGODB_URI: LazyCell<String> = LazyCell::new(|| std::env::var("MONGODB_URI").unwrap());
+const MONGODB_URI: LazyCell<String> = LazyCell::new(|| std::env::var("MONGODB_URI").expect("MONGODB_URI environment variable"));
 
 #[test]
 fn use_plugin() {
