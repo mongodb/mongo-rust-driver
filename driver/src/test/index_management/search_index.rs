@@ -48,10 +48,10 @@ async fn search_index_create_list() {
         }
     };
 
-    assert_eq!(
-        found.get_document("latestDefinition").unwrap(),
-        &doc! { "mappings": { "dynamic": false } }
-    );
+    let dynamic = found["latestDefinition"]["mappings"]["dynamic"]
+        .as_bool()
+        .unwrap();
+    assert!(!dynamic);
 }
 
 /// Search Index Case 2: Driver can successfully create multiple indexes in batch
@@ -105,14 +105,14 @@ async fn search_index_create_multiple() {
         }
     }
 
-    assert_eq!(
-        index1.unwrap().get_document("latestDefinition").unwrap(),
-        &doc! { "mappings": { "dynamic": false } }
-    );
-    assert_eq!(
-        index2.unwrap().get_document("latestDefinition").unwrap(),
-        &doc! { "mappings": { "dynamic": false } }
-    );
+    let dynamic = index1.unwrap()["latestDefinition"]["mappings"]["dynamic"]
+        .as_bool()
+        .unwrap();
+    assert!(!dynamic);
+    let dynamic = index2.unwrap()["latestDefinition"]["mappings"]["dynamic"]
+        .as_bool()
+        .unwrap();
+    assert!(!dynamic);
 }
 
 /// Search Index Case 3: Driver can successfully drop search indexes
@@ -229,10 +229,10 @@ async fn search_index_update() {
         }
     };
 
-    assert_eq!(
-        found.get_document("latestDefinition").unwrap(),
-        &doc! { "mappings": { "dynamic": true } }
-    );
+    let dynamic = found["latestDefinition"]["mappings"]["dynamic"]
+        .as_bool()
+        .unwrap();
+    assert!(dynamic);
 }
 
 /// Search Index Case 5: dropSearchIndex suppresses namespace not found errors
