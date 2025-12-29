@@ -34,7 +34,7 @@ BSON document assets use the path structure `mongodb://document/<database>/<coll
 ```
 Bevy metadata is loaded from an object (if found) with the same shape and an additional `meta: true` entry.
 
-GridFS assets use the path structure `mongodb://gridfs/<database>/<bucket>/<name>`.  Bevy metadata is loaded from a GridFS file (if found) of the same name with an additional `.meta` extension.
+GridFS assets use the path structure `mongodb://gridfs/<database>/<bucket>/<name>`.  Bevy metadata is loaded from the GridFS file metadata document field `bevyAsset` (if found).
 
 ## Bevy Compatibility
 

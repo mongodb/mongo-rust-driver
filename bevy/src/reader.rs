@@ -136,28 +136,49 @@ impl AssetRequest {
         let bucket = client
             .database(&db)
             .gridfs_bucket(GridFsBucketOptions::builder().bucket_name(bucket).build());
-        let name = if is_meta {
-            format!("{name}.meta")
-        } else {
-            name
+
+        let map_not_found = |e: mongodb::error::Error| {
+            if matches!(
+                &*e.kind,
+                MdbErrorKind::GridFs(
+                    GridFsErrorKind::FileNotFound { .. } | GridFsErrorKind::RevisionNotFound { .. },
+                )
+            ) {
+                AssetReaderError::NotFound(path.clone())
+            } else {
+                mdb_io_error(e)
+            }
         };
+
+        if is_meta {
+            let coll_doc = bucket
+                .find_one(doc! { "filename": name })
+                .await
+                .map_err(map_not_found)?
+                .ok_or_else(|| AssetReaderError::NotFound(path.clone()))?;
+            let gridfs_meta = coll_doc
+                .metadata
+                .ok_or_else(|| AssetReaderError::NotFound(path.clone()))?;
+            let bevy_meta = gridfs_meta
+                .get("bevyAsset")
+                .ok_or_else(|| AssetReaderError::NotFound(path.clone()))?;
+            return match bevy_meta {
+                mongodb::bson::Bson::Binary(binary) => Ok(binary.bytes.to_owned()),
+                _ => Err(AssetReaderError::Io(Arc::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "{:?}: expected Binary, got {:?}",
+                        path,
+                        bevy_meta.element_type()
+                    ),
+                )))),
+            };
+        }
 
         let mut stream = bucket
             .open_download_stream_by_name(name)
             .await
-            .map_err(|e| {
-                if matches!(
-                    &*e.kind,
-                    MdbErrorKind::GridFs(
-                        GridFsErrorKind::FileNotFound { .. }
-                            | GridFsErrorKind::RevisionNotFound { .. },
-                    )
-                ) {
-                    AssetReaderError::NotFound(path)
-                } else {
-                    mdb_io_error(e)
-                }
-            })?;
+            .map_err(map_not_found)?;
         let mut bytes = Vec::new();
         stream.read_to_end(&mut bytes).await?;
 
