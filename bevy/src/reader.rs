@@ -104,16 +104,19 @@ impl AssetRequest {
     ) -> AssetResponse {
         let Self { path, is_meta } = self;
 
+        let meta_coll_name;
+        let coll_name = if is_meta {
+            meta_coll_name = format!("{}.meta", namespace.coll);
+            &meta_coll_name
+        } else {
+            &namespace.coll
+        };
+
         let coll = client
             .database(&namespace.db)
-            .collection::<mongodb::bson::RawDocumentBuf>(&namespace.coll);
+            .collection::<mongodb::bson::RawDocumentBuf>(coll_name);
 
-        let meta_query = if is_meta {
-            doc! { "$eq": true }
-        } else {
-            doc! { "$exists": false }
-        };
-        let query = doc! { "name": { "$eq": &name }, "meta": meta_query };
+        let query = doc! { "name": &name };
         let Some(doc) = coll.find_one(query).await.map_err(mdb_io_error)? else {
             return Err(AssetReaderError::NotFound(path));
         };
