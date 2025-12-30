@@ -467,6 +467,7 @@ buildvariants:
 
   - name: bevy
     display_name: "Bevy"
+    patchable: false
     run_on: [rhel8-latest-small]
     tasks:
       - name: test-bevy-asset
