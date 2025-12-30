@@ -501,7 +501,6 @@ impl Handshaker {
             handler.handle(command.clone());
         }
         let mut hello_reply = run_hello(conn, command, cancellation_receiver).await?;
-        dbg!(&hello_reply);
 
         conn.stream_description = Some(StreamDescription::from_hello_reply(&hello_reply));
 
