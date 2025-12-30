@@ -1137,3 +1137,55 @@ async fn socks5_proxy_skip_ci() {
     let (started, _) = client.events.get_successful_command_execution("ping");
     assert_eq!(&started.connection.address.to_string(), mapped_host);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn backpressure() {
+    use crate::test::Event;
+
+    let setup_client = Client::for_test().await;
+    let test_runner_client = Client::for_test().await;
+    let collection = test_runner_client
+        .database("sdam-tests")
+        .collection("backpressure-network-timeout-error");
+    collection.drop().await.unwrap();
+    collection
+        .insert_many(vec![doc! { "_id": 1 }, doc! { "_id": 2 }])
+        .await
+        .unwrap();
+
+    let mut options = get_client_options().await.clone();
+    options.retry_writes = Some(false);
+    options.heartbeat_freq = Some(Duration::from_millis(1000000));
+    options.app_name = Some("backpressureNetworkTimeoutErrorTest".to_string());
+    // options.server_monitoring_mode = Some(crate::options::ServerMonitoringMode::Poll);
+    options.connect_timeout = Some(Duration::from_millis(250));
+    options.socket_timeout = Some(Duration::from_millis(250));
+    let client = Client::for_test().options(options).monitor_events().await;
+    let mut stream = client.events.stream_all();
+
+    let database = client.database("sdam-tests");
+    let collection = database.collection::<Document>("backpressure-network-timeout-error");
+
+    stream
+        .next_match(Duration::from_secs(10), |e| {
+            let Event::Sdam(e) = e else {
+                return false;
+            };
+            matches!(e, SdamEvent::ServerDescriptionChanged(_))
+        })
+        .await
+        .unwrap();
+
+    let fail_point = FailPoint::fail_command(&["hello", "isMaster"], FailPointMode::AlwaysOn)
+        .block_connection(Duration::from_millis(500))
+        .app_name("backpressureNetworkTimeoutErrorTest");
+    let _guard = setup_client.enable_fail_point(fail_point).await.unwrap();
+
+    let _ = collection
+        .insert_many(vec![doc! { "_id": 3 }, doc! { "_id": 4 }])
+        .await;
+
+    //     .unwrap_err();
+    // assert!(error.contains_label("SystemOverloadedError"));
+    // assert!(error.contains_label("RetryableError"));
+}

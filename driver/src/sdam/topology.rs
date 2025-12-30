@@ -5,7 +5,11 @@ use std::{
     time::Duration,
 };
 
-use crate::{bson::oid::ObjectId, cmap::establish::handshake::ClientMetadata};
+use crate::{
+    bson::oid::ObjectId,
+    cmap::establish::handshake::ClientMetadata,
+    error::SYSTEM_OVERLOADED_ERROR,
+};
 use futures_util::{
     stream::{FuturesUnordered, StreamExt},
     FutureExt,
@@ -642,11 +646,8 @@ impl TopologyWorker {
             server.monitor_manager.request_immediate_check();
 
             updated
-        } else if error.is_non_timeout_network_error()
-            || (handshake.is_before_completion()
-                && (error.is_auth_error()
-                    || error.is_network_timeout()
-                    || error.is_command_error()))
+        } else if (error.is_non_timeout_network_error() || handshake.is_before_completion())
+            && !error.contains_label(SYSTEM_OVERLOADED_ERROR)
         {
             let updated = if is_load_balanced {
                 // Only clear the pool in load balanced mode if we got far enough in the handshake

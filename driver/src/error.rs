@@ -185,6 +185,7 @@ impl Error {
         matches!(self.kind.as_ref(), ErrorKind::Authentication { .. })
     }
 
+    #[cfg(all(feature = "in-use-encryption", test))]
     pub(crate) fn is_command_error(&self) -> bool {
         matches!(self.kind.as_ref(), ErrorKind::Command(_))
     }
