@@ -156,7 +156,7 @@ where
                 }
             };
 
-            responses = get_more_response.batch;
+            responses = get_more_response.batch()?;
             more_responses = get_more_response.id != 0;
             namespace = get_more_response.ns;
         }

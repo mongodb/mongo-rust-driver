@@ -212,7 +212,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     const NAME: &'static CStr;
 
     /// Whether this operation should use alternate paths to avoid copying response data.
-    const ZERO_COPY: bool = true;
+    const ZERO_COPY: bool = false;
 
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
@@ -231,7 +231,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         Err(ErrorKind::Internal {
-            message: format!("operation handling not implemented for {}", Self::NAME),
+            message: format!("response handling not implemented for {}", Self::NAME),
         }
         .into())
     }
@@ -255,7 +255,10 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         _response: RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        unimplemented!()
+        Err(ErrorKind::Internal {
+            message: format!("owned response handling not implemented for {}", Self::NAME),
+        }
+        .into())
     }
 
     /// Interpret an error encountered while sending the built command to the server, potentially

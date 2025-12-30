@@ -195,8 +195,9 @@ impl<'s, S: ClientSessionHandle<'s>> GenericCursor<'s, S> {
                 if get_more.id != 0 {
                     self.info.id = get_more.id
                 }
+                let batch = get_more.batch()?;
                 self.info.ns = get_more.ns;
-                self.state_mut().buffer = CursorBuffer::new(get_more.batch);
+                self.state_mut().buffer = CursorBuffer::new(batch);
                 self.state_mut().post_batch_resume_token = get_more.post_batch_resume_token;
 
                 Ok(())

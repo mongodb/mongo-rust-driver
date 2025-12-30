@@ -1,5 +1,5 @@
 mod common;
-//mod raw_batch;
+mod raw_batch;
 pub(crate) mod session;
 
 #[cfg(test)]
