@@ -501,15 +501,15 @@ impl Client {
     }
 
     /// Executes an operation on a given connection, optionally using a provided session.
-    pub(crate) async fn execute_operation_on_connection<T: Operation>(
+    pub(crate) async fn execute_operation_on_connection<Op: Operation>(
         &self,
-        op: &mut T,
+        op: &mut Op,
         connection: &mut PooledConnection,
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
         retryability: Retryability,
         effective_criteria: SelectionCriteria,
-    ) -> Result<T::O> {
+    ) -> Result<Op::O> {
         loop {
             let cmd = self.build_command(
                 op,
@@ -657,21 +657,28 @@ impl Client {
                         effective_criteria: effective_criteria.clone(),
                     };
 
-                    match op.handle_response(&response, context).await {
-                        Ok(response) => Ok(response),
+                    let handle_result = match Op::ZERO_COPY {
+                        true => op.handle_response_owned(response, context),
+                        false => op
+                            .handle_response(&response, context)
+                            .await
+                            .map_err(|e| e.with_server_response(&response)),
+                    };
+                    match handle_result {
+                        Ok(op_out) => Ok(op_out),
                         Err(mut err) => {
                             err.add_labels_and_update_pin(
                                 Some(connection.stream_description()?),
                                 session,
                                 Some(retryability),
                             );
-                            Err(err.with_server_response(&response))
+                            Err(err)
                         }
                     }
                 }
             };
             #[cfg(feature = "opentelemetry")]
-            span.record_command_result::<T>(&result);
+            span.record_command_result::<Op>(&result);
 
             if result
                 .as_ref()

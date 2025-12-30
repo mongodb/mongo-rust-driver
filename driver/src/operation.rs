@@ -128,6 +128,9 @@ pub(crate) trait Operation {
     /// The name of the server side command associated with this operation.
     const NAME: &'static CStr;
 
+    /// Whether this operation should use alternate paths to avoid copying response data.
+    const ZERO_COPY: bool;
+
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command>;
@@ -142,6 +145,16 @@ pub(crate) trait Operation {
         response: &'a RawCommandResponse,
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>>;
+
+    /// Interprets the server response taking ownership of the body to enable zero-copy handling.
+    ///
+    /// Default behavior delegates to the borrowed [`handle_response`]; operations that set
+    /// [`ZERO_COPY`] to `true` should override this to consume the response.
+    fn handle_response_owned<'a>(
+        &'a self,
+        _response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
+    ) -> Result<Self::O>;
 
     /// Interpret an error encountered while sending the built command to the server, potentially
     /// recovering.
@@ -198,6 +211,9 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     /// The name of the server side command associated with this operation.
     const NAME: &'static CStr;
 
+    /// Whether this operation should use alternate paths to avoid copying response data.
+    const ZERO_COPY: bool = true;
+
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command>;
@@ -228,6 +244,18 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move { self.handle_response(response, context) }.boxed()
+    }
+
+    /// Interprets the server response taking ownership of the body to enable zero-copy handling.
+    ///
+    /// Default behavior delegates to the borrowed [`handle_response`]; operations that set
+    /// [`ZERO_COPY`] to `true` should override this to consume the response.
+    fn handle_response_owned<'a>(
+        &'a self,
+        _response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
+    ) -> Result<Self::O> {
+        unimplemented!()
     }
 
     /// Interpret an error encountered while sending the built command to the server, potentially
@@ -296,6 +324,7 @@ where
 {
     type O = T::O;
     const NAME: &'static CStr = T::NAME;
+    const ZERO_COPY: bool = T::ZERO_COPY;
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.build(description)
     }
@@ -308,6 +337,13 @@ where
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         self.handle_response_async(response, context)
+    }
+    fn handle_response_owned<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        context: ExecutionContext<'a>,
+    ) -> Result<Self::O> {
+        self.handle_response_owned(response, context)
     }
     fn handle_error(&self, error: Error) -> Result<Self::O> {
         self.handle_error(error)
