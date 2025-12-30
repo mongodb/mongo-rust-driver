@@ -465,6 +465,13 @@ buildvariants:
       #- name: .8.0
       #- name: .7.0
 
+  - name: bevy
+    display_name: "Bevy"
+    patchable: false
+    run_on: [rhel8-latest-small]
+    tasks:
+      - name: test-bevy-asset
+
 ###############
 # Task Groups #
 ###############
@@ -1421,6 +1428,22 @@ tasks:
         permissions: public-read
         content_type: application/zstd
         display_name: nextest-archive.tar.zst
+
+  - name: test-bevy-asset
+    commands:
+    - func: bootstrap mongo-orchestration
+      vars:
+        MONGODB_VERSION: latest
+        TOPOLOGY: standalone
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: src
+        binary: bash
+        args: [.evergreen/run-bevy-asset-test.sh]
+        include_expansions_in_env:
+          - PROJECT_DIRECTORY
+          - MONGODB_URI
 
 #############
 # Functions #
