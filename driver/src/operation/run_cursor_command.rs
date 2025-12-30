@@ -34,6 +34,7 @@ impl<'conn> RunCursorCommand<'conn> {
 
 impl Operation for RunCursorCommand<'_> {
     type O = CursorSpecification;
+    const ZERO_COPY: bool = false;
 
     const NAME: &'static CStr = cstr!("run_cursor_command");
 
@@ -118,6 +119,14 @@ impl Operation for RunCursorCommand<'_> {
             ))
         }
         .boxed()
+    }
+
+    fn handle_response_owned<'a>(
+        &'a self,
+        _response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
+    ) -> Result<Self::O> {
+        unimplemented!()
     }
 
     #[cfg(feature = "opentelemetry")]

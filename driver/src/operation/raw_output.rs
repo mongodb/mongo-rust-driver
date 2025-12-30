@@ -1,5 +1,3 @@
-use futures_util::FutureExt;
-
 use crate::{
     bson_compat::CStr,
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -17,6 +15,7 @@ pub(crate) struct RawOutput<Op>(pub(crate) Op);
 impl<Op: Operation> Operation for RawOutput<Op> {
     type O = RawCommandResponse;
     const NAME: &'static CStr = Op::NAME;
+    const ZERO_COPY: bool = true;
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.0.build(description)
@@ -31,10 +30,18 @@ impl<Op: Operation> Operation for RawOutput<Op> {
 
     fn handle_response<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        _response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
-        async move { Ok(response.clone()) }.boxed()
+        unimplemented!()
+    }
+
+    fn handle_response_owned<'a>(
+        &'a self,
+        response: RawCommandResponse,
+        _context: ExecutionContext<'a>,
+    ) -> Result<Self::O> {
+        Ok(response)
     }
 
     fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {
