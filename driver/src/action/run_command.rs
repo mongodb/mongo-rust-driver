@@ -261,7 +261,7 @@ impl<'a> Action for RunCursorCommand<'a, ImplicitSession> {
 }
 
 impl<'a> RunCursorCommand<'a, ImplicitSession> {
-    async fn batched(self) -> Result<crate::RawBatchCursor> {
+    pub async fn batched(self) -> Result<crate::RawBatchCursor> {
         todo!()
     }
 }

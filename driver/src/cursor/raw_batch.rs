@@ -445,7 +445,7 @@ impl<'s, S: ClientSessionHandle<'s>> GetMoreRawProvider<'s, S> {
             if let Self::Idle(mut session) = this {
                 let pinned = pinned_connection.map(|c| c.replicate());
                 let fut = Box::pin(async move {
-                    let get_more = GetMore::new(info, pinned.as_ref());
+                    let get_more = GetMore::new_owned(info, pinned.as_ref(), true);
                     let res = client
                         .execute_operation(get_more, session.borrow_mut())
                         .await;

@@ -29,12 +29,21 @@ pub(crate) struct GetMore<'conn> {
     max_time: Option<Duration>,
     pinned_connection: Option<&'conn PinnedConnectionHandle>,
     comment: Option<Bson>,
+    owned: bool,
 }
 
 impl<'conn> GetMore<'conn> {
     pub(crate) fn new(
         info: CursorInformation,
         pinned: Option<&'conn PinnedConnectionHandle>,
+    ) -> Self {
+        Self::new_owned(info, pinned, false)
+    }
+
+    pub(crate) fn new_owned(
+        info: CursorInformation,
+        pinned: Option<&'conn PinnedConnectionHandle>,
+        owned: bool,
     ) -> Self {
         Self {
             ns: info.ns,
@@ -44,6 +53,7 @@ impl<'conn> GetMore<'conn> {
             max_time: info.max_time,
             pinned_connection: pinned,
             comment: info.comment,
+            owned,
         }
     }
 }
@@ -125,7 +135,7 @@ impl OperationWithDefaults for GetMore<'_> {
     }
 
     fn wants_owned_response(&self) -> bool {
-        true
+        self.owned
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
