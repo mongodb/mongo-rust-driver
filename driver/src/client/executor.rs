@@ -3,6 +3,7 @@ use crate::bson::RawDocumentBuf;
 use crate::{
     bson::{doc, RawBsonRef, RawDocument, Timestamp},
     cursor::{CursorInformation, CursorSpecification2},
+    RawBatchCursor,
 };
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
@@ -243,6 +244,32 @@ impl Client {
                 details.implicit_session,
                 pinned,
             )
+        })
+        .await
+    }
+
+    pub(crate) async fn execute_raw_batch_cursor_operation<Op>(
+        &self,
+        mut op: impl BorrowMut<Op>,
+    ) -> Result<RawBatchCursor>
+    where
+        Op: Operation<O = CursorSpecification2>,
+    {
+        Box::pin(async {
+            let mut details = self
+                .execute_operation_with_details(op.borrow_mut(), None)
+                .await?;
+            let pinned = self.pin_connection_for_cursor(
+                &details.output.info,
+                &mut details.connection,
+                None,
+            )?;
+            Ok(RawBatchCursor::new(
+                self.clone(),
+                details.output,
+                details.implicit_session,
+                pinned,
+            ))
         })
         .await
     }

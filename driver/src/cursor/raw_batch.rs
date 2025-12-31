@@ -45,6 +45,7 @@ use std::{
 
 use crate::{
     bson::{RawArray, RawBsonRef, RawDocument},
+    cursor::CursorSpecification2,
     operation::GetMore,
 };
 use futures_core::{future::BoxFuture, Future, Stream};
@@ -67,13 +68,6 @@ use crate::{
 };
 
 use super::common::CursorInformation;
-
-#[derive(Debug, Clone)]
-pub(crate) struct RawBatchCursorSpecification {
-    pub(crate) info: CursorInformation,
-    pub(crate) initial_reply: RawDocumentBuf,
-    pub(crate) post_batch_resume_token: Option<ResumeToken>,
-}
 
 /// A raw batch response returned by the server for a cursor getMore/find.
 ///
@@ -137,7 +131,7 @@ struct RawBatchCursorState {
 impl RawBatchCursor {
     pub(crate) fn new(
         client: Client,
-        spec: RawBatchCursorSpecification,
+        spec: CursorSpecification2,
         session: Option<ClientSession>,
         pin: Option<PinnedConnectionHandle>,
     ) -> Self {
@@ -278,7 +272,7 @@ pub struct SessionRawBatchCursor {
 impl SessionRawBatchCursor {
     pub(crate) fn new(
         client: Client,
-        spec: RawBatchCursorSpecification,
+        spec: CursorSpecification2,
         pinned: Option<PinnedConnectionHandle>,
     ) -> Self {
         let exhausted = spec.info.id == 0;

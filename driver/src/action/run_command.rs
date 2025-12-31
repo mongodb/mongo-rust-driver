@@ -256,13 +256,26 @@ impl<'a> Action for RunCursorCommand<'a, ImplicitSession> {
         );
         let rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
         let client = self.db.client();
-        client.execute_cursor_operation(rc_command).await
+        client.execute_cursor_operation2(rc_command).await
     }
 }
 
 impl<'a> RunCursorCommand<'a, ImplicitSession> {
-    pub async fn batched(self) -> Result<crate::RawBatchCursor> {
-        todo!()
+    /// Execute this command, returning a cursor that provides results in zero-copy raw batches.
+    pub async fn batch(self) -> Result<crate::RawBatchCursor> {
+        let selection_criteria = self
+            .options
+            .as_ref()
+            .and_then(|options| options.selection_criteria.clone());
+        let rcc = run_command::RunCommand::new(
+            self.db.name().to_string(),
+            self.command?,
+            selection_criteria,
+            None,
+        );
+        let rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
+        let client = self.db.client();
+        client.execute_raw_batch_cursor_operation(rc_command).await
     }
 }
 
@@ -289,7 +302,7 @@ impl<'a> Action for RunCursorCommand<'a, ExplicitSession<'a>> {
         let rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
         let client = self.db.client();
         client
-            .execute_session_cursor_operation(rc_command, self.session.0)
+            .execute_session_cursor_operation2(rc_command, self.session.0)
             .await
     }
 }
