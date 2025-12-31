@@ -260,6 +260,12 @@ impl<'a> Action for RunCursorCommand<'a, ImplicitSession> {
     }
 }
 
+impl<'a> RunCursorCommand<'a, ImplicitSession> {
+    async fn batched(self) -> Result<crate::RawBatchCursor> {
+        todo!()
+    }
+}
+
 #[action_impl(sync = crate::sync::SessionCursor<Document>)]
 impl<'a> Action for RunCursorCommand<'a, ExplicitSession<'a>> {
     type Future = RunCursorCommandSessionFuture;

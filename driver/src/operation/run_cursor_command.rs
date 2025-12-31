@@ -151,3 +151,8 @@ impl crate::otel::OtelInfo for RunCursorCommand<'_> {
         Some(output.id())
     }
 }
+
+#[derive(Debug, Clone)]
+struct RunBatchCursorCommand<'conn> {
+    inner: RunCursorCommand<'conn>,
+}
