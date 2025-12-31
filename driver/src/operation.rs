@@ -128,9 +128,6 @@ pub(crate) trait Operation {
     /// The name of the server side command associated with this operation.
     const NAME: &'static CStr;
 
-    /// Whether this operation should use alternate paths to avoid copying response data.
-    const ZERO_COPY: bool;
-
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command>;
@@ -145,6 +142,10 @@ pub(crate) trait Operation {
         response: Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>>;
+
+    /// Whether this operation prefers to take ownership of the server response body for
+    /// zero-copy handling.
+    fn wants_owned_response(&self) -> bool;
 
     /// Interpret an error encountered while sending the built command to the server, potentially
     /// recovering.
@@ -201,9 +202,6 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     /// The name of the server side command associated with this operation.
     const NAME: &'static CStr;
 
-    /// Whether this operation should use alternate paths to avoid copying response data.
-    const ZERO_COPY: bool = false;
-
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command>;
@@ -224,6 +222,12 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
             message: format!("response handling not implemented for {}", Self::NAME),
         }
         .into())
+    }
+
+    /// Whether this operation prefers to take ownership of the server response body for
+    /// zero-copy handling.
+    fn wants_owned_response(&self) -> bool {
+        false
     }
 
     /// Interprets the server response taking ownership of the body to enable zero-copy handling.
@@ -314,7 +318,6 @@ where
 {
     type O = T::O;
     const NAME: &'static CStr = T::NAME;
-    const ZERO_COPY: bool = T::ZERO_COPY;
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.build(description)
     }
@@ -327,6 +330,9 @@ where
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         self.handle_response_async(response, context)
+    }
+    fn wants_owned_response(&self) -> bool {
+        self.wants_owned_response()
     }
     fn handle_error(&self, error: Error) -> Result<Self::O> {
         self.handle_error(error)
