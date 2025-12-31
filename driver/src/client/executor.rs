@@ -1,6 +1,9 @@
 #[cfg(feature = "in-use-encryption")]
 use crate::bson::RawDocumentBuf;
-use crate::bson::{doc, RawBsonRef, RawDocument, Timestamp};
+use crate::{
+    bson::{doc, RawBsonRef, RawDocument, Timestamp},
+    cursor::{CursorInformation, CursorSpecification2},
+};
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
 use serde::de::DeserializeOwned;
@@ -200,14 +203,46 @@ impl Client {
             let mut details = self
                 .execute_operation_with_details(op.borrow_mut(), None)
                 .await?;
-            let pinned =
-                self.pin_connection_for_cursor(&details.output, &mut details.connection, None)?;
+            let pinned = self.pin_connection_for_cursor(
+                &details.output.info,
+                &mut details.connection,
+                None,
+            )?;
             Ok(Cursor::new(
                 self.clone(),
                 details.output,
                 details.implicit_session,
                 pinned,
             ))
+        })
+        .await
+    }
+
+    /// Execute the given operation, returning the cursor created by the operation.
+    ///
+    /// Server selection be will performed using the criteria specified on the operation, if any.
+    pub(crate) async fn execute_cursor_operation2<Op, T>(
+        &self,
+        mut op: impl BorrowMut<Op>,
+    ) -> Result<Cursor<T>>
+    where
+        Op: Operation<O = CursorSpecification2>,
+    {
+        Box::pin(async {
+            let mut details = self
+                .execute_operation_with_details(op.borrow_mut(), None)
+                .await?;
+            let pinned = self.pin_connection_for_cursor(
+                &details.output.info,
+                &mut details.connection,
+                None,
+            )?;
+            Cursor::new2(
+                self.clone(),
+                details.output,
+                details.implicit_session,
+                pinned,
+            )
         })
         .await
     }
@@ -225,11 +260,31 @@ impl Client {
             .await?;
 
         let pinned = self.pin_connection_for_cursor(
-            &details.output,
+            &details.output.info,
             &mut details.connection,
             Some(session),
         )?;
         Ok(SessionCursor::new(self.clone(), details.output, pinned))
+    }
+
+    pub(crate) async fn execute_session_cursor_operation2<Op, T>(
+        &self,
+        mut op: impl BorrowMut<Op>,
+        session: &mut ClientSession,
+    ) -> Result<SessionCursor<T>>
+    where
+        Op: Operation<O = CursorSpecification2>,
+    {
+        let mut details = self
+            .execute_operation_with_details(op.borrow_mut(), &mut *session)
+            .await?;
+
+        let pinned = self.pin_connection_for_cursor(
+            &details.output.info,
+            &mut details.connection,
+            Some(session),
+        )?;
+        SessionCursor::new2(self.clone(), details.output, pinned)
     }
 
     pub(crate) fn is_load_balanced(&self) -> bool {
@@ -238,14 +293,14 @@ impl Client {
 
     pub(crate) fn pin_connection_for_cursor(
         &self,
-        spec: &CursorSpecification,
+        info: &CursorInformation,
         conn: &mut PooledConnection,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<PinnedConnectionHandle>> {
         if let Some(handle) = session.and_then(|s| s.transaction.pinned_connection()) {
             // Cursor operations on a transaction share the same pinned connection.
             Ok(Some(handle.replicate()))
-        } else if self.is_load_balanced() && spec.info.id != 0 {
+        } else if self.is_load_balanced() && info.id != 0 {
             // Cursor operations on load balanced topologies always pin connections.
             Ok(Some(conn.pin()?))
         } else {
@@ -283,7 +338,7 @@ impl Client {
             }
             let (cursor_spec, cs_data) = details.output;
             let pinned =
-                self.pin_connection_for_cursor(&cursor_spec, &mut details.connection, None)?;
+                self.pin_connection_for_cursor(&cursor_spec.info, &mut details.connection, None)?;
             let cursor = Cursor::new(self.clone(), cursor_spec, details.implicit_session, pinned);
 
             Ok(ChangeStream::new(cursor, args, cs_data))
@@ -316,7 +371,7 @@ impl Client {
                 .await?;
             let (cursor_spec, cs_data) = details.output;
             let pinned = self.pin_connection_for_cursor(
-                &cursor_spec,
+                &cursor_spec.info,
                 &mut details.connection,
                 Some(session),
             )?;

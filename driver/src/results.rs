@@ -111,6 +111,13 @@ pub(crate) struct GetMoreResult {
 }
 
 impl GetMoreResult {
+    pub(crate) fn next_batch(&self) -> crate::error::Result<&crate::bson::RawArray> {
+        Ok(self
+            .raw_reply
+            .get_document("cursor")?
+            .get_array("nextBatch")?)
+    }
+
     pub(crate) fn batch(&self) -> crate::error::Result<VecDeque<RawDocumentBuf>> {
         let cursor = self.raw_reply.get_document("cursor")?;
         let batch = cursor.get_array("nextBatch")?;

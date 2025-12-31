@@ -4,7 +4,7 @@ use crate::{
     bson::{rawdoc, Document},
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification,
+    cursor::CursorSpecification2,
     error::{Error, Result},
     operation::{CursorBody, OperationWithDefaults, Retryability, SERVER_4_4_0_WIRE_VERSION},
     options::{CursorType, FindOptions, SelectionCriteria},
@@ -31,7 +31,7 @@ impl Find {
 }
 
 impl OperationWithDefaults for Find {
-    type O = CursorSpecification;
+    type O = CursorSpecification2;
     const NAME: &'static CStr = cstr!("find");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -90,13 +90,11 @@ impl OperationWithDefaults for Find {
         CursorBody::extract_at_cluster_time(response)
     }
 
-    fn handle_response<'a>(
+    fn handle_response_cow<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: CursorBody = response.body()?;
-
         let description = context.connection.stream_description()?;
 
         // The comment should only be propagated to getMore calls on 4.4+.
@@ -106,13 +104,17 @@ impl OperationWithDefaults for Find {
             self.options.as_ref().and_then(|opts| opts.comment.clone())
         };
 
-        Ok(CursorSpecification::new(
-            response.cursor,
+        CursorSpecification2::new(
+            response.into_owned(),
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
             comment,
-        ))
+        )
+    }
+
+    fn wants_owned_response(&self) -> bool {
+        true
     }
 
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {

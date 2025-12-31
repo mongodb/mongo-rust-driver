@@ -5,7 +5,10 @@ use std::{
     time::Duration,
 };
 
-use crate::bson::{RawDocument, RawDocumentBuf};
+use crate::{
+    bson::{RawDocument, RawDocumentBuf},
+    cmap::RawCommandResponse,
+};
 use derive_where::derive_where;
 use futures_core::{future::BoxFuture, Future};
 #[cfg(test)]
@@ -69,6 +72,30 @@ impl GenericCursor<'static, ImplicitClientSessionHandle> {
                 pinned_connection,
             }),
         }
+    }
+
+    pub(super) fn with_implicit_session2(
+        client: Client,
+        spec: CursorSpecification2,
+        pinned_connection: PinnedConnection,
+        session: ImplicitClientSessionHandle,
+    ) -> Result<Self> {
+        let exhausted = spec.id() == 0;
+        Ok(Self {
+            client,
+            provider: if exhausted {
+                GetMoreProvider::Done
+            } else {
+                GetMoreProvider::Idle(Box::new(session))
+            },
+            info: spec.info,
+            state: Some(CursorState {
+                buffer: CursorBuffer::new(reply_batch(&spec.initial_reply)?),
+                exhausted,
+                post_batch_resume_token: None,
+                pinned_connection,
+            }),
+        })
     }
 
     /// Extracts the stored implicit [`ClientSession`], if any.
@@ -447,6 +474,54 @@ impl CursorSpecification {
     }
 }
 
+/// Specification used to create a new cursor.
+#[derive(Debug, Clone)]
+pub(crate) struct CursorSpecification2 {
+    pub(crate) info: CursorInformation,
+    pub(crate) initial_reply: RawDocumentBuf,
+    pub(crate) post_batch_resume_token: Option<ResumeToken>,
+}
+
+impl CursorSpecification2 {
+    pub(crate) fn new(
+        response: RawCommandResponse,
+        address: ServerAddress,
+        batch_size: impl Into<Option<u32>>,
+        max_time: impl Into<Option<Duration>>,
+        comment: impl Into<Option<Bson>>,
+    ) -> Result<Self> {
+        // Parse minimal fields via raw to avoid per-doc copies.
+        let raw_root = response.raw_body();
+        let cursor_doc = raw_root.get_document("cursor")?;
+        let id = cursor_doc.get_i64("id")?;
+        let ns_str = cursor_doc.get_str("ns")?;
+        let ns = Namespace::from_str(ns_str)
+            .ok_or_else(|| Error::invalid_response("invalid cursor ns"))?;
+        let post_token_raw = cursor_doc
+            .get("postBatchResumeToken")?
+            .and_then(crate::bson::RawBsonRef::as_document)
+            .map(|d| d.to_owned());
+        let post_batch_resume_token =
+            crate::change_stream::event::ResumeToken::from_raw(post_token_raw);
+        Ok(Self {
+            info: CursorInformation {
+                ns,
+                id,
+                address,
+                batch_size: batch_size.into(),
+                max_time: max_time.into(),
+                comment: comment.into(),
+            },
+            initial_reply: response.into_raw_document_buf(),
+            post_batch_resume_token,
+        })
+    }
+
+    pub(crate) fn id(&self) -> i64 {
+        self.info.id
+    }
+}
+
 /// Static information about a cursor.
 #[derive(Clone, Debug)]
 pub(crate) struct CursorInformation {
@@ -645,4 +720,30 @@ pub(super) trait ClientSessionHandle<'a>: Send + 'a {
     fn is_implicit(&self) -> bool;
 
     fn borrow_mut(&mut self) -> Option<&mut ClientSession>;
+}
+
+pub(super) fn reply_batch(
+    reply: &RawDocument,
+) -> Result<VecDeque<crate::bson::raw::RawDocumentBuf>> {
+    let cursor = reply.get_document("cursor")?;
+    let docs = match cursor.get("firstBatch")? {
+        Some(d) => d
+            .as_array()
+            .ok_or_else(|| Error::invalid_response("invalid `firstBatch` value"))?,
+        None => cursor.get_array("nextBatch")?,
+    };
+    let mut out = VecDeque::new();
+    for elt in docs {
+        let elt = elt?;
+        let doc = match elt.as_document() {
+            Some(doc) => doc.to_owned(),
+            None => {
+                return Err(crate::error::Error::invalid_response(
+                    "invalid batch element",
+                ))
+            }
+        };
+        out.push_back(doc);
+    }
+    Ok(out)
 }

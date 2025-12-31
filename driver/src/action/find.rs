@@ -118,7 +118,7 @@ impl<'a, T: Send + Sync> Action for Find<'a, T, ImplicitSession> {
         resolve_options!(self.coll, self.options, [read_concern, selection_criteria]);
 
         let find = Op::new(self.coll.namespace(), self.filter, self.options);
-        self.coll.client().execute_cursor_operation(find).await
+        self.coll.client().execute_cursor_operation2(find).await
     }
 }
 
@@ -137,7 +137,7 @@ impl<'a, T: Send + Sync> Action for Find<'a, T, ExplicitSession<'a>> {
         let find = Op::new(self.coll.namespace(), self.filter, self.options);
         self.coll
             .client()
-            .execute_session_cursor_operation(find, self.session.0)
+            .execute_session_cursor_operation2(find, self.session.0)
             .await
     }
 }

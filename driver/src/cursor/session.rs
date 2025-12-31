@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::bson::RawDocument;
+use crate::{bson::RawDocument, cursor::CursorSpecification2};
 use futures_core::Stream;
 use futures_util::StreamExt;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -102,6 +102,31 @@ impl<T> SessionCursor<T> {
             }
             .into(),
         }
+    }
+
+    pub(crate) fn new2(
+        client: Client,
+        spec: CursorSpecification2,
+        pinned: Option<PinnedConnectionHandle>,
+    ) -> Result<Self> {
+        let exhausted = spec.info.id == 0;
+
+        Ok(Self {
+            drop_token: client.register_async_drop(),
+            client,
+            info: spec.info,
+            drop_address: None,
+            _phantom: Default::default(),
+            #[cfg(test)]
+            kill_watcher: None,
+            state: CursorState {
+                buffer: CursorBuffer::new(super::common::reply_batch(&spec.initial_reply)?),
+                exhausted,
+                post_batch_resume_token: None,
+                pinned_connection: PinnedConnection::new(pinned),
+            }
+            .into(),
+        })
     }
 }
 

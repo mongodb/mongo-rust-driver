@@ -2,8 +2,6 @@ mod common;
 pub(crate) mod raw_batch;
 pub(crate) mod session;
 
-#[cfg(test)]
-use std::collections::VecDeque;
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -34,6 +32,7 @@ pub(crate) use common::{
     BatchValue,
     CursorInformation,
     CursorSpecification,
+    CursorSpecification2,
     CursorStream,
     NextInBatchFuture,
     PinnedConnection,
@@ -135,6 +134,28 @@ impl<T> Cursor<T> {
             kill_watcher: None,
             _phantom: Default::default(),
         }
+    }
+
+    pub(crate) fn new2(
+        client: Client,
+        spec: CursorSpecification2,
+        session: Option<ClientSession>,
+        pin: Option<PinnedConnectionHandle>,
+    ) -> Result<Self> {
+        Ok(Self {
+            client: client.clone(),
+            drop_token: client.register_async_drop(),
+            wrapped_cursor: Some(ImplicitSessionCursor::with_implicit_session2(
+                client,
+                spec,
+                PinnedConnection::new(pin),
+                ImplicitClientSessionHandle(session),
+            )?),
+            drop_address: None,
+            #[cfg(test)]
+            kill_watcher: None,
+            _phantom: Default::default(),
+        })
     }
 
     pub(crate) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
@@ -306,7 +327,7 @@ impl<T> Cursor<T> {
     }
 
     #[cfg(test)]
-    pub(crate) fn current_batch(&self) -> &VecDeque<RawDocumentBuf> {
+    pub(crate) fn current_batch(&self) -> &std::collections::VecDeque<RawDocumentBuf> {
         self.wrapped_cursor.as_ref().unwrap().current_batch()
     }
 }
