@@ -391,7 +391,7 @@ where
 
     fn handle_response_async<'b>(
         &'b self,
-        response: &'b RawCommandResponse,
+        response: std::borrow::Cow<'b, RawCommandResponse>,
         mut context: ExecutionContext<'b>,
     ) -> BoxFuture<'b, Result<Self::O>> {
         async move {

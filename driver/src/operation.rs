@@ -25,7 +25,7 @@ pub(crate) mod run_cursor_command;
 mod search_index;
 mod update;
 
-use std::{collections::VecDeque, fmt::Debug, ops::Deref};
+use std::{borrow::Cow, collections::VecDeque, fmt::Debug, ops::Deref};
 
 use bson::{RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
 use futures_util::FutureExt;
@@ -142,19 +142,9 @@ pub(crate) trait Operation {
     /// Interprets the server response to the command.
     fn handle_response<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>>;
-
-    /// Interprets the server response taking ownership of the body to enable zero-copy handling.
-    ///
-    /// Default behavior delegates to the borrowed [`handle_response`]; operations that set
-    /// [`ZERO_COPY`] to `true` should override this to consume the response.
-    fn handle_response_owned<'a>(
-        &'a self,
-        _response: RawCommandResponse,
-        _context: ExecutionContext<'a>,
-    ) -> Result<Self::O>;
 
     /// Interpret an error encountered while sending the built command to the server, potentially
     /// recovering.
@@ -236,29 +226,26 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         .into())
     }
 
-    /// Interprets the server response to the command. This method should only be implemented when
-    /// async code is required to handle the response.
-    fn handle_response_async<'a>(
-        &'a self,
-        response: &'a RawCommandResponse,
-        context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move { self.handle_response(response, context) }.boxed()
-    }
-
     /// Interprets the server response taking ownership of the body to enable zero-copy handling.
     ///
     /// Default behavior delegates to the borrowed [`handle_response`]; operations that set
     /// [`ZERO_COPY`] to `true` should override this to consume the response.
-    fn handle_response_owned<'a>(
+    fn handle_response_cow<'a>(
         &'a self,
-        _response: RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        response: Cow<'a, RawCommandResponse>,
+        context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        Err(ErrorKind::Internal {
-            message: format!("owned response handling not implemented for {}", Self::NAME),
-        }
-        .into())
+        self.handle_response(&*response, context)
+    }
+
+    /// Interprets the server response to the command. This method should only be implemented when
+    /// async code is required to handle the response.
+    fn handle_response_async<'a>(
+        &'a self,
+        response: Cow<'a, RawCommandResponse>,
+        context: ExecutionContext<'a>,
+    ) -> BoxFuture<'a, Result<Self::O>> {
+        async move { self.handle_response_cow(response, context) }.boxed()
     }
 
     /// Interpret an error encountered while sending the built command to the server, potentially
@@ -336,17 +323,10 @@ where
     }
     fn handle_response<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         self.handle_response_async(response, context)
-    }
-    fn handle_response_owned<'a>(
-        &'a self,
-        response: RawCommandResponse,
-        context: ExecutionContext<'a>,
-    ) -> Result<Self::O> {
-        self.handle_response_owned(response, context)
     }
     fn handle_error(&self, error: Error) -> Result<Self::O> {
         self.handle_error(error)

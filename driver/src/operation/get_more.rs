@@ -83,9 +83,9 @@ impl OperationWithDefaults for GetMore<'_> {
         Ok(Command::new(Self::NAME, &self.ns.db, body))
     }
 
-    fn handle_response_owned<'a>(
+    fn handle_response_cow<'a>(
         &'a self,
-        response: RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         // Extract minimal fields directly from the raw reply to avoid walking the batch via serde.
@@ -115,7 +115,7 @@ impl OperationWithDefaults for GetMore<'_> {
         let post_batch_resume_token = ResumeToken::from_raw(token_raw);
 
         // Take ownership of the raw bytes without copying.
-        let raw = response.into_raw_document_buf();
+        let raw = response.into_owned().into_raw_document_buf();
 
         Ok(GetMoreResult {
             raw_reply: raw,

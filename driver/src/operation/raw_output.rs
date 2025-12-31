@@ -1,3 +1,5 @@
+use futures_util::FutureExt;
+
 use crate::{
     bson_compat::CStr,
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -30,18 +32,10 @@ impl<Op: Operation> Operation for RawOutput<Op> {
 
     fn handle_response<'a>(
         &'a self,
-        _response: &'a RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         _context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
-        unimplemented!()
-    }
-
-    fn handle_response_owned<'a>(
-        &'a self,
-        response: RawCommandResponse,
-        _context: ExecutionContext<'a>,
-    ) -> Result<Self::O> {
-        Ok(response)
+        async move { Ok(response.into_owned()) }.boxed()
     }
 
     fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {

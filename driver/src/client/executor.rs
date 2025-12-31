@@ -4,7 +4,7 @@ use crate::bson::{doc, RawBsonRef, RawDocument, Timestamp};
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
 use serde::de::DeserializeOwned;
-use std::sync::LazyLock;
+use std::{borrow::Cow, sync::LazyLock};
 
 use std::{
     borrow::BorrowMut,
@@ -658,9 +658,9 @@ impl Client {
                     };
 
                     let handle_result = match Op::ZERO_COPY {
-                        true => op.handle_response_owned(response, context),
+                        true => op.handle_response(Cow::Owned(response), context).await,
                         false => op
-                            .handle_response(&response, context)
+                            .handle_response(Cow::Borrowed(&response), context)
                             .await
                             .map_err(|e| e.with_server_response(&response)),
                     };

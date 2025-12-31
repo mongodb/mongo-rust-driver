@@ -95,7 +95,7 @@ impl Operation for RunCursorCommand<'_> {
 
     fn handle_response<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
@@ -119,14 +119,6 @@ impl Operation for RunCursorCommand<'_> {
             ))
         }
         .boxed()
-    }
-
-    fn handle_response_owned<'a>(
-        &'a self,
-        _response: RawCommandResponse,
-        _context: ExecutionContext<'a>,
-    ) -> Result<Self::O> {
-        unimplemented!()
     }
 
     #[cfg(feature = "opentelemetry")]
