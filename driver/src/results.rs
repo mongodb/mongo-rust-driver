@@ -2,7 +2,7 @@
 
 mod bulk_write;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -108,34 +108,6 @@ pub(crate) struct GetMoreResult {
     pub(crate) post_batch_resume_token: Option<ResumeToken>,
     pub(crate) ns: Namespace,
     pub(crate) id: i64,
-}
-
-impl GetMoreResult {
-    pub(crate) fn next_batch(&self) -> crate::error::Result<&crate::bson::RawArray> {
-        Ok(self
-            .raw_reply
-            .get_document("cursor")?
-            .get_array("nextBatch")?)
-    }
-
-    pub(crate) fn batch(&self) -> crate::error::Result<VecDeque<RawDocumentBuf>> {
-        let cursor = self.raw_reply.get_document("cursor")?;
-        let batch = cursor.get_array("nextBatch")?;
-        let mut out = VecDeque::new();
-        for elt in batch {
-            let elt = elt?;
-            let doc = match elt.as_document() {
-                Some(doc) => doc.to_owned(),
-                None => {
-                    return Err(crate::error::Error::invalid_response(
-                        "invalid batch element",
-                    ))
-                }
-            };
-            out.push_back(doc);
-        }
-        Ok(out)
-    }
 }
 
 /// Describes the type of data store returned when executing

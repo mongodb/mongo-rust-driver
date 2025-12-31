@@ -156,7 +156,7 @@ where
                 }
             };
 
-            responses = get_more_response.batch()?;
+            responses = crate::cursor::reply_batch(&get_more_response.raw_reply)?;
             more_responses = get_more_response.id != 0;
             namespace = get_more_response.ns;
         }

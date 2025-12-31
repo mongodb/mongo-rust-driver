@@ -28,6 +28,7 @@ use crate::{
 };
 use common::{kill_cursor, GenericCursor};
 pub(crate) use common::{
+    reply_batch,
     stream_poll_next,
     BatchValue,
     CursorInformation,

@@ -222,9 +222,8 @@ impl<'s, S: ClientSessionHandle<'s>> GenericCursor<'s, S> {
                 if get_more.id != 0 {
                     self.info.id = get_more.id
                 }
-                let batch = get_more.batch()?;
                 self.info.ns = get_more.ns;
-                self.state_mut().buffer = CursorBuffer::new(batch);
+                self.state_mut().buffer = CursorBuffer::new(reply_batch(&get_more.raw_reply)?);
                 self.state_mut().post_batch_resume_token = get_more.post_batch_resume_token;
 
                 Ok(())
@@ -722,7 +721,7 @@ pub(super) trait ClientSessionHandle<'a>: Send + 'a {
     fn borrow_mut(&mut self) -> Option<&mut ClientSession>;
 }
 
-pub(super) fn reply_batch(
+pub(crate) fn reply_batch(
     reply: &RawDocument,
 ) -> Result<VecDeque<crate::bson::raw::RawDocumentBuf>> {
     let cursor = reply.get_document("cursor")?;
