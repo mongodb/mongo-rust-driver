@@ -16,7 +16,6 @@ use uuid::Uuid;
 use crate::{
     bson::{doc, spec::BinarySubtype, Binary, Bson, Document, Timestamp},
     cmap::conn::PinnedConnectionHandle,
-    error::{Error, Result},
     operation::Retryability,
     options::{SessionOptions, TransactionOptions},
     sdam::ServerInfo,

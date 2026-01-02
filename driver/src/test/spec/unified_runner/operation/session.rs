@@ -215,11 +215,7 @@ impl TestOperation for GetSnapshotTime {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             with_mut_session!(test_runner, id, |session| {
-                async move {
-                    session
-                        .snapshot_time()
-                        .map(|option| option.map(|ts| Bson::Timestamp(ts).into()))
-                }
+                async move { Ok(session.snapshot_time().map(|ts| Bson::Timestamp(ts).into())) }
             })
             .await
         }
