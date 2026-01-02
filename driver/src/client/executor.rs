@@ -4,6 +4,7 @@ use crate::{
     bson::{doc, RawBsonRef, RawDocument, Timestamp},
     cursor::{CursorInformation, CursorSpecification2},
     RawBatchCursor,
+    SessionRawBatchCursor,
 };
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
@@ -312,6 +313,29 @@ impl Client {
             Some(session),
         )?;
         SessionCursor::new2(self.clone(), details.output, pinned)
+    }
+
+    pub(crate) async fn execute_session_raw_batch_cursor_operation<Op>(
+        &self,
+        mut op: impl BorrowMut<Op>,
+        session: &mut ClientSession,
+    ) -> Result<SessionRawBatchCursor>
+    where
+        Op: Operation<O = CursorSpecification2>,
+    {
+        let mut details = self
+            .execute_operation_with_details(op.borrow_mut(), &mut *session)
+            .await?;
+        let pinned = self.pin_connection_for_cursor(
+            &details.output.info,
+            &mut details.connection,
+            Some(session),
+        )?;
+        Ok(SessionRawBatchCursor::new(
+            self.clone(),
+            details.output,
+            pinned,
+        ))
     }
 
     pub(crate) fn is_load_balanced(&self) -> bool {

@@ -306,3 +306,29 @@ impl<'a> Action for RunCursorCommand<'a, ExplicitSession<'a>> {
             .await
     }
 }
+
+impl<'a> RunCursorCommand<'a, ExplicitSession<'a>> {
+    /// Execute this command, returning a cursor that provides results in zero-copy raw batches.
+    pub async fn batch(mut self) -> Result<crate::SessionRawBatchCursor> {
+        resolve_selection_criteria_with_session!(
+            self.db,
+            self.options,
+            Some(&mut *self.session.0)
+        )?;
+        let selection_criteria = self
+            .options
+            .as_ref()
+            .and_then(|options| options.selection_criteria.clone());
+        let rcc = run_command::RunCommand::new(
+            self.db.name().to_string(),
+            self.command?,
+            selection_criteria,
+            None,
+        );
+        let rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
+        let client = self.db.client();
+        client
+            .execute_session_raw_batch_cursor_operation(rc_command, self.session.0)
+            .await
+    }
+}

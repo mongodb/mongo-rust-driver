@@ -112,6 +112,7 @@ impl RawBatch {
     }
 }
 
+/// Streams the results of a query, providing direct access to each batch of results.
 pub struct RawBatchCursor {
     client: Client,
     drop_token: AsyncDropToken,
@@ -155,15 +156,17 @@ impl RawBatchCursor {
         }
     }
 
-    pub fn address(&self) -> &ServerAddress {
+    #[expect(unused)]
+    pub(crate) fn address(&self) -> &ServerAddress {
         &self.info.address
     }
 
-    pub fn set_drop_address(&mut self, address: ServerAddress) {
+    #[expect(unused)]
+    pub(crate) fn set_drop_address(&mut self, address: ServerAddress) {
         self.drop_address = Some(address);
     }
 
-    pub fn is_exhausted(&self) -> bool {
+    pub(crate) fn is_exhausted(&self) -> bool {
         self.state.exhausted
     }
 
@@ -257,6 +260,7 @@ impl Drop for RawBatchCursor {
     }
 }
 
+/// A raw batch cursor that was created with a [`ClientSession`] and must be iterated using one.
 #[derive(Debug)]
 pub struct SessionRawBatchCursor {
     client: Client,
@@ -288,6 +292,8 @@ impl SessionRawBatchCursor {
         }
     }
 
+    /// Retrieves a [`SessionRawBatchCursorStream`] to iterate this cursor. The session provided
+    /// must be the same session used to create the cursor.
     pub fn stream<'session>(
         &mut self,
         session: &'session mut ClientSession,
@@ -298,15 +304,17 @@ impl SessionRawBatchCursor {
         }
     }
 
-    pub fn address(&self) -> &ServerAddress {
+    #[expect(unused)]
+    pub(crate) fn address(&self) -> &ServerAddress {
         &self.info.address
     }
 
-    pub fn set_drop_address(&mut self, address: ServerAddress) {
+    #[expect(unused)]
+    pub(crate) fn set_drop_address(&mut self, address: ServerAddress) {
         self.drop_address = Some(address);
     }
 
-    pub fn is_exhausted(&self) -> bool {
+    pub(crate) fn is_exhausted(&self) -> bool {
         self.exhausted
     }
 }
@@ -329,6 +337,8 @@ impl Drop for SessionRawBatchCursor {
     }
 }
 
+/// A [`Stream`] type for the results of [`SessionRawBatchCursor`].  Returned from
+/// [`SessionRawBatchCursor::stream`].
 pub struct SessionRawBatchCursorStream<'cursor, 'session> {
     parent: &'cursor mut SessionRawBatchCursor,
     provider: GetMoreRawProvider<'session, ExplicitClientSessionHandle<'session>>,
