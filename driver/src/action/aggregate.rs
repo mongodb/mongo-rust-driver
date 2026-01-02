@@ -209,13 +209,13 @@ impl<'a, T> Action for Aggregate<'a, ExplicitSession<'a>, T> {
     type Future = AggregateSessionFuture;
 
     async fn execute(mut self) -> Result<SessionCursor<T>> {
-        resolve_read_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
-        resolve_write_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
+        resolve_read_concern_with_session!(self.target, self.options, Some(&mut *self.session.0));
+        resolve_write_concern_with_session!(self.target, self.options, Some(&mut *self.session.0));
         resolve_selection_criteria_with_session!(
             self.target,
             self.options,
             Some(&mut *self.session.0)
-        )?;
+        );
 
         let aggregate = crate::operation::aggregate::Aggregate::new(
             self.target.target(),

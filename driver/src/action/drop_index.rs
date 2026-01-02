@@ -103,7 +103,7 @@ impl<'a> Action for DropIndex<'a> {
             }
             .into());
         }
-        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref());
 
         // If there is no provided name, that means we should drop all indexes.
         let index_name = self.name.unwrap_or_else(|| "*".to_string());

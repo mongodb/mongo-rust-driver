@@ -94,7 +94,7 @@ pub struct Find<'a, T: Send + Sync, Session = ImplicitSession> {
 }
 
 #[option_setters(crate::coll::options::FindOptions)]
-#[export_doc(find)]
+#[export_doc(find, extra = [batch])]
 impl<'a, T: Send + Sync, Session> Find<'a, T, Session> {
     /// Use the provided session when running the operation.
     pub fn session<'s>(
@@ -115,6 +115,12 @@ impl<'a, T: Send + Sync> Action for Find<'a, T, ImplicitSession> {
     type Future = FindFuture;
 
     async fn execute(mut self) -> Result<Cursor<T>> {
+        self.exec_generic().await
+    }
+}
+
+impl<'a, T: Send + Sync> Find<'a, T, ImplicitSession> {
+    async fn exec_generic<C: crate::cursor::NewCursor>(mut self) -> Result<C> {
         resolve_options!(self.coll, self.options, [read_concern, selection_criteria]);
 
         let mut find = Op::new(self.coll.namespace(), self.filter, self.options);
@@ -123,6 +129,11 @@ impl<'a, T: Send + Sync> Action for Find<'a, T, ImplicitSession> {
             .execute_cursor_operation2(&mut find, None)
             .await
     }
+
+    /// Execute the find command, returning a cursor that provides results in zero-copy raw batches.
+    pub async fn batch(self) -> Result<crate::raw_batch_cursor::RawBatchCursor> {
+        self.exec_generic().await
+    }
 }
 
 #[action_impl(sync = crate::sync::SessionCursor<T>)]
@@ -130,18 +141,29 @@ impl<'a, T: Send + Sync> Action for Find<'a, T, ExplicitSession<'a>> {
     type Future = FindSessionFuture;
 
     async fn execute(mut self) -> Result<SessionCursor<T>> {
-        resolve_read_concern_with_session!(self.coll, self.options, Some(&mut *self.session.0))?;
+        self.exec_generic().await
+    }
+}
+
+impl<'a, T: Send + Sync> Find<'a, T, ExplicitSession<'a>> {
+    async fn exec_generic<C: crate::cursor::NewCursor>(mut self) -> Result<C> {
+        resolve_read_concern_with_session!(self.coll, self.options, Some(&mut *self.session.0));
         resolve_selection_criteria_with_session!(
             self.coll,
             self.options,
             Some(&mut *self.session.0)
-        )?;
+        );
 
         let mut find = Op::new(self.coll.namespace(), self.filter, self.options);
         self.coll
             .client()
             .execute_cursor_operation2(&mut find, Some(self.session.0))
             .await
+    }
+
+    /// Execute the find command, returning a cursor that provides results in zero-copy raw batches.
+    pub async fn batch(self) -> Result<crate::raw_batch_cursor::SessionRawBatchCursor> {
+        self.exec_generic().await
     }
 }
 
