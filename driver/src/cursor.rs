@@ -380,3 +380,23 @@ impl<T> Drop for Cursor<T> {
 /// A `GenericCursor` that optionally owns its own sessions.
 /// This is to be used by cursors associated with implicit sessions.
 type ImplicitSessionCursor = GenericCursor<'static, ImplicitClientSessionHandle>;
+
+pub(crate) trait NewCursor: Sized {
+    fn generic_new(
+        client: Client,
+        spec: CursorSpecification2,
+        implicit_session: Option<ClientSession>,
+        pinned: Option<PinnedConnectionHandle>,
+    ) -> Result<Self>;
+}
+
+impl<T> NewCursor for Cursor<T> {
+    fn generic_new(
+        client: Client,
+        spec: CursorSpecification2,
+        implicit_session: Option<ClientSession>,
+        pinned: Option<PinnedConnectionHandle>,
+    ) -> Result<Self> {
+        Self::new2(client, spec, implicit_session, pinned)
+    }
+}

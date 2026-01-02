@@ -3,7 +3,6 @@ use crate::bson::RawDocumentBuf;
 use crate::{
     bson::{doc, RawBsonRef, RawDocument, Timestamp},
     cursor::{CursorInformation, CursorSpecification2},
-    raw_batch_cursor::{RawBatchCursor, SessionRawBatchCursor},
 };
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
@@ -222,54 +221,30 @@ impl Client {
     /// Execute the given operation, returning the cursor created by the operation.
     ///
     /// Server selection be will performed using the criteria specified on the operation, if any.
-    pub(crate) async fn execute_cursor_operation2<Op, T>(
+    pub(crate) async fn execute_cursor_operation2<Op, C>(
         &self,
-        mut op: impl BorrowMut<Op>,
-    ) -> Result<Cursor<T>>
+        op: &mut Op,
+        mut session: Option<&mut ClientSession>,
+    ) -> Result<C>
     where
         Op: Operation<O = CursorSpecification2>,
+        C: crate::cursor::NewCursor,
     {
         Box::pin(async {
             let mut details = self
-                .execute_operation_with_details(op.borrow_mut(), None)
+                .execute_operation_with_details(op, session.as_deref_mut())
                 .await?;
             let pinned = self.pin_connection_for_cursor(
                 &details.output.info,
                 &mut details.connection,
-                None,
+                session,
             )?;
-            Cursor::new2(
+            C::generic_new(
                 self.clone(),
                 details.output,
                 details.implicit_session,
                 pinned,
             )
-        })
-        .await
-    }
-
-    pub(crate) async fn execute_raw_batch_cursor_operation<Op>(
-        &self,
-        mut op: impl BorrowMut<Op>,
-    ) -> Result<RawBatchCursor>
-    where
-        Op: Operation<O = CursorSpecification2>,
-    {
-        Box::pin(async {
-            let mut details = self
-                .execute_operation_with_details(op.borrow_mut(), None)
-                .await?;
-            let pinned = self.pin_connection_for_cursor(
-                &details.output.info,
-                &mut details.connection,
-                None,
-            )?;
-            Ok(RawBatchCursor::new(
-                self.clone(),
-                details.output,
-                details.implicit_session,
-                pinned,
-            ))
         })
         .await
     }
@@ -292,49 +267,6 @@ impl Client {
             Some(session),
         )?;
         Ok(SessionCursor::new(self.clone(), details.output, pinned))
-    }
-
-    pub(crate) async fn execute_session_cursor_operation2<Op, T>(
-        &self,
-        mut op: impl BorrowMut<Op>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<T>>
-    where
-        Op: Operation<O = CursorSpecification2>,
-    {
-        let mut details = self
-            .execute_operation_with_details(op.borrow_mut(), &mut *session)
-            .await?;
-
-        let pinned = self.pin_connection_for_cursor(
-            &details.output.info,
-            &mut details.connection,
-            Some(session),
-        )?;
-        SessionCursor::new2(self.clone(), details.output, pinned)
-    }
-
-    pub(crate) async fn execute_session_raw_batch_cursor_operation<Op>(
-        &self,
-        mut op: impl BorrowMut<Op>,
-        session: &mut ClientSession,
-    ) -> Result<SessionRawBatchCursor>
-    where
-        Op: Operation<O = CursorSpecification2>,
-    {
-        let mut details = self
-            .execute_operation_with_details(op.borrow_mut(), &mut *session)
-            .await?;
-        let pinned = self.pin_connection_for_cursor(
-            &details.output.info,
-            &mut details.connection,
-            Some(session),
-        )?;
-        Ok(SessionRawBatchCursor::new(
-            self.clone(),
-            details.output,
-            pinned,
-        ))
     }
 
     pub(crate) fn is_load_balanced(&self) -> bool {

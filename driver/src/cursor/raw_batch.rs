@@ -129,8 +129,19 @@ struct RawBatchCursorState {
     initial_reply: Option<RawDocumentBuf>,
 }
 
+impl crate::cursor::NewCursor for RawBatchCursor {
+    fn generic_new(
+        client: Client,
+        spec: CursorSpecification2,
+        implicit_session: Option<ClientSession>,
+        pinned: Option<PinnedConnectionHandle>,
+    ) -> Result<Self> {
+        Ok(Self::new(client, spec, implicit_session, pinned))
+    }
+}
+
 impl RawBatchCursor {
-    pub(crate) fn new(
+    fn new(
         client: Client,
         spec: CursorSpecification2,
         session: Option<ClientSession>,
@@ -273,8 +284,19 @@ pub struct SessionRawBatchCursor {
     drop_address: Option<ServerAddress>,
 }
 
+impl super::NewCursor for SessionRawBatchCursor {
+    fn generic_new(
+        client: Client,
+        spec: CursorSpecification2,
+        _implicit_session: Option<ClientSession>,
+        pinned: Option<PinnedConnectionHandle>,
+    ) -> Result<Self> {
+        Ok(Self::new(client, spec, pinned))
+    }
+}
+
 impl SessionRawBatchCursor {
-    pub(crate) fn new(
+    fn new(
         client: Client,
         spec: CursorSpecification2,
         pinned: Option<PinnedConnectionHandle>,

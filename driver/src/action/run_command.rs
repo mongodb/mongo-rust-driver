@@ -245,8 +245,10 @@ impl<'a> Action for RunCursorCommand<'a, ImplicitSession> {
 
     async fn execute(self) -> Result<Cursor<Document>> {
         let client = self.db.client();
-        let rc_command = self.prep_command()?;
-        client.execute_cursor_operation2(rc_command).await
+        let mut rc_command = self.prep_command()?;
+        client
+            .execute_cursor_operation2(&mut rc_command, None)
+            .await
     }
 }
 
@@ -268,8 +270,10 @@ impl<'a> RunCursorCommand<'a, ImplicitSession> {
     /// Execute this command, returning a cursor that provides results in zero-copy raw batches.
     pub async fn batch(self) -> Result<crate::raw_batch_cursor::RawBatchCursor> {
         let client = self.db.client();
-        let rc_command = self.prep_command()?;
-        client.execute_raw_batch_cursor_operation(rc_command).await
+        let mut rc_command = self.prep_command()?;
+        client
+            .execute_cursor_operation2(&mut rc_command, None)
+            .await
     }
 }
 
@@ -279,9 +283,9 @@ impl<'a> Action for RunCursorCommand<'a, ExplicitSession<'a>> {
 
     async fn execute(mut self) -> Result<SessionCursor<Document>> {
         let client = self.db.client();
-        let (rc_command, session) = self.prep_command()?;
+        let (mut rc_command, session) = self.prep_command()?;
         client
-            .execute_session_cursor_operation2(rc_command, session.0)
+            .execute_cursor_operation2(&mut rc_command, Some(session.0))
             .await
     }
 }
@@ -317,9 +321,9 @@ impl<'a> RunCursorCommand<'a, ExplicitSession<'a>> {
     /// Execute this command, returning a cursor that provides results in zero-copy raw batches.
     pub async fn batch(self) -> Result<crate::raw_batch_cursor::SessionRawBatchCursor> {
         let client = self.db.client();
-        let (rc_command, session) = self.prep_command()?;
+        let (mut rc_command, session) = self.prep_command()?;
         client
-            .execute_session_raw_batch_cursor_operation(rc_command, session.0)
+            .execute_cursor_operation2(&mut rc_command, Some(session.0))
             .await
     }
 }

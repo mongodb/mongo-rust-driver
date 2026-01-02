@@ -78,6 +78,17 @@ pub struct SessionCursor<T> {
     kill_watcher: Option<oneshot::Sender<()>>,
 }
 
+impl<T> super::NewCursor for SessionCursor<T> {
+    fn generic_new(
+        client: Client,
+        spec: CursorSpecification2,
+        _implicit_session: Option<ClientSession>,
+        pinned: Option<PinnedConnectionHandle>,
+    ) -> Result<Self> {
+        Self::new2(client, spec, pinned)
+    }
+}
+
 impl<T> SessionCursor<T> {
     pub(crate) fn new(
         client: Client,
@@ -104,7 +115,7 @@ impl<T> SessionCursor<T> {
         }
     }
 
-    pub(crate) fn new2(
+    fn new2(
         client: Client,
         spec: CursorSpecification2,
         pinned: Option<PinnedConnectionHandle>,

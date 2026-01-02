@@ -36,7 +36,7 @@ mod coll;
 mod collation;
 mod compression;
 mod concern;
-mod cursor;
+pub(crate) mod cursor;
 mod db;
 pub mod error;
 pub mod event;
