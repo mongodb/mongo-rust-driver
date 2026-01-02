@@ -3240,7 +3240,7 @@ impl SessionOptions {
         }
         if self.snapshot_time.is_some() && self.snapshot != Some(true) {
             return Err(Error::invalid_argument(
-                "cannot set snapshot_time without setting snapshot to true",
+                "cannot set `snapshot_time` without setting `snapshot` to true",
             ));
         }
         Ok(())

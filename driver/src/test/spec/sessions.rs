@@ -325,6 +325,8 @@ async fn cannot_call_snapshot_time_on_non_snapshot_session() {
 
     let client = Client::for_test().await;
     let session = client.start_session().snapshot(false).await.unwrap();
-    let error = session.snapshot_time().unwrap_err();
-    assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
+    assert!(session.snapshot_time().is_none());
 }
+
+// Sessions prose test 23 skipped: "Drivers MAY skip this test if they choose to expose a read-only
+// `snapshotTime` property using an accessor method only."

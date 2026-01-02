@@ -308,21 +308,11 @@ impl ClientSession {
         self.operation_time
     }
 
-    /// The snapshot time for a snapshot session. This will return `None` if `snapshot_time` was not
-    /// provided and the server has not yet responded with a snapshot time. It is an error to call
-    /// this method on a non-snapshot session.
-    pub fn snapshot_time(&self) -> Result<Option<Timestamp>> {
-        if !self
-            .options
-            .as_ref()
-            .and_then(|o| o.snapshot)
-            .unwrap_or(false)
-        {
-            return Err(Error::invalid_argument(
-                "cannot access snapshot time on a non-snapshot session",
-            ));
-        }
-        Ok(self.snapshot_time)
+    /// The snapshot time for a snapshot session. This will return `None` if this session is not a
+    /// snapshot session or if [`snapshot_time`](SessionOptions::snapshot_time) was not set and the
+    /// server has not yet responded with a snapshot time.
+    pub fn snapshot_time(&self) -> Option<Timestamp> {
+        self.snapshot_time
     }
 
     pub(crate) fn causal_consistency(&self) -> bool {
