@@ -411,9 +411,10 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
         }
     }
 }
-pub struct GetMoreRawResultAndSession<S> {
-    pub result: Result<crate::results::GetMoreResult>,
-    pub session: S,
+
+struct GetMoreRawResultAndSession<S> {
+    result: Result<crate::results::GetMoreResult>,
+    session: S,
 }
 
 enum GetMoreRawProvider<'s, S> {

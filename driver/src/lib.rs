@@ -77,7 +77,7 @@ pub use crate::{
     client::{session::ClientSession, Client},
     coll::Collection,
     cursor::{
-        raw_batch::{RawBatchCursor, SessionRawBatchCursor},
+        raw_batch as raw_batch_cursor,
         session::{SessionCursor, SessionCursorStream},
         Cursor,
     },

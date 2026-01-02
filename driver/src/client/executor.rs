@@ -3,8 +3,7 @@ use crate::bson::RawDocumentBuf;
 use crate::{
     bson::{doc, RawBsonRef, RawDocument, Timestamp},
     cursor::{CursorInformation, CursorSpecification2},
-    RawBatchCursor,
-    SessionRawBatchCursor,
+    raw_batch_cursor::{RawBatchCursor, SessionRawBatchCursor},
 };
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;

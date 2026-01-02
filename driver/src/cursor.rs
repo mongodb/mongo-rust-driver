@@ -1,5 +1,5 @@
 mod common;
-pub(crate) mod raw_batch;
+pub mod raw_batch;
 pub(crate) mod session;
 
 use std::{
