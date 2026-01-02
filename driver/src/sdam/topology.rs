@@ -646,9 +646,11 @@ impl TopologyWorker {
             server.monitor_manager.request_immediate_check();
 
             updated
-        } else if (error.is_non_timeout_network_error() || handshake.is_before_completion())
-            && !error.contains_label(SYSTEM_OVERLOADED_ERROR)
-        {
+        } else if error.is_non_timeout_network_error() || handshake.is_before_completion() {
+            if error.contains_label(SYSTEM_OVERLOADED_ERROR) {
+                return false;
+            }
+
             let updated = if is_load_balanced {
                 // Only clear the pool in load balanced mode if we got far enough in the handshake
                 // to determine a serviceId.

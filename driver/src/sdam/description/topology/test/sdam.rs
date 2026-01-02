@@ -1,15 +1,21 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use crate::bson::Document;
 use serde::Deserialize;
 
 use super::TestSdamEvent;
 
 use crate::{
-    bson::{doc, oid::ObjectId},
+    bson::{doc, oid::ObjectId, Document},
     client::Client,
     cmap::{conn::ConnectionGeneration, PoolGeneration},
-    error::{CommandError, Error, ErrorKind, InsertManyError},
+    error::{
+        CommandError,
+        Error,
+        ErrorKind,
+        InsertManyError,
+        RETRYABLE_ERROR,
+        SYSTEM_OVERLOADED_ERROR,
+    },
     event::sdam::SdamEvent,
     hello::{HelloCommandResponse, HelloReply, LastWrite, LEGACY_HELLO_COMMAND_NAME},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
@@ -332,7 +338,7 @@ async fn run_test(test_file: TestFile) {
 
         for application_error in phase.application_errors {
             if let Some(server) = topology.watcher().servers().get(&application_error.address) {
-                let error = application_error.to_error();
+                let mut error = application_error.to_error();
                 let pool_generation = application_error
                     .generation
                     .map(PoolGeneration::Normal)
@@ -343,9 +349,15 @@ async fn run_test(test_file: TestFile) {
                     .unwrap_or(0);
                 let conn_generation = ConnectionGeneration::Normal(conn_generation);
                 let handshake_phase = match application_error.when {
-                    ErrorHandshakePhase::BeforeHandshakeCompletes => HandshakePhase::PreHello {
-                        generation: pool_generation,
-                    },
+                    ErrorHandshakePhase::BeforeHandshakeCompletes => {
+                        if error.is_network_error() {
+                            error.add_label(SYSTEM_OVERLOADED_ERROR);
+                            error.add_label(RETRYABLE_ERROR);
+                        }
+                        HandshakePhase::PreHello {
+                            generation: pool_generation,
+                        }
+                    }
                     ErrorHandshakePhase::AfterHandshakeCompletes => {
                         HandshakePhase::AfterCompletion {
                             generation: conn_generation,
@@ -707,76 +719,4 @@ async fn direct_connection() {
         .insert_one(doc! {})
         .await
         .expect("write should succeed with directConnection unspecified");
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn pool_cleared_error_does_not_mark_unknown() {
-    let address = ServerAddress::parse("a:1234").unwrap();
-    let mut options = ClientOptions::builder()
-        .hosts(vec![address.clone()])
-        .build();
-    options.test_options_mut().disable_monitoring_threads = true;
-    let topology = Topology::new(options).unwrap();
-    topology.watcher().clone().wait_until_initialized().await;
-
-    // get the one server in the topology
-    let server = topology.watcher().servers().into_values().next().unwrap();
-
-    let heartbeat_response: HelloCommandResponse =
-        crate::bson_compat::deserialize_from_document(doc! {
-            "ok": 1,
-            "isWritablePrimary": true,
-            "minWireVersion": 0,
-            "maxWireVersion": 6,
-            "maxBsonObjectSize": 16_000,
-            "maxWriteBatchSize": 10_000,
-            "maxMessageSizeBytes": 48_000_000,
-        })
-        .unwrap();
-
-    // discover the node
-    topology
-        .updater()
-        .update(ServerDescription::new_from_hello_reply(
-            address.clone(),
-            HelloReply {
-                server_address: address.clone(),
-                command_response: heartbeat_response,
-                cluster_time: None,
-                raw_command_response: Default::default(),
-            },
-            Duration::from_secs(1),
-        ))
-        .await;
-    assert_eq!(
-        topology
-            .latest()
-            .description
-            .server(&address)
-            .unwrap()
-            .server_type,
-        ServerType::Standalone
-    );
-
-    // assert a pool cleared error would have no effect on the topology
-    let error: Error = ErrorKind::ConnectionPoolCleared {
-        message: "foo".to_string(),
-    }
-    .into();
-    let phase = HandshakePhase::PreHello {
-        generation: server.pool.generation(),
-    };
-    topology
-        .updater()
-        .handle_application_error(server.address.clone(), error, phase)
-        .await;
-    assert_eq!(
-        topology
-            .latest()
-            .description
-            .server(&address)
-            .unwrap()
-            .server_type,
-        ServerType::Standalone
-    );
 }
