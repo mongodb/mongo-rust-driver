@@ -93,6 +93,7 @@ pub(crate) async fn run_hello(
     match response_result {
         Ok(raw_response) => raw_response.into_hello_reply(),
         Err(mut error) => {
+            dbg!(&error);
             if error.is_network_error() {
                 error.add_label(SYSTEM_OVERLOADED_ERROR);
                 error.add_label(RETRYABLE_ERROR);

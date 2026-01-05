@@ -311,11 +311,15 @@ async fn connection_pool_backpressure() {
         let admin = client.database("admin");
         admin
             .run_command(
-                doc! { "setParameter": 1, "ingressConnectionEstablishmentRateLimiterEnabled": true }
+                doc! { "setParameter": 1, "ingressConnectionEstablishmentRateLimiterEnabled":
+                true },
             )
             .await?;
         admin
-            .run_command(doc! { "setParameter": 1, "ingressConnectionEstablishmentRatePerSec": 20})
+            .run_command(
+                doc! { "setParameter": 1, "ingressConnectionEstablishmentRatePerSec":
+                20},
+            )
             .await?;
         admin
             .run_command(
@@ -375,7 +379,8 @@ async fn connection_pool_backpressure() {
     client
         .database("admin")
         .run_command(
-            doc! { "setParameter": 1, "ingressConnectionEstablishmentRateLimiterEnabled": false },
+            doc! { "setParameter": 1, "ingressConnectionEstablishmentRateLimiterEnabled": false
+            },
         )
         .await
         .unwrap();

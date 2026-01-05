@@ -112,11 +112,17 @@ impl ConnectionEstablisher {
     }
 
     async fn make_stream(&self, address: ServerAddress) -> Result<AsyncStream> {
-        runtime::timeout(
+        let result = runtime::timeout(
             self.connect_timeout,
             AsyncStream::connect(address, self.tls_config.as_ref(), self.proxy.as_ref()),
         )
-        .await?
+        .await;
+        #[cfg(test)]
+        if let Err(ref error) = result {
+            crate::test::log_uncaptured(format!("error in make stream: {}", error));
+        }
+        let result = result?;
+        result
     }
 
     /// Establishes a connection.

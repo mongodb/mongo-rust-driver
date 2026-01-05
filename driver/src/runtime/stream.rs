@@ -119,11 +119,35 @@ impl AsyncStream {
                     }
                     .into());
                 }
-                let inner = tcp_connect(resolved).await?;
+                let inner = match tcp_connect(resolved).await {
+                    Ok(stream) => stream,
+                    Err(mut error) => {
+                        #[cfg(test)]
+                        crate::test::log_uncaptured(format!(
+                            "got error in tcp connect: {}",
+                            &error
+                        ));
+                        if error.is_network_error() {
+                            error.add_label(SYSTEM_OVERLOADED_ERROR);
+                            error.add_label(RETRYABLE_ERROR);
+                        }
+                        return Err(error);
+                    }
+                };
 
                 // If there are TLS options, wrap the inner stream in an AsyncTlsStream.
                 match tls_cfg {
-                    Some(cfg) => Ok(AsyncStream::Tls(tls_connect(host, inner, cfg).await?)),
+                    Some(cfg) => {
+                        let tls_result = tls_connect(host, inner, cfg).await;
+                        #[cfg(test)]
+                        if let Err(ref error) = tls_result {
+                            crate::test::log_uncaptured(format!(
+                                "got error in tls connect: {}",
+                                &error
+                            ));
+                        }
+                        Ok(AsyncStream::Tls(tls_result?))
+                    }
                     None => Ok(AsyncStream::Tcp(inner)),
                 }
             }
@@ -136,15 +160,7 @@ impl AsyncStream {
 }
 
 async fn tcp_try_connect(address: &SocketAddr) -> Result<TcpStream> {
-    let stream = match TcpStream::connect(address).await {
-        Ok(stream) => stream,
-        Err(io_error) => {
-            let mut error = Error::from(io_error);
-            error.add_label(SYSTEM_OVERLOADED_ERROR);
-            error.add_label(RETRYABLE_ERROR);
-            return Err(error);
-        }
-    };
+    let stream = TcpStream::connect(address).await?;
     stream.set_nodelay(true)?;
 
     #[cfg(not(target_os = "wasi"))]
