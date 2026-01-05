@@ -344,12 +344,6 @@ async fn connection_pool_backpressure() {
 
         let events = &client.events;
 
-        let all_cmap_events = events.filter_map(|e| match e {
-            Event::Cmap(e) => Some(e.clone()),
-            _ => None,
-        });
-        dbg!(all_cmap_events.len());
-
         let checkout_failed_events = events.filter_map(|e| match e {
             Event::Cmap(CmapEvent::ConnectionCheckoutFailed(e)) => Some(e.clone()),
             _ => None,
