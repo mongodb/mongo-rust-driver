@@ -624,6 +624,15 @@ impl From<crate::bson_compat::RawError> for ErrorKind {
     }
 }
 
+#[cfg(not(feature = "bson-3"))]
+impl From<crate::bson::raw::ValueAccessError> for ErrorKind {
+    fn from(err: crate::bson::raw::ValueAccessError) -> Self {
+        Self::InvalidResponse {
+            message: err.to_string(),
+        }
+    }
+}
+
 #[cfg(feature = "bson-3")]
 impl From<crate::bson::error::Error> for ErrorKind {
     fn from(err: crate::bson::error::Error) -> Self {
