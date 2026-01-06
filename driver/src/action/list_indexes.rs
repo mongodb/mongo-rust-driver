@@ -120,8 +120,11 @@ impl<'a> Action for ListIndexes<'a, ListSpecifications, ImplicitSession> {
     type Future = ListIndexesFuture;
 
     async fn execute(self) -> Result<Cursor<IndexModel>> {
-        let op = Op::new(self.coll.namespace(), self.options);
-        self.coll.client().execute_cursor_operation(op).await
+        let mut op = Op::new(self.coll.namespace(), self.options);
+        self.coll
+            .client()
+            .execute_cursor_operation(&mut op, None)
+            .await
     }
 }
 
@@ -130,10 +133,10 @@ impl<'a> Action for ListIndexes<'a, ListSpecifications, ExplicitSession<'a>> {
     type Future = ListIndexesSessionFuture;
 
     async fn execute(self) -> Result<SessionCursor<IndexModel>> {
-        let op = Op::new(self.coll.namespace(), self.options);
+        let mut op = Op::new(self.coll.namespace(), self.options);
         self.coll
             .client()
-            .execute_session_cursor_operation(op, self.session.0)
+            .execute_cursor_operation(&mut op, Some(self.session.0))
             .await
     }
 }

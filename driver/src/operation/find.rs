@@ -6,7 +6,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification2,
     error::{Error, Result},
-    operation::{CursorBody, OperationWithDefaults, Retryability, SERVER_4_4_0_WIRE_VERSION},
+    operation::{OperationWithDefaults, Retryability, SERVER_4_4_0_WIRE_VERSION},
     options::{CursorType, FindOptions, SelectionCriteria},
     Namespace,
 };
@@ -87,7 +87,7 @@ impl OperationWithDefaults for Find {
         &self,
         response: &crate::bson::RawDocument,
     ) -> Result<Option<crate::bson::Timestamp>> {
-        CursorBody::extract_at_cluster_time(response)
+        super::cursor_get_at_cluster_time(response)
     }
 
     fn handle_response_cow<'a>(

@@ -126,7 +126,7 @@ impl<'a, T: Send + Sync> Find<'a, T, ImplicitSession> {
         let mut find = Op::new(self.coll.namespace(), self.filter, self.options);
         self.coll
             .client()
-            .execute_cursor_operation2(&mut find, None)
+            .execute_cursor_operation(&mut find, None)
             .await
     }
 
@@ -157,7 +157,7 @@ impl<'a, T: Send + Sync> Find<'a, T, ExplicitSession<'a>> {
         let mut find = Op::new(self.coll.namespace(), self.filter, self.options);
         self.coll
             .client()
-            .execute_cursor_operation2(&mut find, Some(self.session.0))
+            .execute_cursor_operation(&mut find, Some(self.session.0))
             .await
     }
 

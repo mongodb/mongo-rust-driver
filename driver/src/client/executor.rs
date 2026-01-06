@@ -36,7 +36,7 @@ use crate::{
         RawCommandResponse,
         StreamDescription,
     },
-    cursor::{session::SessionCursor, Cursor, CursorSpecification},
+    cursor::{session::SessionCursor, Cursor},
     error::{
         Error,
         ErrorKind,
@@ -192,36 +192,7 @@ impl Client {
     /// Execute the given operation, returning the cursor created by the operation.
     ///
     /// Server selection be will performed using the criteria specified on the operation, if any.
-    pub(crate) async fn execute_cursor_operation<Op, T>(
-        &self,
-        mut op: impl BorrowMut<Op>,
-    ) -> Result<Cursor<T>>
-    where
-        Op: Operation<O = CursorSpecification>,
-    {
-        Box::pin(async {
-            let mut details = self
-                .execute_operation_with_details(op.borrow_mut(), None)
-                .await?;
-            let pinned = self.pin_connection_for_cursor(
-                &details.output.info,
-                &mut details.connection,
-                None,
-            )?;
-            Ok(Cursor::new(
-                self.clone(),
-                details.output,
-                details.implicit_session,
-                pinned,
-            ))
-        })
-        .await
-    }
-
-    /// Execute the given operation, returning the cursor created by the operation.
-    ///
-    /// Server selection be will performed using the criteria specified on the operation, if any.
-    pub(crate) async fn execute_cursor_operation2<Op, C>(
+    pub(crate) async fn execute_cursor_operation<Op, C>(
         &self,
         op: &mut Op,
         mut session: Option<&mut ClientSession>,
@@ -247,26 +218,6 @@ impl Client {
             )
         })
         .await
-    }
-
-    pub(crate) async fn execute_session_cursor_operation<Op, T>(
-        &self,
-        mut op: impl BorrowMut<Op>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<T>>
-    where
-        Op: Operation<O = CursorSpecification>,
-    {
-        let mut details = self
-            .execute_operation_with_details(op.borrow_mut(), &mut *session)
-            .await?;
-
-        let pinned = self.pin_connection_for_cursor(
-            &details.output.info,
-            &mut details.connection,
-            Some(session),
-        )?;
-        Ok(SessionCursor::new(self.clone(), details.output, pinned))
     }
 
     pub(crate) fn is_load_balanced(&self) -> bool {

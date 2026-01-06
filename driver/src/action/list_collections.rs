@@ -116,7 +116,7 @@ impl<'a, S: ActionSession<'a>> ListCollections<'a, ListSpecifications, S> {
             op::ListCollections::new(self.db.name().to_string(), false, self.options);
         self.db
             .client()
-            .execute_cursor_operation2(&mut list_collections, self.session.into_opt_session())
+            .execute_cursor_operation(&mut list_collections, self.session.into_opt_session())
             .await
     }
 }
@@ -183,7 +183,7 @@ impl<'a> Action for ListCollections<'a, ListNames, ImplicitSession> {
         let cursor: Cursor<Document> = self
             .db
             .client()
-            .execute_cursor_operation2(&mut list_collections, None)
+            .execute_cursor_operation(&mut list_collections, None)
             .await?;
         return list_collection_names_common(cursor).await;
     }
@@ -199,7 +199,7 @@ impl<'a> Action for ListCollections<'a, ListNames, ExplicitSession<'a>> {
         let mut cursor: SessionCursor<Document> = self
             .db
             .client()
-            .execute_cursor_operation2(&mut list_collections, Some(&mut *self.session.0))
+            .execute_cursor_operation(&mut list_collections, Some(&mut *self.session.0))
             .await?;
 
         list_collection_names_common(cursor.stream(self.session.0)).await

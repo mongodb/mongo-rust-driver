@@ -262,9 +262,7 @@ impl<'a> RunCursorCommand<'a, ImplicitSession> {
         );
         let mut rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
         let client = self.db.client();
-        client
-            .execute_cursor_operation2(&mut rc_command, None)
-            .await
+        client.execute_cursor_operation(&mut rc_command, None).await
     }
 
     /// Execute this command, returning a cursor that provides results in zero-copy raw batches.
@@ -298,7 +296,7 @@ impl<'a> RunCursorCommand<'a, ExplicitSession<'a>> {
         let mut rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
         let client = self.db.client();
         client
-            .execute_cursor_operation2(&mut rc_command, Some(self.session.0))
+            .execute_cursor_operation(&mut rc_command, Some(self.session.0))
             .await
     }
 

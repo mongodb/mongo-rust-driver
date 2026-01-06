@@ -29,7 +29,7 @@ use crate::{
     change_stream::event::ResumeToken,
     client::{options::ServerAddress, AsyncDropToken},
     cmap::conn::PinnedConnectionHandle,
-    cursor::{common::ExplicitClientSessionHandle, CursorSpecification},
+    cursor::common::ExplicitClientSessionHandle,
     error::{Error, Result},
     Client,
     ClientSession,
@@ -90,31 +90,6 @@ impl<T> super::NewCursor for SessionCursor<T> {
 }
 
 impl<T> SessionCursor<T> {
-    pub(crate) fn new(
-        client: Client,
-        spec: CursorSpecification,
-        pinned: Option<PinnedConnectionHandle>,
-    ) -> Self {
-        let exhausted = spec.info.id == 0;
-
-        Self {
-            drop_token: client.register_async_drop(),
-            client,
-            info: spec.info,
-            drop_address: None,
-            _phantom: Default::default(),
-            #[cfg(test)]
-            kill_watcher: None,
-            state: CursorState {
-                buffer: CursorBuffer::new(spec.initial_buffer),
-                exhausted,
-                post_batch_resume_token: None,
-                pinned_connection: PinnedConnection::new(pinned),
-            }
-            .into(),
-        }
-    }
-
     pub(crate) fn new2(
         client: Client,
         spec: CursorSpecification2,

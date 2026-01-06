@@ -181,7 +181,7 @@ macro_rules! agg_exec_generic {
             $agg.options,
         );
         let client = $agg.target.client();
-        client.execute_cursor_operation2(&mut aggregate, None).await
+        client.execute_cursor_operation(&mut aggregate, None).await
     }};
 }
 
@@ -234,7 +234,7 @@ macro_rules! agg_exec_generic_session {
         let client = $agg.target.client();
         let session = $agg.session;
         client
-            .execute_cursor_operation2(&mut aggregate, Some(session.0))
+            .execute_cursor_operation(&mut aggregate, Some(session.0))
             .await
     }};
 }

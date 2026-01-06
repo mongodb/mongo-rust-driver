@@ -13,7 +13,6 @@ use crate::{
 };
 
 use super::{
-    CursorBody,
     ExecutionContext,
     OperationWithDefaults,
     WriteConcernOnlyBody,
@@ -75,7 +74,7 @@ impl OperationWithDefaults for Aggregate {
         &self,
         response: &crate::bson::RawDocument,
     ) -> Result<Option<crate::bson::Timestamp>> {
-        CursorBody::extract_at_cluster_time(response)
+        super::cursor_get_at_cluster_time(response)
     }
 
     fn handle_response_cow<'a>(

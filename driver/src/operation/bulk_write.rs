@@ -11,7 +11,7 @@ use crate::{
     bson_util::{self, RawDocumentCollection},
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification,
+    cursor::CursorSpecification2,
     error::{BulkWriteError, Error, ErrorKind, Result},
     operation::{
         run_command::RunCommand,
@@ -95,11 +95,11 @@ where
     async fn do_get_mores(
         &self,
         context: &mut ExecutionContext<'_>,
-        cursor_specification: CursorSpecification,
+        cursor_specification: CursorSpecification2,
         result: &mut impl BulkWriteResult,
         error: &mut BulkWriteError,
     ) -> Result<()> {
-        let mut responses = cursor_specification.initial_buffer;
+        let mut responses = crate::cursor::reply_batch(&cursor_specification.initial_reply)?;
         let mut more_responses = cursor_specification.info.id != 0;
         let mut namespace = cursor_specification.info.ns.clone();
         loop {
@@ -391,30 +391,30 @@ where
 
     fn handle_response_async<'b>(
         &'b self,
-        response: std::borrow::Cow<'b, RawCommandResponse>,
+        raw_response: std::borrow::Cow<'b, RawCommandResponse>,
         mut context: ExecutionContext<'b>,
     ) -> BoxFuture<'b, Result<Self::O>> {
         async move {
-            let response: WriteResponseBody<Response> = response.body()?;
-            let n_errors: usize = Checked::new(response.summary.n_errors).try_into()?;
+            let response: WriteResponseBody<SummaryInfo> = raw_response.body()?;
+            let n_errors: usize = Checked::new(response.body.n_errors).try_into()?;
 
             let mut error: BulkWriteError = Default::default();
             let mut result: R = Default::default();
 
             result.populate_summary_info(
-                response.summary.n_inserted,
-                response.summary.n_matched,
-                response.summary.n_modified,
-                response.summary.n_upserted,
-                response.summary.n_deleted,
+                response.body.n_inserted,
+                response.body.n_matched,
+                response.body.n_modified,
+                response.body.n_upserted,
+                response.body.n_deleted,
             );
 
             if let Some(write_concern_error) = response.write_concern_error {
                 error.write_concern_errors.push(write_concern_error);
             }
 
-            let specification = CursorSpecification::new(
-                response.body.cursor,
+            let specification = CursorSpecification2::new(
+                raw_response.into_owned(),
                 context
                     .connection
                     .stream_description()?
@@ -423,7 +423,7 @@ where
                 None,
                 None,
                 self.options.and_then(|options| options.comment.clone()),
-            );
+            )?;
 
             let iteration_result = if self.client.is_load_balanced() {
                 // Using a cursor with a pinned connection is not feasible here; see RUST-2131 for
@@ -434,7 +434,7 @@ where
                 match context.session {
                     Some(session) => {
                         let mut session_cursor =
-                            SessionCursor::new(self.client.clone(), specification, None);
+                            SessionCursor::new2(self.client.clone(), specification, None)?;
                         self.iterate_results_cursor(
                             session_cursor.stream(session),
                             &mut result,
@@ -443,7 +443,7 @@ where
                         .await
                     }
                     None => {
-                        let cursor = Cursor::new(self.client.clone(), specification, None, None);
+                        let cursor = Cursor::new2(self.client.clone(), specification, None, None)?;
                         self.iterate_results_cursor(cursor, &mut result, &mut error)
                             .await
                     }
@@ -478,6 +478,10 @@ where
             }
         }
         .boxed()
+    }
+
+    fn wants_owned_response(&self) -> bool {
+        true
     }
 
     fn retryability(&self) -> Retryability {

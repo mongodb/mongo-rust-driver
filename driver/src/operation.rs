@@ -25,7 +25,7 @@ pub(crate) mod run_cursor_command;
 mod search_index;
 mod update;
 
-use std::{borrow::Cow, collections::VecDeque, fmt::Debug, ops::Deref};
+use std::{borrow::Cow, fmt::Debug, ops::Deref};
 
 use bson::{RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
 use futures_util::FutureExt;
@@ -56,7 +56,6 @@ use crate::{
     selection_criteria::SelectionCriteria,
     BoxFuture,
     ClientSession,
-    Namespace,
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
@@ -553,33 +552,14 @@ impl<T> Deref for WriteResponseBody<T> {
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct CursorBody {
-    cursor: CursorInfo,
-}
-
-impl CursorBody {
-    fn extract_at_cluster_time(response: &RawDocument) -> Result<Option<Timestamp>> {
-        Ok(response
-            .get("cursor")?
-            .and_then(RawBsonRef::as_document)
-            .map(|d| d.get("atClusterTime"))
-            .transpose()?
-            .flatten()
-            .and_then(RawBsonRef::as_timestamp))
-    }
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CursorInfo {
-    pub(crate) id: i64,
-
-    pub(crate) ns: Namespace,
-
-    pub(crate) first_batch: VecDeque<RawDocumentBuf>,
-
-    pub(crate) post_batch_resume_token: Option<RawDocumentBuf>,
+fn cursor_get_at_cluster_time(response: &RawDocument) -> Result<Option<Timestamp>> {
+    Ok(response
+        .get("cursor")?
+        .and_then(RawBsonRef::as_document)
+        .map(|d| d.get("atClusterTime"))
+        .transpose()?
+        .flatten()
+        .and_then(RawBsonRef::as_timestamp))
 }
 
 /// Type used to deserialize just the first result from a cursor, if any.

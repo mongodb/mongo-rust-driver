@@ -20,7 +20,7 @@ use crate::{
     client::{session::ClientSession, AsyncDropToken},
     cmap::conn::PinnedConnectionHandle,
     error::{Error, ErrorKind, Result},
-    operation::{self, GetMore},
+    operation::GetMore,
     options::ServerAddress,
     results::GetMoreResult,
     Client,
@@ -50,30 +50,6 @@ pub(super) struct GenericCursor<'s, S> {
 }
 
 impl GenericCursor<'static, ImplicitClientSessionHandle> {
-    pub(super) fn with_implicit_session(
-        client: Client,
-        spec: CursorSpecification,
-        pinned_connection: PinnedConnection,
-        session: ImplicitClientSessionHandle,
-    ) -> Self {
-        let exhausted = spec.id() == 0;
-        Self {
-            client,
-            provider: if exhausted {
-                GetMoreProvider::Done
-            } else {
-                GetMoreProvider::Idle(Box::new(session))
-            },
-            info: spec.info,
-            state: Some(CursorState {
-                buffer: CursorBuffer::new(spec.initial_buffer),
-                exhausted,
-                post_batch_resume_token: None,
-                pinned_connection,
-            }),
-        }
-    }
-
     pub(super) fn with_implicit_session2(
         client: Client,
         spec: CursorSpecification2,
@@ -436,42 +412,6 @@ impl<'s, S: ClientSessionHandle<'s>> GetMoreProvider<'s, S> {
 struct GetMoreResultAndSession<S> {
     result: Result<GetMoreResult>,
     session: S,
-}
-
-/// Specification used to create a new cursor.
-#[derive(Debug, Clone)]
-pub(crate) struct CursorSpecification {
-    pub(crate) info: CursorInformation,
-    pub(crate) initial_buffer: VecDeque<RawDocumentBuf>,
-    #[expect(unused)]
-    pub(crate) post_batch_resume_token: Option<ResumeToken>,
-}
-
-impl CursorSpecification {
-    pub(crate) fn new(
-        info: operation::CursorInfo,
-        address: ServerAddress,
-        batch_size: impl Into<Option<u32>>,
-        max_time: impl Into<Option<Duration>>,
-        comment: impl Into<Option<Bson>>,
-    ) -> Self {
-        Self {
-            info: CursorInformation {
-                ns: info.ns,
-                id: info.id,
-                address,
-                batch_size: batch_size.into(),
-                max_time: max_time.into(),
-                comment: comment.into(),
-            },
-            initial_buffer: info.first_batch,
-            post_batch_resume_token: ResumeToken::from_raw(info.post_batch_resume_token),
-        }
-    }
-
-    pub(crate) fn id(&self) -> i64 {
-        self.info.id
-    }
 }
 
 /// Specification used to create a new cursor.

@@ -32,7 +32,6 @@ pub(crate) use common::{
     stream_poll_next,
     BatchValue,
     CursorInformation,
-    CursorSpecification,
     CursorSpecification2,
     CursorStream,
     NextInBatchFuture,
@@ -115,28 +114,6 @@ pub struct Cursor<T> {
 }
 
 impl<T> Cursor<T> {
-    pub(crate) fn new(
-        client: Client,
-        spec: CursorSpecification,
-        session: Option<ClientSession>,
-        pin: Option<PinnedConnectionHandle>,
-    ) -> Self {
-        Self {
-            client: client.clone(),
-            drop_token: client.register_async_drop(),
-            wrapped_cursor: Some(ImplicitSessionCursor::with_implicit_session(
-                client,
-                spec,
-                PinnedConnection::new(pin),
-                ImplicitClientSessionHandle(session),
-            )),
-            drop_address: None,
-            #[cfg(test)]
-            kill_watcher: None,
-            _phantom: Default::default(),
-        }
-    }
-
     pub(crate) fn new2(
         client: Client,
         spec: CursorSpecification2,

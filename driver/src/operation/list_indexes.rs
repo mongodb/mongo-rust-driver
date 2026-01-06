@@ -4,7 +4,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification,
+    cursor::CursorSpecification2,
     error::Result,
     operation::OperationWithDefaults,
     options::ListIndexesOptions,
@@ -12,7 +12,7 @@ use crate::{
     Namespace,
 };
 
-use super::{append_options_to_raw_document, CursorBody, ExecutionContext, Retryability};
+use super::{append_options_to_raw_document, ExecutionContext, Retryability};
 
 pub(crate) struct ListIndexes {
     ns: Namespace,
@@ -26,7 +26,7 @@ impl ListIndexes {
 }
 
 impl OperationWithDefaults for ListIndexes {
-    type O = CursorSpecification;
+    type O = CursorSpecification2;
 
     const NAME: &'static CStr = cstr!("listIndexes");
 
@@ -43,14 +43,13 @@ impl OperationWithDefaults for ListIndexes {
         Ok(Command::new(Self::NAME, &self.ns.db, body))
     }
 
-    fn handle_response<'a>(
+    fn handle_response_cow<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: CursorBody = response.body()?;
-        Ok(CursorSpecification::new(
-            response.cursor,
+        CursorSpecification2::new(
+            response.into_owned(),
             context
                 .connection
                 .stream_description()?
@@ -59,7 +58,7 @@ impl OperationWithDefaults for ListIndexes {
             self.options.as_ref().and_then(|o| o.batch_size),
             self.options.as_ref().and_then(|o| o.max_time),
             None,
-        ))
+        )
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
