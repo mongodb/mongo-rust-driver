@@ -3,9 +3,9 @@ use crate::bson::rawdoc;
 use crate::{
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification,
+    cursor::CursorSpecification2,
     error::Result,
-    operation::{CursorBody, OperationWithDefaults, Retryability},
+    operation::{OperationWithDefaults, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
 };
 
@@ -33,7 +33,7 @@ impl ListCollections {
 }
 
 impl OperationWithDefaults for ListCollections {
-    type O = CursorSpecification;
+    type O = CursorSpecification2;
 
     const NAME: &'static CStr = cstr!("listCollections");
 
@@ -55,14 +55,13 @@ impl OperationWithDefaults for ListCollections {
         Ok(Command::new(Self::NAME, &self.db, body))
     }
 
-    fn handle_response<'a>(
+    fn handle_response_cow<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: CursorBody = response.body()?;
-        Ok(CursorSpecification::new(
-            response.cursor,
+        CursorSpecification2::new(
+            response.into_owned(),
             context
                 .connection
                 .stream_description()?
@@ -71,7 +70,11 @@ impl OperationWithDefaults for ListCollections {
             self.options.as_ref().and_then(|opts| opts.batch_size),
             None,
             None,
-        ))
+        )
+    }
+
+    fn wants_owned_response(&self) -> bool {
+        true
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

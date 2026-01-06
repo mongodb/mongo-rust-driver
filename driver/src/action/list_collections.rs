@@ -1,6 +1,9 @@
 use std::marker::PhantomData;
 
-use crate::bson::{Bson, Document};
+use crate::{
+    action::ActionSession,
+    bson::{Bson, Document},
+};
 use futures_util::TryStreamExt;
 
 use crate::{
@@ -107,17 +110,31 @@ impl<'a, M> ListCollections<'a, M, ImplicitSession> {
     }
 }
 
+impl<'a, S: ActionSession<'a>> ListCollections<'a, ListSpecifications, S> {
+    async fn exec_generic<C: crate::cursor::NewCursor>(self) -> Result<C> {
+        let mut list_collections =
+            op::ListCollections::new(self.db.name().to_string(), false, self.options);
+        self.db
+            .client()
+            .execute_cursor_operation2(&mut list_collections, self.session.into_opt_session())
+            .await
+    }
+}
+
 #[action_impl(sync = crate::sync::Cursor<CollectionSpecification>)]
 impl<'a> Action for ListCollections<'a, ListSpecifications, ImplicitSession> {
     type Future = ListCollectionsFuture;
 
     async fn execute(self) -> Result<Cursor<CollectionSpecification>> {
-        let list_collections =
-            op::ListCollections::new(self.db.name().to_string(), false, self.options);
-        self.db
-            .client()
-            .execute_cursor_operation(list_collections)
-            .await
+        self.exec_generic().await
+    }
+}
+
+impl<'a> ListCollections<'a, ListSpecifications, ImplicitSession> {
+    /// Execute the list collections command, returning a cursor that provides results in zero-copy
+    /// raw batches.
+    pub async fn batch(self) -> Result<crate::raw_batch_cursor::RawBatchCursor> {
+        self.exec_generic().await
     }
 }
 
@@ -126,12 +143,15 @@ impl<'a> Action for ListCollections<'a, ListSpecifications, ExplicitSession<'a>>
     type Future = ListCollectionsSessionFuture;
 
     async fn execute(self) -> Result<SessionCursor<CollectionSpecification>> {
-        let list_collections =
-            op::ListCollections::new(self.db.name().to_string(), false, self.options);
-        self.db
-            .client()
-            .execute_session_cursor_operation(list_collections, self.session.0)
-            .await
+        self.exec_generic().await
+    }
+}
+
+impl<'a> ListCollections<'a, ListSpecifications, ExplicitSession<'a>> {
+    /// Execute the list collections command, returning a cursor that provides results in zero-copy
+    /// raw batches.
+    pub async fn batch(self) -> Result<crate::raw_batch_cursor::SessionRawBatchCursor> {
+        self.exec_generic().await
     }
 }
 
@@ -158,12 +178,12 @@ impl<'a> Action for ListCollections<'a, ListNames, ImplicitSession> {
     type Future = ListCollectionNamesFuture;
 
     async fn execute(self) -> Result<Vec<String>> {
-        let list_collections =
+        let mut list_collections =
             op::ListCollections::new(self.db.name().to_string(), true, self.options);
         let cursor: Cursor<Document> = self
             .db
             .client()
-            .execute_cursor_operation(list_collections)
+            .execute_cursor_operation2(&mut list_collections, None)
             .await?;
         return list_collection_names_common(cursor).await;
     }
@@ -174,12 +194,12 @@ impl<'a> Action for ListCollections<'a, ListNames, ExplicitSession<'a>> {
     type Future = ListCollectionNamesSessionFuture;
 
     async fn execute(self) -> Result<Vec<String>> {
-        let list_collections =
+        let mut list_collections =
             op::ListCollections::new(self.db.name().to_string(), true, self.options);
         let mut cursor: SessionCursor<Document> = self
             .db
             .client()
-            .execute_session_cursor_operation(list_collections, &mut *self.session.0)
+            .execute_cursor_operation2(&mut list_collections, Some(&mut *self.session.0))
             .await?;
 
         list_collection_names_common(cursor.stream(self.session.0)).await
