@@ -25,63 +25,12 @@ mod wait;
 
 use std::{fmt::Debug, ops::Deref};
 
-use collection::{
-    Aggregate,
-    AssertCollectionExists,
-    AssertCollectionNotExists,
-    CreateCollection,
-    DropCollection,
-};
-use command::{CreateCommandCursor, RunCommand, RunCursorCommand};
-use connection::{AssertNumberConnectionsCheckedOut, Close};
-use count::{AssertEventCount, CountDocuments, Distinct, EstimatedDocumentCount};
-use delete::{DeleteMany, DeleteOne};
-use failpoint::{FailPointCommand, TargetedFailPoint};
-use find::{
-    CreateFindCursor,
-    Find,
-    FindOne,
-    FindOneAndDelete,
-    FindOneAndReplace,
-    FindOneAndUpdate,
-};
 use futures::{future::BoxFuture, FutureExt};
-use gridfs::{Delete, DeleteByName, Download, DownloadByName, RenameByName, Upload};
-use index::{
-    AssertIndexExists,
-    AssertIndexNotExists,
-    CreateIndex,
-    DropIndex,
-    DropIndexes,
-    ListIndexNames,
-    ListIndexes,
-};
-use insert::{InsertMany, InsertOne};
-use iteration::{IterateOnce, IterateUntilDocumentOrError};
-use list::{ListCollectionNames, ListCollections, ListDatabaseNames, ListDatabases};
-use rename::Rename;
 use serde::{
     de::{DeserializeOwned, Deserializer},
     Deserialize,
 };
-use session::{
-    AssertDifferentLsidOnLastTwoCommands,
-    AssertSameLsidOnLastTwoCommands,
-    AssertSessionDirty,
-    AssertSessionNotDirty,
-    AssertSessionPinned,
-    AssertSessionTransactionState,
-    AssertSessionUnpinned,
-    EndSession,
-};
-use thread::{RunOnThread, WaitForThread};
 use tokio::sync::Mutex;
-use topology::{AssertTopologyType, RecordTopologyDescription};
-use transaction::{AbortTransaction, CommitTransaction, StartTransaction, WithTransaction};
-use update::{ReplaceOne, UpdateMany, UpdateOne};
-use wait::{Wait, WaitForEvent, WaitForPrimaryChange};
-
-use super::{results_match, Entity, ExpectError, TestCursor, TestFileEntity, TestRunner};
 
 use crate::{
     bson::{doc, Bson, Document},
@@ -89,10 +38,31 @@ use crate::{
     options::ChangeStreamOptions,
 };
 
+use super::{results_match, Entity, ExpectError, TestCursor, TestFileEntity, TestRunner};
+
 use bulk_write::*;
+use collection::*;
+use command::*;
+use connection::*;
+use count::*;
 #[cfg(feature = "in-use-encryption")]
 use csfle::*;
+use delete::*;
+use failpoint::*;
+use find::*;
+use gridfs::*;
+use index::*;
+use insert::*;
+use iteration::*;
+use list::*;
+use rename::*;
 use search_index::*;
+use session::*;
+use thread::*;
+use topology::*;
+use transaction::*;
+use update::*;
+use wait::*;
 
 pub(crate) trait TestOperation: Debug + Send + Sync {
     fn execute_test_runner_operation<'a>(
@@ -439,6 +409,7 @@ impl<'de> Deserialize<'de> for Operation {
             "decrypt" => deserialize_op::<Decrypt>(definition.arguments),
             "dropIndex" => deserialize_op::<DropIndex>(definition.arguments),
             "dropIndexes" => deserialize_op::<DropIndexes>(definition.arguments),
+            "getSnapshotTime" => deserialize_op::<GetSnapshotTime>(definition.arguments),
             s => Ok(Box::new(UnimplementedOperation {
                 _name: s.to_string(),
             }) as Box<dyn TestOperation>),

@@ -11,7 +11,7 @@ use futures::TryStreamExt;
 use futures_util::{future::try_join_all, FutureExt};
 
 use crate::{
-    bson::{doc, Document},
+    bson::{doc, Document, Timestamp},
     error::{ErrorKind, Result},
     event::{
         command::{CommandEvent, CommandStartedEvent},
@@ -21,8 +21,10 @@ use crate::{
         get_client_options,
         log_uncaptured,
         server_version_gte,
+        server_version_lt,
         spec::unified_runner::run_unified_tests,
         topology_is_load_balanced,
+        topology_is_replica_set,
         topology_is_sharded,
         Event,
     },
@@ -281,3 +283,50 @@ async fn no_cluster_time_in_sdam() {
     // Assert that the cluster time hasn't changed
     assert_eq!(cluster_time.as_ref(), start.command.get("$clusterTime"));
 }
+
+// Sessions prose test 21
+#[tokio::test]
+async fn snapshot_time_and_snapshot_false_disallowed() {
+    if server_version_lt(5, 0).await
+        || !(topology_is_replica_set().await || topology_is_sharded().await)
+    {
+        log_uncaptured(
+            "skipping snapshot_time_and_snapshot_false_disallowed: requires 5.0+ replica set or \
+             sharded cluster",
+        );
+        return;
+    }
+
+    let client = Client::for_test().await;
+    let error = client
+        .start_session()
+        .snapshot(false)
+        .snapshot_time(Timestamp {
+            time: 0,
+            increment: 0,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
+}
+
+// Sessions prose test 22
+#[tokio::test]
+async fn cannot_call_snapshot_time_on_non_snapshot_session() {
+    if server_version_lt(5, 0).await
+        || !(topology_is_replica_set().await || topology_is_sharded().await)
+    {
+        log_uncaptured(
+            "skipping cannot_call_snapshot_time_on_non_snapshot_session: requires 5.0+ replica \
+             set or sharded cluster",
+        );
+        return;
+    }
+
+    let client = Client::for_test().await;
+    let session = client.start_session().snapshot(false).await.unwrap();
+    assert!(session.snapshot_time().is_none());
+}
+
+// Sessions prose test 23 skipped: "Drivers MAY skip this test if they choose to expose a read-only
+// `snapshotTime` property using an accessor method only."
