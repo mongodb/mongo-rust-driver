@@ -61,6 +61,10 @@ impl OperationWithDefaults for ListIndexes {
         )
     }
 
+    fn wants_owned_response(&self) -> bool {
+        true
+    }
+
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         Some(SelectionCriteria::ReadPreference(ReadPreference::Primary)).as_ref()
     }

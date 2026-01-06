@@ -3,11 +3,11 @@ use std::time::Duration;
 use crate::{
     bson::{rawdoc, RawBson},
     bson_compat::{cstr, CStr},
+    cursor::CursorReply,
 };
 
 use crate::{
-    bson::{Bson, RawDocumentBuf},
-    change_stream::event::ResumeToken,
+    bson::Bson,
     checked::Checked,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     cursor::CursorInformation,
@@ -29,21 +29,12 @@ pub(crate) struct GetMore<'conn> {
     max_time: Option<Duration>,
     pinned_connection: Option<&'conn PinnedConnectionHandle>,
     comment: Option<Bson>,
-    owned: bool,
 }
 
 impl<'conn> GetMore<'conn> {
     pub(crate) fn new(
         info: CursorInformation,
         pinned: Option<&'conn PinnedConnectionHandle>,
-    ) -> Self {
-        Self::new_owned(info, pinned, false)
-    }
-
-    pub(crate) fn new_owned(
-        info: CursorInformation,
-        pinned: Option<&'conn PinnedConnectionHandle>,
-        owned: bool,
     ) -> Self {
         Self {
             ns: info.ns,
@@ -53,7 +44,6 @@ impl<'conn> GetMore<'conn> {
             max_time: info.max_time,
             pinned_connection: pinned,
             comment: info.comment,
-            owned,
         }
     }
 }
@@ -98,29 +88,12 @@ impl OperationWithDefaults for GetMore<'_> {
     ) -> Result<Self::O> {
         // Extract minimal fields directly from the raw reply to avoid walking the batch via serde.
         let root = response.raw_body();
-        let cursor = root
-            .get("cursor")?
-            .and_then(crate::bson::RawBsonRef::as_document)
-            .ok_or_else(|| crate::error::Error::invalid_response("missing cursor subdocument"))?;
-
-        let id = cursor
-            .get("id")?
-            .and_then(crate::bson::RawBsonRef::as_i64)
-            .ok_or_else(|| crate::error::Error::invalid_response("missing cursor id"))?;
-
-        let ns_str = cursor
-            .get("ns")?
-            .and_then(crate::bson::RawBsonRef::as_str)
-            .ok_or_else(|| crate::error::Error::invalid_response("missing cursor ns"))?;
-        let ns = Namespace::from_str(ns_str)
-            .ok_or_else(|| crate::error::Error::invalid_response("invalid cursor ns"))?;
-
-        let token_raw = cursor
-            .get("postBatchResumeToken")?
-            .and_then(crate::bson::RawBsonRef::as_document)
-            .map(|d| RawDocumentBuf::from_bytes(d.as_bytes().to_vec()))
-            .transpose()?;
-        let post_batch_resume_token = ResumeToken::from_raw(token_raw);
+        let cursor = root.get_document("cursor")?;
+        let CursorReply {
+            id,
+            ns,
+            post_batch_resume_token,
+        } = CursorReply::parse(cursor)?;
 
         // Take ownership of the raw bytes without copying.
         let raw = response.into_owned().into_raw_document_buf();
@@ -135,7 +108,7 @@ impl OperationWithDefaults for GetMore<'_> {
     }
 
     fn wants_owned_response(&self) -> bool {
-        self.owned
+        true
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

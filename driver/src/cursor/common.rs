@@ -50,7 +50,7 @@ pub(super) struct GenericCursor<'s, S> {
 }
 
 impl GenericCursor<'static, ImplicitClientSessionHandle> {
-    pub(super) fn with_implicit_session2(
+    pub(super) fn with_implicit_session(
         client: Client,
         spec: CursorSpecification,
         pinned_connection: PinnedConnection,
@@ -434,18 +434,13 @@ impl CursorSpecification {
         // Parse minimal fields via raw to avoid per-doc copies.
         let raw_root = response.raw_body();
         let cursor_doc = raw_root.get_document("cursor")?;
-        let id = cursor_doc.get_i64("id")?;
-        let ns_str = cursor_doc.get_str("ns")?;
-        let ns = Namespace::from_str(ns_str)
-            .ok_or_else(|| Error::invalid_response("invalid cursor ns"))?;
-        let post_token_raw = cursor_doc
-            .get("postBatchResumeToken")?
-            .and_then(crate::bson::RawBsonRef::as_document)
-            .map(|d| d.to_owned());
+        let CursorReply {
+            id,
+            ns,
+            post_batch_resume_token,
+        } = CursorReply::parse(cursor_doc)?;
         let first_batch = cursor_doc.get_array("firstBatch")?;
         let is_empty = first_batch.is_empty();
-        let post_batch_resume_token =
-            crate::change_stream::event::ResumeToken::from_raw(post_token_raw);
         Ok(Self {
             info: CursorInformation {
                 ns,
@@ -463,6 +458,33 @@ impl CursorSpecification {
 
     pub(crate) fn id(&self) -> i64 {
         self.info.id
+    }
+}
+
+/// Fields in an server cursor reply value, minus the actual documents.
+pub(crate) struct CursorReply {
+    pub(crate) id: i64,
+    pub(crate) ns: Namespace,
+    pub(crate) post_batch_resume_token: Option<ResumeToken>,
+}
+
+impl CursorReply {
+    pub(crate) fn parse(cursor_doc: &RawDocument) -> Result<Self> {
+        let id = cursor_doc.get_i64("id")?;
+        let ns_str = cursor_doc.get_str("ns")?;
+        let ns = Namespace::from_str(ns_str)
+            .ok_or_else(|| Error::invalid_response("invalid cursor ns"))?;
+        let post_token_raw = cursor_doc
+            .get("postBatchResumeToken")?
+            .and_then(crate::bson::RawBsonRef::as_document)
+            .map(|d| d.to_owned());
+        let post_batch_resume_token =
+            crate::change_stream::event::ResumeToken::from_raw(post_token_raw);
+        Ok(Self {
+            id,
+            ns,
+            post_batch_resume_token,
+        })
     }
 }
 

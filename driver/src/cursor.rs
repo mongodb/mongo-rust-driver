@@ -32,6 +32,7 @@ pub(crate) use common::{
     stream_poll_next,
     BatchValue,
     CursorInformation,
+    CursorReply,
     CursorSpecification,
     CursorStream,
     NextInBatchFuture,
@@ -123,7 +124,7 @@ impl<T> Cursor<T> {
         Ok(Self {
             client: client.clone(),
             drop_token: client.register_async_drop(),
-            wrapped_cursor: Some(ImplicitSessionCursor::with_implicit_session2(
+            wrapped_cursor: Some(ImplicitSessionCursor::with_implicit_session(
                 client,
                 spec,
                 PinnedConnection::new(pin),
