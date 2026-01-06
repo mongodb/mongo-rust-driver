@@ -321,7 +321,7 @@ impl Client {
             let (cursor_spec, cs_data) = details.output;
             let pinned =
                 self.pin_connection_for_cursor(&cursor_spec.info, &mut details.connection, None)?;
-            let cursor = Cursor::new(self.clone(), cursor_spec, details.implicit_session, pinned);
+            let cursor = Cursor::new2(self.clone(), cursor_spec, details.implicit_session, pinned)?;
 
             Ok(ChangeStream::new(cursor, args, cs_data))
         })
@@ -357,7 +357,7 @@ impl Client {
                 &mut details.connection,
                 Some(session),
             )?;
-            let cursor = SessionCursor::new(self.clone(), cursor_spec, pinned);
+            let cursor = SessionCursor::new2(self.clone(), cursor_spec, pinned)?;
 
             Ok(SessionChangeStream::new(cursor, args, cs_data))
         })

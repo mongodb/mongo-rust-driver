@@ -5,7 +5,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification,
+    cursor::CursorSpecification2,
     error::Result,
     operation::{append_options, Retryability},
     options::{AggregateOptions, ReadPreference, SelectionCriteria, WriteConcern},
@@ -44,7 +44,7 @@ impl Aggregate {
 // IMPORTANT: If new method implementations are added here, make sure `ChangeStreamAggregate` has
 // the equivalent delegations.
 impl OperationWithDefaults for Aggregate {
-    type O = CursorSpecification;
+    type O = CursorSpecification2;
 
     const NAME: &'static CStr = cstr!("aggregate");
 
@@ -78,13 +78,11 @@ impl OperationWithDefaults for Aggregate {
         CursorBody::extract_at_cluster_time(response)
     }
 
-    fn handle_response<'a>(
+    fn handle_response_cow<'a>(
         &'a self,
-        response: &RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let cursor_response: CursorBody = response.body()?;
-
         if self.is_out_or_merge() {
             let wc_error_info = response.body::<WriteConcernOnlyBody>()?;
             wc_error_info.validate()?;
@@ -99,13 +97,17 @@ impl OperationWithDefaults for Aggregate {
             self.options.as_ref().and_then(|opts| opts.comment.clone())
         };
 
-        Ok(CursorSpecification::new(
-            cursor_response.cursor,
+        CursorSpecification2::new(
+            response.into_owned(),
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
             comment,
-        ))
+        )
+    }
+
+    fn wants_owned_response(&self) -> bool {
+        true
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

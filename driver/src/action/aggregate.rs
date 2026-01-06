@@ -116,7 +116,7 @@ pub struct Aggregate<'a, Session = ImplicitSession, T = Document> {
     pipeline: Vec<Document>,
     options: Option<AggregateOptions>,
     session: Session,
-    _phantom: PhantomData<T>,
+    _phantom: PhantomData<fn() -> T>,
 }
 
 impl<'a> Aggregate<'a> {
@@ -183,24 +183,30 @@ impl<'a, T> Aggregate<'a, ImplicitSession, T> {
     }
 }
 
+macro_rules! agg_exec_generic {
+    ($agg:expr) => {{
+        resolve_options!(
+            $agg.target,
+            $agg.options,
+            [read_concern, write_concern, selection_criteria]
+        );
+
+        let mut aggregate = crate::operation::aggregate::Aggregate::new(
+            $agg.target.target(),
+            $agg.pipeline,
+            $agg.options,
+        );
+        let client = $agg.target.client();
+        client.execute_cursor_operation2(&mut aggregate, None).await
+    }};
+}
+
 #[action_impl(sync = crate::sync::Cursor<T>)]
 impl<'a, T> Action for Aggregate<'a, ImplicitSession, T> {
     type Future = AggregateFuture;
 
     async fn execute(mut self) -> Result<Cursor<T>> {
-        resolve_options!(
-            self.target,
-            self.options,
-            [read_concern, write_concern, selection_criteria]
-        );
-
-        let aggregate = crate::operation::aggregate::Aggregate::new(
-            self.target.target(),
-            self.pipeline,
-            self.options,
-        );
-        let client = self.target.client();
-        client.execute_cursor_operation(aggregate).await
+        agg_exec_generic!(self)
     }
 }
 
@@ -217,7 +223,7 @@ impl<'a, T> Action for Aggregate<'a, ExplicitSession<'a>, T> {
             Some(&mut *self.session.0)
         );
 
-        let aggregate = crate::operation::aggregate::Aggregate::new(
+        let mut aggregate = crate::operation::aggregate::Aggregate::new(
             self.target.target(),
             self.pipeline,
             self.options,
@@ -225,7 +231,7 @@ impl<'a, T> Action for Aggregate<'a, ExplicitSession<'a>, T> {
         let client = self.target.client();
         let session = self.session;
         client
-            .execute_session_cursor_operation(aggregate, session.0)
+            .execute_cursor_operation2(&mut aggregate, Some(session.0))
             .await
     }
 }

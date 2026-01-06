@@ -443,6 +443,7 @@ struct GetMoreResultAndSession<S> {
 pub(crate) struct CursorSpecification {
     pub(crate) info: CursorInformation,
     pub(crate) initial_buffer: VecDeque<RawDocumentBuf>,
+    #[expect(unused)]
     pub(crate) post_batch_resume_token: Option<ResumeToken>,
 }
 
@@ -478,6 +479,7 @@ impl CursorSpecification {
 pub(crate) struct CursorSpecification2 {
     pub(crate) info: CursorInformation,
     pub(crate) initial_reply: RawDocumentBuf,
+    pub(crate) is_empty: bool,
     pub(crate) post_batch_resume_token: Option<ResumeToken>,
 }
 
@@ -500,6 +502,8 @@ impl CursorSpecification2 {
             .get("postBatchResumeToken")?
             .and_then(crate::bson::RawBsonRef::as_document)
             .map(|d| d.to_owned());
+        let first_batch = cursor_doc.get_array("firstBatch")?;
+        let is_empty = first_batch.is_empty();
         let post_batch_resume_token =
             crate::change_stream::event::ResumeToken::from_raw(post_token_raw);
         Ok(Self {
@@ -512,6 +516,7 @@ impl CursorSpecification2 {
                 comment: comment.into(),
             },
             initial_reply: response.into_raw_document_buf(),
+            is_empty,
             post_batch_resume_token,
         })
     }

@@ -115,7 +115,7 @@ impl<T> SessionCursor<T> {
         }
     }
 
-    fn new2(
+    pub(crate) fn new2(
         client: Client,
         spec: CursorSpecification2,
         pinned: Option<PinnedConnectionHandle>,
