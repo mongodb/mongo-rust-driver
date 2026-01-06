@@ -5,13 +5,13 @@
 //!
 //! # When to Use
 //!
-//! **Use `find_raw_batches()` when:**
+//! **Use `RawBatchCursor` when:**
 //! - Processing high-volume queries where deserialization is a bottleneck
 //! - Implementing custom batch-level logic (e.g., batch transformation, filtering)
 //! - Inspecting raw BSON structure without a known schema
 //! - Forwarding documents without modification (e.g., proxying, caching)
 //!
-//! **Use regular `find()` when:**
+//! **Use regular `Cursor` when:**
 //! - Working with strongly-typed `Deserialize` documents
 //! - Iterating one document at a time
 //! - Deserialization overhead is acceptable for your use case
@@ -19,13 +19,14 @@
 //! # Example
 //!
 //! ```no_run
-//! # use mongodb::{Client, bson::doc};
+//! # use mongodb::{Client, bson::{doc, Document}};
 //! # async fn example() -> mongodb::error::Result<()> {
 //! # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
 //! # let db = client.database("db");
+//! # let coll = db.collection::<Document>("coll");
 //! use futures::stream::StreamExt;
 //!
-//! let mut cursor = db.find_raw_batches("coll", doc! {}).await?;
+//! let mut cursor = coll.find(doc! {}).batch().await?;
 //! while let Some(batch) = cursor.next().await {
 //!     let batch = batch?;
 //!     // Zero-copy access to documents in this batch
@@ -165,16 +166,6 @@ impl RawBatchCursor {
                 initial_reply: Some(spec.initial_reply),
             },
         }
-    }
-
-    #[expect(unused)]
-    pub(crate) fn address(&self) -> &ServerAddress {
-        &self.info.address
-    }
-
-    #[expect(unused)]
-    pub(crate) fn set_drop_address(&mut self, address: ServerAddress) {
-        self.drop_address = Some(address);
     }
 
     pub(crate) fn is_exhausted(&self) -> bool {
