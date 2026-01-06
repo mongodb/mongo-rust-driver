@@ -2,7 +2,7 @@ use crate::{
     bson::{doc, Document},
     change_stream::{event::ResumeToken, ChangeStreamData, WatchArgs},
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification2,
+    cursor::CursorSpecification,
     error::Result,
     operation::{append_options, ExecutionContext, OperationWithDefaults, Retryability},
     options::{ChangeStreamOptions, SelectionCriteria, WriteConcern},
@@ -40,7 +40,7 @@ impl ChangeStreamAggregate {
 }
 
 impl OperationWithDefaults for ChangeStreamAggregate {
-    type O = (CursorSpecification2, ChangeStreamData);
+    type O = (CursorSpecification, ChangeStreamData);
 
     const NAME: &'static crate::bson_compat::CStr = Aggregate::NAME;
 

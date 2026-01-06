@@ -2,7 +2,7 @@
 #[cfg(test)]
 use std::convert::TryInto;
 
-use crate::{cursor::CursorSpecification2, options::ChangeStreamOptions};
+use crate::{cursor::CursorSpecification, options::ChangeStreamOptions};
 
 use crate::bson::{DateTime, Document, RawBson, RawDocumentBuf, Timestamp};
 #[cfg(test)]
@@ -26,7 +26,7 @@ pub struct ResumeToken(pub(crate) RawBson);
 impl ResumeToken {
     pub(crate) fn initial(
         options: Option<&ChangeStreamOptions>,
-        spec: &CursorSpecification2,
+        spec: &CursorSpecification,
     ) -> Option<ResumeToken> {
         match &spec.post_batch_resume_token {
             // Token from initial response from `aggregate`

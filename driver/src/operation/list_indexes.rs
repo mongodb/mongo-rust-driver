@@ -4,7 +4,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification2,
+    cursor::CursorSpecification,
     error::Result,
     operation::OperationWithDefaults,
     options::ListIndexesOptions,
@@ -26,7 +26,7 @@ impl ListIndexes {
 }
 
 impl OperationWithDefaults for ListIndexes {
-    type O = CursorSpecification2;
+    type O = CursorSpecification;
 
     const NAME: &'static CStr = cstr!("listIndexes");
 
@@ -48,7 +48,7 @@ impl OperationWithDefaults for ListIndexes {
         response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        CursorSpecification2::new(
+        CursorSpecification::new(
             response.into_owned(),
             context
                 .connection

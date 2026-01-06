@@ -11,7 +11,7 @@ use crate::{
     bson_util::{self, RawDocumentCollection},
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification2,
+    cursor::CursorSpecification,
     error::{BulkWriteError, Error, ErrorKind, Result},
     operation::{
         run_command::RunCommand,
@@ -95,7 +95,7 @@ where
     async fn do_get_mores(
         &self,
         context: &mut ExecutionContext<'_>,
-        cursor_specification: CursorSpecification2,
+        cursor_specification: CursorSpecification,
         result: &mut impl BulkWriteResult,
         error: &mut BulkWriteError,
     ) -> Result<()> {
@@ -413,7 +413,7 @@ where
                 error.write_concern_errors.push(write_concern_error);
             }
 
-            let specification = CursorSpecification2::new(
+            let specification = CursorSpecification::new(
                 raw_response.into_owned(),
                 context
                     .connection
@@ -434,7 +434,7 @@ where
                 match context.session {
                     Some(session) => {
                         let mut session_cursor =
-                            SessionCursor::new2(self.client.clone(), specification, None)?;
+                            SessionCursor::new(self.client.clone(), specification, None)?;
                         self.iterate_results_cursor(
                             session_cursor.stream(session),
                             &mut result,
@@ -443,7 +443,7 @@ where
                         .await
                     }
                     None => {
-                        let cursor = Cursor::new2(self.client.clone(), specification, None, None)?;
+                        let cursor = Cursor::new(self.client.clone(), specification, None, None)?;
                         self.iterate_results_cursor(cursor, &mut result, &mut error)
                             .await
                     }

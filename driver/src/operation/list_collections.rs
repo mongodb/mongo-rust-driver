@@ -3,7 +3,7 @@ use crate::bson::rawdoc;
 use crate::{
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification2,
+    cursor::CursorSpecification,
     error::Result,
     operation::{OperationWithDefaults, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
@@ -33,7 +33,7 @@ impl ListCollections {
 }
 
 impl OperationWithDefaults for ListCollections {
-    type O = CursorSpecification2;
+    type O = CursorSpecification;
 
     const NAME: &'static CStr = cstr!("listCollections");
 
@@ -60,7 +60,7 @@ impl OperationWithDefaults for ListCollections {
         response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        CursorSpecification2::new(
+        CursorSpecification::new(
             response.into_owned(),
             context
                 .connection

@@ -4,7 +4,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     concern::WriteConcern,
-    cursor::CursorSpecification2,
+    cursor::CursorSpecification,
     error::{Error, Result},
     operation::{run_command::RunCommand, Operation, SERVER_4_4_0_WIRE_VERSION},
     options::RunCursorCommandOptions,
@@ -33,7 +33,7 @@ impl<'conn> RunCursorCommand<'conn> {
 }
 
 impl Operation for RunCursorCommand<'_> {
-    type O = CursorSpecification2;
+    type O = CursorSpecification;
 
     const NAME: &'static CStr = cstr!("run_cursor_command");
 
@@ -107,7 +107,7 @@ impl Operation for RunCursorCommand<'_> {
                 self.options.as_ref().and_then(|opts| opts.comment.clone())
             };
 
-            CursorSpecification2::new(
+            CursorSpecification::new(
                 response.into_owned(),
                 description.server_address.clone(),
                 self.options.as_ref().and_then(|opts| opts.batch_size),

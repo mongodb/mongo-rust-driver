@@ -45,7 +45,7 @@ use std::{
 
 use crate::{
     bson::{RawArray, RawBsonRef, RawDocument},
-    cursor::CursorSpecification2,
+    cursor::CursorSpecification,
     operation::GetMore,
 };
 use futures_core::{future::BoxFuture, Future, Stream};
@@ -132,7 +132,7 @@ struct RawBatchCursorState {
 impl crate::cursor::NewCursor for RawBatchCursor {
     fn generic_new(
         client: Client,
-        spec: CursorSpecification2,
+        spec: CursorSpecification,
         implicit_session: Option<ClientSession>,
         pinned: Option<PinnedConnectionHandle>,
     ) -> Result<Self> {
@@ -143,7 +143,7 @@ impl crate::cursor::NewCursor for RawBatchCursor {
 impl RawBatchCursor {
     fn new(
         client: Client,
-        spec: CursorSpecification2,
+        spec: CursorSpecification,
         session: Option<ClientSession>,
         pin: Option<PinnedConnectionHandle>,
     ) -> Self {
@@ -287,7 +287,7 @@ pub struct SessionRawBatchCursor {
 impl super::NewCursor for SessionRawBatchCursor {
     fn generic_new(
         client: Client,
-        spec: CursorSpecification2,
+        spec: CursorSpecification,
         _implicit_session: Option<ClientSession>,
         pinned: Option<PinnedConnectionHandle>,
     ) -> Result<Self> {
@@ -298,7 +298,7 @@ impl super::NewCursor for SessionRawBatchCursor {
 impl SessionRawBatchCursor {
     fn new(
         client: Client,
-        spec: CursorSpecification2,
+        spec: CursorSpecification,
         pinned: Option<PinnedConnectionHandle>,
     ) -> Self {
         let exhausted = spec.info.id == 0;

@@ -32,7 +32,7 @@ pub(crate) use common::{
     stream_poll_next,
     BatchValue,
     CursorInformation,
-    CursorSpecification2,
+    CursorSpecification,
     CursorStream,
     NextInBatchFuture,
     PinnedConnection,
@@ -114,9 +114,9 @@ pub struct Cursor<T> {
 }
 
 impl<T> Cursor<T> {
-    pub(crate) fn new2(
+    pub(crate) fn new(
         client: Client,
-        spec: CursorSpecification2,
+        spec: CursorSpecification,
         session: Option<ClientSession>,
         pin: Option<PinnedConnectionHandle>,
     ) -> Result<Self> {
@@ -361,7 +361,7 @@ type ImplicitSessionCursor = GenericCursor<'static, ImplicitClientSessionHandle>
 pub(crate) trait NewCursor: Sized {
     fn generic_new(
         client: Client,
-        spec: CursorSpecification2,
+        spec: CursorSpecification,
         implicit_session: Option<ClientSession>,
         pinned: Option<PinnedConnectionHandle>,
     ) -> Result<Self>;
@@ -370,10 +370,10 @@ pub(crate) trait NewCursor: Sized {
 impl<T> NewCursor for Cursor<T> {
     fn generic_new(
         client: Client,
-        spec: CursorSpecification2,
+        spec: CursorSpecification,
         implicit_session: Option<ClientSession>,
         pinned: Option<PinnedConnectionHandle>,
     ) -> Result<Self> {
-        Self::new2(client, spec, implicit_session, pinned)
+        Self::new(client, spec, implicit_session, pinned)
     }
 }

@@ -52,7 +52,7 @@ pub(super) struct GenericCursor<'s, S> {
 impl GenericCursor<'static, ImplicitClientSessionHandle> {
     pub(super) fn with_implicit_session2(
         client: Client,
-        spec: CursorSpecification2,
+        spec: CursorSpecification,
         pinned_connection: PinnedConnection,
         session: ImplicitClientSessionHandle,
     ) -> Result<Self> {
@@ -416,14 +416,14 @@ struct GetMoreResultAndSession<S> {
 
 /// Specification used to create a new cursor.
 #[derive(Debug, Clone)]
-pub(crate) struct CursorSpecification2 {
+pub(crate) struct CursorSpecification {
     pub(crate) info: CursorInformation,
     pub(crate) initial_reply: RawDocumentBuf,
     pub(crate) is_empty: bool,
     pub(crate) post_batch_resume_token: Option<ResumeToken>,
 }
 
-impl CursorSpecification2 {
+impl CursorSpecification {
     pub(crate) fn new(
         response: RawCommandResponse,
         address: ServerAddress,

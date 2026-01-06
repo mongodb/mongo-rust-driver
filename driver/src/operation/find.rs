@@ -4,7 +4,7 @@ use crate::{
     bson::{rawdoc, Document},
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification2,
+    cursor::CursorSpecification,
     error::{Error, Result},
     operation::{OperationWithDefaults, Retryability, SERVER_4_4_0_WIRE_VERSION},
     options::{CursorType, FindOptions, SelectionCriteria},
@@ -31,7 +31,7 @@ impl Find {
 }
 
 impl OperationWithDefaults for Find {
-    type O = CursorSpecification2;
+    type O = CursorSpecification;
     const NAME: &'static CStr = cstr!("find");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -104,7 +104,7 @@ impl OperationWithDefaults for Find {
             self.options.as_ref().and_then(|opts| opts.comment.clone())
         };
 
-        CursorSpecification2::new(
+        CursorSpecification::new(
             response.into_owned(),
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),

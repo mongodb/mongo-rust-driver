@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{bson::RawDocument, cursor::CursorSpecification2};
+use crate::{bson::RawDocument, cursor::CursorSpecification};
 use futures_core::Stream;
 use futures_util::StreamExt;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -81,18 +81,18 @@ pub struct SessionCursor<T> {
 impl<T> super::NewCursor for SessionCursor<T> {
     fn generic_new(
         client: Client,
-        spec: CursorSpecification2,
+        spec: CursorSpecification,
         _implicit_session: Option<ClientSession>,
         pinned: Option<PinnedConnectionHandle>,
     ) -> Result<Self> {
-        Self::new2(client, spec, pinned)
+        Self::new(client, spec, pinned)
     }
 }
 
 impl<T> SessionCursor<T> {
-    pub(crate) fn new2(
+    pub(crate) fn new(
         client: Client,
-        spec: CursorSpecification2,
+        spec: CursorSpecification,
         pinned: Option<PinnedConnectionHandle>,
     ) -> Result<Self> {
         let exhausted = spec.info.id == 0;

@@ -5,7 +5,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification2,
+    cursor::CursorSpecification,
     error::Result,
     operation::{append_options, Retryability},
     options::{AggregateOptions, ReadPreference, SelectionCriteria, WriteConcern},
@@ -43,7 +43,7 @@ impl Aggregate {
 // IMPORTANT: If new method implementations are added here, make sure `ChangeStreamAggregate` has
 // the equivalent delegations.
 impl OperationWithDefaults for Aggregate {
-    type O = CursorSpecification2;
+    type O = CursorSpecification;
 
     const NAME: &'static CStr = cstr!("aggregate");
 
@@ -96,7 +96,7 @@ impl OperationWithDefaults for Aggregate {
             self.options.as_ref().and_then(|opts| opts.comment.clone())
         };
 
-        CursorSpecification2::new(
+        CursorSpecification::new(
             response.into_owned(),
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
