@@ -37,6 +37,8 @@ impl Operation for RunCursorCommand<'_> {
 
     const NAME: &'static CStr = cstr!("run_cursor_command");
 
+    const ZERO_COPY: bool = true;
+
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.run_command.build(description)
     }
@@ -116,10 +118,6 @@ impl Operation for RunCursorCommand<'_> {
             )
         }
         .boxed()
-    }
-
-    fn wants_owned_response(&self) -> bool {
-        false
     }
 
     #[cfg(feature = "opentelemetry")]

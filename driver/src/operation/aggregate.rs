@@ -47,6 +47,8 @@ impl OperationWithDefaults for Aggregate {
 
     const NAME: &'static CStr = cstr!("aggregate");
 
+    const ZERO_COPY: bool = true;
+
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             crate::bson_compat::cstr_to_str(Self::NAME): self.target.to_bson(),
@@ -103,10 +105,6 @@ impl OperationWithDefaults for Aggregate {
             self.options.as_ref().and_then(|opts| opts.max_await_time),
             comment,
         )
-    }
-
-    fn wants_owned_response(&self) -> bool {
-        true
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

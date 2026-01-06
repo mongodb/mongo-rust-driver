@@ -30,6 +30,8 @@ impl OperationWithDefaults for ListIndexes {
 
     const NAME: &'static CStr = cstr!("listIndexes");
 
+    const ZERO_COPY: bool = true;
+
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.ns.coll.clone(),
@@ -59,10 +61,6 @@ impl OperationWithDefaults for ListIndexes {
             self.options.as_ref().and_then(|o| o.max_time),
             None,
         )
-    }
-
-    fn wants_owned_response(&self) -> bool {
-        true
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

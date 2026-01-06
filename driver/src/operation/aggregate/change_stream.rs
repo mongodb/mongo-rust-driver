@@ -44,6 +44,8 @@ impl OperationWithDefaults for ChangeStreamAggregate {
 
     const NAME: &'static crate::bson_compat::CStr = Aggregate::NAME;
 
+    const ZERO_COPY: bool = true;
+
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if let Some(data) = &mut self.resume_data {
             let mut new_opts = self.args.options.clone().unwrap_or_default();
@@ -118,10 +120,6 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         }
 
         Ok((spec, data))
-    }
-
-    fn wants_owned_response(&self) -> bool {
-        true
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

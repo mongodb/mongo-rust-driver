@@ -53,6 +53,8 @@ impl OperationWithDefaults for GetMore<'_> {
 
     const NAME: &'static CStr = cstr!("getMore");
 
+    const ZERO_COPY: bool = true;
+
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.cursor_id,
@@ -105,10 +107,6 @@ impl OperationWithDefaults for GetMore<'_> {
             ns,
             id,
         })
-    }
-
-    fn wants_owned_response(&self) -> bool {
-        true
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

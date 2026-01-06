@@ -645,7 +645,7 @@ impl Client {
                         effective_criteria: effective_criteria.clone(),
                     };
 
-                    let handle_result = match op.wants_owned_response() {
+                    let handle_result = match Op::ZERO_COPY {
                         true => op.handle_response(Cow::Owned(response), context).await,
                         false => op
                             .handle_response(Cow::Borrowed(&response), context)

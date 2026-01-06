@@ -33,6 +33,7 @@ impl Find {
 impl OperationWithDefaults for Find {
     type O = CursorSpecification;
     const NAME: &'static CStr = cstr!("find");
+    const ZERO_COPY: bool = true;
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
@@ -111,10 +112,6 @@ impl OperationWithDefaults for Find {
             self.options.as_ref().and_then(|opts| opts.max_await_time),
             comment,
         )
-    }
-
-    fn wants_owned_response(&self) -> bool {
-        true
     }
 
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {

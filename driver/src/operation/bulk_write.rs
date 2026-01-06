@@ -343,6 +343,8 @@ where
 
     const NAME: &'static CStr = cstr!("bulkWrite");
 
+    const ZERO_COPY: bool = true;
+
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if description.max_wire_version.unwrap_or(0) < SERVER_8_0_0_WIRE_VERSION {
             return Err(ErrorKind::IncompatibleServer {
@@ -478,10 +480,6 @@ where
             }
         }
         .boxed()
-    }
-
-    fn wants_owned_response(&self) -> bool {
-        true
     }
 
     fn retryability(&self) -> Retryability {

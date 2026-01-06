@@ -37,6 +37,8 @@ impl OperationWithDefaults for ListCollections {
 
     const NAME: &'static CStr = cstr!("listCollections");
 
+    const ZERO_COPY: bool = true;
+
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: 1,
@@ -71,10 +73,6 @@ impl OperationWithDefaults for ListCollections {
             None,
             None,
         )
-    }
-
-    fn wants_owned_response(&self) -> bool {
-        true
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
