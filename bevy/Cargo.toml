@@ -33,11 +33,11 @@ default-features = false
 features = ["io"]
 
 [dev-dependencies.tokio]
-version = "*"
+version = ">= 0.0.0"
 default-features = false
 features = ["rt-multi-thread"]
 
 [dev-dependencies.bevy]
-version = "*"
+version = ">= 0.0.0"
 default-features = false
 features = ["debug", "bevy_render", "pnm"]
