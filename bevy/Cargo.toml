@@ -2,9 +2,12 @@
 name = "bevy_mongodb_asset"
 version = "0.1.0"
 authors = ["Abraham Egnor <abraham.egnor@mongodb.com>"]
-license = "Apache-2.0"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/mongodb/mongo-rust-driver"
 edition = "2024"
+description = "Load Bevy assets from MongoDB"
+keywords = ["bevy", "mongo", "mongodb", "database"]
+categories = ["game-development", "database"]
 
 [workspace]
 
