@@ -81,7 +81,7 @@ async fn run_test(test_file: TestFile) {
             &read_pref,
             &topology_description,
             &servers,
-            &[],
+            None,
         )
         .expect("selection should not fail")
         .expect("a server should have been selected");

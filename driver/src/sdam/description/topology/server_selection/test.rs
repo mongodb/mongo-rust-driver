@@ -245,8 +245,7 @@ fn predicate_omits_unavailable() {
     }
     .into_topology_description(None);
     pretty_assertions::assert_eq!(
-        desc.filter_servers_by_selection_criteria(&criteria, &[])
-            .unwrap(),
+        desc.suitable_servers_in_latency_window(&criteria).unwrap(),
         Vec::<&ServerDescription>::new()
     );
 }

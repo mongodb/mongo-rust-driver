@@ -59,35 +59,19 @@ pub(crate) fn attempt_to_select_server<'a>(
     criteria: &'a SelectionCriteria,
     topology_description: &'a TopologyDescription,
     servers: &'a HashMap<ServerAddress, Arc<Server>>,
-    deprioritized: &[&ServerAddress],
+    deprioritized: Option<&ServerAddress>,
 ) -> Result<Option<SelectedServer>> {
-    if let Some(compatibility_error) = topology_description.compatibility_error() {
-        return Err(ErrorKind::ServerSelection {
-            message: compatibility_error.clone(),
+    let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
+    if let Some(addr) = deprioritized {
+        if in_window.len() > 1 {
+            in_window.retain(|d| &d.address != addr);
         }
-        .into());
     }
-    if let Some(max_staleness) = criteria.as_read_pref().and_then(|rp| rp.max_staleness()) {
-        if topology_description.is_replica_set() {
-
-
-        super::verify_max_staleness(max_staleness, topology_description.heartbeat_frequency())?;}
-    }
-
-    let mut servers_matching_criteria =
-        topology_description.filter_servers_by_selection_criteria(criteria, deprioritized)?;
-    if servers_matching_criteria.is_empty() && !deprioritized.is_empty() {
-        servers_matching_criteria =
-            topology_description.filter_servers_by_selection_criteria(criteria, &[])?;
-    }
-
-    topology_description.filter_servers_by_latency_window(&mut servers_matching_criteria);
-    let in_window_servers = servers_matching_criteria
+    let in_window_servers = in_window
         .into_iter()
         .flat_map(|desc| servers.get(&desc.address))
         .collect();
     let selected = select_server_in_latency_window(in_window_servers);
-
     Ok(selected.map(SelectedServer::new))
 }
 
@@ -120,53 +104,57 @@ impl TopologyDescription {
         }
     }
 
+    pub(crate) fn suitable_servers_in_latency_window<'a>(
+        &'a self,
+        criteria: &'a SelectionCriteria,
+    ) -> Result<Vec<&'a ServerDescription>> {
+        if let Some(message) = self.compatibility_error() {
+            return Err(ErrorKind::ServerSelection {
+                message: message.to_string(),
+            }
+            .into());
+        }
+
+        let mut suitable_servers = match criteria {
+            SelectionCriteria::ReadPreference(ref read_pref) => self.suitable_servers(read_pref)?,
+            SelectionCriteria::Predicate(ref filter) => self
+                .servers
+                .values()
+                .filter(|s| {
+                    // If we're direct-connected or connected to a standalone, ignore whether the
+                    // single server in the topology is data-bearing.
+                    (self.topology_type == TopologyType::Single || s.server_type.is_data_bearing())
+                        && filter(&ServerInfo::new_borrowed(s))
+                })
+                .collect(),
+        };
+
+        self.retain_servers_within_latency_window(&mut suitable_servers);
+
+        Ok(suitable_servers)
+    }
+
     pub(crate) fn has_available_servers(&self) -> bool {
         self.servers.values().any(|server| server.is_available())
     }
 
-    pub(crate) fn filter_servers_by_selection_criteria(
+    fn suitable_servers(
         &self,
-        selection_criteria: &SelectionCriteria,
-        deprioritized: &[&ServerAddress],
+        read_preference: &ReadPreference,
     ) -> Result<Vec<&ServerDescription>> {
-        let prioritized = self.servers.iter().filter_map(|(address, description)| {
-            if !deprioritized.contains(&address) {
-                Some(description)
-            } else {
-                None
-            }
-        });
-        let servers = match selection_criteria {
-            SelectionCriteria::ReadPreference(read_preference) => match self.topology_type {
-                TopologyType::Unknown => Vec::new(),
-                TopologyType::Single | TopologyType::LoadBalanced => prioritized.collect(),
-                TopologyType::Sharded => prioritized
-                    .filter(|sd| sd.server_type == ServerType::Mongos)
-                    .collect(),
-                TopologyType::ReplicaSetWithPrimary | TopologyType::ReplicaSetNoPrimary => {
-                    self.suitable_servers_in_replica_set(read_preference)?
-                }
-            },
-            SelectionCriteria::Predicate(predicate) => {
-                prioritized
-                    .filter(|s| {
-                        // If we're direct-connected or connected to a standalone, ignore whether
-                        // the single server in the topology is
-                        // data-bearing.
-                        (self.topology_type == TopologyType::Single
-                            || s.server_type.is_data_bearing())
-                            && predicate(&ServerInfo::new_borrowed(s))
-                    })
-                    .collect()
+        let servers = match self.topology_type {
+            TopologyType::Unknown => Vec::new(),
+            TopologyType::Single | TopologyType::LoadBalanced => self.servers.values().collect(),
+            TopologyType::Sharded => self.servers_with_type(&[ServerType::Mongos]).collect(),
+            TopologyType::ReplicaSetWithPrimary | TopologyType::ReplicaSetNoPrimary => {
+                self.suitable_servers_in_replica_set(read_preference)?
             }
         };
+
         Ok(servers)
     }
 
-    pub(crate) fn filter_servers_by_latency_window(
-        &self,
-        suitable_servers: &mut Vec<&ServerDescription>,
-    ) {
+    fn retain_servers_within_latency_window(&self, suitable_servers: &mut Vec<&ServerDescription>) {
         let shortest_average_rtt = suitable_servers
             .iter()
             .filter_map(|server_desc| server_desc.average_round_trip_time)
@@ -205,6 +193,81 @@ impl TopologyDescription {
     #[cfg(any(test, feature = "in-use-encryption"))]
     pub(crate) fn primary(&self) -> Option<&ServerDescription> {
         self.servers_with_type(&[ServerType::RsPrimary]).next()
+    }
+
+    fn suitable_servers_in_replica_set(
+        &self,
+        read_preference: &ReadPreference,
+    ) -> Result<Vec<&ServerDescription>> {
+        let tag_sets = read_preference.tag_sets();
+        let max_staleness = read_preference.max_staleness();
+
+        let servers = match read_preference {
+            ReadPreference::Primary => self.servers_with_type(&[ServerType::RsPrimary]).collect(),
+            ReadPreference::Secondary { .. } => self.suitable_servers_for_read_preference(
+                &[ServerType::RsSecondary],
+                tag_sets,
+                max_staleness,
+            )?,
+            ReadPreference::PrimaryPreferred { .. } => {
+                match self.servers_with_type(&[ServerType::RsPrimary]).next() {
+                    Some(primary) => vec![primary],
+                    None => self.suitable_servers_for_read_preference(
+                        &[ServerType::RsSecondary],
+                        tag_sets,
+                        max_staleness,
+                    )?,
+                }
+            }
+            ReadPreference::SecondaryPreferred { .. } => {
+                let suitable_servers = self.suitable_servers_for_read_preference(
+                    &[ServerType::RsSecondary],
+                    tag_sets,
+                    max_staleness,
+                )?;
+
+                if suitable_servers.is_empty() {
+                    self.servers_with_type(&[ServerType::RsPrimary]).collect()
+                } else {
+                    suitable_servers
+                }
+            }
+            ReadPreference::Nearest { .. } => self.suitable_servers_for_read_preference(
+                &[ServerType::RsPrimary, ServerType::RsSecondary],
+                tag_sets,
+                max_staleness,
+            )?,
+        };
+
+        Ok(servers)
+    }
+
+    fn suitable_servers_for_read_preference(
+        &self,
+        types: &'static [ServerType],
+        tag_sets: Option<&Vec<TagSet>>,
+        max_staleness: Option<Duration>,
+    ) -> Result<Vec<&ServerDescription>> {
+        if let Some(max_staleness) = max_staleness {
+            super::verify_max_staleness(max_staleness, self.heartbeat_frequency())?;
+        }
+
+        let mut servers = self.servers_with_type(types).collect();
+
+        // We don't need to check for the Client's default max_staleness because it would be passed
+        // in as part of the Client's default ReadPreference if none is specified for the operation.
+        if let Some(max_staleness) = max_staleness {
+            // According to the spec, max staleness <= 0 is the same as no max staleness.
+            if max_staleness > Duration::from_secs(0) {
+                self.filter_servers_by_max_staleness(&mut servers, max_staleness);
+            }
+        }
+
+        if let Some(tag_sets) = tag_sets {
+            filter_servers_by_tag_sets(&mut servers, tag_sets);
+        }
+
+        Ok(servers)
     }
 
     fn filter_servers_by_max_staleness(
@@ -353,30 +416,6 @@ impl fmt::Display for TopologyDescription {
     }
 }
 
-fn filter_servers_by_type(servers: &mut Vec<&ServerDescription>, server_type: ServerType) {
-    servers.retain(|sd| sd.server_type == server_type);
-}
-
-fn filter_servers_in_replica_set(
-    servers: &mut Vec<&ServerDescription>,
-    read_preference: &ReadPreference,
-) {
-    let tag_sets = read_preference.tag_sets();
-    let max_staleness = read_preference.max_staleness();
-
-    match read_preference {
-        ReadPreference::Primary => filter_servers_by_type(servers, ServerType::RsPrimary),
-        ReadPreference::PrimaryPreferred { .. } => {
-            if servers
-                .iter()
-                .any(|sd| sd.server_type == ServerType::RsPrimary)
-            {
-            } else {
-            }
-        }
-    }
-}
-
 fn filter_servers_by_tag_sets(servers: &mut Vec<&ServerDescription>, tag_sets: &[TagSet]) {
     if tag_sets.is_empty() {
         return;
@@ -393,26 +432,4 @@ fn filter_servers_by_tag_sets(servers: &mut Vec<&ServerDescription>, tag_sets: &
     }
 
     servers.clear();
-}
-
-/// Functions for filtering a list of server descriptions.
-mod filter {
-    use super::*;
-
-    fn by_type(servers: &mut Vec<&ServerDescription>, server_type: ServerType) {
-        servers.retain(|sd| sd.server_type == server_type);
-    }
-
-    fn by_read_preference_in_replica_set(
-        servers: &mut Vec<&ServerDescription>,
-        read_preference: &ReadPreference,
-    ) {
-        let tag_sets = read_preference.tag_sets();
-        let max_staleness = read_preference.max_staleness();
-
-        match read_preference {
-            ReadPreference::Primary => filter::by_type(servers, ServerType::RsPrimary),
-            ReadPreference::Secondary { .. } =>
-        }
-    }
 }

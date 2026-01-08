@@ -186,15 +186,6 @@ impl TopologyDescription {
         self.topology_type
     }
 
-    /// Whether this topology is a replica set, with or without a primary.
-    pub(crate) fn is_replica_set(&self) -> bool {
-        [
-            TopologyType::ReplicaSetWithPrimary,
-            TopologyType::ReplicaSetNoPrimary,
-        ]
-        .contains(&self.topology_type)
-    }
-
     pub(crate) fn server_addresses(&self) -> impl Iterator<Item = &ServerAddress> {
         self.servers.keys()
     }
