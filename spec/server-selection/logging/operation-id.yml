@@ -128,6 +128,7 @@ tests:
   - description: "Successful client bulkWrite operation: log messages have operationIds"
     runOnRequirements:
       - minServerVersion: "8.0" # required for bulkWrite command
+        serverless: forbid
     operations:
       # ensure we've discovered the server so it is immediately available
       # and no extra "waiting for suitable server" messages are emitted.
@@ -165,6 +166,7 @@ tests:
   - description: "Failed client bulkWrite operation: log messages have operationIds"
     runOnRequirements:
       - minServerVersion: "8.0" # required for bulkWrite command
+        serverless: forbid
     operations:
       # fail all hello/legacy hello commands for the main client.
       - name: failPoint
@@ -189,7 +191,7 @@ tests:
               newDescription:
                 type: Unknown
           count: 1
-      - name: bulkWrite
+      - name: clientBulkWrite
         object: *client
         arguments:
           models:

@@ -36,13 +36,13 @@ impl TopologyDescription {
     /// Whether this topology has a readable server available that satisfies the specified selection
     /// criteria.
     pub fn has_readable_server(&self, selection_criteria: Option<SelectionCriteria>) -> bool {
-        match self.description.suitable_servers_in_latency_window(
-            &selection_criteria
-                .unwrap_or(SelectionCriteria::ReadPreference(ReadPreference::Primary)),
-        ) {
-            Ok(servers) => !servers.is_empty(),
-            Err(_) => false,
-        }
+        let mut servers = self.description.filter_servers_by_selection_criteria(
+            &selection_criteria.unwrap_or(ReadPreference::Primary.into()),
+            &[],
+        );
+        self.description
+            .retain_servers_within_latency_window(&mut servers);
+        !servers.is_empty()
     }
 
     /// Whether this topology has a writable server available.

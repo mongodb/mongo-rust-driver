@@ -3,7 +3,6 @@ use std::time::Duration;
 use crate::{
     runtime,
     test::spec::unified_runner::{operation::TestOperation, ExpectedEvent, TestRunner},
-    ServerType,
 };
 use futures::future::BoxFuture;
 use futures_util::FutureExt;
@@ -53,7 +52,7 @@ impl TestOperation for WaitForPrimaryChange {
             let td = test_runner
                 .get_topology_description(&self.prior_topology_description)
                 .await;
-            let old_primary = td.servers_with_type(&[ServerType::RsPrimary]).next();
+            let old_primary = td.primary();
             let timeout = Duration::from_millis(self.timeout_ms.unwrap_or(10_000));
 
             runtime::timeout(timeout, async {
