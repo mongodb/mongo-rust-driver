@@ -124,9 +124,10 @@ buildvariants:
       SSL: ssl
     tasks:
       - name: build-nextest-archive
-      - name: .standalone
-      - name: .replicaset
-      - name: .sharded
+      # RUST-2327 / SERVER-116018
+      - name: .standalone !.latest
+      - name: .replicaset !.latest
+      - name: .sharded !.latest
 
   - name: openssl-rhel
     display_name: "OpenSSL (RHEL)"
