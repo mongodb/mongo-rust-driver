@@ -6,9 +6,12 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    client::options::ClientOptions,
     error::{Error, Result},
     options::{ReadPreference, ReadPreferenceOptions, TagSet},
+    selection_criteria::SelectionCriteria,
     test::run_spec_test,
+    Client,
 };
 
 use super::{TestServerDescription, TestTopologyDescription};
@@ -21,6 +24,7 @@ struct TestFile {
     topology_description: TestTopologyDescription,
     read_preference: TestReadPreference,
     suitable_servers: Option<Vec<TestServerDescription>>,
+    deprioritized_servers: Option<Vec<TestServerDescription>>,
     in_latency_window: Option<Vec<TestServerDescription>>,
     error: Option<bool>,
     #[serde(rename = "operation")]
@@ -96,7 +100,10 @@ async fn run_test(test_file: TestFile) {
             .into_topology_description(test_file.heartbeat_frequency_ms.map(Duration::from_millis));
 
         let rp: ReadPreference = test_file.read_preference.try_into().unwrap();
-        let mut actual_servers: Vec<_> = topology.suitable_servers(&rp).unwrap();
+        // isabeltodo pass in deprioritized from test
+        let mut actual_servers: Vec<_> = topology
+            .filter_servers_by_selection_criteria(&rp.into(), &[])
+            .unwrap();
 
         assert_eq!(
             get_sorted_addresses!(expected_suitable_servers),
@@ -104,7 +111,7 @@ async fn run_test(test_file: TestFile) {
         );
 
         if let Some(ref expected_in_latency_window) = test_file.in_latency_window {
-            topology.retain_servers_within_latency_window(&mut actual_servers);
+            topology.filter_servers_by_latency_window(&mut actual_servers);
 
             assert_eq!(
                 get_sorted_addresses!(expected_in_latency_window),
@@ -112,12 +119,6 @@ async fn run_test(test_file: TestFile) {
             );
         }
     } else if test_file.error == Some(true) {
-        use crate::{
-            client::options::ClientOptions,
-            selection_criteria::SelectionCriteria,
-            Client,
-        };
-
         let mut uri_options = Vec::new();
         if let Some(ref mode) = test_file.read_preference.mode {
             uri_options.push(format!("readPreference={mode}"));
