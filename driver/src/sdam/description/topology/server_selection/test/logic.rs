@@ -22,6 +22,8 @@ struct TestFile {
     read_preference: TestReadPreference,
     suitable_servers: Option<Vec<TestServerDescription>>,
     in_latency_window: Option<Vec<TestServerDescription>>,
+    #[serde(default)]
+    deprioritized_servers: Vec<TestServerDescription>,
     error: Option<bool>,
     #[serde(rename = "operation")]
     // don't need this since we don't have separate server selection functions for reads/writes
@@ -95,20 +97,26 @@ async fn run_test(test_file: TestFile) {
             .topology_description
             .into_topology_description(test_file.heartbeat_frequency_ms.map(Duration::from_millis));
 
-        let rp: ReadPreference = test_file.read_preference.try_into().unwrap();
-        let mut actual_servers: Vec<_> = topology.suitable_servers(&rp).unwrap();
+        let read_preference = ReadPreference::try_from(test_file.read_preference).unwrap();
+        let deprioritized = test_file
+            .deprioritized_servers
+            .iter()
+            .map(|d| &d.address)
+            .collect::<Vec<_>>();
+        let mut suitable_servers =
+            topology.filter_servers_by_selection_criteria(&read_preference.into(), &deprioritized);
 
         assert_eq!(
+            get_sorted_addresses!(&suitable_servers),
             get_sorted_addresses!(expected_suitable_servers),
-            get_sorted_addresses!(&actual_servers),
         );
 
         if let Some(ref expected_in_latency_window) = test_file.in_latency_window {
-            topology.retain_servers_within_latency_window(&mut actual_servers);
+            topology.retain_servers_within_latency_window(&mut suitable_servers);
 
             assert_eq!(
                 get_sorted_addresses!(expected_in_latency_window),
-                get_sorted_addresses!(&actual_servers)
+                get_sorted_addresses!(&suitable_servers)
             );
         }
     } else if test_file.error == Some(true) {

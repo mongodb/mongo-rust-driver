@@ -60,7 +60,7 @@ impl TestTopologyDescription {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct TestServerDescription {
-    address: String,
+    address: ServerAddress,
     #[serde(rename = "avg_rtt_ms")]
     avg_rtt_ms: Option<f64>,
     #[serde(rename = "type")]
@@ -77,7 +77,6 @@ impl TestServerDescription {
     fn into_server_description(self) -> Option<ServerDescription> {
         let server_type = self.server_type.into_server_type()?;
 
-        let server_address = ServerAddress::parse(self.address).ok()?;
         let tags = self.tags;
         let last_write = self.last_write;
         let avg_rtt_ms = self.avg_rtt_ms;
@@ -87,7 +86,7 @@ impl TestServerDescription {
                 last_write_date: DateTime::from_millis(last_write.last_write_date),
             });
             HelloReply {
-                server_address: server_address.clone(),
+                server_address: self.address.clone(),
                 command_response,
                 cluster_time: None,
                 raw_command_response: Default::default(),
@@ -96,11 +95,11 @@ impl TestServerDescription {
 
         let mut server_desc = match reply {
             Some(reply) => ServerDescription::new_from_hello_reply(
-                server_address,
+                self.address,
                 reply,
                 avg_rtt_ms.map(f64_ms_as_duration).unwrap(),
             ),
-            None => ServerDescription::new(&server_address),
+            None => ServerDescription::new(&self.address),
         };
         server_desc.last_update_time = self
             .last_update_time
@@ -197,7 +196,10 @@ fn predicate_omits_unavailable() {
         topology_type: TopologyType::ReplicaSetWithPrimary,
         servers: vec![
             TestServerDescription {
-                address: "localhost:27017".to_string(),
+                address: ServerAddress::Tcp {
+                    host: "localhost".to_string(),
+                    port: Some(27017),
+                },
                 avg_rtt_ms: Some(12.0),
                 server_type: TestServerType::RsPrimary,
                 tags: None,
@@ -206,7 +208,10 @@ fn predicate_omits_unavailable() {
                 _max_wire_version: None,
             },
             TestServerDescription {
-                address: "localhost:27018".to_string(),
+                address: ServerAddress::Tcp {
+                    host: "localhost".to_string(),
+                    port: Some(27018),
+                },
                 avg_rtt_ms: Some(12.0),
                 server_type: TestServerType::Unknown,
                 tags: None,
@@ -215,7 +220,10 @@ fn predicate_omits_unavailable() {
                 _max_wire_version: None,
             },
             TestServerDescription {
-                address: "localhost:27019".to_string(),
+                address: ServerAddress::Tcp {
+                    host: "localhost".to_string(),
+                    port: Some(27019),
+                },
                 avg_rtt_ms: Some(12.0),
                 server_type: TestServerType::RsArbiter,
                 tags: None,
@@ -224,7 +232,10 @@ fn predicate_omits_unavailable() {
                 _max_wire_version: None,
             },
             TestServerDescription {
-                address: "localhost:27020".to_string(),
+                address: ServerAddress::Tcp {
+                    host: "localhost".to_string(),
+                    port: Some(27020),
+                },
                 avg_rtt_ms: Some(12.0),
                 server_type: TestServerType::RsGhost,
                 tags: None,
@@ -233,7 +244,10 @@ fn predicate_omits_unavailable() {
                 _max_wire_version: None,
             },
             TestServerDescription {
-                address: "localhost:27021".to_string(),
+                address: ServerAddress::Tcp {
+                    host: "localhost".to_string(),
+                    port: Some(27021),
+                },
                 avg_rtt_ms: Some(12.0),
                 server_type: TestServerType::RsOther,
                 tags: None,
@@ -244,8 +258,7 @@ fn predicate_omits_unavailable() {
         ],
     }
     .into_topology_description(None);
-    pretty_assertions::assert_eq!(
-        desc.suitable_servers_in_latency_window(&criteria).unwrap(),
-        Vec::<&ServerDescription>::new()
-    );
+    assert!(desc
+        .filter_servers_by_selection_criteria(&criteria, &[])
+        .is_empty());
 }
