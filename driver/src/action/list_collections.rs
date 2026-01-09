@@ -48,7 +48,7 @@ impl Database {
     ///
     /// `await` will return d[`Result<Vec<String>>`].
     #[deeplink]
-    #[options_doc(list_collections)]
+    #[options_doc(list_collection_names)]
     pub fn list_collection_names(&self) -> ListCollections<'_, ListNames> {
         ListCollections {
             db: self,
@@ -75,7 +75,7 @@ impl crate::sync::Database {
     ///
     /// [`run`](ListCollections::run) will return d[`Result<Vec<String>>`].
     #[deeplink]
-    #[options_doc(list_collections, "run")]
+    #[options_doc(list_collection_names, "run")]
     pub fn list_collection_names(&self) -> ListCollections<'_, ListNames> {
         self.async_database.list_collection_names()
     }
@@ -92,8 +92,8 @@ pub struct ListCollections<'a, M = ListSpecifications, S = ImplicitSession> {
 }
 
 #[option_setters(crate::db::options::ListCollectionsOptions)]
-#[export_doc(list_collections, extra = [session, batch])]
-impl<M, S> ListCollections<'_, M, S> {}
+#[export_doc(list_collection_names, extra = [session])]
+impl<S> ListCollections<'_, ListNames, S> {}
 
 impl<'a, M> ListCollections<'a, M, ImplicitSession> {
     /// Use the provided session when running the operation.
@@ -110,6 +110,8 @@ impl<'a, M> ListCollections<'a, M, ImplicitSession> {
     }
 }
 
+#[option_setters(crate::db::options::ListCollectionsOptions)]
+#[export_doc(list_collections, extra = [session, batch])]
 impl<'a, S: ActionSession<'a>> ListCollections<'a, ListSpecifications, S> {
     async fn exec_generic<C: crate::cursor::NewCursor>(self) -> Result<C> {
         let mut list_collections =
