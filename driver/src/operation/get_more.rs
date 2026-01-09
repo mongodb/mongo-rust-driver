@@ -1,14 +1,13 @@
-use std::{collections::VecDeque, time::Duration};
+use std::time::Duration;
 
 use crate::{
     bson::{rawdoc, RawBson},
     bson_compat::{cstr, CStr},
+    cursor::CursorReply,
 };
-use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Bson, RawDocumentBuf},
-    change_stream::event::ResumeToken,
+    bson::Bson,
     checked::Checked,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     cursor::CursorInformation,
@@ -54,6 +53,8 @@ impl OperationWithDefaults for GetMore<'_> {
 
     const NAME: &'static CStr = cstr!("getMore");
 
+    const ZERO_COPY: bool = true;
+
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.cursor_id,
@@ -82,19 +83,29 @@ impl OperationWithDefaults for GetMore<'_> {
         Ok(Command::new(Self::NAME, &self.ns.db, body))
     }
 
-    fn handle_response<'a>(
+    fn handle_response_cow<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: GetMoreResponseBody = response.body()?;
+        // Extract minimal fields directly from the raw reply to avoid walking the batch via serde.
+        let root = response.raw_body();
+        let cursor = root.get_document("cursor")?;
+        let CursorReply {
+            id,
+            ns,
+            post_batch_resume_token,
+        } = CursorReply::parse(cursor)?;
+
+        // Take ownership of the raw bytes without copying.
+        let raw = response.into_owned().into_raw_document_buf();
 
         Ok(GetMoreResult {
-            batch: response.cursor.next_batch,
-            exhausted: response.cursor.id == 0,
-            post_batch_resume_token: ResumeToken::from_raw(response.cursor.post_batch_resume_token),
-            id: response.cursor.id,
-            ns: Namespace::from_str(response.cursor.ns.as_str()).unwrap(),
+            raw_reply: raw,
+            exhausted: id == 0,
+            post_batch_resume_token,
+            ns,
+            id,
         })
     }
 
@@ -122,6 +133,7 @@ impl crate::otel::OtelInfoDefaults for GetMore<'_> {
     }
 }
 
+/*
 #[derive(Debug, Deserialize)]
 pub(crate) struct GetMoreResponseBody {
     cursor: NextBatchBody,
@@ -135,3 +147,4 @@ struct NextBatchBody {
     post_batch_resume_token: Option<RawDocumentBuf>,
     ns: String,
 }
+*/

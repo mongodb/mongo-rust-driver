@@ -2,7 +2,7 @@
 
 mod bulk_write;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -103,7 +103,7 @@ impl CreateIndexesResult {
 
 #[derive(Debug, Clone)]
 pub(crate) struct GetMoreResult {
-    pub(crate) batch: VecDeque<RawDocumentBuf>,
+    pub(crate) raw_reply: RawDocumentBuf,
     pub(crate) exhausted: bool,
     pub(crate) post_batch_resume_token: Option<ResumeToken>,
     pub(crate) ns: Namespace,

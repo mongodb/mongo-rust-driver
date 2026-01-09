@@ -5,7 +5,10 @@ use std::{
     time::Duration,
 };
 
-use crate::bson::{RawDocument, RawDocumentBuf};
+use crate::{
+    bson::{RawDocument, RawDocumentBuf},
+    cmap::RawCommandResponse,
+};
 use derive_where::derive_where;
 use futures_core::{future::BoxFuture, Future};
 #[cfg(test)]
@@ -17,7 +20,7 @@ use crate::{
     client::{session::ClientSession, AsyncDropToken},
     cmap::conn::PinnedConnectionHandle,
     error::{Error, ErrorKind, Result},
-    operation::{self, GetMore},
+    operation::GetMore,
     options::ServerAddress,
     results::GetMoreResult,
     Client,
@@ -52,9 +55,9 @@ impl GenericCursor<'static, ImplicitClientSessionHandle> {
         spec: CursorSpecification,
         pinned_connection: PinnedConnection,
         session: ImplicitClientSessionHandle,
-    ) -> Self {
+    ) -> Result<Self> {
         let exhausted = spec.id() == 0;
-        Self {
+        Ok(Self {
             client,
             provider: if exhausted {
                 GetMoreProvider::Done
@@ -63,12 +66,12 @@ impl GenericCursor<'static, ImplicitClientSessionHandle> {
             },
             info: spec.info,
             state: Some(CursorState {
-                buffer: CursorBuffer::new(spec.initial_buffer),
+                buffer: CursorBuffer::new(reply_batch(&spec.initial_reply)?),
                 exhausted,
                 post_batch_resume_token: None,
                 pinned_connection,
             }),
-        }
+        })
     }
 
     /// Extracts the stored implicit [`ClientSession`], if any.
@@ -196,7 +199,7 @@ impl<'s, S: ClientSessionHandle<'s>> GenericCursor<'s, S> {
                     self.info.id = get_more.id
                 }
                 self.info.ns = get_more.ns;
-                self.state_mut().buffer = CursorBuffer::new(get_more.batch);
+                self.state_mut().buffer = CursorBuffer::new(reply_batch(&get_more.raw_reply)?);
                 self.state_mut().post_batch_resume_token = get_more.post_batch_resume_token;
 
                 Ok(())
@@ -415,34 +418,73 @@ struct GetMoreResultAndSession<S> {
 #[derive(Debug, Clone)]
 pub(crate) struct CursorSpecification {
     pub(crate) info: CursorInformation,
-    pub(crate) initial_buffer: VecDeque<RawDocumentBuf>,
+    pub(crate) initial_reply: RawDocumentBuf,
+    pub(crate) is_empty: bool,
     pub(crate) post_batch_resume_token: Option<ResumeToken>,
 }
 
 impl CursorSpecification {
     pub(crate) fn new(
-        info: operation::CursorInfo,
+        response: RawCommandResponse,
         address: ServerAddress,
         batch_size: impl Into<Option<u32>>,
         max_time: impl Into<Option<Duration>>,
         comment: impl Into<Option<Bson>>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        // Parse minimal fields via raw to avoid per-doc copies.
+        let raw_root = response.raw_body();
+        let cursor_doc = raw_root.get_document("cursor")?;
+        let CursorReply {
+            id,
+            ns,
+            post_batch_resume_token,
+        } = CursorReply::parse(cursor_doc)?;
+        let first_batch = cursor_doc.get_array("firstBatch")?;
+        let is_empty = first_batch.is_empty();
+        Ok(Self {
             info: CursorInformation {
-                ns: info.ns,
-                id: info.id,
+                ns,
+                id,
                 address,
                 batch_size: batch_size.into(),
                 max_time: max_time.into(),
                 comment: comment.into(),
             },
-            initial_buffer: info.first_batch,
-            post_batch_resume_token: ResumeToken::from_raw(info.post_batch_resume_token),
-        }
+            initial_reply: response.into_raw_document_buf(),
+            is_empty,
+            post_batch_resume_token,
+        })
     }
 
     pub(crate) fn id(&self) -> i64 {
         self.info.id
+    }
+}
+
+/// Fields in an server cursor reply value, minus the actual documents.
+pub(crate) struct CursorReply {
+    pub(crate) id: i64,
+    pub(crate) ns: Namespace,
+    pub(crate) post_batch_resume_token: Option<ResumeToken>,
+}
+
+impl CursorReply {
+    pub(crate) fn parse(cursor_doc: &RawDocument) -> Result<Self> {
+        let id = cursor_doc.get_i64("id")?;
+        let ns_str = cursor_doc.get_str("ns")?;
+        let ns = Namespace::from_str(ns_str)
+            .ok_or_else(|| Error::invalid_response("invalid cursor ns"))?;
+        let post_token_raw = cursor_doc
+            .get("postBatchResumeToken")?
+            .and_then(crate::bson::RawBsonRef::as_document)
+            .map(|d| d.to_owned());
+        let post_batch_resume_token =
+            crate::change_stream::event::ResumeToken::from_raw(post_token_raw);
+        Ok(Self {
+            id,
+            ns,
+            post_batch_resume_token,
+        })
     }
 }
 
@@ -644,4 +686,30 @@ pub(super) trait ClientSessionHandle<'a>: Send + 'a {
     fn is_implicit(&self) -> bool;
 
     fn borrow_mut(&mut self) -> Option<&mut ClientSession>;
+}
+
+pub(crate) fn reply_batch(
+    reply: &RawDocument,
+) -> Result<VecDeque<crate::bson::raw::RawDocumentBuf>> {
+    let cursor = reply.get_document("cursor")?;
+    let docs = match cursor.get("firstBatch")? {
+        Some(d) => d
+            .as_array()
+            .ok_or_else(|| Error::invalid_response("invalid `firstBatch` value"))?,
+        None => cursor.get_array("nextBatch")?,
+    };
+    let mut out = VecDeque::new();
+    for elt in docs {
+        let elt = elt?;
+        let doc = match elt.as_document() {
+            Some(doc) => doc.to_owned(),
+            None => {
+                return Err(crate::error::Error::invalid_response(
+                    "invalid batch element",
+                ))
+            }
+        };
+        out.push_back(doc);
+    }
+    Ok(out)
 }

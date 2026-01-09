@@ -26,6 +26,7 @@ use crate::{
         bulk_write::{InsertBulkWriteBenchmark, MixedBulkWriteBenchmark},
         find_many::FindManyBenchmark,
         find_one::FindOneBenchmark,
+        find_raw_batches::FindRawBatchesBenchmark,
         gridfs_download::GridFsDownloadBenchmark,
         gridfs_multi_download::GridFsMultiDownloadBenchmark,
         gridfs_multi_upload::GridFsMultiUploadBenchmark,
@@ -62,6 +63,7 @@ const FIND_ONE_BENCH: &str = "Find one";
 const FIND_MANY_BENCH: &str = "Find many and empty cursor";
 const FIND_MANY_BENCH_RAW: &str = "Find many and empty cursor (raw BSON)";
 const FIND_MANY_BENCH_SERDE: &str = "Find many and empty cursor (serde structs)";
+const FIND_MANY_BENCH_RAW_BATCHES: &str = "Find many and empty cursor (raw batches)";
 const GRIDFS_DOWNLOAD_BENCH: &str = "GridFS download";
 const LDJSON_MULTI_EXPORT_BENCH: &str = "LDJSON multi-file export";
 const GRIDFS_MULTI_DOWNLOAD_BENCH: &str = "GridFS multi-file download";
@@ -104,6 +106,7 @@ enum BenchmarkId {
     SmallDocInsertBulkWrite, // 23
     LargeDocInsertBulkWrite, // 24
     MixedBulkWrite,          // 25
+    FindManyRawBatches,      // 26
 }
 
 impl BenchmarkId {
@@ -127,6 +130,7 @@ impl BenchmarkId {
             BenchmarkId::BsonFullDocumentEncode => FULL_BSON_ENCODING,
             BenchmarkId::FindManyRawBson => FIND_MANY_BENCH_RAW,
             BenchmarkId::FindManySerde => FIND_MANY_BENCH_SERDE,
+            BenchmarkId::FindManyRawBatches => FIND_MANY_BENCH_RAW_BATCHES,
             BenchmarkId::GridFsDownload => GRIDFS_DOWNLOAD_BENCH,
             BenchmarkId::GridFsUpload => GRIDFS_UPLOAD_BENCH,
             BenchmarkId::GridFsMultiDownload => GRIDFS_MULTI_DOWNLOAD_BENCH,
@@ -199,7 +203,7 @@ const WRITE_BENCHES: &[&str] = &[
     MIXED_BULK_WRITE_BENCH,
 ];
 
-const MAX_ID: u8 = BenchmarkId::MixedBulkWrite as u8;
+const MAX_ID: u8 = BenchmarkId::FindManyRawBatches as u8;
 
 async fn run_benchmarks(
     uri: &str,
@@ -466,6 +470,17 @@ async fn run_benchmarks(
                 comp_score += score_test(find_many, id.name(), 16.22, more_info);
             }
 
+            // Find many using raw batches and empty the cursor
+            BenchmarkId::FindManyRawBatches => {
+                let options = bench::find_raw_batches::Options {
+                    num_iter: 10000,
+                    doc: get_tweet().await,
+                    uri: uri.to_string(),
+                };
+                let result = bench::run_benchmark::<FindRawBatchesBenchmark>(options).await?;
+                comp_score += score_test(result, FIND_MANY_BENCH_RAW_BATCHES, 16.22, more_info);
+            }
+
             // GridFS download
             BenchmarkId::GridFsDownload => {
                 let gridfs_download_options = bench::gridfs_download::Options {
@@ -621,6 +636,7 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         ids.insert(BenchmarkId::FindMany);
         ids.insert(BenchmarkId::FindManyRawBson);
         ids.insert(BenchmarkId::FindManySerde);
+        ids.insert(BenchmarkId::FindManyRawBatches);
         ids.insert(BenchmarkId::SmallDocInsertMany);
         ids.insert(BenchmarkId::LargeDocInsertMany);
         ids.insert(BenchmarkId::LdJsonMultiFileImport);

@@ -3,6 +3,7 @@ pub mod bson_encode;
 pub mod bulk_write;
 pub mod find_many;
 pub mod find_one;
+pub mod find_raw_batches;
 pub mod gridfs_download;
 pub mod gridfs_multi_download;
 pub mod gridfs_multi_upload;

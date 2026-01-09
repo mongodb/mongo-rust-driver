@@ -25,7 +25,7 @@ pub(crate) mod run_cursor_command;
 mod search_index;
 mod update;
 
-use std::{collections::VecDeque, fmt::Debug, ops::Deref};
+use std::{borrow::Cow, fmt::Debug, ops::Deref};
 
 use bson::{RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
 use futures_util::FutureExt;
@@ -56,7 +56,6 @@ use crate::{
     selection_criteria::SelectionCriteria,
     BoxFuture,
     ClientSession,
-    Namespace,
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
@@ -128,6 +127,10 @@ pub(crate) trait Operation {
     /// The name of the server side command associated with this operation.
     const NAME: &'static CStr;
 
+    /// Whether this operation prefers to take ownership of the server response body for
+    /// zero-copy handling.
+    const ZERO_COPY: bool;
+
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command>;
@@ -139,7 +142,7 @@ pub(crate) trait Operation {
     /// Interprets the server response to the command.
     fn handle_response<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>>;
 
@@ -198,6 +201,10 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     /// The name of the server side command associated with this operation.
     const NAME: &'static CStr;
 
+    /// Whether this operation prefers to take ownership of the server response body for
+    /// zero-copy handling.
+    const ZERO_COPY: bool = false;
+
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command>;
@@ -215,19 +222,31 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         Err(ErrorKind::Internal {
-            message: format!("operation handling not implemented for {}", Self::NAME),
+            message: format!("response handling not implemented for {}", Self::NAME),
         }
         .into())
+    }
+
+    /// Interprets the server response taking ownership of the body to enable zero-copy handling.
+    ///
+    /// Default behavior delegates to the borrowed [`handle_response`]; operations that set
+    /// [`ZERO_COPY`] to `true` should override this to consume the response.
+    fn handle_response_cow<'a>(
+        &'a self,
+        response: Cow<'a, RawCommandResponse>,
+        context: ExecutionContext<'a>,
+    ) -> Result<Self::O> {
+        self.handle_response(&*response, context)
     }
 
     /// Interprets the server response to the command. This method should only be implemented when
     /// async code is required to handle the response.
     fn handle_response_async<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
-        async move { self.handle_response(response, context) }.boxed()
+        async move { self.handle_response_cow(response, context) }.boxed()
     }
 
     /// Interpret an error encountered while sending the built command to the server, potentially
@@ -296,6 +315,7 @@ where
 {
     type O = T::O;
     const NAME: &'static CStr = T::NAME;
+    const ZERO_COPY: bool = T::ZERO_COPY;
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.build(description)
     }
@@ -304,7 +324,7 @@ where
     }
     fn handle_response<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         self.handle_response_async(response, context)
@@ -528,33 +548,14 @@ impl<T> Deref for WriteResponseBody<T> {
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct CursorBody {
-    cursor: CursorInfo,
-}
-
-impl CursorBody {
-    fn extract_at_cluster_time(response: &RawDocument) -> Result<Option<Timestamp>> {
-        Ok(response
-            .get("cursor")?
-            .and_then(RawBsonRef::as_document)
-            .map(|d| d.get("atClusterTime"))
-            .transpose()?
-            .flatten()
-            .and_then(RawBsonRef::as_timestamp))
-    }
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CursorInfo {
-    pub(crate) id: i64,
-
-    pub(crate) ns: Namespace,
-
-    pub(crate) first_batch: VecDeque<RawDocumentBuf>,
-
-    pub(crate) post_batch_resume_token: Option<RawDocumentBuf>,
+fn cursor_get_at_cluster_time(response: &RawDocument) -> Result<Option<Timestamp>> {
+    Ok(response
+        .get("cursor")?
+        .and_then(RawBsonRef::as_document)
+        .map(|d| d.get("atClusterTime"))
+        .transpose()?
+        .flatten()
+        .and_then(RawBsonRef::as_timestamp))
 }
 
 /// Type used to deserialize just the first result from a cursor, if any.

@@ -141,8 +141,8 @@ impl<'a> Action for CountDocuments<'a> {
     type Future = CountDocumentsFuture;
 
     async fn execute(mut self) -> Result<u64> {
-        resolve_read_concern_with_session!(self.cr, self.options, self.session.as_ref())?;
-        resolve_selection_criteria_with_session!(self.cr, self.options, self.session.as_ref())?;
+        resolve_read_concern_with_session!(self.cr, self.options, self.session.as_ref());
+        resolve_selection_criteria_with_session!(self.cr, self.options, self.session.as_ref());
 
         let op = crate::operation::count_documents::CountDocuments::new(
             self.cr.namespace(),

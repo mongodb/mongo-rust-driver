@@ -112,8 +112,6 @@ macro_rules! resolve_rw_concern_with_session {
         } else {
             resolve_options!($obj, $opts, [$concern]);
         }
-        let result: Result<()> = Ok(());
-        result
     }};
 }
 
@@ -148,7 +146,5 @@ macro_rules! resolve_selection_criteria_with_session {
         } else {
             resolve_options!($obj, $opts, [selection_criteria]);
         }
-        let result: Result<()> = Ok(());
-        result
     }};
 }

@@ -9,7 +9,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-use super::{CursorBody, ExecutionContext, OperationWithDefaults};
+use super::{ExecutionContext, OperationWithDefaults};
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCommand<'conn> {
@@ -67,7 +67,7 @@ impl OperationWithDefaults for RunCommand<'_> {
         if let Some(RawBsonRef::Timestamp(ts)) = response.get("atClusterTime")? {
             Ok(Some(ts))
         } else {
-            CursorBody::extract_at_cluster_time(response)
+            super::cursor_get_at_cluster_time(response)
         }
     }
 

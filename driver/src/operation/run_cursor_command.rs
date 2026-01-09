@@ -6,7 +6,7 @@ use crate::{
     concern::WriteConcern,
     cursor::CursorSpecification,
     error::{Error, Result},
-    operation::{run_command::RunCommand, CursorBody, Operation},
+    operation::{run_command::RunCommand, Operation, SERVER_4_4_0_WIRE_VERSION},
     options::RunCursorCommandOptions,
     selection_criteria::SelectionCriteria,
     BoxFuture,
@@ -36,6 +36,8 @@ impl Operation for RunCursorCommand<'_> {
     type O = CursorSpecification;
 
     const NAME: &'static CStr = cstr!("run_cursor_command");
+
+    const ZERO_COPY: bool = true;
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.run_command.build(description)
@@ -94,28 +96,26 @@ impl Operation for RunCursorCommand<'_> {
 
     fn handle_response<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
-            let cursor_response: CursorBody = response.body()?;
+            let description = context.connection.stream_description()?;
 
-            let comment = match &self.options {
-                Some(options) => options.comment.clone(),
-                None => None,
+            // The comment should only be propagated to getMore calls on 4.4+.
+            let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
+                None
+            } else {
+                self.options.as_ref().and_then(|opts| opts.comment.clone())
             };
 
-            Ok(CursorSpecification::new(
-                cursor_response.cursor,
-                context
-                    .connection
-                    .stream_description()?
-                    .server_address
-                    .clone(),
+            CursorSpecification::new(
+                response.into_owned(),
+                description.server_address.clone(),
                 self.options.as_ref().and_then(|opts| opts.batch_size),
                 self.options.as_ref().and_then(|opts| opts.max_time),
                 comment,
-            ))
+            )
         }
         .boxed()
     }

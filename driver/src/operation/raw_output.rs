@@ -17,6 +17,7 @@ pub(crate) struct RawOutput<Op>(pub(crate) Op);
 impl<Op: Operation> Operation for RawOutput<Op> {
     type O = RawCommandResponse;
     const NAME: &'static CStr = Op::NAME;
+    const ZERO_COPY: bool = true;
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.0.build(description)
@@ -31,10 +32,10 @@ impl<Op: Operation> Operation for RawOutput<Op> {
 
     fn handle_response<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         _context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
-        async move { Ok(response.clone()) }.boxed()
+        async move { Ok(response.into_owned()) }.boxed()
     }
 
     fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {

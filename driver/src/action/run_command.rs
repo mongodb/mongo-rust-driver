@@ -221,7 +221,7 @@ pub struct RunCursorCommand<'a, Session = ImplicitSession> {
 }
 
 #[option_setters(crate::db::options::RunCursorCommandOptions)]
-#[export_doc(run_cursor_command, extra = [session])]
+#[export_doc(run_cursor_command, extra = [session, batch])]
 impl<Session> RunCursorCommand<'_, Session> {}
 
 impl<'a> RunCursorCommand<'a, ImplicitSession> {
@@ -244,6 +244,12 @@ impl<'a> Action for RunCursorCommand<'a, ImplicitSession> {
     type Future = RunCursorCommandFuture;
 
     async fn execute(self) -> Result<Cursor<Document>> {
+        self.exec_generic().await
+    }
+}
+
+impl<'a> RunCursorCommand<'a, ImplicitSession> {
+    async fn exec_generic<C: crate::cursor::NewCursor>(self) -> Result<C> {
         let selection_criteria = self
             .options
             .as_ref()
@@ -254,9 +260,14 @@ impl<'a> Action for RunCursorCommand<'a, ImplicitSession> {
             selection_criteria,
             None,
         );
-        let rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
+        let mut rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
         let client = self.db.client();
-        client.execute_cursor_operation(rc_command).await
+        client.execute_cursor_operation(&mut rc_command, None).await
+    }
+
+    /// Execute this command, returning a cursor that provides results in zero-copy raw batches.
+    pub async fn batch(self) -> Result<crate::raw_batch_cursor::RawBatchCursor> {
+        self.exec_generic().await
     }
 }
 
@@ -265,11 +276,13 @@ impl<'a> Action for RunCursorCommand<'a, ExplicitSession<'a>> {
     type Future = RunCursorCommandSessionFuture;
 
     async fn execute(mut self) -> Result<SessionCursor<Document>> {
-        resolve_selection_criteria_with_session!(
-            self.db,
-            self.options,
-            Some(&mut *self.session.0)
-        )?;
+        self.exec_generic().await
+    }
+}
+
+impl<'a> RunCursorCommand<'a, ExplicitSession<'a>> {
+    async fn exec_generic<C: crate::cursor::NewCursor>(mut self) -> Result<C> {
+        resolve_selection_criteria_with_session!(self.db, self.options, Some(&mut *self.session.0));
         let selection_criteria = self
             .options
             .as_ref()
@@ -280,10 +293,15 @@ impl<'a> Action for RunCursorCommand<'a, ExplicitSession<'a>> {
             selection_criteria,
             None,
         );
-        let rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
+        let mut rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
         let client = self.db.client();
         client
-            .execute_session_cursor_operation(rc_command, self.session.0)
+            .execute_cursor_operation(&mut rc_command, Some(self.session.0))
             .await
+    }
+
+    /// Execute this command, returning a cursor that provides results in zero-copy raw batches.
+    pub async fn batch(self) -> Result<crate::raw_batch_cursor::SessionRawBatchCursor> {
+        self.exec_generic().await
     }
 }

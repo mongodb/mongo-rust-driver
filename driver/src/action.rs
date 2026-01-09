@@ -71,6 +71,23 @@ pub struct ImplicitSession;
 #[allow(missing_docs)]
 pub struct ExplicitSession<'a>(&'a mut crate::ClientSession);
 
+#[doc(hidden)]
+pub trait ActionSession<'a> {
+    fn into_opt_session(self) -> Option<&'a mut crate::ClientSession>;
+}
+
+impl<'a> ActionSession<'a> for ImplicitSession {
+    fn into_opt_session(self) -> Option<&'a mut crate::ClientSession> {
+        None
+    }
+}
+
+impl<'a> ActionSession<'a> for ExplicitSession<'a> {
+    fn into_opt_session(self) -> Option<&'a mut crate::ClientSession> {
+        Some(self.0)
+    }
+}
+
 #[allow(missing_docs)]
 pub struct Single;
 #[allow(missing_docs)]

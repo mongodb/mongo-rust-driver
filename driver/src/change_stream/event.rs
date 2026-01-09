@@ -30,7 +30,7 @@ impl ResumeToken {
     ) -> Option<ResumeToken> {
         match &spec.post_batch_resume_token {
             // Token from initial response from `aggregate`
-            Some(token) if spec.initial_buffer.is_empty() => Some(token.clone()),
+            Some(token) if spec.is_empty => Some(token.clone()),
             // Token from options passed to `watch`
             _ => options
                 .and_then(|o| o.start_after.as_ref().or(o.resume_after.as_ref()))

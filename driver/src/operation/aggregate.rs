@@ -13,7 +13,6 @@ use crate::{
 };
 
 use super::{
-    CursorBody,
     ExecutionContext,
     OperationWithDefaults,
     WriteConcernOnlyBody,
@@ -48,6 +47,8 @@ impl OperationWithDefaults for Aggregate {
 
     const NAME: &'static CStr = cstr!("aggregate");
 
+    const ZERO_COPY: bool = true;
+
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             crate::bson_compat::cstr_to_str(Self::NAME): self.target.to_bson(),
@@ -75,16 +76,14 @@ impl OperationWithDefaults for Aggregate {
         &self,
         response: &crate::bson::RawDocument,
     ) -> Result<Option<crate::bson::Timestamp>> {
-        CursorBody::extract_at_cluster_time(response)
+        super::cursor_get_at_cluster_time(response)
     }
 
-    fn handle_response<'a>(
+    fn handle_response_cow<'a>(
         &'a self,
-        response: &RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let cursor_response: CursorBody = response.body()?;
-
         if self.is_out_or_merge() {
             let wc_error_info = response.body::<WriteConcernOnlyBody>()?;
             wc_error_info.validate()?;
@@ -99,13 +98,13 @@ impl OperationWithDefaults for Aggregate {
             self.options.as_ref().and_then(|opts| opts.comment.clone())
         };
 
-        Ok(CursorSpecification::new(
-            cursor_response.cursor,
+        CursorSpecification::new(
+            response.into_owned(),
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
             comment,
-        ))
+        )
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
