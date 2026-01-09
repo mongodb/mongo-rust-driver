@@ -92,7 +92,7 @@ pub struct ListCollections<'a, M = ListSpecifications, S = ImplicitSession> {
 }
 
 #[option_setters(crate::db::options::ListCollectionsOptions)]
-#[export_doc(list_collections, extra = [session])]
+#[export_doc(list_collections, extra = [session, batch])]
 impl<M, S> ListCollections<'_, M, S> {}
 
 impl<'a, M> ListCollections<'a, M, ImplicitSession> {
