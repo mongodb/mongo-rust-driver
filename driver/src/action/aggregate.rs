@@ -132,7 +132,7 @@ impl<'a> Aggregate<'a> {
 }
 
 #[option_setters(crate::coll::options::AggregateOptions)]
-#[export_doc(aggregate, extra = [session])]
+#[export_doc(aggregate, extra = [session, batch])]
 impl<'a, Session, T> Aggregate<'a, Session, T> {
     /// Use the provided type for the returned cursor.
     ///

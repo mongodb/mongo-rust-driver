@@ -74,7 +74,7 @@ use super::common::CursorInformation;
 ///
 /// This provides zero-copy access to the server's batch array via
 /// [`doc_slices`](RawBatch::doc_slices).
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RawBatch {
     reply: RawDocumentBuf,
 }
@@ -101,7 +101,7 @@ impl RawBatch {
             .ok_or_else(|| Error::invalid_response("missing firstBatch/nextBatch"))?;
 
         docs.as_array()
-            .ok_or_else(|| Error::invalid_response("missing firstBatch/nextBatch"))
+            .ok_or_else(|| Error::invalid_response("invalid firstBatch/nextBatch"))
     }
 
     /// Returns a reference to the full server response document.
