@@ -335,7 +335,7 @@ buildvariants:
     display_name: "OIDC Windows"
     patchable: true
     run_on:
-      - windows-64-vs2017-small
+      - windows-2022-latest-small
     expansions:
       AUTH: auth
       SSL: ssl
