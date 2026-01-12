@@ -110,6 +110,8 @@ pub struct ClientSession {
     pub(crate) operation_time: Option<Timestamp>,
     #[cfg(test)]
     pub(crate) convenient_transaction_timeout: Option<Duration>,
+    #[cfg(test)]
+    pub(crate) convenient_transaction_jitter: Option<f64>,
 }
 
 #[derive(Debug)]
@@ -249,6 +251,8 @@ impl ClientSession {
             operation_time: None,
             #[cfg(test)]
             convenient_transaction_timeout: None,
+            #[cfg(test)]
+            convenient_transaction_jitter: None,
         }
     }
 
@@ -411,6 +415,8 @@ impl From<DroppedClientSession> for ClientSession {
             operation_time: dropped_session.operation_time,
             #[cfg(test)]
             convenient_transaction_timeout: None,
+            #[cfg(test)]
+            convenient_transaction_jitter: None,
         }
     }
 }

@@ -113,14 +113,11 @@ macro_rules! convenient_run {
         $callback:expr,
         $abort_transaction:expr,
         $commit_transaction:expr,
-        $sleep:expr,
     ) => {{
         let start_time = Instant::now();
         let max_time = MAX_CONVENIENT_TRANSACTION_TIME;
         #[cfg(test)]
-        let max_time = $session
-            .convenient_transaction_timeout
-            .unwrap_or(MAX_CONVENIENT_TRANSACTION_TIME);
+        let max_time = $session.convenient_transaction_timeout.unwrap_or(max_time);
 
         let mut retries = 0;
 
@@ -136,7 +133,7 @@ macro_rules! convenient_run {
                         $abort_transaction?;
                     }
                     if e.contains_label(TRANSIENT_TRANSACTION_ERROR)
-                        && perform_backoff!(retries, start_time, max_time, $sleep)
+                        && perform_backoff!($session, retries, start_time, max_time)
                     {
                         continue 'transaction;
                     }
@@ -156,7 +153,7 @@ macro_rules! convenient_run {
                     Ok(()) => return Ok(ret),
                     Err(e) => {
                         if e.is_max_time_ms_expired_error()
-                            || !perform_backoff!(retries, start_time, max_time, $sleep)
+                            || !perform_backoff!($session, retries, start_time, max_time)
                         {
                             return Err(e);
                         }
@@ -174,34 +171,25 @@ macro_rules! convenient_run {
     }};
 }
 
-macro_rules! sleep_async {
-    ($duration:expr) => {{
-        tokio::time::sleep($duration).await
-    }};
-}
-macro_rules! sleep_sync {
-    ($duration:expr) => {{
-        crate::sync::TOKIO_RUNTIME.block_on(tokio::time::sleep(backoff))
-    }};
-}
-
 /// Calculates the amount of time to back off before retrying and sleeps for that duration if enough
 /// time is remaining. Returns true if another retry should be performed or false if time has run
 /// out.
 macro_rules! perform_backoff {
     (
+        $session:expr,
         $retries:expr,
         $start_time:expr,
-        $max_time:expr,
-        $sleep:expr
+        $max_time:expr
     ) => {{
         const BACKOFF_INITIAL_MS: f64 = 5f64;
         const BACKOFF_MAX_MS: f64 = 500f64;
-        const RETRY_EXP: f64 = 1.5f64;
+        const RETRY_BASE: f64 = 1.5f64;
 
         let jitter = rand::random_range(0f64..1f64);
+        #[cfg(test)]
+        let jitter = $session.convenient_transaction_jitter.unwrap_or(jitter);
 
-        let computed_backoff = jitter * BACKOFF_INITIAL_MS * f64::from($retries).powf(RETRY_EXP);
+        let computed_backoff = jitter * BACKOFF_INITIAL_MS * RETRY_BASE.powf(f64::from($retries));
         let max_backoff = jitter * BACKOFF_MAX_MS;
         let backoff_ms: u64 =
             std::cmp::min(round_clamp(computed_backoff), round_clamp(max_backoff));
@@ -210,7 +198,8 @@ macro_rules! perform_backoff {
         if $start_time.elapsed() + backoff > $max_time {
             false
         } else {
-            $sleep(backoff);
+            $retries += 1;
+            tokio::time::sleep(backoff).await;
             true
         }
     }};
@@ -278,7 +267,6 @@ impl StartTransaction<&mut ClientSession> {
             callback(self.session, &mut context).await,
             self.session.abort_transaction().await,
             self.session.commit_transaction().await,
-            sleep_async,
         )
     }
 
@@ -350,7 +338,6 @@ impl StartTransaction<&mut ClientSession> {
             callback(self.session).await,
             self.session.abort_transaction().await,
             self.session.commit_transaction().await,
-            sleep_async,
         )
     }
 }
@@ -380,21 +367,23 @@ impl StartTransaction<&mut crate::sync::ClientSession> {
     /// callback indefinitely. To avoid this situation, the application MUST NOT silently handle
     /// errors within the callback. If the application needs to handle errors within the
     /// callback, it MUST return them after doing so.
+    #[allow(unused_mut, unused_variables)]
     pub fn and_run<R, F>(self, mut callback: F) -> Result<R>
     where
         F: for<'b> FnMut(&'b mut crate::sync::ClientSession) -> Result<R>,
     {
-        convenient_run!(
-            self.session.async_client_session,
-            self.session
-                .start_transaction()
-                .with_options(self.options.clone())
-                .run(),
-            callback(self.session),
-            self.session.abort_transaction().run(),
-            self.session.commit_transaction().run(),
-            sleep_sync,
-        )
+        todo!()
+        // convenient_run!(
+        //     self.session.async_client_session,
+        //     self.session
+        //         .start_transaction()
+        //         .with_options(self.options.clone())
+        //         .run(),
+        //     callback(self.session),
+        //     self.session.abort_transaction().run(),
+        //     self.session.commit_transaction().run(),
+        //     sleep_sync,
+        // )
     }
 }
 

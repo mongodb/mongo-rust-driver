@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
@@ -276,4 +276,40 @@ async fn write_concern_not_inherited() {
     session.commit_transaction().await.unwrap();
 
     assert!(coll.find_one(doc! { "n": 1 }).await.unwrap().is_some());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn convenient_retry_backoff_is_enforced() {
+    if !transactions_supported().await {
+        log_uncaptured("skipping convenient_retry_backoff_is_enforced: transactions not supported");
+        return;
+    }
+
+    async fn run_test(jitter: f64) -> Duration {
+        let client = Client::for_test().await;
+        let coll = client
+            .database("db")
+            .collection("convenient_retry_backoff_is_enforced");
+
+        let fail_point = FailPoint::fail_command(&["commitTransaction"], FailPointMode::Times(13))
+            .error_code(251);
+        let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+        let mut session = client.start_session().await.unwrap();
+        session.convenient_transaction_jitter = Some(jitter);
+
+        let start = Instant::now();
+        session
+            .start_transaction()
+            .and_run2(async move |session| coll.insert_one(doc! {}).session(session).await)
+            .await
+            .unwrap();
+        start.elapsed()
+    }
+
+    let no_jitter = run_test(0f64).await;
+    let with_jitter = run_test(1f64).await;
+
+    let difference = with_jitter.abs_diff(no_jitter + Duration::from_millis(2200));
+    assert!(difference < Duration::from_secs(1));
 }
