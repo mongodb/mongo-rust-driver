@@ -471,7 +471,7 @@ impl Client {
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
         let (server, _) = self
-            .select_server(criteria, "Test select server", Vec::new(), |_, _| None)
+            .select_server(criteria, "Test select server", &[], |_, _| None)
             .await?;
         Ok(server.address.clone())
     }
@@ -483,7 +483,7 @@ impl Client {
         criteria: Option<&SelectionCriteria>,
         #[allow(unused_variables)] // we only use the operation_name for tracing.
         operation_name: &str,
-        deprioritized: Vec<&ServerAddress>,
+        deprioritized: &[&ServerAddress],
         override_criteria: OverrideCriteriaFn,
     ) -> Result<(SelectedServer, SelectionCriteria)> {
         let criteria =
@@ -526,7 +526,7 @@ impl Client {
                 effective_criteria,
                 &state.description,
                 &state.servers(),
-                &deprioritized,
+                deprioritized,
             );
             match result {
                 Err(error) => {
