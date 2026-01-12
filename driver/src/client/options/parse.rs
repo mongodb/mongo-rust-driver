@@ -12,6 +12,12 @@ impl Action for ParseConnectionString {
 
     async fn execute(self) -> Result<ClientOptions> {
         let mut conn_str = self.conn_str?;
+        #[allow(deprecated)]
+        if conn_str.socket_timeout.is_some() {
+            return Err(Error::invalid_argument(
+                "the Rust driver does not support socketTimeoutMS",
+            ));
+        }
         let auth_source_present = conn_str
             .credential
             .as_ref()
@@ -141,7 +147,6 @@ impl ClientOptions {
             retry_reads: conn_str.retry_reads,
             retry_writes: conn_str.retry_writes,
             server_monitoring_mode: conn_str.server_monitoring_mode,
-            socket_timeout: conn_str.socket_timeout,
             direct_connection: conn_str.direct_connection,
             default_database: conn_str.default_database,
             driver_info: None,

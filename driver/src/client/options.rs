@@ -645,10 +645,6 @@ pub struct ClientOptions {
     /// Overrides the default "mongodb" service name for SRV lookup in both discovery and polling
     pub srv_service_name: Option<String>,
 
-    #[builder(setter(skip))]
-    #[derive_where(skip(Debug))]
-    pub(crate) socket_timeout: Option<Duration>,
-
     /// The TLS configuration for the Client to use in its connections with the server.
     ///
     /// By default, TLS is disabled.
@@ -797,9 +793,6 @@ impl Serialize for ClientOptions {
             #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
             serverselectiontimeoutms: &'a Option<Duration>,
 
-            #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
-            sockettimeoutms: &'a Option<Duration>,
-
             #[serde(flatten, serialize_with = "Tls::serialize")]
             tls: &'a Option<Tls>,
 
@@ -840,7 +833,6 @@ impl Serialize for ClientOptions {
                 .map(|m| format!("{m:?}").to_lowercase()),
             selectioncriteria: &self.selection_criteria,
             serverselectiontimeoutms: &self.server_selection_timeout,
-            sockettimeoutms: &self.socket_timeout,
             tls: &self.tls,
             writeconcern: &self.write_concern,
             loadbalanced: &self.load_balanced,
@@ -1030,6 +1022,10 @@ pub struct ConnectionString {
     /// Amount of time spent attempting to send or receive on a socket before timing out; note that
     /// this only applies to application operations, not server discovery and monitoring.
     #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
+    #[deprecated(
+        since = "3.5.0",
+        note = "the Rust driver does not support socketTimeoutMS"
+    )]
     pub socket_timeout: Option<Duration>,
 
     /// Default read preference for the client.
@@ -1842,6 +1838,7 @@ impl ConnectionString {
             credential,
             default_database,
             load_balanced,
+            #[allow(deprecated)]
             socket_timeout,
             read_preference,
             uuid_representation,
@@ -2549,6 +2546,7 @@ impl ConnectionString {
             k @ "serverselectiontimeoutms" => {
                 self.server_selection_timeout = Some(Duration::from_millis(get_duration!(value, k)))
             }
+            #[allow(deprecated)]
             k @ "sockettimeoutms" => {
                 self.socket_timeout = Some(Duration::from_millis(get_duration!(value, k)));
             }
