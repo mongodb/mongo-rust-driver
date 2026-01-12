@@ -6,7 +6,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{Error, Result},
-    operation::{CursorBody, OperationWithDefaults, Retryability, SERVER_4_4_0_WIRE_VERSION},
+    operation::{OperationWithDefaults, Retryability, SERVER_4_4_0_WIRE_VERSION},
     options::{CursorType, FindOptions, SelectionCriteria},
     Namespace,
 };
@@ -33,6 +33,7 @@ impl Find {
 impl OperationWithDefaults for Find {
     type O = CursorSpecification;
     const NAME: &'static CStr = cstr!("find");
+    const ZERO_COPY: bool = true;
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
@@ -87,16 +88,14 @@ impl OperationWithDefaults for Find {
         &self,
         response: &crate::bson::RawDocument,
     ) -> Result<Option<crate::bson::Timestamp>> {
-        CursorBody::extract_at_cluster_time(response)
+        super::cursor_get_at_cluster_time(response)
     }
 
-    fn handle_response<'a>(
+    fn handle_response_cow<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: CursorBody = response.body()?;
-
         let description = context.connection.stream_description()?;
 
         // The comment should only be propagated to getMore calls on 4.4+.
@@ -106,13 +105,13 @@ impl OperationWithDefaults for Find {
             self.options.as_ref().and_then(|opts| opts.comment.clone())
         };
 
-        Ok(CursorSpecification::new(
-            response.cursor,
+        CursorSpecification::new(
+            response.into_owned(),
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
             comment,
-        ))
+        )
     }
 
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {

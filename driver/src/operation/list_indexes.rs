@@ -12,7 +12,7 @@ use crate::{
     Namespace,
 };
 
-use super::{append_options_to_raw_document, CursorBody, ExecutionContext, Retryability};
+use super::{append_options_to_raw_document, ExecutionContext, Retryability};
 
 pub(crate) struct ListIndexes {
     ns: Namespace,
@@ -30,6 +30,8 @@ impl OperationWithDefaults for ListIndexes {
 
     const NAME: &'static CStr = cstr!("listIndexes");
 
+    const ZERO_COPY: bool = true;
+
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.ns.coll.clone(),
@@ -43,14 +45,13 @@ impl OperationWithDefaults for ListIndexes {
         Ok(Command::new(Self::NAME, &self.ns.db, body))
     }
 
-    fn handle_response<'a>(
+    fn handle_response_cow<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: CursorBody = response.body()?;
-        Ok(CursorSpecification::new(
-            response.cursor,
+        CursorSpecification::new(
+            response.into_owned(),
             context
                 .connection
                 .stream_description()?
@@ -59,7 +60,7 @@ impl OperationWithDefaults for ListIndexes {
             self.options.as_ref().and_then(|o| o.batch_size),
             self.options.as_ref().and_then(|o| o.max_time),
             None,
-        ))
+        )
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

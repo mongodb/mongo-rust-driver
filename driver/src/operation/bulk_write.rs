@@ -99,7 +99,7 @@ where
         result: &mut impl BulkWriteResult,
         error: &mut BulkWriteError,
     ) -> Result<()> {
-        let mut responses = cursor_specification.initial_buffer;
+        let mut responses = crate::cursor::reply_batch(&cursor_specification.initial_reply)?;
         let mut more_responses = cursor_specification.info.id != 0;
         let mut namespace = cursor_specification.info.ns.clone();
         loop {
@@ -156,7 +156,7 @@ where
                 }
             };
 
-            responses = get_more_response.batch;
+            responses = crate::cursor::reply_batch(&get_more_response.raw_reply)?;
             more_responses = get_more_response.id != 0;
             namespace = get_more_response.ns;
         }
@@ -343,6 +343,8 @@ where
 
     const NAME: &'static CStr = cstr!("bulkWrite");
 
+    const ZERO_COPY: bool = true;
+
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if description.max_wire_version.unwrap_or(0) < SERVER_8_0_0_WIRE_VERSION {
             return Err(ErrorKind::IncompatibleServer {
@@ -391,22 +393,22 @@ where
 
     fn handle_response_async<'b>(
         &'b self,
-        response: &'b RawCommandResponse,
+        raw_response: std::borrow::Cow<'b, RawCommandResponse>,
         mut context: ExecutionContext<'b>,
     ) -> BoxFuture<'b, Result<Self::O>> {
         async move {
-            let response: WriteResponseBody<Response> = response.body()?;
-            let n_errors: usize = Checked::new(response.summary.n_errors).try_into()?;
+            let response: WriteResponseBody<SummaryInfo> = raw_response.body()?;
+            let n_errors: usize = Checked::new(response.body.n_errors).try_into()?;
 
             let mut error: BulkWriteError = Default::default();
             let mut result: R = Default::default();
 
             result.populate_summary_info(
-                response.summary.n_inserted,
-                response.summary.n_matched,
-                response.summary.n_modified,
-                response.summary.n_upserted,
-                response.summary.n_deleted,
+                response.body.n_inserted,
+                response.body.n_matched,
+                response.body.n_modified,
+                response.body.n_upserted,
+                response.body.n_deleted,
             );
 
             if let Some(write_concern_error) = response.write_concern_error {
@@ -414,7 +416,7 @@ where
             }
 
             let specification = CursorSpecification::new(
-                response.body.cursor,
+                raw_response.into_owned(),
                 context
                     .connection
                     .stream_description()?
@@ -423,7 +425,7 @@ where
                 None,
                 None,
                 self.options.and_then(|options| options.comment.clone()),
-            );
+            )?;
 
             let iteration_result = if self.client.is_load_balanced() {
                 // Using a cursor with a pinned connection is not feasible here; see RUST-2131 for
@@ -434,7 +436,7 @@ where
                 match context.session {
                     Some(session) => {
                         let mut session_cursor =
-                            SessionCursor::new(self.client.clone(), specification, None);
+                            SessionCursor::new(self.client.clone(), specification, None)?;
                         self.iterate_results_cursor(
                             session_cursor.stream(session),
                             &mut result,
@@ -443,7 +445,7 @@ where
                         .await
                     }
                     None => {
-                        let cursor = Cursor::new(self.client.clone(), specification, None, None);
+                        let cursor = Cursor::new(self.client.clone(), specification, None, None)?;
                         self.iterate_results_cursor(cursor, &mut result, &mut error)
                             .await
                     }

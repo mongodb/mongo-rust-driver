@@ -44,6 +44,8 @@ impl OperationWithDefaults for ChangeStreamAggregate {
 
     const NAME: &'static crate::bson_compat::CStr = Aggregate::NAME;
 
+    const ZERO_COPY: bool = true;
+
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if let Some(data) = &mut self.resume_data {
             let mut new_opts = self.args.options.clone().unwrap_or_default();
@@ -81,9 +83,9 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         self.inner.extract_at_cluster_time(response)
     }
 
-    fn handle_response<'a>(
+    fn handle_response_cow<'a>(
         &'a self,
-        response: &RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         mut context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         let op_time = response
@@ -96,7 +98,7 @@ impl OperationWithDefaults for ChangeStreamAggregate {
             session: context.session.as_deref_mut(),
             effective_criteria: context.effective_criteria,
         };
-        let spec = self.inner.handle_response(response, inner_context)?;
+        let spec = self.inner.handle_response_cow(response, inner_context)?;
 
         let mut data = ChangeStreamData {
             resume_token: ResumeToken::initial(self.args.options.as_ref(), &spec),
@@ -111,7 +113,7 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         let description = context.connection.stream_description()?;
         if self.args.options.as_ref().is_none_or(has_no_time)
             && description.max_wire_version.is_some_and(|v| v >= 7)
-            && spec.initial_buffer.is_empty()
+            && spec.is_empty
             && spec.post_batch_resume_token.is_none()
         {
             data.initial_operation_time = op_time;

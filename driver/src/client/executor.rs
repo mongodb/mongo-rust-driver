@@ -1,10 +1,13 @@
 #[cfg(feature = "in-use-encryption")]
 use crate::bson::RawDocumentBuf;
-use crate::bson::{doc, RawBsonRef, RawDocument, Timestamp};
+use crate::{
+    bson::{doc, RawBsonRef, RawDocument, Timestamp},
+    cursor::{CursorInformation, CursorSpecification},
+};
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
 use serde::de::DeserializeOwned;
-use std::sync::LazyLock;
+use std::{borrow::Cow, sync::LazyLock};
 
 use std::{
     borrow::BorrowMut,
@@ -33,7 +36,7 @@ use crate::{
         RawCommandResponse,
         StreamDescription,
     },
-    cursor::{session::SessionCursor, Cursor, CursorSpecification},
+    cursor::{session::SessionCursor, Cursor},
     error::{
         Error,
         ErrorKind,
@@ -189,47 +192,32 @@ impl Client {
     /// Execute the given operation, returning the cursor created by the operation.
     ///
     /// Server selection be will performed using the criteria specified on the operation, if any.
-    pub(crate) async fn execute_cursor_operation<Op, T>(
+    pub(crate) async fn execute_cursor_operation<Op, C>(
         &self,
-        mut op: impl BorrowMut<Op>,
-    ) -> Result<Cursor<T>>
+        op: &mut Op,
+        mut session: Option<&mut ClientSession>,
+    ) -> Result<C>
     where
         Op: Operation<O = CursorSpecification>,
+        C: crate::cursor::NewCursor,
     {
         Box::pin(async {
             let mut details = self
-                .execute_operation_with_details(op.borrow_mut(), None)
+                .execute_operation_with_details(op, session.as_deref_mut())
                 .await?;
-            let pinned =
-                self.pin_connection_for_cursor(&details.output, &mut details.connection, None)?;
-            Ok(Cursor::new(
+            let pinned = self.pin_connection_for_cursor(
+                &details.output.info,
+                &mut details.connection,
+                session,
+            )?;
+            C::generic_new(
                 self.clone(),
                 details.output,
                 details.implicit_session,
                 pinned,
-            ))
+            )
         })
         .await
-    }
-
-    pub(crate) async fn execute_session_cursor_operation<Op, T>(
-        &self,
-        mut op: impl BorrowMut<Op>,
-        session: &mut ClientSession,
-    ) -> Result<SessionCursor<T>>
-    where
-        Op: Operation<O = CursorSpecification>,
-    {
-        let mut details = self
-            .execute_operation_with_details(op.borrow_mut(), &mut *session)
-            .await?;
-
-        let pinned = self.pin_connection_for_cursor(
-            &details.output,
-            &mut details.connection,
-            Some(session),
-        )?;
-        Ok(SessionCursor::new(self.clone(), details.output, pinned))
     }
 
     pub(crate) fn is_load_balanced(&self) -> bool {
@@ -238,14 +226,14 @@ impl Client {
 
     pub(crate) fn pin_connection_for_cursor(
         &self,
-        spec: &CursorSpecification,
+        info: &CursorInformation,
         conn: &mut PooledConnection,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<PinnedConnectionHandle>> {
         if let Some(handle) = session.and_then(|s| s.transaction.pinned_connection()) {
             // Cursor operations on a transaction share the same pinned connection.
             Ok(Some(handle.replicate()))
-        } else if self.is_load_balanced() && spec.info.id != 0 {
+        } else if self.is_load_balanced() && info.id != 0 {
             // Cursor operations on load balanced topologies always pin connections.
             Ok(Some(conn.pin()?))
         } else {
@@ -283,8 +271,8 @@ impl Client {
             }
             let (cursor_spec, cs_data) = details.output;
             let pinned =
-                self.pin_connection_for_cursor(&cursor_spec, &mut details.connection, None)?;
-            let cursor = Cursor::new(self.clone(), cursor_spec, details.implicit_session, pinned);
+                self.pin_connection_for_cursor(&cursor_spec.info, &mut details.connection, None)?;
+            let cursor = Cursor::new(self.clone(), cursor_spec, details.implicit_session, pinned)?;
 
             Ok(ChangeStream::new(cursor, args, cs_data))
         })
@@ -316,11 +304,11 @@ impl Client {
                 .await?;
             let (cursor_spec, cs_data) = details.output;
             let pinned = self.pin_connection_for_cursor(
-                &cursor_spec,
+                &cursor_spec.info,
                 &mut details.connection,
                 Some(session),
             )?;
-            let cursor = SessionCursor::new(self.clone(), cursor_spec, pinned);
+            let cursor = SessionCursor::new(self.clone(), cursor_spec, pinned)?;
 
             Ok(SessionChangeStream::new(cursor, args, cs_data))
         })
@@ -501,15 +489,15 @@ impl Client {
     }
 
     /// Executes an operation on a given connection, optionally using a provided session.
-    pub(crate) async fn execute_operation_on_connection<T: Operation>(
+    pub(crate) async fn execute_operation_on_connection<Op: Operation>(
         &self,
-        op: &mut T,
+        op: &mut Op,
         connection: &mut PooledConnection,
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
         retryability: Retryability,
         effective_criteria: SelectionCriteria,
-    ) -> Result<T::O> {
+    ) -> Result<Op::O> {
         loop {
             let cmd = self.build_command(
                 op,
@@ -657,21 +645,28 @@ impl Client {
                         effective_criteria: effective_criteria.clone(),
                     };
 
-                    match op.handle_response(&response, context).await {
-                        Ok(response) => Ok(response),
+                    let handle_result = match Op::ZERO_COPY {
+                        true => op.handle_response(Cow::Owned(response), context).await,
+                        false => op
+                            .handle_response(Cow::Borrowed(&response), context)
+                            .await
+                            .map_err(|e| e.with_server_response(&response)),
+                    };
+                    match handle_result {
+                        Ok(op_out) => Ok(op_out),
                         Err(mut err) => {
                             err.add_labels_and_update_pin(
                                 Some(connection.stream_description()?),
                                 session,
                                 Some(retryability),
                             );
-                            Err(err.with_server_response(&response))
+                            Err(err)
                         }
                     }
                 }
             };
             #[cfg(feature = "opentelemetry")]
-            span.record_command_result::<T>(&result);
+            span.record_command_result::<Op>(&result);
 
             if result
                 .as_ref()

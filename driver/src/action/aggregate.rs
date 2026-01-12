@@ -116,7 +116,7 @@ pub struct Aggregate<'a, Session = ImplicitSession, T = Document> {
     pipeline: Vec<Document>,
     options: Option<AggregateOptions>,
     session: Session,
-    _phantom: PhantomData<T>,
+    _phantom: PhantomData<fn() -> T>,
 }
 
 impl<'a> Aggregate<'a> {
@@ -132,7 +132,7 @@ impl<'a> Aggregate<'a> {
 }
 
 #[option_setters(crate::coll::options::AggregateOptions)]
-#[export_doc(aggregate, extra = [session])]
+#[export_doc(aggregate, extra = [session, batch])]
 impl<'a, Session, T> Aggregate<'a, Session, T> {
     /// Use the provided type for the returned cursor.
     ///
@@ -167,6 +167,24 @@ impl<'a, Session, T> Aggregate<'a, Session, T> {
     }
 }
 
+macro_rules! agg_exec_generic {
+    ($agg:expr) => {{
+        resolve_options!(
+            $agg.target,
+            $agg.options,
+            [read_concern, write_concern, selection_criteria]
+        );
+
+        let mut aggregate = crate::operation::aggregate::Aggregate::new(
+            $agg.target.target(),
+            $agg.pipeline,
+            $agg.options,
+        );
+        let client = $agg.target.client();
+        client.execute_cursor_operation(&mut aggregate, None).await
+    }};
+}
+
 impl<'a, T> Aggregate<'a, ImplicitSession, T> {
     /// Use the provided session when running the operation.
     pub fn session(
@@ -181,6 +199,12 @@ impl<'a, T> Aggregate<'a, ImplicitSession, T> {
             _phantom: PhantomData,
         }
     }
+
+    /// Execute the aggregate command, returning a cursor that provides results in zero-copy raw
+    /// batches.
+    pub async fn batch(mut self) -> Result<crate::raw_batch_cursor::RawBatchCursor> {
+        agg_exec_generic!(self)
+    }
 }
 
 #[action_impl(sync = crate::sync::Cursor<T>)]
@@ -188,19 +212,38 @@ impl<'a, T> Action for Aggregate<'a, ImplicitSession, T> {
     type Future = AggregateFuture;
 
     async fn execute(mut self) -> Result<Cursor<T>> {
-        resolve_options!(
-            self.target,
-            self.options,
-            [read_concern, write_concern, selection_criteria]
+        agg_exec_generic!(self)
+    }
+}
+
+macro_rules! agg_exec_generic_session {
+    ($agg:expr) => {{
+        resolve_read_concern_with_session!($agg.target, $agg.options, Some(&mut *$agg.session.0));
+        resolve_write_concern_with_session!($agg.target, $agg.options, Some(&mut *$agg.session.0));
+        resolve_selection_criteria_with_session!(
+            $agg.target,
+            $agg.options,
+            Some(&mut *$agg.session.0)
         );
 
-        let aggregate = crate::operation::aggregate::Aggregate::new(
-            self.target.target(),
-            self.pipeline,
-            self.options,
+        let mut aggregate = crate::operation::aggregate::Aggregate::new(
+            $agg.target.target(),
+            $agg.pipeline,
+            $agg.options,
         );
-        let client = self.target.client();
-        client.execute_cursor_operation(aggregate).await
+        let client = $agg.target.client();
+        let session = $agg.session;
+        client
+            .execute_cursor_operation(&mut aggregate, Some(session.0))
+            .await
+    }};
+}
+
+impl<'a, T> Aggregate<'a, ExplicitSession<'a>, T> {
+    /// Execute the aggregate command, returning a cursor that provides results in zero-copy raw
+    /// batches.
+    pub async fn batch(mut self) -> Result<crate::raw_batch_cursor::SessionRawBatchCursor> {
+        agg_exec_generic_session!(self)
     }
 }
 
@@ -209,24 +252,7 @@ impl<'a, T> Action for Aggregate<'a, ExplicitSession<'a>, T> {
     type Future = AggregateSessionFuture;
 
     async fn execute(mut self) -> Result<SessionCursor<T>> {
-        resolve_read_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
-        resolve_write_concern_with_session!(self.target, self.options, Some(&mut *self.session.0))?;
-        resolve_selection_criteria_with_session!(
-            self.target,
-            self.options,
-            Some(&mut *self.session.0)
-        )?;
-
-        let aggregate = crate::operation::aggregate::Aggregate::new(
-            self.target.target(),
-            self.pipeline,
-            self.options,
-        );
-        let client = self.target.client();
-        let session = self.session;
-        client
-            .execute_session_cursor_operation(aggregate, session.0)
-            .await
+        agg_exec_generic_session!(self)
     }
 }
 

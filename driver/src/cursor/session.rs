@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::bson::RawDocument;
+use crate::{bson::RawDocument, cursor::CursorSpecification};
 use futures_core::Stream;
 use futures_util::StreamExt;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -29,7 +29,7 @@ use crate::{
     change_stream::event::ResumeToken,
     client::{options::ServerAddress, AsyncDropToken},
     cmap::conn::PinnedConnectionHandle,
-    cursor::{common::ExplicitClientSessionHandle, CursorSpecification},
+    cursor::common::ExplicitClientSessionHandle,
     error::{Error, Result},
     Client,
     ClientSession,
@@ -78,15 +78,26 @@ pub struct SessionCursor<T> {
     kill_watcher: Option<oneshot::Sender<()>>,
 }
 
+impl<T> super::NewCursor for SessionCursor<T> {
+    fn generic_new(
+        client: Client,
+        spec: CursorSpecification,
+        _implicit_session: Option<ClientSession>,
+        pinned: Option<PinnedConnectionHandle>,
+    ) -> Result<Self> {
+        Self::new(client, spec, pinned)
+    }
+}
+
 impl<T> SessionCursor<T> {
     pub(crate) fn new(
         client: Client,
         spec: CursorSpecification,
         pinned: Option<PinnedConnectionHandle>,
-    ) -> Self {
+    ) -> Result<Self> {
         let exhausted = spec.info.id == 0;
 
-        Self {
+        Ok(Self {
             drop_token: client.register_async_drop(),
             client,
             info: spec.info,
@@ -95,13 +106,13 @@ impl<T> SessionCursor<T> {
             #[cfg(test)]
             kill_watcher: None,
             state: CursorState {
-                buffer: CursorBuffer::new(spec.initial_buffer),
+                buffer: CursorBuffer::new(super::common::reply_batch(&spec.initial_reply)?),
                 exhausted,
                 post_batch_resume_token: None,
                 pinned_connection: PinnedConnection::new(pinned),
             }
             .into(),
-        }
+        })
     }
 }
 

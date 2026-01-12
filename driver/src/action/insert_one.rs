@@ -84,7 +84,7 @@ impl<'a> Action for InsertOne<'a> {
     type Future = InsertOneFuture;
 
     async fn execute(mut self) -> Result<InsertOneResult> {
-        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref())?;
+        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref());
 
         let doc = self.doc?;
 

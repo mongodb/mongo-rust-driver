@@ -1,15 +1,6 @@
 use serde::Deserialize;
 
-use crate::{bson::Bson, error::WriteError, operation::CursorInfo};
-
-/// The top-level response to the bulkWrite command.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct Response {
-    pub(super) cursor: CursorInfo,
-    #[serde(flatten)]
-    pub(super) summary: SummaryInfo,
-}
+use crate::{bson::Bson, error::WriteError};
 
 /// The summary information contained within the top-level response to the bulkWrite command.
 #[derive(Debug, Deserialize)]

@@ -5,7 +5,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{CursorBody, OperationWithDefaults, Retryability},
+    operation::{OperationWithDefaults, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
 };
 
@@ -37,6 +37,8 @@ impl OperationWithDefaults for ListCollections {
 
     const NAME: &'static CStr = cstr!("listCollections");
 
+    const ZERO_COPY: bool = true;
+
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: 1,
@@ -55,14 +57,13 @@ impl OperationWithDefaults for ListCollections {
         Ok(Command::new(Self::NAME, &self.db, body))
     }
 
-    fn handle_response<'a>(
+    fn handle_response_cow<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: CursorBody = response.body()?;
-        Ok(CursorSpecification::new(
-            response.cursor,
+        CursorSpecification::new(
+            response.into_owned(),
             context
                 .connection
                 .stream_description()?
@@ -71,7 +72,7 @@ impl OperationWithDefaults for ListCollections {
             self.options.as_ref().and_then(|opts| opts.batch_size),
             None,
             None,
-        ))
+        )
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

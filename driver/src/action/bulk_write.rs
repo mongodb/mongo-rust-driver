@@ -117,11 +117,7 @@ where
     }
 
     async fn execute_inner(mut self) -> Result<R> {
-        resolve_write_concern_with_session!(
-            self.client,
-            self.options,
-            self.session.as_deref_mut()
-        )?;
+        resolve_write_concern_with_session!(self.client, self.options, self.session.as_deref_mut());
 
         let mut total_attempted = 0;
         let mut execution_status = ExecutionStatus::None;

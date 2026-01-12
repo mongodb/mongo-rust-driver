@@ -1,8 +1,7 @@
 mod common;
+pub mod raw_batch;
 pub(crate) mod session;
 
-#[cfg(test)]
-use std::collections::VecDeque;
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -29,9 +28,11 @@ use crate::{
 };
 use common::{kill_cursor, GenericCursor};
 pub(crate) use common::{
+    reply_batch,
     stream_poll_next,
     BatchValue,
     CursorInformation,
+    CursorReply,
     CursorSpecification,
     CursorStream,
     NextInBatchFuture,
@@ -119,8 +120,8 @@ impl<T> Cursor<T> {
         spec: CursorSpecification,
         session: Option<ClientSession>,
         pin: Option<PinnedConnectionHandle>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        Ok(Self {
             client: client.clone(),
             drop_token: client.register_async_drop(),
             wrapped_cursor: Some(ImplicitSessionCursor::with_implicit_session(
@@ -128,12 +129,12 @@ impl<T> Cursor<T> {
                 spec,
                 PinnedConnection::new(pin),
                 ImplicitClientSessionHandle(session),
-            )),
+            )?),
             drop_address: None,
             #[cfg(test)]
             kill_watcher: None,
             _phantom: Default::default(),
-        }
+        })
     }
 
     pub(crate) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
@@ -305,7 +306,7 @@ impl<T> Cursor<T> {
     }
 
     #[cfg(test)]
-    pub(crate) fn current_batch(&self) -> &VecDeque<RawDocumentBuf> {
+    pub(crate) fn current_batch(&self) -> &std::collections::VecDeque<RawDocumentBuf> {
         self.wrapped_cursor.as_ref().unwrap().current_batch()
     }
 }
@@ -357,3 +358,23 @@ impl<T> Drop for Cursor<T> {
 /// A `GenericCursor` that optionally owns its own sessions.
 /// This is to be used by cursors associated with implicit sessions.
 type ImplicitSessionCursor = GenericCursor<'static, ImplicitClientSessionHandle>;
+
+pub(crate) trait NewCursor: Sized {
+    fn generic_new(
+        client: Client,
+        spec: CursorSpecification,
+        implicit_session: Option<ClientSession>,
+        pinned: Option<PinnedConnectionHandle>,
+    ) -> Result<Self>;
+}
+
+impl<T> NewCursor for Cursor<T> {
+    fn generic_new(
+        client: Client,
+        spec: CursorSpecification,
+        implicit_session: Option<ClientSession>,
+        pinned: Option<PinnedConnectionHandle>,
+    ) -> Result<Self> {
+        Self::new(client, spec, implicit_session, pinned)
+    }
+}
