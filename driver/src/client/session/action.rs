@@ -2,8 +2,9 @@ use std::time::{Duration, Instant};
 
 use crate::{
     action::{action_impl, AbortTransaction, CommitTransaction, StartTransaction},
+    bson_util::round_clamp,
     client::options::TransactionOptions,
-    error::{ErrorKind, Result},
+    error::{ErrorKind, Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
     operation::{self, Operation},
     sdam::TransactionSupportStatus,
     BoxFuture,
@@ -11,6 +12,8 @@ use crate::{
 };
 
 use super::TransactionState;
+
+const MAX_CONVENIENT_TRANSACTION_TIME: Duration = Duration::from_secs(120);
 
 impl ClientSession {
     async fn start_transaction_impl(&mut self, options: Option<TransactionOptions>) -> Result<()> {
@@ -110,13 +113,16 @@ macro_rules! convenient_run {
         $callback:expr,
         $abort_transaction:expr,
         $commit_transaction:expr,
+        $sleep:expr,
     ) => {{
-        let timeout = Duration::from_secs(120);
+        let start_time = Instant::now();
+        let max_time = MAX_CONVENIENT_TRANSACTION_TIME;
         #[cfg(test)]
-        let timeout = $session.convenient_transaction_timeout.unwrap_or(timeout);
-        let start = Instant::now();
+        let max_time = $session
+            .convenient_transaction_timeout
+            .unwrap_or(MAX_CONVENIENT_TRANSACTION_TIME);
 
-        use crate::error::{TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT};
+        let mut retries = 0;
 
         'transaction: loop {
             $start_transaction?;
@@ -129,7 +135,9 @@ macro_rules! convenient_run {
                     ) {
                         $abort_transaction?;
                     }
-                    if e.contains_label(TRANSIENT_TRANSACTION_ERROR) && start.elapsed() < timeout {
+                    if e.contains_label(TRANSIENT_TRANSACTION_ERROR)
+                        && perform_backoff!(retries, start_time, max_time, $sleep)
+                    {
                         continue 'transaction;
                     }
                     return Err(e);
@@ -147,7 +155,9 @@ macro_rules! convenient_run {
                 match $commit_transaction {
                     Ok(()) => return Ok(ret),
                     Err(e) => {
-                        if e.is_max_time_ms_expired_error() || start.elapsed() >= timeout {
+                        if e.is_max_time_ms_expired_error()
+                            || !perform_backoff!(retries, start_time, max_time, $sleep)
+                        {
                             return Err(e);
                         }
                         if e.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
@@ -160,6 +170,48 @@ macro_rules! convenient_run {
                     }
                 }
             }
+        }
+    }};
+}
+
+macro_rules! sleep_async {
+    ($duration:expr) => {{
+        tokio::time::sleep($duration).await
+    }};
+}
+macro_rules! sleep_sync {
+    ($duration:expr) => {{
+        crate::sync::TOKIO_RUNTIME.block_on(tokio::time::sleep(backoff))
+    }};
+}
+
+/// Calculates the amount of time to back off before retrying and sleeps for that duration if enough
+/// time is remaining. Returns true if another retry should be performed or false if time has run
+/// out.
+macro_rules! perform_backoff {
+    (
+        $retries:expr,
+        $start_time:expr,
+        $max_time:expr,
+        $sleep:expr
+    ) => {{
+        const BACKOFF_INITIAL_MS: f64 = 5f64;
+        const BACKOFF_MAX_MS: f64 = 500f64;
+        const RETRY_EXP: f64 = 1.5f64;
+
+        let jitter = rand::random_range(0f64..1f64);
+
+        let computed_backoff = jitter * BACKOFF_INITIAL_MS * f64::from($retries).powf(RETRY_EXP);
+        let max_backoff = jitter * BACKOFF_MAX_MS;
+        let backoff_ms: u64 =
+            std::cmp::min(round_clamp(computed_backoff), round_clamp(max_backoff));
+        let backoff = Duration::from_millis(backoff_ms);
+
+        if $start_time.elapsed() + backoff > $max_time {
+            false
+        } else {
+            $sleep(backoff);
+            true
         }
     }};
 }
@@ -226,6 +278,7 @@ impl StartTransaction<&mut ClientSession> {
             callback(self.session, &mut context).await,
             self.session.abort_transaction().await,
             self.session.commit_transaction().await,
+            sleep_async,
         )
     }
 
@@ -297,6 +350,7 @@ impl StartTransaction<&mut ClientSession> {
             callback(self.session).await,
             self.session.abort_transaction().await,
             self.session.commit_transaction().await,
+            sleep_async,
         )
     }
 }
@@ -339,6 +393,7 @@ impl StartTransaction<&mut crate::sync::ClientSession> {
             callback(self.session),
             self.session.abort_transaction().run(),
             self.session.commit_transaction().run(),
+            sleep_sync,
         )
     }
 }
