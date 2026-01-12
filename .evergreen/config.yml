@@ -115,19 +115,18 @@ buildvariants:
       - name: .replicaset
       - name: .sharded
 
-  - name: windows-64-vs2017
-    display_name: "Windows (VS 2017)"
+  - name: windows-2022
+    display_name: "Windows 2022"
     run_on:
-      - windows-64-vs2017-small
+      - windows-2022-latest-small
     expansions:
       AUTH: auth
       SSL: ssl
     tasks:
       - name: build-nextest-archive
-      # RUST-2327 / SERVER-116018
-      - name: .standalone !.latest
-      - name: .replicaset !.latest
-      - name: .sharded !.latest
+      - name: .standalone
+      - name: .replicaset
+      - name: .sharded
 
   - name: openssl-rhel
     display_name: "OpenSSL (RHEL)"
@@ -171,7 +170,7 @@ buildvariants:
     display_name: "OpenSSL (Windows)"
     patchable: false
     run_on:
-      - windows-64-vs2017-small
+      - windows-2022-latest-small
     expansions:
       OPENSSL: true
       AUTH: auth
@@ -291,7 +290,7 @@ buildvariants:
     display_name: "GSSAPI Authentication - Windows"
     patchable: true
     run_on:
-      - windows-64-vs2017-small
+      - windows-2022-latest-small
     tasks:
       - test-gssapi-auth
 
@@ -336,7 +335,7 @@ buildvariants:
     display_name: "OIDC Windows"
     patchable: true
     run_on:
-      - windows-64-vsMulti-small
+      - windows-64-vs2017-small
     expansions:
       AUTH: auth
       SSL: ssl
