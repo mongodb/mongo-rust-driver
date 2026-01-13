@@ -105,35 +105,18 @@ pub(super) async fn authenticate_stream(
 }
 
 // Find credentials using MongoDB URI or AWS SDK
-pub(crate) async fn get_aws_credentials(credential: &Credential) -> Result<Credentials> {
-    if let (Some(access_key), Some(secret_key)) = (&credential.username, &credential.password) {
-        // Look for credentials in the MongoDB URI
-        Ok(Credentials::new(
-            access_key.clone(),
-            secret_key.clone(),
-            credential
-                .mechanism_properties
-                .as_ref()
-                .and_then(|mp| mp.get_str("AWS_SESSION_TOKEN").ok())
-                .map(str::to_owned),
-            None,
-            "MongoDB URI",
-        ))
-    } else {
-        // If credentials are not provided in the URI, use the AWS SDK to load
-        let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
-        let creds = config
-            .credentials_provider()
-            .ok_or_else(|| {
-                Error::authentication_error(MECH_NAME, "no credential provider configured")
-            })?
-            .provide_credentials()
-            .await
-            .map_err(|e| {
-                Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
-            })?;
-        Ok(creds)
-    }
+pub(crate) async fn get_aws_credentials(_credential: &Credential) -> Result<Credentials> {
+    // Use the AWS SDK to load
+    let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
+    let creds = config
+        .credentials_provider()
+        .ok_or_else(|| Error::authentication_error(MECH_NAME, "no credential provider configured"))?
+        .provide_credentials()
+        .await
+        .map_err(|e| {
+            Error::authentication_error(MECH_NAME, &format!("failed to get creds: {e}"))
+        })?;
+    Ok(creds)
 }
 
 pub fn compute_aws_sigv4_payload(
