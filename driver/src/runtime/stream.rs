@@ -12,7 +12,7 @@ use tokio::{
 };
 
 use crate::{
-    error::{Error, ErrorKind, Result, RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
+    error::{Error, ErrorKind, Result},
     options::{ServerAddress, Socks5Proxy},
     runtime,
 };
@@ -119,36 +119,19 @@ impl AsyncStream {
                     }
                     .into());
                 }
-                let inner = match tcp_connect(resolved).await {
-                    Ok(stream) => stream,
-                    Err(mut error) => {
-                        #[cfg(test)]
-                        crate::test::log_uncaptured(format!(
-                            "got error in tcp connect: {}",
-                            &error
-                        ));
-                        if error.is_network_error() {
-                            error.add_label(SYSTEM_OVERLOADED_ERROR);
-                            error.add_label(RETRYABLE_ERROR);
-                        }
-                        return Err(error);
-                    }
-                };
+                let tcp_stream = tcp_connect(resolved)
+                    .await
+                    .map_err(Error::with_backpressure_labels)?;
 
-                // If there are TLS options, wrap the inner stream in an AsyncTlsStream.
+                // If there are TLS options, wrap the TCP stream in an AsyncTlsStream.
                 match tls_cfg {
                     Some(cfg) => {
-                        let tls_result = tls_connect(host, inner, cfg).await;
-                        #[cfg(test)]
-                        if let Err(ref error) = tls_result {
-                            crate::test::log_uncaptured(format!(
-                                "got error in tls connect: {}",
-                                &error
-                            ));
-                        }
-                        Ok(AsyncStream::Tls(tls_result?))
+                        let tls_stream = tls_connect(host, tcp_stream, cfg)
+                            .await
+                            .map_err(Error::with_backpressure_labels)?;
+                        Ok(AsyncStream::Tls(tls_stream))
                     }
-                    None => Ok(AsyncStream::Tcp(inner)),
+                    None => Ok(AsyncStream::Tcp(tcp_stream)),
                 }
             }
             #[cfg(unix)]

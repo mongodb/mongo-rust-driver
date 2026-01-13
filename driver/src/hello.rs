@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::{
     bson::{rawdoc, RawDocumentBuf},
     bson_compat::cstr,
-    error::{RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
+    error::Error,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
@@ -83,24 +83,15 @@ pub(crate) async fn run_hello(
     command: Command,
     mut cancellation_receiver: Option<broadcast::Receiver<()>>,
 ) -> Result<HelloReply> {
-    let response_result = match cancellation_receiver {
+    let response = match cancellation_receiver {
         Some(ref mut cancellation_receiver) => {
             conn.send_message_with_cancellation(command, cancellation_receiver)
                 .await
         }
         None => conn.send_message(command).await,
-    };
-    match response_result {
-        Ok(raw_response) => raw_response.into_hello_reply(),
-        Err(mut error) => {
-            dbg!(&error);
-            if error.is_network_error() {
-                error.add_label(SYSTEM_OVERLOADED_ERROR);
-                error.add_label(RETRYABLE_ERROR);
-            }
-            Err(error)
-        }
     }
+    .map_err(Error::with_backpressure_labels)?;
+    response.into_hello_reply()
 }
 
 #[derive(Debug, Clone, Serialize)]

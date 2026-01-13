@@ -8,14 +8,7 @@ use crate::{
     bson::{doc, oid::ObjectId, Document},
     client::Client,
     cmap::{conn::ConnectionGeneration, PoolGeneration},
-    error::{
-        CommandError,
-        Error,
-        ErrorKind,
-        InsertManyError,
-        RETRYABLE_ERROR,
-        SYSTEM_OVERLOADED_ERROR,
-    },
+    error::{CommandError, Error, ErrorKind, InsertManyError},
     event::sdam::SdamEvent,
     hello::{HelloCommandResponse, HelloReply, LastWrite, LEGACY_HELLO_COMMAND_NAME},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
@@ -350,10 +343,7 @@ async fn run_test(test_file: TestFile) {
                 let conn_generation = ConnectionGeneration::Normal(conn_generation);
                 let handshake_phase = match application_error.when {
                     ErrorHandshakePhase::BeforeHandshakeCompletes => {
-                        if error.is_network_error() {
-                            error.add_label(SYSTEM_OVERLOADED_ERROR);
-                            error.add_label(RETRYABLE_ERROR);
-                        }
+                        error = error.with_backpressure_labels();
                         HandshakePhase::PreHello {
                             generation: pool_generation,
                         }
