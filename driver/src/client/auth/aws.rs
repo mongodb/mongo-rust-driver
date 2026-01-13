@@ -104,7 +104,7 @@ pub(super) async fn authenticate_stream(
     Ok(())
 }
 
-// Find credentials using MongoDB URI or AWS SDK
+// Find credentials using AWS SDK
 pub(crate) async fn get_aws_credentials(_credential: &Credential) -> Result<Credentials> {
     // Use the AWS SDK to load
     let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
