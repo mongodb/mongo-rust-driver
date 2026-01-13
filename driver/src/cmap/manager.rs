@@ -26,8 +26,6 @@ pub(crate) struct PoolManager {
 impl PoolManager {
     /// Lazily clear the pool.
     pub(super) async fn clear(&self, cause: Error, service_id: Option<ObjectId>) {
-        #[cfg(test)]
-        crate::test::log_uncaptured(format!("clearing pool, reason: {}", &cause));
         let (message, acknowledgment_receiver) = AcknowledgedMessage::package(());
         if self
             .sender

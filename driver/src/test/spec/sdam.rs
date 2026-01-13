@@ -310,26 +310,28 @@ async fn connection_pool_backpressure() {
     async fn run_test(client: &EventClient) -> Result<()> {
         let admin = client.database("admin");
         admin
-            .run_command(
-                doc! { "setParameter": 1, "ingressConnectionEstablishmentRateLimiterEnabled":
-                true },
-            )
+            .run_command(doc! {
+                "setParameter": 1,
+                "ingressConnectionEstablishmentRateLimiterEnabled": true,
+            })
             .await?;
         admin
-            .run_command(
-                doc! { "setParameter": 1, "ingressConnectionEstablishmentRatePerSec":
-                20},
-            )
+            .run_command(doc! {
+                "setParameter": 1,
+                "ingressConnectionEstablishmentRatePerSec": 20,
+            })
             .await?;
         admin
-            .run_command(
-                doc! { "setParameter": 1, "ingressConnectionEstablishmentBurstCapacitySecs": 1 },
-            )
+            .run_command(doc! {
+                "setParameter": 1,
+                "ingressConnectionEstablishmentBurstCapacitySecs": 1,
+            })
             .await?;
         admin
-            .run_command(
-                doc! { "setParameter": 1, "ingressConnectionEstablishmentMaxQueueDepth": 1 },
-            )
+            .run_command(doc! {
+                "setParameter": 1,
+                "ingressConnectionEstablishmentMaxQueueDepth": 1,
+            })
             .await?;
 
         let coll = client.database("test").collection("test");
@@ -378,10 +380,10 @@ async fn connection_pool_backpressure() {
     tokio::time::sleep(Duration::from_secs(1)).await;
     client
         .database("admin")
-        .run_command(
-            doc! { "setParameter": 1, "ingressConnectionEstablishmentRateLimiterEnabled": false
-            },
-        )
+        .run_command(doc! {
+            "setParameter": 1,
+            "ingressConnectionEstablishmentRateLimiterEnabled": false,
+        })
         .await
         .unwrap();
 
