@@ -339,7 +339,10 @@ impl Client {
                 .select_server(
                     selection_criteria,
                     crate::bson_compat::cstr_to_str(op.name()),
-                    retry.as_ref().map(|r| &r.first_server),
+                    &retry
+                        .as_ref()
+                        .map(|r| vec![&r.first_server])
+                        .unwrap_or_default(),
                     op.override_criteria(),
                 )
                 .await
@@ -933,7 +936,7 @@ impl Client {
                 || server_type.is_data_bearing()
         }));
         let _ = self
-            .select_server(Some(&criteria), operation_name, None, |_, _| None)
+            .select_server(Some(&criteria), operation_name, &[], |_, _| None)
             .await?;
         Ok(())
     }

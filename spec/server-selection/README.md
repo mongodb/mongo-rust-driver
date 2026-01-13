@@ -47,7 +47,7 @@ that it selects the correct subset of servers from the TopologyDescription. Each
 stages of server selection:
 
 - `suitable_servers`: the set of servers in topology_description that are suitable, as per the Server Selection spec,
-  given operation and read_preference
+    given operation and read_preference
 - `in_latency_window`: the set of suitable_servers that fall within the latency window
 
 Drivers implementing server selection MUST test that their implementation correctly returns the set of servers in
@@ -63,19 +63,18 @@ Each YAML file for these tests has the following format:
 - `topology_description`: the state of a mocked cluster
 
 - `mocked_topology_state`: array of objects containing the operationCounts for each server included in
-  `topology_description`. Each element will have all of the following fields:
+    `topology_description`. Each element will have all of the following fields:
 
-  - `address`: a unique address identifying this server
-  - `operation_count`: the `operationCount` for this server
+    - `address`: a unique address identifying this server
+    - `operation_count`: the `operationCount` for this server
 
-- `iterations`: the number of selections that should be run as part of this\
-  test
+- `iterations`: the number of selections that should be run as part of this test
 
 - `outcome`: an object describing the expected outcome of the selections
 
-  - `tolerance`: the maximum difference between an observed frequency and an expected one
-  - `expected_frequencies`: a document whose keys are the server addresses from the `in_window` array and values are
-    numbers in `[0, 1]` indicating the frequency at which the server should have been selected.
+    - `tolerance`: the maximum difference between an observed frequency and an expected one
+    - `expected_frequencies`: a document whose keys are the server addresses from the `in_window` array and values are
+        numbers in `[0, 1]` indicating the frequency at which the server should have been selected.
 
 For each file, create a new TopologyDescription object initialized with the values from `topology_description` and
 populate the operationCounts based on the information provided in `mocked_topology_state`. Then, repeatedly select a
