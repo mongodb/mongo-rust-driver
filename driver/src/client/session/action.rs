@@ -209,7 +209,7 @@ fn compute_backoff(attempt: u32, #[cfg(test)] test_jitter: Option<f64>) -> Durat
     Duration::from_millis(backoff)
 }
 
-// perform_backoff needs an ident to access on the result from std::thread::sleep, so we use a dummy
+// convenient_run needs an ident to access on the result from std::thread::sleep, so we use a dummy
 // struct with a field
 #[cfg(feature = "sync")]
 struct SleepResult {
