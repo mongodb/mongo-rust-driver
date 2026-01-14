@@ -314,6 +314,6 @@ async fn convenient_api_retry_backoff_is_enforced() {
     let no_jitter = run_test(0f64).await;
     let with_jitter = run_test(1f64).await;
 
-    let difference = with_jitter.abs_diff(no_jitter + Duration::from_millis(2200));
-    assert!(difference < Duration::from_secs(1));
+    let difference = with_jitter.abs_diff(no_jitter + Duration::from_millis(1800));
+    assert!(difference < Duration::from_millis(500));
 }

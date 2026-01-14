@@ -470,6 +470,11 @@ fn gridfs() {
 
 #[test]
 fn convenient_transactions() {
+    let skip = !crate::sync::TOKIO_RUNTIME.block_on(transactions_supported());
+    if skip {
+        return;
+    }
+
     let client = Client::with_options(CLIENT_OPTIONS.clone()).unwrap();
     let coll = client.database("db").collection("convenient_transaction");
     let mut session = client.start_session().run().unwrap();
