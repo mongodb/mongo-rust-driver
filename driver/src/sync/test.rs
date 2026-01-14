@@ -467,3 +467,14 @@ fn gridfs() {
 
     assert_eq!(upload, download);
 }
+
+#[test]
+fn convenient_transactions() {
+    let client = Client::with_options(CLIENT_OPTIONS.clone()).unwrap();
+    let coll = client.database("db").collection("convenient_transaction");
+    let mut session = client.start_session().run().unwrap();
+    session
+        .start_transaction()
+        .and_run(|session| coll.insert_one(doc! { "x": 1 }).session(session).run())
+        .unwrap();
+}

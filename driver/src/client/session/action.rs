@@ -113,6 +113,8 @@ macro_rules! convenient_run {
         $callback:expr,
         $abort_transaction:expr,
         $commit_transaction:expr,
+        $sleep:expr,
+        $await:ident,
     ) => {{
         let start_time = Instant::now();
         let max_time = MAX_CONVENIENT_TRANSACTION_TIME;
@@ -133,7 +135,7 @@ macro_rules! convenient_run {
                         $abort_transaction?;
                     }
                     if e.contains_label(TRANSIENT_TRANSACTION_ERROR)
-                        && perform_backoff!($session, retries, start_time, max_time)
+                        && perform_backoff!($session, retries, start_time, max_time, $sleep, $await)
                     {
                         continue 'transaction;
                     }
@@ -153,7 +155,9 @@ macro_rules! convenient_run {
                     Ok(()) => return Ok(ret),
                     Err(e) => {
                         if e.is_max_time_ms_expired_error()
-                            || !perform_backoff!($session, retries, start_time, max_time)
+                            || !perform_backoff!(
+                                $session, retries, start_time, max_time, $sleep, $await
+                            )
                         {
                             return Err(e);
                         }
@@ -179,7 +183,9 @@ macro_rules! perform_backoff {
         $session:expr,
         $retries:expr,
         $start_time:expr,
-        $max_time:expr
+        $max_time:expr,
+        $sleep:expr,
+        $await:ident
     ) => {{
         const BACKOFF_INITIAL_MS: f64 = 5f64;
         const BACKOFF_MAX_MS: f64 = 500f64;
@@ -199,10 +205,22 @@ macro_rules! perform_backoff {
             false
         } else {
             $retries += 1;
-            tokio::time::sleep(backoff).await;
+            $sleep(backoff).$await;
             true
         }
     }};
+}
+
+// perform_backoff needs an ident to access on the result from std::thread::sleep, so we use a dummy
+// struct with a field
+#[cfg(feature = "sync")]
+struct SleepResult {
+    _r: (),
+}
+#[cfg(feature = "sync")]
+fn sleep_sync(duration: Duration) -> SleepResult {
+    std::thread::sleep(duration);
+    SleepResult { _r: () }
 }
 
 impl StartTransaction<&mut ClientSession> {
@@ -267,6 +285,8 @@ impl StartTransaction<&mut ClientSession> {
             callback(self.session, &mut context).await,
             self.session.abort_transaction().await,
             self.session.commit_transaction().await,
+            tokio::time::sleep,
+            await,
         )
     }
 
@@ -338,6 +358,8 @@ impl StartTransaction<&mut ClientSession> {
             callback(self.session).await,
             self.session.abort_transaction().await,
             self.session.commit_transaction().await,
+            tokio::time::sleep,
+            await,
         )
     }
 }
@@ -372,18 +394,18 @@ impl StartTransaction<&mut crate::sync::ClientSession> {
     where
         F: for<'b> FnMut(&'b mut crate::sync::ClientSession) -> Result<R>,
     {
-        todo!()
-        // convenient_run!(
-        //     self.session.async_client_session,
-        //     self.session
-        //         .start_transaction()
-        //         .with_options(self.options.clone())
-        //         .run(),
-        //     callback(self.session),
-        //     self.session.abort_transaction().run(),
-        //     self.session.commit_transaction().run(),
-        //     sleep_sync,
-        // )
+        convenient_run!(
+            self.session.async_client_session,
+            self.session
+                .start_transaction()
+                .with_options(self.options.clone())
+                .run(),
+            callback(self.session),
+            self.session.abort_transaction().run(),
+            self.session.commit_transaction().run(),
+            sleep_sync,
+            _r,
+        )
     }
 }
 

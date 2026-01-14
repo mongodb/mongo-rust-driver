@@ -279,14 +279,18 @@ async fn write_concern_not_inherited() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn convenient_retry_backoff_is_enforced() {
+async fn convenient_api_retry_backoff_is_enforced() {
     if !transactions_supported().await {
         log_uncaptured("skipping convenient_retry_backoff_is_enforced: transactions not supported");
         return;
     }
 
     async fn run_test(jitter: f64) -> Duration {
-        let client = Client::for_test().await;
+        let mut options = get_client_options().await.clone();
+        if topology_is_sharded().await {
+            options.hosts.drain(1..);
+        }
+        let client = Client::for_test().options(options).await;
         let coll = client
             .database("db")
             .collection("convenient_retry_backoff_is_enforced");
