@@ -291,9 +291,12 @@ async fn convenient_api_retry_backoff_is_enforced() {
             options.hosts.drain(1..);
         }
         let client = Client::for_test().options(options).await;
-        let coll = client
-            .database("db")
-            .collection("convenient_retry_backoff_is_enforced");
+
+        let coll_name = "convenient_retry_backoff_is_enforced";
+        let db = client.database("db");
+        let coll = db.collection(coll_name);
+        coll.drop().await.unwrap();
+        db.create_collection(coll_name).await.unwrap();
 
         let fail_point = FailPoint::fail_command(&["commitTransaction"], FailPointMode::Times(13))
             .error_code(251);
