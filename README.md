@@ -23,7 +23,7 @@ The driver is available on [crates.io](https://crates.io/crates/mongodb). To use
 
 ```toml
 [dependencies]
-mongodb = "3.4.1"
+mongodb = "3.5.0"
 ```
 
 Version 1 of this crate has reached end of life and will no longer be receiving any updates or bug fixes, so all users are recommended to always depend on the latest 2.x release. See the [2.0.0 release notes](https://github.com/mongodb/mongo-rust-driver/releases/tag/v2.0.0) for migration information if upgrading from a 1.x version.
@@ -34,7 +34,7 @@ The driver also provides a blocking sync API. To enable this, add the `"sync"` f
 
 ```toml
 [dependencies.mongodb]
-version = "3.4.1"
+version = "3.5.0"
 features = ["sync"]
 ```
 

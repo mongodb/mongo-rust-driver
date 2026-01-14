@@ -620,8 +620,8 @@ dependencies = [
 
 [[package]]
 name = "bson"
-version = "3.0.0"
-source = "git+https://github.com/mongodb/bson-rust?branch=main#516f78066dcfdc474ed61ab11eb15b946efffdad"
+version = "3.1.0"
+source = "git+https://github.com/mongodb/bson-rust?branch=main#2ee4414267877206401a389a3bdeb7735092d899"
 dependencies = [
  "ahash",
  "base64",
@@ -2094,7 +2094,7 @@ version = "0.3.2"
 source = "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#6fc0084825b4eb98229d13d621cab42b03498653"
 dependencies = [
  "bson 2.15.0",
- "bson 3.0.0",
+ "bson 3.1.0",
  "mongocrypt-sys",
  "once_cell",
  "serde",
@@ -2107,7 +2107,7 @@ source = "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#6fc0
 
 [[package]]
 name = "mongodb"
-version = "3.4.1"
+version = "3.5.0"
 dependencies = [
  "anyhow",
  "approx",
@@ -2118,7 +2118,7 @@ dependencies = [
  "base64",
  "bitflags",
  "bson 2.15.0",
- "bson 3.0.0",
+ "bson 3.1.0",
  "chrono",
  "cross-krb5",
  "derive-where",
@@ -2189,7 +2189,7 @@ dependencies = [
 
 [[package]]
 name = "mongodb-internal-macros"
-version = "3.4.1"
+version = "3.5.0"
 dependencies = [
  "macro_magic",
  "proc-macro2",
