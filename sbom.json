@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:b7a4df14-dbee-4d43-9198-8cb0caafbc2e",
+  "serialNumber": "urn:uuid:87b5c770-7c68-4c7d-8847-e1df96f688f2",
   "metadata": {
-    "timestamp": "2026-01-12T11:57:28.029876117Z",
+    "timestamp": "2026-01-14T15:32:35.146806650Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -40,10 +40,10 @@
     ],
     "component": {
       "type": "library",
-      "bom-ref": "path+file:///home/runner/work/mongo-rust-driver/mongo-rust-driver/driver#mongodb@3.4.1",
+      "bom-ref": "path+file:///home/runner/work/mongo-rust-driver/mongo-rust-driver/driver#mongodb@3.5.0",
       "author": "Saghm Rossi <saghmrossi@gmail.com>, Patrick Freed <patrick.freed@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>, Abraham Egnor <abraham.egnor@mongodb.com>, Kaitlin Mahar <kaitlin.mahar@mongodb.com>, Patrick Meredith <pmeredit@protonmail.com>",
       "name": "mongodb",
-      "version": "3.4.1",
+      "version": "3.5.0",
       "description": "The official MongoDB driver for Rust",
       "scope": "required",
       "licenses": [
@@ -51,7 +51,7 @@
           "expression": "Apache-2.0"
         }
       ],
-      "purl": "pkg:cargo/mongodb@3.4.1?download_url=file://.",
+      "purl": "pkg:cargo/mongodb@3.5.0?download_url=file://.",
       "externalReferences": [
         {
           "type": "website",
@@ -65,10 +65,10 @@
       "components": [
         {
           "type": "library",
-          "bom-ref": "path+file:///home/runner/work/mongo-rust-driver/mongo-rust-driver/driver#mongodb@3.4.1 bin-target-0",
+          "bom-ref": "path+file:///home/runner/work/mongo-rust-driver/mongo-rust-driver/driver#mongodb@3.5.0 bin-target-0",
           "name": "mongodb",
-          "version": "3.4.1",
-          "purl": "pkg:cargo/mongodb@3.4.1?download_url=file://.#src/lib.rs"
+          "version": "3.5.0",
+          "purl": "pkg:cargo/mongodb@3.5.0?download_url=file://.#src/lib.rs"
         }
       ]
     },
@@ -149,10 +149,10 @@
     },
     {
       "type": "library",
-      "bom-ref": "path+file:///home/runner/work/mongo-rust-driver/mongo-rust-driver/macros#mongodb-internal-macros@3.4.1",
+      "bom-ref": "path+file:///home/runner/work/mongo-rust-driver/mongo-rust-driver/macros#mongodb-internal-macros@3.5.0",
       "author": "Saghm Rossi <saghmrossi@gmail.com>, Patrick Freed <patrick.freed@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>, Abraham Egnor <abraham.egnor@mongodb.com>, Kaitlin Mahar <kaitlin.mahar@mongodb.com>, Patrick Meredith <pmeredit@protonmail.com>",
       "name": "mongodb-internal-macros",
-      "version": "3.4.1",
+      "version": "3.5.0",
       "description": "Internal macros for the mongodb crate",
       "scope": "required",
       "licenses": [
@@ -160,7 +160,7 @@
           "expression": "Apache-2.0"
         }
       ],
-      "purl": "pkg:cargo/mongodb-internal-macros@3.4.1?download_url=file://../macros",
+      "purl": "pkg:cargo/mongodb-internal-macros@3.5.0?download_url=file://../macros",
       "externalReferences": [
         {
           "type": "vcs",
@@ -5446,7 +5446,7 @@
       ]
     },
     {
-      "ref": "path+file:///home/runner/work/mongo-rust-driver/mongo-rust-driver/driver#mongodb@3.4.1",
+      "ref": "path+file:///home/runner/work/mongo-rust-driver/mongo-rust-driver/driver#mongodb@3.5.0",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1",
         "registry+https://github.com/rust-lang/crates.io-index#bitflags@2.10.0",
@@ -5463,7 +5463,7 @@
         "registry+https://github.com/rust-lang/crates.io-index#macro_magic@0.5.1",
         "registry+https://github.com/rust-lang/crates.io-index#md-5@0.10.6",
         "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#mongocrypt@0.3.2",
-        "path+file:///home/runner/work/mongo-rust-driver/mongo-rust-driver/macros#mongodb-internal-macros@3.4.1",
+        "path+file:///home/runner/work/mongo-rust-driver/mongo-rust-driver/macros#mongodb-internal-macros@3.5.0",
         "registry+https://github.com/rust-lang/crates.io-index#pbkdf2@0.12.2",
         "registry+https://github.com/rust-lang/crates.io-index#percent-encoding@2.3.2",
         "registry+https://github.com/rust-lang/crates.io-index#rand@0.9.2",
@@ -5489,7 +5489,7 @@
       ]
     },
     {
-      "ref": "path+file:///home/runner/work/mongo-rust-driver/mongo-rust-driver/macros#mongodb-internal-macros@3.4.1",
+      "ref": "path+file:///home/runner/work/mongo-rust-driver/mongo-rust-driver/macros#mongodb-internal-macros@3.5.0",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#macro_magic@0.5.1",
         "registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.105",
