@@ -389,7 +389,6 @@ impl StartTransaction<&mut crate::sync::ClientSession> {
     /// callback indefinitely. To avoid this situation, the application MUST NOT silently handle
     /// errors within the callback. If the application needs to handle errors within the
     /// callback, it MUST return them after doing so.
-    #[allow(unused_mut, unused_variables)]
     pub fn and_run<R, F>(self, mut callback: F) -> Result<R>
     where
         F: for<'b> FnMut(&'b mut crate::sync::ClientSession) -> Result<R>,
