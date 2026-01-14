@@ -15,7 +15,7 @@
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]
-#![doc(html_root_url = "https://docs.rs/mongodb/3.4.1")]
+#![doc(html_root_url = "https://docs.rs/mongodb/3.5.0")]
 
 #[macro_use]
 pub mod options;
