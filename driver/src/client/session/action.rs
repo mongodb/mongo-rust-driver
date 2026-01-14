@@ -106,71 +106,6 @@ impl<'a> Action for StartTransaction<&'a mut ClientSession> {
     }
 }
 
-macro_rules! convenient_run_async {
-    (
-        $session:expr,
-        $options:expr,
-        $callback:expr,
-    ) => {{
-        let start_time = Instant::now();
-        let max_time = MAX_CONVENIENT_TRANSACTION_TIME;
-        #[cfg(test)]
-        let max_time = $session.convenient_transaction_timeout.unwrap_or(max_time);
-
-        let mut retries = 0;
-        'transaction: loop {
-            $session
-                .start_transaction()
-                .with_options($options.clone())
-                .await?;
-            let ret = match $callback {
-                Ok(v) => v,
-                Err(e) => {
-                    if matches!(
-                        $session.transaction.state,
-                        TransactionState::Starting | TransactionState::InProgress
-                    ) {
-                        $session.abort_transaction().await?;
-                    }
-                    if e.contains_label(TRANSIENT_TRANSACTION_ERROR)
-                        && perform_backoff!($session, retries, start_time, max_time)
-                    {
-                        continue 'transaction;
-                    }
-                    return Err(e);
-                }
-            };
-            if matches!(
-                $session.transaction.state,
-                TransactionState::None
-                    | TransactionState::Aborted
-                    | TransactionState::Committed { .. }
-            ) {
-                return Ok(ret);
-            }
-            'commit: loop {
-                match $session.commit_transaction().await {
-                    Ok(()) => return Ok(ret),
-                    Err(e) => {
-                        if e.is_max_time_ms_expired_error()
-                            || !perform_backoff!($session, retries, start_time, max_time)
-                        {
-                            return Err(e);
-                        }
-                        if e.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
-                            continue 'commit;
-                        }
-                        if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
-                            continue 'transaction;
-                        }
-                        return Err(e);
-                    }
-                }
-            }
-        }
-    }};
-}
-
 macro_rules! convenient_run {
     (
         $session:expr,
@@ -323,21 +258,16 @@ impl StartTransaction<&mut ClientSession> {
     where
         F: for<'b> FnMut(&'b mut ClientSession, &'b mut C) -> BoxFuture<'b, Result<R>>,
     {
-        convenient_run_async!(
+        convenient_run!(
             self.session,
-            &self.options,
+            self.session
+                .start_transaction()
+                .with_options(self.options.clone())
+                .await,
             callback(self.session, &mut context).await,
+            self.session.abort_transaction().await,
+            self.session.commit_transaction().await,
         )
-        // convenient_run!(
-        //     self.session,
-        //     self.session
-        //         .start_transaction()
-        //         .with_options(self.options.clone())
-        //         .await,
-        //     callback(self.session, &mut context).await,
-        //     self.session.abort_transaction().await,
-        //     self.session.commit_transaction().await,
-        // )
     }
 
     /// Starts a transaction, runs the given callback, and commits or aborts the transaction.
@@ -399,17 +329,16 @@ impl StartTransaction<&mut ClientSession> {
     where
         F: for<'b> AsyncFnMut(&'b mut ClientSession) -> Result<R>,
     {
-        convenient_run_async!(self.session, &self.options, callback(self.session).await,)
-        // convenient_run!(
-        //     self.session,
-        //     self.session
-        //         .start_transaction()
-        //         .with_options(self.options.clone())
-        //         .await,
-        //     callback(self.session).await,
-        //     self.session.abort_transaction().await,
-        //     self.session.commit_transaction().await,
-        // )
+        convenient_run!(
+            self.session,
+            self.session
+                .start_transaction()
+                .with_options(self.options.clone())
+                .await,
+            callback(self.session).await,
+            self.session.abort_transaction().await,
+            self.session.commit_transaction().await,
+        )
     }
 }
 
@@ -443,14 +372,7 @@ impl StartTransaction<&mut crate::sync::ClientSession> {
     where
         F: for<'b> FnMut(&'b mut crate::sync::ClientSession) -> Result<R>,
     {
-        crate::sync::TOKIO_RUNTIME.block_on(async {
-            convenient_run_async!(
-                self.session.async_client_session,
-                &self.options,
-                callback(self.session),
-            )
-        })
-        // todo!()
+        todo!()
         // convenient_run!(
         //     self.session.async_client_session,
         //     self.session
