@@ -4,7 +4,13 @@ use crate::{
     action::{action_impl, AbortTransaction, CommitTransaction, StartTransaction},
     bson_util::round_clamp,
     client::options::TransactionOptions,
-    error::{ErrorKind, Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
+    error::{
+        Error,
+        ErrorKind,
+        Result,
+        TRANSIENT_TRANSACTION_ERROR,
+        UNKNOWN_TRANSACTION_COMMIT_RESULT,
+    },
     operation::{self, Operation},
     sdam::TransactionSupportStatus,
     BoxFuture,
@@ -121,10 +127,25 @@ macro_rules! convenient_run {
         #[cfg(test)]
         let max_time = $session.convenient_transaction_timeout.unwrap_or(max_time);
 
-        let mut retries = 0;
+        let mut attempt = 0;
+        let mut last_error = Error::internal("no error recorded for convenient transaction");
 
         'transaction: loop {
+            if attempt > 0 {
+                let backoff = compute_backoff(
+                    attempt,
+                    #[cfg(test)]
+                    $session.convenient_transaction_jitter,
+                );
+                if start_time.elapsed() + backoff >= max_time {
+                    return Err(last_error);
+                }
+                $sleep(backoff).$await;
+            }
+
             $start_transaction?;
+            attempt += 1;
+
             let ret = match $callback {
                 Ok(v) => v,
                 Err(e) => {
@@ -135,8 +156,9 @@ macro_rules! convenient_run {
                         $abort_transaction?;
                     }
                     if e.contains_label(TRANSIENT_TRANSACTION_ERROR)
-                        && perform_backoff!($session, retries, start_time, max_time, $sleep, $await)
+                        && start_time.elapsed() < max_time
                     {
+                        last_error = e;
                         continue 'transaction;
                     }
                     return Err(e);
@@ -154,17 +176,14 @@ macro_rules! convenient_run {
                 match $commit_transaction {
                     Ok(()) => return Ok(ret),
                     Err(e) => {
-                        if e.is_max_time_ms_expired_error()
-                            || !perform_backoff!(
-                                $session, retries, start_time, max_time, $sleep, $await
-                            )
-                        {
+                        if e.is_max_time_ms_expired_error() || start_time.elapsed() >= max_time {
                             return Err(e);
                         }
                         if e.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
                             continue 'commit;
                         }
                         if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
+                            last_error = e;
                             continue 'transaction;
                         }
                         return Err(e);
@@ -175,40 +194,19 @@ macro_rules! convenient_run {
     }};
 }
 
-/// Calculates the amount of time to back off before retrying and sleeps for that duration if enough
-/// time is remaining. Returns true if another retry should be performed or false if time has run
-/// out.
-macro_rules! perform_backoff {
-    (
-        $session:expr,
-        $retries:expr,
-        $start_time:expr,
-        $max_time:expr,
-        $sleep:expr,
-        $await:ident
-    ) => {{
-        const BACKOFF_INITIAL_MS: f64 = 5f64;
-        const BACKOFF_MAX_MS: f64 = 500f64;
-        const RETRY_BASE: f64 = 1.5f64;
+fn compute_backoff(attempt: u32, #[cfg(test)] test_jitter: Option<f64>) -> Duration {
+    const BACKOFF_INITIAL_MS: f64 = 5f64;
+    const BACKOFF_MAX_MS: f64 = 500f64;
+    const RETRY_BASE: f64 = 1.5f64;
 
-        let jitter = rand::random_range(0f64..1f64);
-        #[cfg(test)]
-        let jitter = $session.convenient_transaction_jitter.unwrap_or(jitter);
+    let jitter = rand::random_range(0f64..1f64);
+    #[cfg(test)]
+    let jitter = test_jitter.unwrap_or(jitter);
 
-        let computed_backoff = jitter * BACKOFF_INITIAL_MS * RETRY_BASE.powf(f64::from($retries));
-        let max_backoff = jitter * BACKOFF_MAX_MS;
-        let backoff_ms: u64 =
-            std::cmp::min(round_clamp(computed_backoff), round_clamp(max_backoff));
-        let backoff = Duration::from_millis(backoff_ms);
-
-        if $start_time.elapsed() + backoff > $max_time {
-            false
-        } else {
-            $retries += 1;
-            $sleep(backoff).$await;
-            true
-        }
-    }};
+    let computed_backoff = jitter * BACKOFF_INITIAL_MS * RETRY_BASE.powf(f64::from(attempt - 1));
+    let max_backoff = jitter * BACKOFF_MAX_MS;
+    let backoff: u64 = std::cmp::min(round_clamp(computed_backoff), round_clamp(max_backoff));
+    Duration::from_millis(backoff)
 }
 
 // perform_backoff needs an ident to access on the result from std::thread::sleep, so we use a dummy
