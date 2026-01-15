@@ -2,8 +2,15 @@ use std::time::{Duration, Instant};
 
 use crate::{
     action::{action_impl, AbortTransaction, CommitTransaction, StartTransaction},
+    bson_util::round_clamp,
     client::options::TransactionOptions,
-    error::{ErrorKind, Result},
+    error::{
+        Error,
+        ErrorKind,
+        Result,
+        TRANSIENT_TRANSACTION_ERROR,
+        UNKNOWN_TRANSACTION_COMMIT_RESULT,
+    },
     operation::{self, Operation},
     sdam::TransactionSupportStatus,
     BoxFuture,
@@ -11,6 +18,8 @@ use crate::{
 };
 
 use super::TransactionState;
+
+const MAX_CONVENIENT_TRANSACTION_TIME: Duration = Duration::from_secs(120);
 
 impl ClientSession {
     async fn start_transaction_impl(&mut self, options: Option<TransactionOptions>) -> Result<()> {
@@ -110,16 +119,33 @@ macro_rules! convenient_run {
         $callback:expr,
         $abort_transaction:expr,
         $commit_transaction:expr,
+        $sleep:expr,
+        $await:ident,
     ) => {{
-        let timeout = Duration::from_secs(120);
+        let start_time = Instant::now();
+        let max_time = MAX_CONVENIENT_TRANSACTION_TIME;
         #[cfg(test)]
-        let timeout = $session.convenient_transaction_timeout.unwrap_or(timeout);
-        let start = Instant::now();
+        let max_time = $session.convenient_transaction_timeout.unwrap_or(max_time);
 
-        use crate::error::{TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT};
+        let mut attempt = 0;
+        let mut last_error = Error::internal("no error recorded for convenient transaction");
 
         'transaction: loop {
+            if attempt > 0 {
+                let backoff = compute_backoff(
+                    attempt,
+                    #[cfg(test)]
+                    $session.convenient_transaction_jitter,
+                );
+                if start_time.elapsed() + backoff >= max_time {
+                    return Err(last_error);
+                }
+                $sleep(backoff).$await;
+            }
+
             $start_transaction?;
+            attempt += 1;
+
             let ret = match $callback {
                 Ok(v) => v,
                 Err(e) => {
@@ -129,7 +155,10 @@ macro_rules! convenient_run {
                     ) {
                         $abort_transaction?;
                     }
-                    if e.contains_label(TRANSIENT_TRANSACTION_ERROR) && start.elapsed() < timeout {
+                    if e.contains_label(TRANSIENT_TRANSACTION_ERROR)
+                        && start_time.elapsed() < max_time
+                    {
+                        last_error = e;
                         continue 'transaction;
                     }
                     return Err(e);
@@ -147,13 +176,14 @@ macro_rules! convenient_run {
                 match $commit_transaction {
                     Ok(()) => return Ok(ret),
                     Err(e) => {
-                        if e.is_max_time_ms_expired_error() || start.elapsed() >= timeout {
+                        if e.is_max_time_ms_expired_error() || start_time.elapsed() >= max_time {
                             return Err(e);
                         }
                         if e.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
                             continue 'commit;
                         }
                         if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
+                            last_error = e;
                             continue 'transaction;
                         }
                         return Err(e);
@@ -162,6 +192,33 @@ macro_rules! convenient_run {
             }
         }
     }};
+}
+
+fn compute_backoff(attempt: u32, #[cfg(test)] test_jitter: Option<f64>) -> Duration {
+    const BACKOFF_INITIAL_MS: f64 = 5f64;
+    const BACKOFF_MAX_MS: f64 = 500f64;
+    const RETRY_BASE: f64 = 1.5f64;
+
+    let jitter = rand::random_range(0f64..1f64);
+    #[cfg(test)]
+    let jitter = test_jitter.unwrap_or(jitter);
+
+    let computed_backoff = jitter * BACKOFF_INITIAL_MS * RETRY_BASE.powf(f64::from(attempt - 1));
+    let max_backoff = jitter * BACKOFF_MAX_MS;
+    let backoff: u64 = std::cmp::min(round_clamp(computed_backoff), round_clamp(max_backoff));
+    Duration::from_millis(backoff)
+}
+
+// convenient_run needs an ident to access on the result from std::thread::sleep, so we use a dummy
+// struct with a field
+#[cfg(feature = "sync")]
+struct SleepResult {
+    _r: (),
+}
+#[cfg(feature = "sync")]
+fn sleep_sync(duration: Duration) -> SleepResult {
+    std::thread::sleep(duration);
+    SleepResult { _r: () }
 }
 
 impl StartTransaction<&mut ClientSession> {
@@ -226,6 +283,8 @@ impl StartTransaction<&mut ClientSession> {
             callback(self.session, &mut context).await,
             self.session.abort_transaction().await,
             self.session.commit_transaction().await,
+            tokio::time::sleep,
+            await,
         )
     }
 
@@ -297,6 +356,8 @@ impl StartTransaction<&mut ClientSession> {
             callback(self.session).await,
             self.session.abort_transaction().await,
             self.session.commit_transaction().await,
+            tokio::time::sleep,
+            await,
         )
     }
 }
@@ -339,6 +400,8 @@ impl StartTransaction<&mut crate::sync::ClientSession> {
             callback(self.session),
             self.session.abort_transaction().run(),
             self.session.commit_transaction().run(),
+            sleep_sync,
+            _r,
         )
     }
 }
