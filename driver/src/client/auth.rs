@@ -202,13 +202,10 @@ impl AuthMechanism {
             }
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => {
-                if credential.username.is_some() && credential.password.is_none() {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "Username cannot be provided without password for MONGODB-AWS \
-                                  authentication"
-                            .to_string(),
-                    }
-                    .into());
+                if credential.username.is_some() || credential.password.is_some() {
+                    return Err(Error::invalid_argument(
+                        "username and password are not supported for MONGODB-AWS authentication",
+                    ));
                 }
 
                 Ok(())
