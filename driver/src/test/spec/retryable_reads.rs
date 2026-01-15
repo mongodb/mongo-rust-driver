@@ -156,6 +156,7 @@ async fn retry_read_different_mongos() {
     }
     client_options.hosts.drain(2..);
     client_options.retry_reads = Some(true);
+    client_options.local_threshold = Some(Duration::from_secs(1));
 
     let hosts = client_options.hosts.clone();
     let client = Client::for_test()
