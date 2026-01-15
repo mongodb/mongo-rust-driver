@@ -198,7 +198,7 @@ where
         let ns = self.namespace();
 
         let op = crate::operation::run_command::RunCommand::new(
-            ns.db,
+            self.inner.db.clone(),
             rawdoc! {
                 "killCursors": ns.coll.as_str(),
                 "cursors": [cursor_id]

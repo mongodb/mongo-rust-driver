@@ -7,13 +7,14 @@ use crate::{
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     selection_criteria::SelectionCriteria,
+    Database,
 };
 
 use super::{ExecutionContext, OperationWithDefaults};
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCommand<'conn> {
-    db: String,
+    db: Database,
     command: RawDocumentBuf,
     selection_criteria: Option<SelectionCriteria>,
     pinned_connection: Option<&'conn PinnedConnectionHandle>,
@@ -21,7 +22,7 @@ pub(crate) struct RunCommand<'conn> {
 
 impl<'conn> RunCommand<'conn> {
     pub(crate) fn new(
-        db: String,
+        db: Database,
         command: RawDocumentBuf,
         selection_criteria: Option<SelectionCriteria>,
         pinned_connection: Option<&'conn PinnedConnectionHandle>,
@@ -57,7 +58,11 @@ impl OperationWithDefaults for RunCommand<'_> {
                 message: "an empty document cannot be passed to a run_command operation".into(),
             })?;
 
-        Ok(Command::new(command_name, &self.db, self.command.clone()))
+        Ok(Command::new(
+            command_name,
+            &self.db.name(),
+            self.command.clone(),
+        ))
     }
 
     fn extract_at_cluster_time(
@@ -102,6 +107,6 @@ impl OperationWithDefaults for RunCommand<'_> {
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for RunCommand<'_> {
     fn target(&self) -> crate::otel::OperationTarget<'_> {
-        self.db.as_str().into()
+        self.db.name().into()
     }
 }

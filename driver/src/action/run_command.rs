@@ -202,7 +202,7 @@ impl<'a> Action for RunCommand<'a> {
         }
 
         let operation =
-            run_command::RunCommand::new(self.db.name().into(), command, selection_criteria, None);
+            run_command::RunCommand::new(self.db.clone(), command, selection_criteria, None);
         self.db
             .client()
             .execute_operation(operation, self.session)
@@ -254,12 +254,8 @@ impl<'a> RunCursorCommand<'a, ImplicitSession> {
             .options
             .as_ref()
             .and_then(|options| options.selection_criteria.clone());
-        let rcc = run_command::RunCommand::new(
-            self.db.name().to_string(),
-            self.command?,
-            selection_criteria,
-            None,
-        );
+        let rcc =
+            run_command::RunCommand::new(self.db.clone(), self.command?, selection_criteria, None);
         let mut rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
         let client = self.db.client();
         client.execute_cursor_operation(&mut rc_command, None).await
@@ -287,12 +283,8 @@ impl<'a> RunCursorCommand<'a, ExplicitSession<'a>> {
             .options
             .as_ref()
             .and_then(|options| options.selection_criteria.clone());
-        let rcc = run_command::RunCommand::new(
-            self.db.name().to_string(),
-            self.command?,
-            selection_criteria,
-            None,
-        );
+        let rcc =
+            run_command::RunCommand::new(self.db.clone(), self.command?, selection_criteria, None);
         let mut rc_command = run_cursor_command::RunCursorCommand::new(rcc, self.options)?;
         let client = self.db.client();
         client

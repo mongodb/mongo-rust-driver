@@ -138,8 +138,12 @@ where
                             "killCursors": namespace.db.clone(),
                             "cursors": [cursor_specification.info.id],
                         };
-                        let mut run_command =
-                            RunCommand::new(namespace.db.clone(), kill_cursors, None, None);
+                        let mut run_command = RunCommand::new(
+                            self.client.database(&namespace.db),
+                            kill_cursors,
+                            None,
+                            None,
+                        );
                         let _ = self
                             .client
                             .execute_operation_on_connection(

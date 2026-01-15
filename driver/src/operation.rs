@@ -56,6 +56,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
     BoxFuture,
     ClientSession,
+    Database,
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
@@ -196,6 +197,24 @@ pub(crate) type OverrideCriteriaFn =
 
 pub(crate) trait OperationTarget: Send + Sync {
     fn selection_criteria(&self) -> Option<&SelectionCriteria>;
+}
+
+impl OperationTarget for crate::Client {
+    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        self.selection_criteria()
+    }
+}
+
+impl OperationTarget for Database {
+    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        self.selection_criteria()
+    }
+}
+
+impl<T: Send + Sync> OperationTarget for crate::Collection<T> {
+    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        self.selection_criteria()
+    }
 }
 
 // A mirror of the `Operation` trait, with default behavior where appropriate.  Should only be
