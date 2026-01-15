@@ -194,9 +194,10 @@ pub(crate) trait Operation {
 pub(crate) type OverrideCriteriaFn =
     fn(&SelectionCriteria, &crate::sdam::TopologyDescription) -> Option<SelectionCriteria>;
 
-pub(crate) trait OperationTarget {
+pub(crate) trait OperationTarget: Send + Sync {
     fn selection_criteria(&self) -> Option<&SelectionCriteria>;
 }
+
 // A mirror of the `Operation` trait, with default behavior where appropriate.  Should only be
 // implemented by operation types that do not delegate to other operations.
 pub(crate) trait OperationWithDefaults: Send + Sync {
@@ -318,7 +319,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     type Otel: crate::otel::OtelWitness<Op = Self>;
 }
 
-struct NullTarget;
+pub(crate) struct NullTarget;
 
 impl OperationTarget for NullTarget {
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
