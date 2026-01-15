@@ -82,6 +82,10 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.name()
     }
 
+    fn op_target(&self) -> &impl super::OperationTarget {
+        self.0.op_target()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }

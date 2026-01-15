@@ -94,6 +94,10 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.name()
     }
 
+    fn op_target(&self) -> &impl super::OperationTarget {
+        self.run_command.op_target()
+    }
+
     fn handle_response<'a>(
         &'a self,
         response: std::borrow::Cow<'a, RawCommandResponse>,
