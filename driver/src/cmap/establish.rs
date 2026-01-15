@@ -144,7 +144,6 @@ impl ConnectionEstablisher {
         if let Some(patch) = self.test_patch_reply {
             patch(&mut handshake_result);
         }
-        let handshake_result = handshake_result;
 
         // If the handshake response had a `serviceId` field, this is a connection to a load
         // balancer and must derive its generation from the service_generations map.

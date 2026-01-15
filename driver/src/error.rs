@@ -43,6 +43,11 @@ pub const TRANSIENT_TRANSACTION_ERROR: &str = "TransientTransactionError";
 /// error, network error, write-retryable error, MaxTimeMSExpired error, or write concern
 /// failed/timeout during a commitTransaction.
 pub const UNKNOWN_TRANSACTION_COMMIT_RESULT: &str = "UnknownTransactionCommitResult";
+/// Indicates that an error occurred during connection establishment because the server was
+/// overloaded.
+pub const SYSTEM_OVERLOADED_ERROR: &str = "SystemOverloadedError";
+/// Indicates that an error is retryable.
+pub const RETRYABLE_ERROR: &str = "RetryableError";
 
 /// The result type for all methods that can return an error in the `mongodb` crate.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -181,6 +186,7 @@ impl Error {
         matches!(self.kind.as_ref(), ErrorKind::Authentication { .. })
     }
 
+    #[cfg(all(feature = "in-use-encryption", test))]
     pub(crate) fn is_command_error(&self) -> bool {
         matches!(self.kind.as_ref(), ErrorKind::Command(_))
     }
@@ -300,6 +306,14 @@ impl Error {
     pub(crate) fn add_label<T: AsRef<str>>(&mut self, label: T) {
         let label = label.as_ref().to_string();
         self.labels.insert(label);
+    }
+
+    pub(crate) fn with_backpressure_labels(mut self) -> Self {
+        if self.is_network_error() {
+            self.add_label(SYSTEM_OVERLOADED_ERROR);
+            self.add_label(RETRYABLE_ERROR);
+        }
+        self
     }
 
     /// The full response returned from the server. This can be used to inspect error fields that

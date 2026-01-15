@@ -199,6 +199,10 @@ impl ObserveEvent {
                 Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)),
             ) => true,
             (Self::ServerHeartbeatFailed, Event::Sdam(SdamEvent::ServerHeartbeatFailed(_))) => true,
+            (
+                Self::ServerDescriptionChanged,
+                Event::Sdam(SdamEvent::ServerDescriptionChanged(_)),
+            ) => true,
             _ => false,
         }
     }

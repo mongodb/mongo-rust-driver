@@ -3,6 +3,7 @@ use std::time::Duration;
 use crate::{
     bson::{rawdoc, RawDocumentBuf},
     bson_compat::cstr,
+    error::Error,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
@@ -82,14 +83,15 @@ pub(crate) async fn run_hello(
     command: Command,
     mut cancellation_receiver: Option<broadcast::Receiver<()>>,
 ) -> Result<HelloReply> {
-    let response_result = match cancellation_receiver {
+    let response = match cancellation_receiver {
         Some(ref mut cancellation_receiver) => {
             conn.send_message_with_cancellation(command, cancellation_receiver)
                 .await
         }
         None => conn.send_message(command).await,
-    };
-    response_result.and_then(|raw_response| raw_response.into_hello_reply())
+    }
+    .map_err(Error::with_backpressure_labels)?;
+    response.into_hello_reply()
 }
 
 #[derive(Debug, Clone, Serialize)]
