@@ -294,7 +294,8 @@ fn record_error<T>(context: &Context, result: &Result<T>) {
 }
 
 fn op_target(op: &impl OtelInfo) -> String {
-    let target = op.target();
+    use crate::operation::OperationTarget;
+    let target = op.op_target().otel();
     if let Some(coll) = target.collection {
         format!("{}.{}", target.database, coll)
     } else {

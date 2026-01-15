@@ -197,11 +197,24 @@ pub(crate) type OverrideCriteriaFn =
 
 pub(crate) trait OperationTarget: Send + Sync {
     fn selection_criteria(&self) -> Option<&SelectionCriteria>;
+
+    #[cfg(feature = "opentelemetry")]
+    fn otel(&self) -> crate::otel::OperationTarget<'_>;
 }
 
-impl OperationTarget for crate::Client {
+pub(crate) struct NullTarget;
+
+impl OperationTarget for NullTarget {
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        self.selection_criteria()
+        None
+    }
+
+    #[cfg(feature = "opentelemetry")]
+    fn otel(&self) -> crate::otel::OperationTarget<'_> {
+        crate::otel::OperationTarget {
+            database: "NULL",
+            collection: None,
+        }
     }
 }
 
@@ -209,11 +222,27 @@ impl OperationTarget for Database {
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         self.selection_criteria()
     }
+
+    #[cfg(feature = "opentelemetry")]
+    fn otel(&self) -> crate::otel::OperationTarget<'_> {
+        crate::otel::OperationTarget {
+            database: self.name(),
+            collection: None,
+        }
+    }
 }
 
 impl<T: Send + Sync> OperationTarget for crate::Collection<T> {
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         self.selection_criteria()
+    }
+
+    #[cfg(feature = "opentelemetry")]
+    fn otel(&self) -> crate::otel::OperationTarget<'_> {
+        crate::otel::OperationTarget {
+            database: self.db().name(),
+            collection: Some(self.name()),
+        }
     }
 }
 
@@ -336,14 +365,6 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
 
     #[cfg(feature = "opentelemetry")]
     type Otel: crate::otel::OtelWitness<Op = Self>;
-}
-
-pub(crate) struct NullTarget;
-
-impl OperationTarget for NullTarget {
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        None
-    }
 }
 
 impl<T: OperationWithDefaults> Operation for T

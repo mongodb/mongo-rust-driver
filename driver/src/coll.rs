@@ -188,6 +188,10 @@ where
         self.inner.write_concern.as_ref()
     }
 
+    pub(crate) fn db(&self) -> &Database {
+        &self.inner.db
+    }
+
     /// Kill the server side cursor that id corresponds to.
     pub(super) async fn kill_cursor(
         &self,
