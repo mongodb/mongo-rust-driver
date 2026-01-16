@@ -363,8 +363,10 @@ impl<'a> Action for CommitTransaction<'a> {
                 Ok(())
             }
             TransactionState::InProgress => {
-                let commit_transaction =
-                    operation::CommitTransaction::new(self.session.transaction.options.clone());
+                let commit_transaction = operation::CommitTransaction::new(
+                    &self.session.client(),
+                    self.session.transaction.options.clone(),
+                );
                 self.session.transaction.commit(true);
                 let out = self
                     .session
@@ -378,8 +380,10 @@ impl<'a> Action for CommitTransaction<'a> {
             TransactionState::Committed {
                 data_committed: true,
             } => {
-                let mut commit_transaction =
-                    operation::CommitTransaction::new(self.session.transaction.options.clone());
+                let mut commit_transaction = operation::CommitTransaction::new(
+                    &self.session.client(),
+                    self.session.transaction.options.clone(),
+                );
                 commit_transaction.update_for_retry();
                 self.session
                     .client
@@ -426,6 +430,7 @@ impl<'a> Action for AbortTransaction<'a> {
                     .and_then(|options| options.write_concern.as_ref())
                     .cloned();
                 let abort_transaction = operation::AbortTransaction::new(
+                    &self.session.client(),
                     write_concern,
                     self.session.transaction.pinned.take(),
                 );

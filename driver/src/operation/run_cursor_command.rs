@@ -94,8 +94,8 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.name()
     }
 
-    fn op_target(&self) -> &impl super::OperationTarget {
-        self.run_command.op_target()
+    fn target(&self) -> super::OperationTarget {
+        self.run_command.target()
     }
 
     fn handle_response<'a>(
@@ -132,10 +132,6 @@ impl Operation for RunCursorCommand<'_> {
 impl crate::otel::OtelInfo for RunCursorCommand<'_> {
     fn log_name(&self) -> &str {
         self.run_command.otel().log_name()
-    }
-
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        self.run_command.otel().target()
     }
 
     fn cursor_id(&self) -> Option<i64> {

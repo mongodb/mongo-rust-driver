@@ -123,7 +123,7 @@ impl OperationWithDefaults for GetMore<'_> {
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for GetMore<'_> {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
+    fn target(&self) -> crate::otel::TargetName<'_> {
         (&self.ns).into()
     }
 

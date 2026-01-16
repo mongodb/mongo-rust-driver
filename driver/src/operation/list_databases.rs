@@ -64,8 +64,8 @@ impl OperationWithDefaults for ListDatabases {
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for ListDatabases {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        crate::otel::OperationTarget::ADMIN
+    fn target(&self) -> crate::otel::TargetName<'_> {
+        crate::otel::TargetName::ADMIN
     }
 }
 

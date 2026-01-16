@@ -181,7 +181,8 @@ pub(crate) trait Operation {
     /// The name of the server side command associated with this operation.
     fn name(&self) -> &CStr;
 
-    fn op_target(&self) -> &impl OperationTarget;
+    /// The noun to this operation's verb.
+    fn target(&self) -> OperationTarget;
 
     #[cfg(feature = "opentelemetry")]
     type Otel: crate::otel::OtelWitness<Op = Self>;
@@ -195,53 +196,24 @@ pub(crate) trait Operation {
 pub(crate) type OverrideCriteriaFn =
     fn(&SelectionCriteria, &crate::sdam::TopologyDescription) -> Option<SelectionCriteria>;
 
-pub(crate) trait OperationTarget: Send + Sync {
-    fn selection_criteria(&self) -> Option<&SelectionCriteria>;
-
-    #[cfg(feature = "opentelemetry")]
-    fn otel(&self) -> crate::otel::OperationTarget<'_>;
+#[derive(Debug, Clone)]
+pub(crate) enum OperationTarget {
+    Null,
+    Database(Database),
+    #[expect(unused)]
+    Collection(crate::Collection<Document>),
 }
 
-pub(crate) struct NullTarget;
-
-impl OperationTarget for NullTarget {
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        None
+impl OperationTarget {
+    pub(crate) fn admin(client: &crate::Client) -> Self {
+        Self::Database(client.database("ADMIN"))
     }
 
-    #[cfg(feature = "opentelemetry")]
-    fn otel(&self) -> crate::otel::OperationTarget<'_> {
-        crate::otel::OperationTarget {
-            database: "NULL",
-            collection: None,
-        }
-    }
-}
-
-impl OperationTarget for Database {
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        self.selection_criteria()
-    }
-
-    #[cfg(feature = "opentelemetry")]
-    fn otel(&self) -> crate::otel::OperationTarget<'_> {
-        crate::otel::OperationTarget {
-            database: self.name(),
-            collection: None,
-        }
-    }
-}
-
-impl<T: Send + Sync> OperationTarget for crate::Collection<T> {
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        self.selection_criteria()
-    }
-
-    #[cfg(feature = "opentelemetry")]
-    fn otel(&self) -> crate::otel::OperationTarget<'_> {
-        crate::otel::OperationTarget {
-            database: self.db().name(),
-            collection: Some(self.name()),
+    pub(crate) fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        match self {
+            Self::Null => None,
+            Self::Database(db) => db.selection_criteria(),
+            Self::Collection(coll) => coll.selection_criteria(),
         }
     }
 }
@@ -359,8 +331,8 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         Self::NAME
     }
 
-    fn op_target(&self) -> &impl OperationTarget {
-        &NullTarget
+    fn target(&self) -> OperationTarget {
+        OperationTarget::Null
     }
 
     #[cfg(feature = "opentelemetry")]
@@ -420,8 +392,8 @@ where
     fn name(&self) -> &CStr {
         self.name()
     }
-    fn op_target(&self) -> &impl OperationTarget {
-        self.op_target()
+    fn target(&self) -> OperationTarget {
+        self.target()
     }
     #[cfg(feature = "opentelemetry")]
     type Otel = <Self as OperationWithDefaults>::Otel;

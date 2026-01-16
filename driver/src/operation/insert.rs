@@ -184,7 +184,7 @@ impl OperationWithDefaults for Insert<'_> {
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for Insert<'_> {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
+    fn target(&self) -> crate::otel::TargetName<'_> {
         (&self.ns).into()
     }
 }

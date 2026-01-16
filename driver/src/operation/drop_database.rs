@@ -59,7 +59,7 @@ impl OperationWithDefaults for DropDatabase {
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for DropDatabase {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
+    fn target(&self) -> crate::otel::TargetName<'_> {
         self.target_db.as_str().into()
     }
 }

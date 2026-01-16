@@ -58,7 +58,7 @@ impl OperationWithDefaults for DropIndexes {
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for DropIndexes {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
+    fn target(&self) -> crate::otel::TargetName<'_> {
         (&self.ns).into()
     }
 }

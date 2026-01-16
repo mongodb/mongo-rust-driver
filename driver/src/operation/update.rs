@@ -219,7 +219,7 @@ impl OperationWithDefaults for Update {
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for Update {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
+    fn target(&self) -> crate::otel::TargetName<'_> {
         (&self.ns).into()
     }
 }

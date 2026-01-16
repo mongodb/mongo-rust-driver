@@ -72,7 +72,7 @@ impl crate::otel::OtelInfoDefaults for DropCollection {
     }
 
     #[cfg(feature = "opentelemetry")]
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
+    fn target(&self) -> crate::otel::TargetName<'_> {
         (&self.ns).into()
     }
 }

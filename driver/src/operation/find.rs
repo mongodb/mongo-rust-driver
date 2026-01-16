@@ -134,7 +134,7 @@ impl OperationWithDefaults for Find {
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for Find {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
+    fn target(&self) -> crate::otel::TargetName<'_> {
         (&self.ns).into()
     }
 

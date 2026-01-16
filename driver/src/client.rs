@@ -745,7 +745,7 @@ impl Drop for Client {
 pub(crate) struct OpSelectionInfo<'a> {
     name: &'a str,
     override_criteria: OverrideCriteriaFn,
-    op_target: &'a dyn OperationTarget,
+    op_target: OperationTarget,
 }
 
 impl<'a, T: crate::operation::Operation> From<&'a T> for OpSelectionInfo<'a> {
@@ -753,7 +753,7 @@ impl<'a, T: crate::operation::Operation> From<&'a T> for OpSelectionInfo<'a> {
         Self {
             name: crate::bson_compat::cstr_to_str(op.name()),
             override_criteria: op.override_criteria(),
-            op_target: op.op_target(),
+            op_target: op.target(),
         }
     }
 }
@@ -763,7 +763,7 @@ impl<'a> OpSelectionInfo<'a> {
         Self {
             name,
             override_criteria: |_, _| None,
-            op_target: &crate::operation::NullTarget,
+            op_target: crate::operation::OperationTarget::Null,
         }
     }
 }

@@ -143,8 +143,4 @@ impl OperationWithDefaults for ChangeStreamAggregate {
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for ChangeStreamAggregate {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        self.inner.target()
-    }
-}
+impl crate::otel::OtelInfoDefaults for ChangeStreamAggregate {}

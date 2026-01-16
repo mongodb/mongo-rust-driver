@@ -94,7 +94,7 @@ impl crate::otel::OtelInfoDefaults for ListCollections {
     }
 
     #[cfg(feature = "opentelemetry")]
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
+    fn target(&self) -> crate::otel::TargetName<'_> {
         self.db.as_str().into()
     }
 }

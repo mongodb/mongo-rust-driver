@@ -96,7 +96,7 @@ impl OperationWithDefaults for Distinct {
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for Distinct {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
+    fn target(&self) -> crate::otel::TargetName<'_> {
         (&self.ns).into()
     }
 }

@@ -80,7 +80,7 @@ impl OperationWithDefaults for CreateSearchIndexes {
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for CreateSearchIndexes {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
+    fn target(&self) -> crate::otel::TargetName<'_> {
         (&self.ns).into()
     }
 }
@@ -144,7 +144,7 @@ impl OperationWithDefaults for UpdateSearchIndex {
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for UpdateSearchIndex {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
+    fn target(&self) -> crate::otel::TargetName<'_> {
         (&self.ns).into()
     }
 }
@@ -206,7 +206,7 @@ impl OperationWithDefaults for DropSearchIndex {
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for DropSearchIndex {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
+    fn target(&self) -> crate::otel::TargetName<'_> {
         (&self.ns).into()
     }
 }

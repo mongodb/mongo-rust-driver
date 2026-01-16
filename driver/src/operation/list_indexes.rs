@@ -81,7 +81,7 @@ impl crate::otel::OtelInfoDefaults for ListIndexes {
         Some(output.id())
     }
 
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
+    fn target(&self) -> crate::otel::TargetName<'_> {
         (&self.ns).into()
     }
 }

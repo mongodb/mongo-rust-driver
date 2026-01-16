@@ -14,11 +14,15 @@ use super::{ExecutionContext, WriteConcernOnlyBody};
 
 pub(crate) struct CommitTransaction {
     options: Option<TransactionOptions>,
+    target: super::OperationTarget,
 }
 
 impl CommitTransaction {
-    pub(crate) fn new(options: Option<TransactionOptions>) -> Self {
-        Self { options }
+    pub(crate) fn new(client: &crate::Client, options: Option<TransactionOptions>) -> Self {
+        Self {
+            options,
+            target: super::OperationTarget::admin(client),
+        }
     }
 }
 
@@ -81,13 +85,13 @@ impl OperationWithDefaults for CommitTransaction {
         }
     }
 
+    fn target(&self) -> super::OperationTarget {
+        self.target.clone()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for CommitTransaction {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        crate::otel::OperationTarget::ADMIN
-    }
-}
+impl crate::otel::OtelInfoDefaults for CommitTransaction {}

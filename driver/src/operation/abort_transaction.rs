@@ -16,13 +16,19 @@ use super::{ExecutionContext, OperationWithDefaults, WriteConcernOnlyBody};
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
     pinned: Option<TransactionPin>,
+    target: crate::operation::OperationTarget,
 }
 
 impl AbortTransaction {
-    pub(crate) fn new(write_concern: Option<WriteConcern>, pinned: Option<TransactionPin>) -> Self {
+    pub(crate) fn new(
+        client: &crate::Client,
+        write_concern: Option<WriteConcern>,
+        pinned: Option<TransactionPin>,
+    ) -> Self {
         Self {
             write_concern,
             pinned,
+            target: crate::operation::OperationTarget::admin(client),
         }
     }
 }
@@ -81,13 +87,13 @@ impl OperationWithDefaults for AbortTransaction {
         self.pinned = None;
     }
 
+    fn target(&self) -> super::OperationTarget {
+        self.target.clone()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for AbortTransaction {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        crate::otel::OperationTarget::ADMIN
-    }
-}
+impl crate::otel::OtelInfoDefaults for AbortTransaction {}

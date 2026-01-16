@@ -82,8 +82,8 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.name()
     }
 
-    fn op_target(&self) -> &impl super::OperationTarget {
-        self.0.op_target()
+    fn target(&self) -> super::OperationTarget {
+        self.0.target()
     }
 
     #[cfg(feature = "opentelemetry")]
@@ -94,10 +94,6 @@ impl<Op: Operation> Operation for RawOutput<Op> {
 impl<Op: Operation> crate::otel::OtelInfo for RawOutput<Op> {
     fn log_name(&self) -> &str {
         self.0.otel().log_name()
-    }
-
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        self.0.otel().target()
     }
 
     fn cursor_id(&self) -> Option<i64> {

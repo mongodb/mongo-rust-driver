@@ -116,11 +116,7 @@ impl OperationWithDefaults for CountDocuments {
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for CountDocuments {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        self.aggregate.target()
-    }
-}
+impl crate::otel::OtelInfoDefaults for CountDocuments {}
 
 #[derive(Debug, Deserialize)]
 struct Body {
