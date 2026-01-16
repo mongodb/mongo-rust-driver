@@ -141,6 +141,10 @@ impl<'a> CollRef<'a> {
             _ref: PhantomData,
         }
     }
+
+    pub(crate) fn inner(&self) -> &Collection<Document> {
+        &self.inner
+    }
 }
 
 impl Deref for CollRef<'_> {

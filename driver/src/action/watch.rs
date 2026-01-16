@@ -1,6 +1,9 @@
 use std::{marker::PhantomData, time::Duration};
 
-use crate::bson::{Bson, Document, Timestamp};
+use crate::{
+    bson::{Bson, Document, Timestamp},
+    operation::OperationTarget,
+};
 use serde::de::DeserializeOwned;
 
 use super::{
@@ -21,7 +24,6 @@ use crate::{
     },
     collation::Collation,
     error::Result,
-    operation::aggregate::AggregateTarget,
     options::ReadConcern,
     selection_criteria::SelectionCriteria,
     Client,
@@ -84,10 +86,7 @@ impl Database {
     #[deeplink]
     #[options_doc(watch)]
     pub fn watch(&self) -> Watch<'_> {
-        Watch::new(
-            self.client(),
-            AggregateTarget::Database(self.name().to_string()),
-        )
+        Watch::new(self.client(), self.into())
     }
 }
 
@@ -112,7 +111,7 @@ where
     #[deeplink]
     #[options_doc(watch)]
     pub fn watch(&self) -> Watch<'_, T> {
-        Watch::new(self.client(), self.namespace().into())
+        Watch::new(self.client(), self.into())
     }
 }
 
@@ -176,7 +175,7 @@ where
 #[must_use]
 pub struct Watch<'a, T = Document, S = ImplicitSession> {
     client: &'a Client,
-    target: AggregateTarget,
+    target: OperationTarget,
     pipeline: Vec<Document>,
     options: Option<ChangeStreamOptions>,
     session: S,
@@ -185,7 +184,7 @@ pub struct Watch<'a, T = Document, S = ImplicitSession> {
 }
 
 impl<'a, T> Watch<'a, T, ImplicitSession> {
-    fn new(client: &'a Client, target: AggregateTarget) -> Self {
+    fn new(client: &'a Client, target: OperationTarget) -> Self {
         Self {
             client,
             target,
@@ -200,7 +199,7 @@ impl<'a, T> Watch<'a, T, ImplicitSession> {
     fn new_cluster(client: &'a Client) -> Self {
         Self {
             client,
-            target: AggregateTarget::Database("admin".to_string()),
+            target: OperationTarget::admin(client),
             pipeline: vec![],
             options: None,
             session: ImplicitSession,

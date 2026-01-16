@@ -3,6 +3,7 @@ use crate::bson::RawDocumentBuf;
 use crate::{
     bson::{doc, RawBsonRef, RawDocument, Timestamp},
     cursor::{CursorInformation, CursorSpecification},
+    operation::OperationTarget,
 };
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
@@ -53,7 +54,7 @@ use crate::{
     },
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
-        aggregate::{change_stream::ChangeStreamAggregate, AggregateTarget},
+        aggregate::change_stream::ChangeStreamAggregate,
         AbortTransaction,
         CommandErrorBody,
         CommitTransaction,
@@ -245,7 +246,7 @@ impl Client {
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
-        target: AggregateTarget,
+        target: OperationTarget,
         mut resume_data: Option<ChangeStreamData>,
     ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
     where
@@ -283,7 +284,7 @@ impl Client {
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
-        target: AggregateTarget,
+        target: OperationTarget,
         resume_data: Option<ChangeStreamData>,
         session: &mut ClientSession,
     ) -> Result<SessionChangeStream<ChangeStreamEvent<T>>>

@@ -7,9 +7,8 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, Retryability},
+    operation::{append_options, OperationTarget, Retryability},
     options::{AggregateOptions, ReadPreference, SelectionCriteria, WriteConcern},
-    Namespace,
 };
 
 use super::{
@@ -21,14 +20,14 @@ use super::{
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {
-    target: AggregateTarget,
+    target: OperationTarget,
     pipeline: Vec<Document>,
     options: Option<AggregateOptions>,
 }
 
 impl Aggregate {
     pub(crate) fn new(
-        target: impl Into<AggregateTarget>,
+        target: OperationTarget,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<AggregateOptions>,
     ) -> Self {
@@ -51,7 +50,7 @@ impl OperationWithDefaults for Aggregate {
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
-            crate::bson_compat::cstr_to_str(Self::NAME): self.target.to_bson(),
+            crate::bson_compat::cstr_to_str(Self::NAME): target_bson(&self.target),
             "pipeline": bson_util::to_bson_array(&self.pipeline),
             "cursor": {}
         };
@@ -66,7 +65,7 @@ impl OperationWithDefaults for Aggregate {
 
         Ok(Command::new_read(
             Self::NAME,
-            self.target.db_name(),
+            target_db_name(&self.target),
             self.options.as_ref().and_then(|o| o.read_concern.clone()),
             (&body).try_into()?,
         ))
@@ -153,6 +152,10 @@ impl OperationWithDefaults for Aggregate {
         }
     }
 
+    fn target(&self) -> OperationTarget {
+        self.target.clone()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
@@ -177,36 +180,18 @@ impl Aggregate {
     }
 }
 
-#[derive(Clone, Debug)]
-pub(crate) enum AggregateTarget {
-    Database(String),
-    Collection(Namespace),
-}
-
-impl AggregateTarget {
-    fn to_bson(&self) -> Bson {
-        match self {
-            AggregateTarget::Database(_) => Bson::Int32(1),
-            AggregateTarget::Collection(ref ns) => Bson::String(ns.coll.to_string()),
-        }
-    }
-
-    fn db_name(&self) -> &str {
-        match self {
-            AggregateTarget::Database(ref s) => s.as_str(),
-            AggregateTarget::Collection(ref ns) => ns.db.as_str(),
-        }
+fn target_bson(target: &OperationTarget) -> Bson {
+    match target {
+        OperationTarget::Database(_) => Bson::Int32(1),
+        OperationTarget::Collection(coll) => Bson::String(coll.namespace().to_string()),
+        OperationTarget::Null => panic!("invalid aggregate target"),
     }
 }
 
-impl From<Namespace> for AggregateTarget {
-    fn from(ns: Namespace) -> Self {
-        AggregateTarget::Collection(ns)
-    }
-}
-
-impl From<String> for AggregateTarget {
-    fn from(db_name: String) -> Self {
-        AggregateTarget::Database(db_name)
+fn target_db_name(target: &OperationTarget) -> &str {
+    match target {
+        OperationTarget::Database(db) => db.name(),
+        OperationTarget::Collection(coll) => coll.db().name(),
+        OperationTarget::Null => panic!("invalid aggregate target"),
     }
 }

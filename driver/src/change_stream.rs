@@ -13,7 +13,10 @@ use std::{
 
 #[cfg(test)]
 use crate::bson::RawDocumentBuf;
-use crate::bson::{Document, Timestamp};
+use crate::{
+    bson::{Document, Timestamp},
+    operation::OperationTarget,
+};
 use derive_where::derive_where;
 use futures_core::{future::BoxFuture, Stream};
 use serde::de::DeserializeOwned;
@@ -26,7 +29,6 @@ use crate::{
     change_stream::event::{ChangeStreamEvent, ResumeToken},
     cursor::{stream_poll_next, BatchValue, CursorStream, NextInBatchFuture},
     error::{ErrorKind, Result},
-    operation::aggregate::AggregateTarget,
     ClientSession,
     Cursor,
 };
@@ -190,7 +192,7 @@ pub(crate) struct WatchArgs {
     pub(crate) pipeline: Vec<Document>,
 
     /// The original target of the change stream.
-    pub(crate) target: AggregateTarget,
+    pub(crate) target: OperationTarget,
 
     /// The options provided to the initial `$changeStream` stage.
     pub(crate) options: Option<options::ChangeStreamOptions>,

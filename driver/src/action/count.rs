@@ -145,7 +145,7 @@ impl<'a> Action for CountDocuments<'a> {
         resolve_selection_criteria_with_session!(self.cr, self.options, self.session.as_ref());
 
         let op = crate::operation::count_documents::CountDocuments::new(
-            self.cr.namespace(),
+            self.cr.inner(),
             self.filter,
             self.options,
         )?;

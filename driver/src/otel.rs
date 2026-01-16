@@ -18,7 +18,7 @@ use crate::{
     bson::Bson,
     cmap::{conn::wire::Message, Command, ConnectionInfo, StreamDescription},
     error::{ErrorKind, Result},
-    operation::{aggregate::AggregateTarget, Operation, OperationTarget},
+    operation::{Operation, OperationTarget},
     options::{ClientOptions, ServerAddress, DEFAULT_PORT},
     Client,
     ClientSession,
@@ -450,15 +450,6 @@ impl<'a> From<&'a Namespace> for TargetName<'a> {
         TargetName {
             database: &value.db,
             collection: Some(&value.coll),
-        }
-    }
-}
-
-impl<'a> From<&'a AggregateTarget> for TargetName<'a> {
-    fn from(value: &'a AggregateTarget) -> Self {
-        match value {
-            AggregateTarget::Database(db) => db.as_str().into(),
-            AggregateTarget::Collection(ns) => ns.into(),
         }
     }
 }

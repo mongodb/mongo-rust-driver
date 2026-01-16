@@ -9,7 +9,6 @@ use crate::{
     operation::aggregate::Aggregate,
     options::{AggregateOptions, CountOptions},
     selection_criteria::SelectionCriteria,
-    Namespace,
 };
 
 use super::{ExecutionContext, OperationWithDefaults, Retryability, SingleCursorResult};
@@ -20,7 +19,7 @@ pub(crate) struct CountDocuments {
 
 impl CountDocuments {
     pub(crate) fn new(
-        namespace: Namespace,
+        coll: &crate::Collection<Document>,
         filter: Document,
         options: Option<CountOptions>,
     ) -> Result<Self> {
@@ -69,7 +68,7 @@ impl CountDocuments {
         });
 
         Ok(Self {
-            aggregate: Aggregate::new(namespace, pipeline, aggregate_options),
+            aggregate: Aggregate::new(coll.into(), pipeline, aggregate_options),
         })
     }
 }

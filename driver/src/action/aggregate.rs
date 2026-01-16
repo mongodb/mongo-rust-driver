@@ -6,7 +6,7 @@ use crate::{
     coll::options::{AggregateOptions, Hint},
     collation::Collation,
     error::Result,
-    operation::aggregate::AggregateTarget,
+    operation::OperationTarget,
     options::{ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
     Client,
@@ -262,10 +262,10 @@ enum AggregateTargetRef<'a> {
 }
 
 impl AggregateTargetRef<'_> {
-    fn target(&self) -> AggregateTarget {
+    fn target(&self) -> OperationTarget {
         match self {
-            Self::Collection(cr) => AggregateTarget::Collection(cr.namespace()),
-            Self::Database(db) => AggregateTarget::Database(db.name().to_string()),
+            Self::Collection(cr) => OperationTarget::Collection((*cr).clone()),
+            Self::Database(db) => OperationTarget::Database((*db).clone()),
         }
     }
 

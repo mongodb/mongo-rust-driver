@@ -56,6 +56,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
     BoxFuture,
     ClientSession,
+    Collection,
     Database,
 };
 
@@ -200,7 +201,6 @@ pub(crate) type OverrideCriteriaFn =
 pub(crate) enum OperationTarget {
     Null,
     Database(Database),
-    #[expect(unused)]
     Collection(crate::Collection<Document>),
 }
 
@@ -215,6 +215,18 @@ impl OperationTarget {
             Self::Database(db) => db.selection_criteria(),
             Self::Collection(coll) => coll.selection_criteria(),
         }
+    }
+}
+
+impl From<&Database> for OperationTarget {
+    fn from(value: &Database) -> Self {
+        Self::Database(value.clone())
+    }
+}
+
+impl<T: Send + Sync> From<&Collection<T>> for OperationTarget {
+    fn from(value: &Collection<T>) -> Self {
+        Self::Collection(value.clone_with_type())
     }
 }
 
