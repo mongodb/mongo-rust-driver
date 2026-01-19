@@ -743,6 +743,7 @@ impl Drop for Client {
 
 /// Operation-specific parameters to server selection
 pub(crate) struct OpSelectionInfo<'a> {
+    #[allow(unused)]
     name: &'a str,
     override_criteria: OverrideCriteriaFn,
     op_target: OperationTarget,

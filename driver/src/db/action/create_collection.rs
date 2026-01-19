@@ -1,10 +1,11 @@
+#[cfg(feature = "in-use-encryption")]
+use crate::Namespace;
 use crate::{
     action::{action_impl, CreateCollection},
     bson::Document,
     error::Result,
     operation::create as op,
     Database,
-    Namespace,
 };
 
 #[action_impl]
@@ -15,8 +16,9 @@ impl<'a> Action for CreateCollection<'a> {
         resolve_options!(self.db, self.options, [write_concern]);
 
         let coll = self.db.collection::<Document>(&self.name);
-        let ns = coll.namespace();
 
+        #[cfg(feature = "in-use-encryption")]
+        let ns = coll.namespace();
         #[cfg(feature = "in-use-encryption")]
         let has_encrypted_fields = {
             self.db

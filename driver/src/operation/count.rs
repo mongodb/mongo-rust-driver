@@ -41,7 +41,7 @@ impl OperationWithDefaults for Count {
 
         Ok(Command::new_read(
             Self::NAME,
-            &self.target.db().name(),
+            self.target.db().name(),
             self.options.as_ref().and_then(|o| o.read_concern.clone()),
             body,
         ))
