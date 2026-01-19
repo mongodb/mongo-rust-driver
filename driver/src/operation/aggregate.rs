@@ -32,7 +32,7 @@ impl Aggregate {
         options: Option<AggregateOptions>,
     ) -> Self {
         Self {
-            target: target.into(),
+            target,
             pipeline: pipeline.into_iter().collect(),
             options,
         }
@@ -183,8 +183,8 @@ impl Aggregate {
 fn target_bson(target: &OperationTarget) -> Bson {
     match target {
         OperationTarget::Database(_) => Bson::Int32(1),
-        OperationTarget::Collection(coll) => Bson::String(coll.namespace().to_string()),
-        OperationTarget::Disowned(ns) => Bson::String(ns.to_string()),
+        OperationTarget::Collection(coll) => Bson::String(coll.name().to_owned()),
+        OperationTarget::Disowned(ns) => Bson::String(ns.coll.to_owned()),
         OperationTarget::Null => panic!("invalid aggregate target"),
     }
 }
