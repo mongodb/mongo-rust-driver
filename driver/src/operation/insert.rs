@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    bson::{rawdoc, Bson, RawDocument},
+    bson::{rawdoc, Bson, Document, RawDocument},
     bson_compat::{cstr, CStr},
     bson_util::{
         array_entry_size_bytes,
@@ -15,14 +15,14 @@ use crate::{
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
-    Namespace,
+    Collection,
 };
 
 use super::{ExecutionContext, MAX_ENCRYPTED_WRITE_SIZE, OP_MSG_OVERHEAD_BYTES};
 
 #[derive(Debug)]
 pub(crate) struct Insert<'a> {
-    ns: Namespace,
+    target: Collection<Document>,
     documents: Vec<&'a RawDocument>,
     inserted_ids: Vec<Bson>,
     options: InsertManyOptions,
@@ -31,7 +31,7 @@ pub(crate) struct Insert<'a> {
 
 impl<'a> Insert<'a> {
     pub(crate) fn new(
-        ns: Namespace,
+        target: Collection<Document>,
         documents: Vec<&'a RawDocument>,
         options: Option<InsertManyOptions>,
         encrypted: bool,
@@ -42,7 +42,7 @@ impl<'a> Insert<'a> {
         }
 
         Self {
-            ns,
+            target,
             options,
             documents,
             inserted_ids: vec![],
@@ -64,7 +64,7 @@ impl OperationWithDefaults for Insert<'_> {
             Checked::new(description.max_message_size_bytes).try_into()?;
         let max_operations: usize = Checked::new(description.max_write_batch_size).try_into()?;
 
-        let mut command_body = rawdoc! { Self::NAME: self.ns.coll.clone() };
+        let mut command_body = rawdoc! { Self::NAME: self.target.name() };
         let options = crate::bson_compat::serialize_to_raw_document_buf(&self.options)?;
         extend_raw_document_buf(&mut command_body, options)?;
 
@@ -111,7 +111,7 @@ impl OperationWithDefaults for Insert<'_> {
         }
 
         let mut body = rawdoc! {
-            Self::NAME: self.ns.coll.clone(),
+            Self::NAME: self.target.name(),
         };
 
         let options_doc = crate::bson_compat::serialize_to_raw_document_buf(&self.options)?;
@@ -120,9 +120,9 @@ impl OperationWithDefaults for Insert<'_> {
         if self.encrypted {
             // Auto-encryption does not support document sequences
             body.append(cstr!("documents"), vec_to_raw_array_buf(docs));
-            Ok(Command::new(Self::NAME, &self.ns.db, body))
+            Ok(Command::new(Self::NAME, self.target.db().name(), body))
         } else {
-            let mut command = Command::new(Self::NAME, &self.ns.db, body);
+            let mut command = Command::new(Self::NAME, self.target.db().name(), body);
             command.add_document_sequence("documents", docs);
             Ok(command)
         }
@@ -178,13 +178,13 @@ impl OperationWithDefaults for Insert<'_> {
         Retryability::Write
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for Insert<'_> {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        (&self.ns).into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for Insert<'_> {}

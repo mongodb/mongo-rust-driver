@@ -1,29 +1,31 @@
-use crate::bson::RawDocumentBuf;
-
 use crate::{
-    bson::{rawdoc, Document},
+    bson::{rawdoc, Document, RawDocumentBuf},
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{Error, Result},
     operation::{OperationWithDefaults, Retryability, SERVER_4_4_0_WIRE_VERSION},
     options::{CursorType, FindOptions, SelectionCriteria},
-    Namespace,
+    Collection,
 };
 
 use super::{append_options_to_raw_document, ExecutionContext};
 
 #[derive(Debug)]
 pub(crate) struct Find {
-    ns: Namespace,
+    target: Collection<Document>,
     filter: Document,
     options: Option<Box<FindOptions>>,
 }
 
 impl Find {
-    pub(crate) fn new(ns: Namespace, filter: Document, options: Option<FindOptions>) -> Self {
+    pub(crate) fn new(
+        target: Collection<Document>,
+        filter: Document,
+        options: Option<FindOptions>,
+    ) -> Self {
         Self {
-            ns,
+            target,
             filter,
             options: options.map(Box::new),
         }
@@ -37,7 +39,7 @@ impl OperationWithDefaults for Find {
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
-            Self::NAME: self.ns.coll.clone(),
+            Self::NAME: self.target.name(),
         };
 
         if let Some(ref mut options) = self.options {
@@ -78,7 +80,7 @@ impl OperationWithDefaults for Find {
 
         Ok(Command::new_read(
             Self::NAME,
-            &self.ns.db,
+            self.target.db().name(),
             self.options.as_ref().and_then(|o| o.read_concern.clone()),
             body,
         ))
@@ -128,16 +130,16 @@ impl OperationWithDefaults for Find {
         Retryability::Read
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for Find {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        (&self.ns).into()
-    }
-
     fn output_cursor_id(output: &Self::O) -> Option<i64> {
         Some(output.id())
     }

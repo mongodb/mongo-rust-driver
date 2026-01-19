@@ -10,7 +10,7 @@ use crate::{
     bson_compat::{cstr, deserialize_from_slice, CStr},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    coll::{options::UpdateModifications, Namespace},
+    coll::options::UpdateModifications,
     error::{ErrorKind, Result},
     operation::{
         append_options_to_raw_document,
@@ -19,12 +19,13 @@ use crate::{
         Retryability,
     },
     options::WriteConcern,
+    Collection,
 };
 
 use super::{ExecutionContext, UpdateOrReplace};
 
 pub(crate) struct FindAndModify<T: DeserializeOwned> {
-    ns: Namespace,
+    target: Collection<Document>,
     query: Document,
     modification: Modification,
     options: Option<FindAndModifyOptions>,
@@ -33,7 +34,7 @@ pub(crate) struct FindAndModify<T: DeserializeOwned> {
 
 impl<T: DeserializeOwned> FindAndModify<T> {
     pub(crate) fn with_modification(
-        ns: Namespace,
+        target: Collection<Document>,
         query: Document,
         modification: Modification,
         options: Option<FindAndModifyOptions>,
@@ -45,7 +46,7 @@ impl<T: DeserializeOwned> FindAndModify<T> {
             bson_util::update_document_check(d)?;
         };
         Ok(Self {
-            ns,
+            target,
             query,
             modification,
             options,
@@ -71,7 +72,7 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
         }
 
         let mut body = rawdoc! {
-            Self::NAME: self.ns.coll.clone(),
+            Self::NAME: self.target.name(),
             "query": RawDocumentBuf::try_from(&self.query)?,
         };
 
@@ -84,7 +85,7 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(Self::NAME, &self.ns.db, body))
+        Ok(Command::new(Self::NAME, &self.target.db().name(), body))
     }
 
     fn handle_response<'a>(
@@ -119,13 +120,13 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
         Retryability::Write
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl<T: DeserializeOwned> crate::otel::OtelInfoDefaults for FindAndModify<T> {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        (&self.ns).into()
-    }
-}
+impl<T: DeserializeOwned> crate::otel::OtelInfoDefaults for FindAndModify<T> {}

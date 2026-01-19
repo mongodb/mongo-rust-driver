@@ -108,7 +108,7 @@ impl<'a> Action for DropIndex<'a> {
         // If there is no provided name, that means we should drop all indexes.
         let index_name = self.name.unwrap_or_else(|| "*".to_string());
 
-        let op = Op::new(self.coll.namespace(), index_name, self.options);
+        let op = Op::new(self.coll.clone(), index_name, self.options);
         self.coll.client().execute_operation(op, self.session).await
     }
 }

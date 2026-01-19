@@ -1,4 +1,4 @@
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, Database};
 
 use crate::{
     bson_compat::{cstr, CStr},
@@ -13,14 +13,14 @@ use super::{append_options_to_raw_document, ExecutionContext};
 
 #[derive(Debug)]
 pub(crate) struct ListCollections {
-    db: String,
+    db: Database,
     name_only: bool,
     options: Option<ListCollectionsOptions>,
 }
 
 impl ListCollections {
     pub(crate) fn new(
-        db: String,
+        db: Database,
         name_only: bool,
         options: Option<ListCollectionsOptions>,
     ) -> Self {
@@ -54,7 +54,7 @@ impl OperationWithDefaults for ListCollections {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(Self::NAME, &self.db, body))
+        Ok(Command::new(Self::NAME, &self.db.name(), body))
     }
 
     fn handle_response_cow<'a>(
@@ -83,6 +83,10 @@ impl OperationWithDefaults for ListCollections {
         Retryability::Read
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.db).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
@@ -91,10 +95,5 @@ impl OperationWithDefaults for ListCollections {
 impl crate::otel::OtelInfoDefaults for ListCollections {
     fn output_cursor_id(output: &Self::O) -> Option<i64> {
         Some(output.id())
-    }
-
-    #[cfg(feature = "opentelemetry")]
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        self.db.as_str().into()
     }
 }

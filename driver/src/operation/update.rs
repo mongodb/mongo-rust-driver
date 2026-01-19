@@ -11,7 +11,7 @@ use crate::{
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
     options::{UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
-    Namespace,
+    Collection,
 };
 
 use super::ExecutionContext;
@@ -53,7 +53,7 @@ impl From<UpdateModifications> for UpdateOrReplace {
 
 #[derive(Debug)]
 pub(crate) struct Update {
-    ns: Namespace,
+    target: Collection<Document>,
     filter: Document,
     update: UpdateOrReplace,
     multi: Option<bool>,
@@ -62,14 +62,14 @@ pub(crate) struct Update {
 
 impl Update {
     pub(crate) fn with_update(
-        ns: Namespace,
+        target: Collection<Document>,
         filter: Document,
         update: UpdateModifications,
         multi: bool,
         options: Option<UpdateOptions>,
     ) -> Self {
         Self {
-            ns,
+            target,
             filter,
             update: update.into(),
             multi: multi.then_some(true),
@@ -78,14 +78,14 @@ impl Update {
     }
 
     pub(crate) fn with_replace_raw(
-        ns: Namespace,
+        target: Collection<Document>,
         filter: Document,
         update: RawDocumentBuf,
         multi: bool,
         options: Option<UpdateOptions>,
     ) -> Result<Self> {
         Ok(Self {
-            ns,
+            target,
             filter,
             update: UpdateOrReplace::Replacement(update),
             multi: multi.then_some(true),
@@ -101,7 +101,7 @@ impl OperationWithDefaults for Update {
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
-            Self::NAME: self.ns.coll.clone(),
+            Self::NAME: self.target.name(),
         };
 
         let mut update = rawdoc! {
@@ -167,7 +167,7 @@ impl OperationWithDefaults for Update {
         body.append(cstr!("updates"), updates);
         body.append(cstr!("ordered"), true); // command monitoring tests expect this (SPEC-1130)
 
-        Ok(Command::new(Self::NAME, &self.ns.db, body))
+        Ok(Command::new(Self::NAME, &self.target.db().name(), body))
     }
 
     fn handle_response<'a>(
@@ -213,16 +213,16 @@ impl OperationWithDefaults for Update {
         }
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for Update {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        (&self.ns).into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for Update {}
 
 #[derive(Deserialize)]
 pub(crate) struct UpdateBody {

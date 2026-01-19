@@ -2,19 +2,19 @@ use crate::{
     bson::{doc, Document},
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
-    coll::Namespace,
     collation::Collation,
     error::{convert_insert_many_error, Result},
     operation::{append_options, OperationWithDefaults, Retryability, WriteResponseBody},
     options::{DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
+    Collection,
 };
 
 use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct Delete {
-    ns: Namespace,
+    target: Collection<Document>,
     filter: Document,
     limit: u32,
     options: Option<DeleteOptions>,
@@ -24,13 +24,13 @@ pub(crate) struct Delete {
 
 impl Delete {
     pub(crate) fn new(
-        ns: Namespace,
+        target: Collection<Document>,
         filter: Document,
         limit: Option<u32>,
         mut options: Option<DeleteOptions>,
     ) -> Self {
         Self {
-            ns,
+            target,
             filter,
             limit: limit.unwrap_or(0), // 0 = no limit
             collation: options.as_mut().and_then(|opts| opts.collation.take()),
@@ -63,14 +63,18 @@ impl OperationWithDefaults for Delete {
         }
 
         let mut body = doc! {
-            crate::bson_compat::cstr_to_str(Self::NAME): self.ns.coll.clone(),
+            crate::bson_compat::cstr_to_str(Self::NAME): self.target.name(),
             "deletes": [delete],
             "ordered": true, // command monitoring tests expect this (SPEC-1130)
         };
 
         append_options(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(Self::NAME, &self.ns.db, (&body).try_into()?))
+        Ok(Command::new(
+            Self::NAME,
+            &self.target.db().name(),
+            (&body).try_into()?,
+        ))
     }
 
     fn handle_response<'a>(
@@ -100,13 +104,13 @@ impl OperationWithDefaults for Delete {
         }
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for Delete {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        (&self.ns).into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for Delete {}

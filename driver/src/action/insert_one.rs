@@ -89,7 +89,7 @@ impl<'a> Action for InsertOne<'a> {
         let doc = self.doc?;
 
         let insert = Op::new(
-            self.coll.namespace(),
+            self.coll.clone(),
             vec![doc.deref()],
             self.options.map(InsertManyOptions::from_insert_one_options),
             self.coll.client().should_auto_encrypt().await,

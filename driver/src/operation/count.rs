@@ -1,11 +1,11 @@
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, Collection};
 use serde::Deserialize;
 
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
-    coll::{options::EstimatedDocumentCountOptions, Namespace},
+    coll::options::EstimatedDocumentCountOptions,
     error::{Error, Result},
     operation::{OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
@@ -14,13 +14,16 @@ use crate::{
 use super::{append_options_to_raw_document, ExecutionContext};
 
 pub(crate) struct Count {
-    ns: Namespace,
+    target: Collection<Document>,
     options: Option<EstimatedDocumentCountOptions>,
 }
 
 impl Count {
-    pub fn new(ns: Namespace, options: Option<EstimatedDocumentCountOptions>) -> Self {
-        Count { ns, options }
+    pub fn new(
+        target: Collection<Document>,
+        options: Option<EstimatedDocumentCountOptions>,
+    ) -> Self {
+        Count { target, options }
     }
 }
 
@@ -31,14 +34,14 @@ impl OperationWithDefaults for Count {
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
-            Self::NAME: self.ns.coll.clone(),
+            Self::NAME: self.target.name(),
         };
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
         Ok(Command::new_read(
             Self::NAME,
-            &self.ns.db,
+            &self.target.db().name(),
             self.options.as_ref().and_then(|o| o.read_concern.clone()),
             body,
         ))
@@ -76,16 +79,16 @@ impl OperationWithDefaults for Count {
         Retryability::Read
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for Count {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        (&self.ns).into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for Count {}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ResponseBody {

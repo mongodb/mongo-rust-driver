@@ -16,7 +16,7 @@ impl<'a> Action for DropCollection<'a> {
             .drop_aux_collections(self.options.as_ref(), self.session.as_deref_mut())
             .await?;
 
-        let drop = op::DropCollection::new(self.cr.namespace(), self.options);
+        let drop = op::DropCollection::new(self.cr.clone(), self.options);
         self.cr
             .client()
             .execute_operation(drop, self.session.as_deref_mut())
@@ -86,7 +86,8 @@ where
         // Drop the collections.
         if let Some(enc_fields) = enc_fields {
             for ns in crate::client::csfle::aux_collections(&self.namespace(), enc_fields)? {
-                let drop = op::DropCollection::new(ns, options.cloned());
+                let coll = self.client().database(&ns.db).collection(&ns.coll);
+                let drop = op::DropCollection::new(coll, options.cloned());
                 self.client()
                     .execute_operation(drop, session.as_deref_mut())
                     .await?;

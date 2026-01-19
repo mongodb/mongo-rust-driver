@@ -113,7 +113,7 @@ impl<'a> Action for InsertMany<'a> {
 
         while n_attempted < ds.len() {
             let docs: Vec<_> = ds.iter().skip(n_attempted).map(Deref::deref).collect();
-            let insert = Op::new(self.coll.namespace(), docs, self.options.clone(), encrypted);
+            let insert = Op::new(self.coll.clone(), docs, self.options.clone(), encrypted);
 
             match self
                 .coll

@@ -1,4 +1,4 @@
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, Client};
 
 use crate::{
     bson_compat::{cstr, CStr},
@@ -16,19 +16,19 @@ use super::{ExecutionContext, OperationWithDefaults, WriteConcernOnlyBody};
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
     pinned: Option<TransactionPin>,
-    target: crate::operation::OperationTarget,
+    target: Client,
 }
 
 impl AbortTransaction {
     pub(crate) fn new(
-        client: &crate::Client,
+        client: &Client,
         write_concern: Option<WriteConcern>,
         pinned: Option<TransactionPin>,
     ) -> Self {
         Self {
             write_concern,
             pinned,
-            target: crate::operation::OperationTarget::admin(client),
+            target: client.clone(),
         }
     }
 }
@@ -88,7 +88,7 @@ impl OperationWithDefaults for AbortTransaction {
     }
 
     fn target(&self) -> super::OperationTarget {
-        self.target.clone()
+        crate::operation::OperationTarget::admin(&self.target)
     }
 
     #[cfg(feature = "opentelemetry")]

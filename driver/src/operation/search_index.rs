@@ -1,13 +1,12 @@
-use crate::bson::{rawdoc, RawDocumentBuf};
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Document},
+    bson::{doc, rawdoc, Document, RawDocumentBuf},
     bson_compat::{cstr, CStr},
     bson_util::to_raw_bson_array_ser,
     cmap::{Command, RawCommandResponse},
     error::Result,
-    Namespace,
+    Collection,
     SearchIndexModel,
 };
 
@@ -15,13 +14,13 @@ use super::{ExecutionContext, OperationWithDefaults};
 
 #[derive(Debug)]
 pub(crate) struct CreateSearchIndexes {
-    ns: Namespace,
+    target: Collection<Document>,
     indexes: Vec<SearchIndexModel>,
 }
 
 impl CreateSearchIndexes {
-    pub(crate) fn new(ns: Namespace, indexes: Vec<SearchIndexModel>) -> Self {
-        Self { ns, indexes }
+    pub(crate) fn new(target: Collection<Document>, indexes: Vec<SearchIndexModel>) -> Self {
+        Self { target, indexes }
     }
 }
 
@@ -32,9 +31,9 @@ impl OperationWithDefaults for CreateSearchIndexes {
     fn build(&mut self, _description: &crate::cmap::StreamDescription) -> Result<Command> {
         Ok(Command::new(
             Self::NAME.to_string(),
-            self.ns.db.clone(),
+            self.target.db().name(),
             rawdoc! {
-                Self::NAME: self.ns.coll.clone(),
+                Self::NAME: self.target.name(),
                 "indexes": to_raw_bson_array_ser(&self.indexes)?,
             },
         ))
@@ -74,28 +73,28 @@ impl OperationWithDefaults for CreateSearchIndexes {
         false
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for CreateSearchIndexes {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        (&self.ns).into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for CreateSearchIndexes {}
 
 #[derive(Debug)]
 pub(crate) struct UpdateSearchIndex {
-    ns: Namespace,
+    target: Collection<Document>,
     name: String,
     definition: Document,
 }
 
 impl UpdateSearchIndex {
-    pub(crate) fn new(ns: Namespace, name: String, definition: Document) -> Self {
+    pub(crate) fn new(target: Collection<Document>, name: String, definition: Document) -> Self {
         Self {
-            ns,
+            target,
             name,
             definition,
         }
@@ -113,9 +112,9 @@ impl OperationWithDefaults for UpdateSearchIndex {
         let raw_def: RawDocumentBuf = (&self.definition).try_into()?;
         Ok(Command::new(
             Self::NAME,
-            &self.ns.db,
+            &self.target.db().name(),
             rawdoc! {
-                Self::NAME: self.ns.coll.as_str(),
+                Self::NAME: self.target.name(),
                 "name": self.name.as_str(),
                 "definition": raw_def,
             },
@@ -138,26 +137,26 @@ impl OperationWithDefaults for UpdateSearchIndex {
         false
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for UpdateSearchIndex {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        (&self.ns).into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for UpdateSearchIndex {}
 
 #[derive(Debug)]
 pub(crate) struct DropSearchIndex {
-    ns: Namespace,
+    target: Collection<Document>,
     name: String,
 }
 
 impl DropSearchIndex {
-    pub(crate) fn new(ns: Namespace, name: String) -> Self {
-        Self { ns, name }
+    pub(crate) fn new(target: Collection<Document>, name: String) -> Self {
+        Self { target, name }
     }
 }
 
@@ -168,9 +167,9 @@ impl OperationWithDefaults for DropSearchIndex {
     fn build(&mut self, _description: &crate::cmap::StreamDescription) -> Result<Command> {
         Ok(Command::new(
             Self::NAME,
-            &self.ns.db,
+            &self.target.db().name(),
             rawdoc! {
-                Self::NAME: self.ns.coll.as_str(),
+                Self::NAME: self.target.name(),
                 "name": self.name.as_str(),
             },
         ))
@@ -200,13 +199,13 @@ impl OperationWithDefaults for DropSearchIndex {
         false
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for DropSearchIndex {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        (&self.ns).into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for DropSearchIndex {}

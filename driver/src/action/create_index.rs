@@ -134,7 +134,7 @@ impl<'a> Action for CreateIndex<'a, Multiple> {
     async fn execute(mut self) -> Result<CreateIndexesResult> {
         resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref());
 
-        let op = Op::new(self.coll.namespace(), self.indexes, self.options);
+        let op = Op::new(self.coll.clone(), self.indexes, self.options);
         self.coll.client().execute_operation(op, self.session).await
     }
 }

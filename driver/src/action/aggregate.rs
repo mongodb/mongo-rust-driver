@@ -176,7 +176,7 @@ macro_rules! agg_exec_generic {
         );
 
         let mut aggregate = crate::operation::aggregate::Aggregate::new(
-            $agg.target.target(),
+            (&$agg.target).into(),
             $agg.pipeline,
             $agg.options,
         );
@@ -227,7 +227,7 @@ macro_rules! agg_exec_generic_session {
         );
 
         let mut aggregate = crate::operation::aggregate::Aggregate::new(
-            $agg.target.target(),
+            (&$agg.target).into(),
             $agg.pipeline,
             $agg.options,
         );
@@ -262,13 +262,6 @@ enum AggregateTargetRef<'a> {
 }
 
 impl AggregateTargetRef<'_> {
-    fn target(&self) -> OperationTarget {
-        match self {
-            Self::Collection(cr) => OperationTarget::Collection((*cr).clone()),
-            Self::Database(db) => OperationTarget::Database((*db).clone()),
-        }
-    }
-
     fn client(&self) -> &Client {
         match self {
             Self::Collection(cr) => cr.client(),
@@ -294,6 +287,15 @@ impl AggregateTargetRef<'_> {
         match self {
             Self::Collection(cr) => cr.selection_criteria(),
             Self::Database(db) => db.selection_criteria(),
+        }
+    }
+}
+
+impl From<&AggregateTargetRef<'_>> for OperationTarget {
+    fn from(value: &AggregateTargetRef<'_>) -> Self {
+        match value {
+            AggregateTargetRef::Collection(cr) => OperationTarget::Collection((*cr).clone()),
+            AggregateTargetRef::Database(db) => OperationTarget::Database((*db).clone()),
         }
     }
 }

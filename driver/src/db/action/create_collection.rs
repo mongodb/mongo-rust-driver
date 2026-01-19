@@ -1,5 +1,6 @@
 use crate::{
     action::{action_impl, CreateCollection},
+    bson::Document,
     error::Result,
     operation::create as op,
     Database,
@@ -13,10 +14,8 @@ impl<'a> Action for CreateCollection<'a> {
     async fn execute(mut self) -> Result<()> {
         resolve_options!(self.db, self.options, [write_concern]);
 
-        let ns = Namespace {
-            db: self.db.name().to_string(),
-            coll: self.name,
-        };
+        let coll = self.db.collection::<Document>(&self.name);
+        let ns = coll.namespace();
 
         #[cfg(feature = "in-use-encryption")]
         let has_encrypted_fields = {
@@ -32,7 +31,7 @@ impl<'a> Action for CreateCollection<'a> {
                 .is_some()
         };
 
-        let create = op::Create::new(ns.clone(), self.options);
+        let create = op::Create::new(coll, self.options);
         self.db
             .client()
             .execute_operation(create, self.session.as_deref_mut())
@@ -127,7 +126,11 @@ impl Database {
                 name: None,
                 v: None,
             });
-            let create = op::Create::new(ns, Some(sub_opts));
+            let coll = self
+                .client()
+                .database(&ns.db)
+                .collection::<Document>(&ns.coll);
+            let create = op::Create::new(coll, Some(sub_opts));
             self.client()
                 .execute_operation(create, session.as_deref_mut())
                 .await?;

@@ -110,6 +110,10 @@ impl OperationWithDefaults for CountDocuments {
         self.aggregate.supports_read_concern(description)
     }
 
+    fn target(&self) -> super::OperationTarget {
+        self.aggregate.target()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }

@@ -84,7 +84,7 @@ impl<'a> Action for ReplaceOne<'a> {
         resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref());
 
         let update = Op::with_replace_raw(
-            self.coll.namespace(),
+            self.coll.clone(),
             self.query,
             self.replacement?,
             false,

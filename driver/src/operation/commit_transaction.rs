@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, Client};
 
 use crate::{
     bson_compat::{cstr, CStr},
@@ -14,14 +14,14 @@ use super::{ExecutionContext, WriteConcernOnlyBody};
 
 pub(crate) struct CommitTransaction {
     options: Option<TransactionOptions>,
-    target: super::OperationTarget,
+    target: Client,
 }
 
 impl CommitTransaction {
-    pub(crate) fn new(client: &crate::Client, options: Option<TransactionOptions>) -> Self {
+    pub(crate) fn new(client: &Client, options: Option<TransactionOptions>) -> Self {
         Self {
             options,
-            target: super::OperationTarget::admin(client),
+            target: client.clone(),
         }
     }
 }
@@ -86,7 +86,7 @@ impl OperationWithDefaults for CommitTransaction {
     }
 
     fn target(&self) -> super::OperationTarget {
-        self.target.clone()
+        super::OperationTarget::admin(&self.target)
     }
 
     #[cfg(feature = "opentelemetry")]

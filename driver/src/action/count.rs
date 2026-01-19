@@ -112,7 +112,7 @@ impl<'a> Action for EstimatedDocumentCount<'a> {
 
     async fn execute(mut self) -> Result<u64> {
         resolve_options!(self.cr, self.options, [read_concern, selection_criteria]);
-        let op = crate::operation::count::Count::new(self.cr.namespace(), self.options);
+        let op = crate::operation::count::Count::new(self.cr.clone(), self.options);
         self.cr.client().execute_operation(op, None).await
     }
 }

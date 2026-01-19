@@ -1,16 +1,11 @@
 use std::time::Duration;
 
 use crate::{
-    bson::{rawdoc, RawBson},
+    bson::{rawdoc, Bson, RawBson},
     bson_compat::{cstr, CStr},
-    cursor::CursorReply,
-};
-
-use crate::{
-    bson::Bson,
     checked::Checked,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
-    cursor::CursorInformation,
+    cursor::{CursorInformation, CursorReply},
     error::Result,
     operation::OperationWithDefaults,
     options::SelectionCriteria,
@@ -117,16 +112,16 @@ impl OperationWithDefaults for GetMore<'_> {
         self.pinned_connection
     }
 
+    fn target(&self) -> super::OperationTarget {
+        super::OperationTarget::Disowned(self.ns.clone())
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for GetMore<'_> {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        (&self.ns).into()
-    }
-
     #[cfg(feature = "opentelemetry")]
     fn cursor_id(&self) -> Option<i64> {
         Some(self.cursor_id)

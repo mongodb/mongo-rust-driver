@@ -149,7 +149,7 @@ impl<'a> Action for Update<'a> {
         resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref());
 
         let op = Op::with_update(
-            self.coll.namespace(),
+            self.coll.clone(),
             self.query,
             self.update,
             self.multi,

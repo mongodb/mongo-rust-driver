@@ -36,7 +36,7 @@ impl<T: DeserializeOwned + Send + Sync> Collection<T> {
     ) -> Result<Option<T>> {
         resolve_write_concern_with_session!(self, options, session.as_ref());
 
-        let op = Op::<T>::with_modification(self.namespace(), filter, modification, options)?;
+        let op = Op::<T>::with_modification(self.clone_with_type(), filter, modification, options)?;
         self.client().execute_operation(op, session).await
     }
 

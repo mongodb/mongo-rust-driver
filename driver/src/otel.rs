@@ -308,6 +308,10 @@ impl OperationTarget {
                 database: coll.db().name(),
                 collection: Some(coll.name()),
             },
+            OperationTarget::Disowned(ns) => TargetName {
+                database: &ns.db,
+                collection: Some(&ns.coll),
+            },
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, Client};
 use serde::Deserialize;
 
 use crate::{
@@ -15,13 +15,18 @@ use super::{append_options_to_raw_document, ExecutionContext};
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
+    client: Client,
     name_only: bool,
     options: Option<ListDatabasesOptions>,
 }
 
 impl ListDatabases {
-    pub fn new(name_only: bool, options: Option<ListDatabasesOptions>) -> Self {
-        ListDatabases { name_only, options }
+    pub fn new(client: Client, name_only: bool, options: Option<ListDatabasesOptions>) -> Self {
+        ListDatabases {
+            client,
+            name_only,
+            options,
+        }
     }
 }
 
@@ -58,16 +63,16 @@ impl OperationWithDefaults for ListDatabases {
         Retryability::Read
     }
 
+    fn target(&self) -> super::OperationTarget {
+        super::OperationTarget::admin(&self.client)
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for ListDatabases {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        crate::otel::TargetName::ADMIN
-    }
-}
+impl crate::otel::OtelInfoDefaults for ListDatabases {}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Response {

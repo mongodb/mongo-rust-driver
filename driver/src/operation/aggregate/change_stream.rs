@@ -138,6 +138,10 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         self.inner.retryability()
     }
 
+    fn target(&self) -> crate::operation::OperationTarget {
+        self.inner.target()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }

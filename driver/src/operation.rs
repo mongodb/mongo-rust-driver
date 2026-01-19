@@ -58,6 +58,7 @@ use crate::{
     ClientSession,
     Collection,
     Database,
+    Namespace,
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
@@ -202,6 +203,7 @@ pub(crate) enum OperationTarget {
     Null,
     Database(Database),
     Collection(crate::Collection<Document>),
+    Disowned(Namespace),
 }
 
 impl OperationTarget {
@@ -211,7 +213,7 @@ impl OperationTarget {
 
     pub(crate) fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         match self {
-            Self::Null => None,
+            Self::Null | Self::Disowned(_) => None,
             Self::Database(db) => db.selection_criteria(),
             Self::Collection(coll) => coll.selection_criteria(),
         }
@@ -343,9 +345,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         Self::NAME
     }
 
-    fn target(&self) -> OperationTarget {
-        OperationTarget::Null
-    }
+    fn target(&self) -> OperationTarget;
 
     #[cfg(feature = "opentelemetry")]
     type Otel: crate::otel::OtelWitness<Op = Self>;

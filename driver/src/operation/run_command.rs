@@ -100,13 +100,13 @@ impl OperationWithDefaults for RunCommand<'_> {
         self.pinned_connection
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.db).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for RunCommand<'_> {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        self.db.name().into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for RunCommand<'_> {}

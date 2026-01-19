@@ -100,7 +100,7 @@ pub struct ListIndexes<'a, Mode = ListSpecifications, Session = ImplicitSession>
 #[export_doc(list_indexes, extra = [session, batch])]
 impl<'a, Session: ActionSession<'a>> ListIndexes<'a, ListSpecifications, Session> {
     async fn exec_generic<C: crate::cursor::NewCursor>(self) -> Result<C> {
-        let mut op = Op::new(self.coll.namespace(), self.options);
+        let mut op = Op::new(self.coll.clone(), self.options);
         self.coll
             .client()
             .execute_cursor_operation(&mut op, self.session.into_opt_session())
@@ -157,7 +157,7 @@ impl<'a> Action for ListIndexes<'a, ListSpecifications, ExplicitSession<'a>> {
     type Future = ListIndexesSessionFuture;
 
     async fn execute(self) -> Result<SessionCursor<IndexModel>> {
-        let mut op = Op::new(self.coll.namespace(), self.options);
+        let mut op = Op::new(self.coll.clone(), self.options);
         self.coll
             .client()
             .execute_cursor_operation(&mut op, Some(self.session.0))

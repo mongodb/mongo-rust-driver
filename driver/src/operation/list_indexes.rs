@@ -1,6 +1,5 @@
-use crate::bson::rawdoc;
-
 use crate::{
+    bson::{rawdoc, Document},
     bson_compat::{cstr, CStr},
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -9,19 +8,19 @@ use crate::{
     operation::OperationWithDefaults,
     options::ListIndexesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
-    Namespace,
+    Collection,
 };
 
 use super::{append_options_to_raw_document, ExecutionContext, Retryability};
 
 pub(crate) struct ListIndexes {
-    ns: Namespace,
+    target: Collection<Document>,
     options: Option<ListIndexesOptions>,
 }
 
 impl ListIndexes {
-    pub(crate) fn new(ns: Namespace, options: Option<ListIndexesOptions>) -> Self {
-        ListIndexes { ns, options }
+    pub(crate) fn new(target: Collection<Document>, options: Option<ListIndexesOptions>) -> Self {
+        ListIndexes { target, options }
     }
 }
 
@@ -34,7 +33,7 @@ impl OperationWithDefaults for ListIndexes {
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
-            Self::NAME: self.ns.coll.clone(),
+            Self::NAME: self.target.name(),
         };
         if let Some(size) = self.options.as_ref().and_then(|o| o.batch_size) {
             let size = Checked::from(size).try_into::<i32>()?;
@@ -42,7 +41,7 @@ impl OperationWithDefaults for ListIndexes {
         }
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(Self::NAME, &self.ns.db, body))
+        Ok(Command::new(Self::NAME, &self.target.db().name(), body))
     }
 
     fn handle_response_cow<'a>(
@@ -71,6 +70,10 @@ impl OperationWithDefaults for ListIndexes {
         Retryability::Read
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
@@ -79,9 +82,5 @@ impl OperationWithDefaults for ListIndexes {
 impl crate::otel::OtelInfoDefaults for ListIndexes {
     fn output_cursor_id(output: &Self::O) -> Option<i64> {
         Some(output.id())
-    }
-
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        (&self.ns).into()
     }
 }

@@ -114,8 +114,7 @@ impl<'a, M> ListCollections<'a, M, ImplicitSession> {
 #[export_doc(list_collections, extra = [session, batch])]
 impl<'a, S: ActionSession<'a>> ListCollections<'a, ListSpecifications, S> {
     async fn exec_generic<C: crate::cursor::NewCursor>(self) -> Result<C> {
-        let mut list_collections =
-            op::ListCollections::new(self.db.name().to_string(), false, self.options);
+        let mut list_collections = op::ListCollections::new(self.db.clone(), false, self.options);
         self.db
             .client()
             .execute_cursor_operation(&mut list_collections, self.session.into_opt_session())
@@ -180,8 +179,7 @@ impl<'a> Action for ListCollections<'a, ListNames, ImplicitSession> {
     type Future = ListCollectionNamesFuture;
 
     async fn execute(self) -> Result<Vec<String>> {
-        let mut list_collections =
-            op::ListCollections::new(self.db.name().to_string(), true, self.options);
+        let mut list_collections = op::ListCollections::new(self.db.clone(), true, self.options);
         let cursor: Cursor<Document> = self
             .db
             .client()
@@ -196,8 +194,7 @@ impl<'a> Action for ListCollections<'a, ListNames, ExplicitSession<'a>> {
     type Future = ListCollectionNamesSessionFuture;
 
     async fn execute(self) -> Result<Vec<String>> {
-        let mut list_collections =
-            op::ListCollections::new(self.db.name().to_string(), true, self.options);
+        let mut list_collections = op::ListCollections::new(self.db.clone(), true, self.options);
         let mut cursor: SessionCursor<Document> = self
             .db
             .client()

@@ -4,16 +4,17 @@ use crate::{
     bson::{doc, rawdoc, Bson, Document, RawBsonRef, RawDocumentBuf},
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
-    coll::{options::DistinctOptions, Namespace},
+    coll::options::DistinctOptions,
     error::Result,
     operation::{OperationWithDefaults, Retryability},
     selection_criteria::SelectionCriteria,
+    Collection,
 };
 
 use super::{append_options_to_raw_document, ExecutionContext};
 
 pub(crate) struct Distinct {
-    ns: Namespace,
+    target: Collection<Document>,
     field_name: String,
     query: Document,
     options: Option<DistinctOptions>,
@@ -21,13 +22,13 @@ pub(crate) struct Distinct {
 
 impl Distinct {
     pub fn new(
-        ns: Namespace,
+        target: Collection<Document>,
         field_name: String,
         query: Document,
         options: Option<DistinctOptions>,
     ) -> Self {
         Distinct {
-            ns,
+            target,
             field_name,
             query,
             options,
@@ -42,7 +43,7 @@ impl OperationWithDefaults for Distinct {
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
-            Self::NAME: self.ns.coll.clone(),
+            Self::NAME: self.target.name(),
             "key": self.field_name.clone(),
             "query": RawDocumentBuf::try_from(&self.query)?,
         };
@@ -51,7 +52,7 @@ impl OperationWithDefaults for Distinct {
 
         Ok(Command::new_read(
             Self::NAME,
-            &self.ns.db,
+            &self.target.db().name(),
             self.options.as_ref().and_then(|o| o.read_concern.clone()),
             body,
         ))
@@ -90,16 +91,16 @@ impl OperationWithDefaults for Distinct {
         true
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for Distinct {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        (&self.ns).into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for Distinct {}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Response {

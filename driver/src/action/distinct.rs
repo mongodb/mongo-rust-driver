@@ -79,7 +79,7 @@ impl<'a> Action for Distinct<'a> {
         resolve_selection_criteria_with_session!(self.coll, self.options, self.session.as_ref());
 
         let op = Op::new(
-            self.coll.namespace(),
+            self.coll.clone(),
             self.field_name,
             self.filter,
             self.options,

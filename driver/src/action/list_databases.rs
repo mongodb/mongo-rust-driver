@@ -99,7 +99,7 @@ impl<'a> Action for ListDatabases<'a, ListSpecifications> {
     type Future = ListDatabasesFuture;
 
     async fn execute(self) -> Result<Vec<DatabaseSpecification>> {
-        let op = op::ListDatabases::new(false, self.options);
+        let op = op::ListDatabases::new(self.client.clone(), false, self.options);
         self.client
             .execute_operation(op, self.session)
             .await
@@ -119,7 +119,7 @@ impl<'a> Action for ListDatabases<'a, ListNames> {
     type Future = ListDatabaseNamesFuture;
 
     async fn execute(self) -> Result<Vec<String>> {
-        let op = op::ListDatabases::new(true, self.options);
+        let op = op::ListDatabases::new(self.client.clone(), true, self.options);
         match self.client.execute_operation(op, self.session).await {
             Ok(databases) => databases
                 .into_iter()

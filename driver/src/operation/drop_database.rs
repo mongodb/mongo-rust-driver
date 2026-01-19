@@ -1,4 +1,4 @@
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, Database};
 
 use crate::{
     bson_compat::{cstr, CStr},
@@ -13,12 +13,12 @@ use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct DropDatabase {
-    target_db: String,
+    target_db: Database,
     options: Option<DropDatabaseOptions>,
 }
 
 impl DropDatabase {
-    pub(crate) fn new(target_db: String, options: Option<DropDatabaseOptions>) -> Self {
+    pub(crate) fn new(target_db: Database, options: Option<DropDatabaseOptions>) -> Self {
         Self { target_db, options }
     }
 }
@@ -35,7 +35,7 @@ impl OperationWithDefaults for DropDatabase {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(Self::NAME, &self.target_db, body))
+        Ok(Command::new(Self::NAME, self.target_db.name(), body))
     }
 
     fn handle_response<'a>(
@@ -53,13 +53,13 @@ impl OperationWithDefaults for DropDatabase {
             .and_then(|opts| opts.write_concern.as_ref())
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.target_db).into()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for DropDatabase {
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        self.target_db.as_str().into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for DropDatabase {}

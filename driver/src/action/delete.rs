@@ -110,7 +110,7 @@ impl<'a> Action for Delete<'a> {
     async fn execute(mut self) -> Result<DeleteResult> {
         resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref());
 
-        let op = Op::new(self.coll.namespace(), self.query, self.limit, self.options);
+        let op = Op::new(self.coll.clone(), self.query, self.limit, self.options);
         self.coll.client().execute_operation(op, self.session).await
     }
 }

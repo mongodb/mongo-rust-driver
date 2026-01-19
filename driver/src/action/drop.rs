@@ -66,7 +66,7 @@ impl<'a> Action for DropDatabase<'a> {
 
     async fn execute(mut self) -> Result<()> {
         resolve_options!(self.db, self.options, [write_concern]);
-        let op = drop_database::DropDatabase::new(self.db.name().to_string(), self.options);
+        let op = drop_database::DropDatabase::new(self.db.clone(), self.options);
         self.db.client().execute_operation(op, self.session).await
     }
 }
