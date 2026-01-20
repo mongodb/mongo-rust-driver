@@ -155,6 +155,29 @@ impl Client {
             write_concern.validate()?;
         }
 
+        let op_target;
+        let selection_criteria = match op.selection_criteria() {
+            Feature::Set(s) => Some(s),
+            Feature::NotSupported => None,
+            Feature::Inherit => {
+                op_target = op.target();
+                session
+                    .as_ref()
+                    .and_then(|s| {
+                        if s.in_transaction() {
+                            s.transaction
+                                .options
+                                .as_ref()
+                                .and_then(|o| o.selection_criteria.as_ref())
+                        } else {
+                            None
+                        }
+                    })
+                    .or_else(|| op_target.selection_criteria())
+            }
+        }
+        .cloned();
+
         // Validate the session and update its transaction status if needed.
         if let Some(ref mut session) = session {
             if !TrackingArc::ptr_eq(&self.inner, &session.client().inner) {
@@ -162,6 +185,17 @@ impl Client {
                     "the session provided to an operation must be created from the same client as \
                      the collection/database on which the operation is being performed",
                 ));
+            }
+            if selection_criteria
+                .as_ref()
+                .and_then(|sc| sc.as_read_pref())
+                .is_some_and(|rp| rp != &ReadPreference::Primary)
+                && session.in_transaction()
+            {
+                return Err(ErrorKind::Transaction {
+                    message: "read preference in a transaction must be primary".into(),
+                }
+                .into());
             }
             // If the current transaction has been committed/aborted and it is not being
             // re-committed/re-aborted, reset the transaction's state to None.
@@ -176,7 +210,11 @@ impl Client {
             }
         }
 
-        Box::pin(async { self.execute_operation_with_retry(op, session).await }).await
+        Box::pin(async {
+            self.execute_operation_with_retry(op, selection_criteria, session)
+                .await
+        })
+        .await
     }
 
     /// Execute the given operation, returning the cursor created by the operation.
@@ -311,54 +349,21 @@ impl Client {
     async fn execute_operation_with_retry<T: Operation>(
         &self,
         op: &mut T,
+        selection_criteria: Option<SelectionCriteria>,
         mut session: Option<&mut ClientSession>,
     ) -> Result<ExecutionDetails<T>> {
         let mut retry: Option<ExecutionRetry> = None;
         let mut implicit_session: Option<ClientSession> = None;
+
         loop {
             if retry.is_some() {
                 op.update_for_retry();
             }
 
-            // Selection criteria priority list:
-            // * Pinned mongos
-            let mut selection_criteria =
-                session.as_ref().and_then(|s| s.transaction.pinned_mongos());
-            let op_target;
-            if selection_criteria.is_none() {
-                selection_criteria = match op.selection_criteria() {
-                    // * Explicitly set on operation
-                    Feature::Set(s) => Some(s),
-                    Feature::NotSupported => None,
-                    Feature::Inherit => {
-                        op_target = op.target();
-                        // * Inherit from active transaction
-                        session.as_ref().and_then(|s| {
-                            if s.in_transaction() {
-                                s
-                                        .transaction
-                                        .options
-                                        .as_ref()
-                                        .and_then(|o| o.selection_criteria.as_ref())
-                            } else {
-                                None
-                            }
-                        })
-                        // * Inherit from operation target
-                        .or_else(|| op_target.selection_criteria())
-                    }
-                };
-            }
-            if selection_criteria
-                .and_then(|sc| sc.as_read_pref())
-                .is_some_and(|rp| rp != &ReadPreference::Primary)
-                && session.as_ref().map_or(false, |s| s.in_transaction())
-            {
-                return Err(ErrorKind::Transaction {
-                    message: "read preference in a transaction must be primary".into(),
-                }
-                .into());
-            }
+            let selection_criteria = session
+                .as_ref()
+                .and_then(|s| s.transaction.pinned_mongos())
+                .or_else(|| selection_criteria.as_ref());
 
             let (server, effective_criteria) = match self
                 .select_server(
