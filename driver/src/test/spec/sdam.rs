@@ -370,7 +370,6 @@ async fn connection_pool_backpressure() {
             _ => None,
         });
         if !pool_cleared_events.is_empty() {
-            dbg!(&pool_cleared_events);
             return Err(Error::internal(format!(
                 "expected no pool cleared events, got {}",
                 pool_cleared_events.len()
