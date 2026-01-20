@@ -119,12 +119,19 @@ impl AsyncStream {
                     }
                     .into());
                 }
-                let inner = tcp_connect(resolved).await?;
+                let tcp_stream = tcp_connect(resolved)
+                    .await
+                    .map_err(Error::with_backpressure_labels)?;
 
-                // If there are TLS options, wrap the inner stream in an AsyncTlsStream.
+                // If there are TLS options, wrap the TCP stream in an AsyncTlsStream.
                 match tls_cfg {
-                    Some(cfg) => Ok(AsyncStream::Tls(tls_connect(host, inner, cfg).await?)),
-                    None => Ok(AsyncStream::Tcp(inner)),
+                    Some(cfg) => {
+                        let tls_stream = tls_connect(host, tcp_stream, cfg)
+                            .await
+                            .map_err(Error::with_backpressure_labels)?;
+                        Ok(AsyncStream::Tls(tls_stream))
+                    }
+                    None => Ok(AsyncStream::Tcp(tcp_stream)),
                 }
             }
             #[cfg(unix)]

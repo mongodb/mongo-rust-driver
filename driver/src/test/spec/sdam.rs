@@ -1,22 +1,25 @@
 use std::time::Duration;
 
-use crate::bson::{doc, Document};
-
 use crate::{
-    event::sdam::SdamEvent,
+    bson::{doc, Document},
+    error::{Error, Result},
+    event::{cmap::CmapEvent, sdam::SdamEvent},
     hello::LEGACY_HELLO_COMMAND_NAME,
     runtime,
     test::{
         get_client_options,
         log_uncaptured,
+        server_version_lt,
         spec::unified_runner::run_unified_tests,
         streaming_monitor_protocol_supported,
         topology_is_load_balanced,
+        topology_is_sharded,
         util::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
         },
         Event,
+        EventClient,
     },
     Client,
 };
@@ -40,6 +43,7 @@ async fn run_unified() {
             // The driver does not support socketTimeoutMS.
             "Reset server and pool after network timeout error during authentication",
             "Ignore network timeout error on find",
+            "apply backpressure on network timeout error during connection establishment",
             // TODO RUST-2068: unskip these tests
             "Pool is cleared on handshake error during minPoolSize population",
             "Pool is cleared on authentication error during minPoolSize population",
@@ -290,3 +294,101 @@ async fn heartbeat_started_before_socket() {
     );
 }
 */
+
+#[tokio::test(flavor = "multi_thread")]
+async fn connection_pool_backpressure() {
+    if server_version_lt(7, 0).await {
+        log_uncaptured("skipping connection_pool_backpressure: requires 7.0+");
+        return;
+    }
+
+    let mut options = get_client_options().await.clone();
+    options.max_connecting = Some(100);
+    // the driver has a default max pool size of 10 rather than the spec's default of 100
+    options.max_pool_size = Some(100);
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
+    let client = Client::for_test().options(options).monitor_events().await;
+
+    async fn run_test(client: &EventClient) -> Result<()> {
+        let admin = client.database("admin");
+        admin
+            .run_command(doc! {
+                "setParameter": 1,
+                "ingressConnectionEstablishmentRateLimiterEnabled": true,
+            })
+            .await?;
+        admin
+            .run_command(doc! {
+                "setParameter": 1,
+                "ingressConnectionEstablishmentRatePerSec": 20,
+            })
+            .await?;
+        admin
+            .run_command(doc! {
+                "setParameter": 1,
+                "ingressConnectionEstablishmentBurstCapacitySecs": 1,
+            })
+            .await?;
+        admin
+            .run_command(doc! {
+                "setParameter": 1,
+                "ingressConnectionEstablishmentMaxQueueDepth": 1,
+            })
+            .await?;
+
+        let coll = client.database("test").collection("test");
+        coll.insert_one(doc! {}).await?;
+
+        let mut tasks = Vec::new();
+        for _ in 0..100 {
+            let coll = coll.clone();
+            tasks.push(tokio::task::spawn(async move {
+                let _ = coll
+                    .find_one(doc! { "$where": "sleep(2000) || true" })
+                    .await;
+            }));
+        }
+        futures::future::join_all(tasks).await;
+
+        let events = &client.events;
+
+        let checkout_failed_events = events.filter_map(|e| match e {
+            Event::Cmap(CmapEvent::ConnectionCheckoutFailed(e)) => Some(e.clone()),
+            _ => None,
+        });
+        if checkout_failed_events.len() < 10 {
+            return Err(Error::internal(format!(
+                "expected >= 10 checkout failed events, got {}",
+                checkout_failed_events.len()
+            )));
+        }
+
+        let pool_cleared_events = events.filter_map(|e| match e {
+            Event::Cmap(CmapEvent::PoolCleared(e)) => Some(e.clone()),
+            _ => None,
+        });
+        if !pool_cleared_events.is_empty() {
+            return Err(Error::internal(format!(
+                "expected no pool cleared events, got {}",
+                pool_cleared_events.len()
+            )));
+        }
+
+        Ok(())
+    }
+    let result = run_test(&client).await;
+
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    client
+        .database("admin")
+        .run_command(doc! {
+            "setParameter": 1,
+            "ingressConnectionEstablishmentRateLimiterEnabled": false,
+        })
+        .await
+        .unwrap();
+
+    result.unwrap();
+}

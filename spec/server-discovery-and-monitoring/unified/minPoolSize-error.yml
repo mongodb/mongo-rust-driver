@@ -21,7 +21,7 @@ initialData: &initialData
     documents: []
 
 tests:
-  - description: Network error on minPoolSize background creation
+  - description: Server error on minPoolSize background creation
     operations:
       # Configure the initial monitor handshake to succeed but the
       # first or second background minPoolSize establishments to fail.
@@ -38,7 +38,7 @@ tests:
                 - hello
                 - isMaster
               appName: SDAMminPoolSizeError
-              closeConnection: true
+              errorCode: 91
       - name: createEntities
         object: testRunner
         arguments:
@@ -54,6 +54,7 @@ tests:
                   heartbeatFrequencyMS: 10000
                   appname: SDAMminPoolSizeError
                   minPoolSize: 10
+                  serverMonitoringMode: poll
                   serverSelectionTimeoutMS: 1000
             - database:
                 id: &database database
