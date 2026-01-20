@@ -208,7 +208,7 @@ pub(crate) enum OperationTarget {
 
 impl OperationTarget {
     pub(crate) fn admin(client: &crate::Client) -> Self {
-        Self::Database(client.database("ADMIN"))
+        Self::Database(client.database("admin"))
     }
 
     pub(crate) fn selection_criteria(&self) -> Option<&SelectionCriteria> {
