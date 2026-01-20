@@ -1,4 +1,4 @@
-use crate::{bson::rawdoc, Collection};
+use crate::{bson::rawdoc, options::SelectionCriteria, Collection};
 use serde::Deserialize;
 
 use crate::{
@@ -8,7 +8,6 @@ use crate::{
     coll::options::EstimatedDocumentCountOptions,
     error::{Error, Result},
     operation::{OperationWithDefaults, Retryability},
-    selection_criteria::SelectionCriteria,
 };
 
 use super::{append_options_to_raw_document, ExecutionContext};
@@ -64,11 +63,11 @@ impl OperationWithDefaults for Count {
         }
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        if let Some(ref options) = self.options {
-            return options.selection_criteria.as_ref();
-        }
-        None
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
+        self.options
+            .as_ref()
+            .and_then(|o| o.selection_criteria.as_ref())
+            .into()
     }
 
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {

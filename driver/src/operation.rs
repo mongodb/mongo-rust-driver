@@ -154,7 +154,7 @@ pub(crate) trait Operation {
     fn handle_error(&self, error: Error) -> Result<Self::O>;
 
     /// Criteria to use for selecting the server that this operation will be executed on.
-    fn selection_criteria(&self) -> Option<&SelectionCriteria>;
+    fn selection_criteria(&self) -> Feature<&SelectionCriteria>;
 
     /// Whether or not this operation will request acknowledgment from the server.
     fn is_acknowledged(&self) -> bool;
@@ -192,6 +192,31 @@ pub(crate) trait Operation {
     #[cfg(feature = "opentelemetry")]
     fn otel(&self) -> &impl crate::otel::OtelInfo {
         <Self::Otel as crate::otel::OtelWitness>::otel(self)
+    }
+}
+
+pub(crate) enum Feature<T> {
+    Set(T),
+    Inherit,
+    NotSupported,
+}
+
+impl<T> From<Option<T>> for Feature<T> {
+    fn from(value: Option<T>) -> Self {
+        match value {
+            Some(c) => Self::Set(c),
+            None => Self::Inherit,
+        }
+    }
+}
+
+impl<T> Feature<T> {
+    pub(crate) fn and_then<U>(self, f: impl FnOnce(T) -> Option<U>) -> Option<U> {
+        match self {
+            Self::Set(v) => f(v),
+            Self::Inherit => None,
+            Self::NotSupported => None,
+        }
     }
 }
 
@@ -296,8 +321,8 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     }
 
     /// Criteria to use for selecting the server that this operation will be executed on.
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        None
+    fn selection_criteria(&self) -> Feature<&SelectionCriteria> {
+        Feature::NotSupported
     }
 
     /// Whether or not this operation will request acknowledgment from the server.
@@ -374,7 +399,7 @@ where
     fn handle_error(&self, error: Error) -> Result<Self::O> {
         self.handle_error(error)
     }
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+    fn selection_criteria(&self) -> Feature<&SelectionCriteria> {
         self.selection_criteria()
     }
     fn is_acknowledged(&self) -> bool {

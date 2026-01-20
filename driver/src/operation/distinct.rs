@@ -7,7 +7,7 @@ use crate::{
     coll::options::DistinctOptions,
     error::Result,
     operation::{OperationWithDefaults, Retryability},
-    selection_criteria::SelectionCriteria,
+    options::SelectionCriteria,
     Collection,
 };
 
@@ -76,11 +76,11 @@ impl OperationWithDefaults for Distinct {
         Ok(response.values)
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        if let Some(ref options) = self.options {
-            return options.selection_criteria.as_ref();
-        }
-        None
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
+        self.options
+            .as_ref()
+            .and_then(|o| o.selection_criteria.as_ref())
+            .into()
     }
 
     fn retryability(&self) -> Retryability {

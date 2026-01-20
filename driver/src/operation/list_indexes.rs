@@ -62,8 +62,8 @@ impl OperationWithDefaults for ListIndexes {
         )
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        Some(SelectionCriteria::ReadPreference(ReadPreference::Primary)).as_ref()
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
+        super::Feature::Set(&SelectionCriteria::ReadPreference(ReadPreference::Primary))
     }
 
     fn retryability(&self) -> Retryability {

@@ -7,8 +7,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, Result},
     operation::aggregate::Aggregate,
-    options::{AggregateOptions, CountOptions},
-    selection_criteria::SelectionCriteria,
+    options::{AggregateOptions, CountOptions, SelectionCriteria},
 };
 
 use super::{ExecutionContext, OperationWithDefaults, Retryability, SingleCursorResult};
@@ -98,8 +97,8 @@ impl OperationWithDefaults for CountDocuments {
         Ok(response.0.map(|r| r.n).unwrap_or(0))
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        self.aggregate.selection_criteria()
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
+        self.aggregate.selection_criteria().into()
     }
 
     fn retryability(&self) -> Retryability {

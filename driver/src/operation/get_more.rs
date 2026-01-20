@@ -104,8 +104,8 @@ impl OperationWithDefaults for GetMore<'_> {
         })
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        Some(&self.selection_criteria)
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
+        super::Feature::Set(&self.selection_criteria)
     }
 
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {

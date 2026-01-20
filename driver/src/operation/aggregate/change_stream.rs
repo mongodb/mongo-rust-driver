@@ -122,7 +122,7 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         Ok((spec, data))
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+    fn selection_criteria(&self) -> crate::operation::Feature<&SelectionCriteria> {
         self.inner.selection_criteria()
     }
 

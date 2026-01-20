@@ -1,14 +1,13 @@
-use crate::{bson::rawdoc, Client};
-
 use crate::{
+    bson::rawdoc,
     bson_compat::{cstr, CStr},
     bson_util::append_ser,
     client::session::TransactionPin,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::Retryability,
-    options::WriteConcern,
-    selection_criteria::SelectionCriteria,
+    options::{SelectionCriteria, WriteConcern},
+    Client,
 };
 
 use super::{ExecutionContext, OperationWithDefaults, WriteConcernOnlyBody};
@@ -60,10 +59,10 @@ impl OperationWithDefaults for AbortTransaction {
         response.validate()
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
         match &self.pinned {
-            Some(TransactionPin::Mongos(s)) => Some(s),
-            _ => None,
+            Some(TransactionPin::Mongos(s)) => super::Feature::Set(s),
+            _ => super::Feature::NotSupported,
         }
     }
 

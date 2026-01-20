@@ -1,12 +1,12 @@
-use crate::{bson::rawdoc, Database};
-
 use crate::{
+    bson::rawdoc,
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
     operation::{OperationWithDefaults, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
+    Database,
 };
 
 use super::{append_options_to_raw_document, ExecutionContext};
@@ -75,8 +75,8 @@ impl OperationWithDefaults for ListCollections {
         )
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        Some(SelectionCriteria::ReadPreference(ReadPreference::Primary)).as_ref()
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
+        super::Feature::Set(&SelectionCriteria::ReadPreference(ReadPreference::Primary))
     }
 
     fn retryability(&self) -> Retryability {

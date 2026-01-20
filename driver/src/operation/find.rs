@@ -120,10 +120,11 @@ impl OperationWithDefaults for Find {
         true
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
         self.options
             .as_ref()
             .and_then(|opts| opts.selection_criteria.as_ref())
+            .into()
     }
 
     fn retryability(&self) -> Retryability {

@@ -84,8 +84,13 @@ impl OperationWithDefaults for RunCommand<'_> {
         Ok(response.raw_body().try_into()?)
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        self.selection_criteria.as_ref()
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
+        // Per spec, runCommand MUST ignore any default read preference from client, database or
+        // collection configuration
+        match &self.selection_criteria {
+            Some(s) => super::Feature::Set(s),
+            None => super::Feature::NotSupported,
+        }
     }
 
     fn supports_sessions(&self) -> bool {

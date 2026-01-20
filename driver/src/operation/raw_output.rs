@@ -4,6 +4,7 @@ use crate::{
     bson_compat::CStr,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
+    options::SelectionCriteria,
     BoxFuture,
 };
 
@@ -42,7 +43,7 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         Err(error)
     }
 
-    fn selection_criteria(&self) -> Option<&crate::selection_criteria::SelectionCriteria> {
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
         self.0.selection_criteria()
     }
 

@@ -7,8 +7,7 @@ use crate::{
     cursor::CursorSpecification,
     error::{Error, Result},
     operation::{run_command::RunCommand, Operation, SERVER_4_4_0_WIRE_VERSION},
-    options::RunCursorCommandOptions,
-    selection_criteria::SelectionCriteria,
+    options::{RunCursorCommandOptions, SelectionCriteria},
     BoxFuture,
 };
 
@@ -54,7 +53,7 @@ impl Operation for RunCursorCommand<'_> {
         Err(error)
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
         self.run_command.selection_criteria()
     }
 

@@ -3,7 +3,7 @@ use crate::bson::RawDocumentBuf;
 use crate::{
     bson::{doc, RawBsonRef, RawDocument, Timestamp},
     cursor::{CursorInformation, CursorSpecification},
-    operation::OperationTarget,
+    operation::{Feature, OperationTarget},
 };
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
@@ -335,27 +335,30 @@ impl Client {
             // * Pinned mongos
             let mut selection_criteria =
                 session.as_ref().and_then(|s| s.transaction.pinned_mongos());
-            // * Explicitly set on operation
-            if selection_criteria.is_none() {
-                selection_criteria = op.selection_criteria();
-            }
-            // * Inherit from active transaction
-            if selection_criteria.is_none() {
-                if let Some(s) = &session {
-                    if s.in_transaction() {
-                        selection_criteria = s
-                            .transaction
-                            .options
-                            .as_ref()
-                            .and_then(|o| o.selection_criteria.as_ref());
-                    }
-                }
-            }
-            // * Inherit from target
             let op_target;
             if selection_criteria.is_none() {
-                op_target = op.target();
-                selection_criteria = op_target.selection_criteria();
+                selection_criteria = match op.selection_criteria() {
+                    // * Explicitly set on operation
+                    Feature::Set(s) => Some(s),
+                    Feature::NotSupported => None,
+                    Feature::Inherit => {
+                        op_target = op.target();
+                        // * Inherit from active transaction
+                        session.as_ref().and_then(|s| {
+                            if s.in_transaction() {
+                                s
+                                        .transaction
+                                        .options
+                                        .as_ref()
+                                        .and_then(|o| o.selection_criteria.as_ref())
+                            } else {
+                                None
+                            }
+                        })
+                        // * Inherit from operation target
+                        .or_else(|| op_target.selection_criteria())
+                    }
+                };
             }
 
             let (server, effective_criteria) = match self
