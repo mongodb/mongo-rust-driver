@@ -296,10 +296,6 @@ fn record_error<T>(context: &Context, result: &Result<T>) {
 impl OperationTarget {
     fn name(&self) -> TargetName<'_> {
         match self {
-            OperationTarget::Null => TargetName {
-                database: "NULL",
-                collection: None,
-            },
             OperationTarget::Database(db) => TargetName {
                 database: db.name(),
                 collection: None,

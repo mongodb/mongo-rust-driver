@@ -114,37 +114,3 @@ macro_rules! resolve_rw_concern_with_session {
         }
     }};
 }
-
-/// Updates the selection criteria of an options struct. If a transaction is starting or in progress
-/// and the selection criteria is not configured directly on the operation, inherit the selection
-/// criteria from the transaction options. Otherwise, use the selection criteria defined on the
-/// operation or inherit it from the collection/database.
-macro_rules! resolve_selection_criteria_with_session {
-    ($obj:expr, $opts:expr, $session:expr) => {{
-        use crate::client::session::TransactionState;
-        if let Some(session) = $session {
-            match session.transaction.state {
-                TransactionState::Starting | TransactionState::InProgress => {
-                    if let Some(ref options) = session.transaction.options {
-                        if let Some(ref selection_criteria) = options.selection_criteria {
-                            if $opts
-                                .as_ref()
-                                .map(|opts| opts.selection_criteria.is_none())
-                                .unwrap_or(true)
-                            {
-                                $opts
-                                    .get_or_insert_with(Default::default)
-                                    .selection_criteria = Some(selection_criteria.clone());
-                            }
-                        }
-                    }
-                }
-                _ => {
-                    resolve_options!($obj, $opts, [selection_criteria]);
-                }
-            }
-        } else {
-            resolve_options!($obj, $opts, [selection_criteria]);
-        }
-    }};
-}

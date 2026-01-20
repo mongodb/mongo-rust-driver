@@ -220,11 +220,6 @@ macro_rules! agg_exec_generic_session {
     ($agg:expr) => {{
         resolve_read_concern_with_session!($agg.target, $agg.options, Some(&mut *$agg.session.0));
         resolve_write_concern_with_session!($agg.target, $agg.options, Some(&mut *$agg.session.0));
-        resolve_selection_criteria_with_session!(
-            $agg.target,
-            $agg.options,
-            Some(&mut *$agg.session.0)
-        );
 
         let mut aggregate = crate::operation::aggregate::Aggregate::new(
             (&$agg.target).into(),

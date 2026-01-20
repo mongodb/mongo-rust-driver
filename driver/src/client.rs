@@ -35,7 +35,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
     event::command::CommandEvent,
     id_set::IdSet,
-    operation::{OperationTarget, OverrideCriteriaFn},
+    operation::OverrideCriteriaFn,
     options::{
         ClientOptions,
         DatabaseOptions,
@@ -484,9 +484,8 @@ impl Client {
         deprioritized: &[&ServerAddress],
         op_info: OpSelectionInfo<'_>,
     ) -> Result<(SelectedServer, SelectionCriteria)> {
-        let criteria = criteria
-            .or_else(|| op_info.op_target.selection_criteria())
-            .unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
+        let criteria =
+            criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
 
         let start_time = Instant::now();
         let timeout = self
@@ -746,7 +745,6 @@ pub(crate) struct OpSelectionInfo<'a> {
     #[allow(unused)]
     name: &'a str,
     override_criteria: OverrideCriteriaFn,
-    op_target: OperationTarget,
 }
 
 impl<'a, T: crate::operation::Operation> From<&'a T> for OpSelectionInfo<'a> {
@@ -754,7 +752,6 @@ impl<'a, T: crate::operation::Operation> From<&'a T> for OpSelectionInfo<'a> {
         Self {
             name: crate::bson_compat::cstr_to_str(op.name()),
             override_criteria: op.override_criteria(),
-            op_target: op.target(),
         }
     }
 }
@@ -764,7 +761,6 @@ impl<'a> OpSelectionInfo<'a> {
         Self {
             name,
             override_criteria: |_, _| None,
-            op_target: crate::operation::OperationTarget::Null,
         }
     }
 }

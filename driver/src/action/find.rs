@@ -148,12 +148,6 @@ impl<'a, T: Send + Sync> Action for Find<'a, T, ExplicitSession<'a>> {
 impl<'a, T: Send + Sync> Find<'a, T, ExplicitSession<'a>> {
     async fn exec_generic<C: crate::cursor::NewCursor>(mut self) -> Result<C> {
         resolve_read_concern_with_session!(self.coll, self.options, Some(&mut *self.session.0));
-        resolve_selection_criteria_with_session!(
-            self.coll,
-            self.options,
-            Some(&mut *self.session.0)
-        );
-
         let mut find = Op::new(self.coll.clone_with_type(), self.filter, self.options);
         self.coll
             .client()

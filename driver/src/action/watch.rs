@@ -284,11 +284,6 @@ impl<'a, T: DeserializeOwned + Unpin + Send + Sync> Action for Watch<'a, T, Expl
 
     async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<T>>> {
         resolve_read_concern_with_session!(self.client, self.options, Some(&mut *self.session.0));
-        resolve_selection_criteria_with_session!(
-            self.client,
-            self.options,
-            Some(&mut *self.session.0)
-        );
         if self.cluster {
             self.options
                 .get_or_insert_with(Default::default)

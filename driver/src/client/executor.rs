@@ -163,17 +163,6 @@ impl Client {
                      the collection/database on which the operation is being performed",
                 ));
             }
-            if op
-                .selection_criteria()
-                .and_then(|sc| sc.as_read_pref())
-                .is_some_and(|rp| rp != &ReadPreference::Primary)
-                && session.in_transaction()
-            {
-                return Err(ErrorKind::Transaction {
-                    message: "read preference in a transaction must be primary".into(),
-                }
-                .into());
-            }
             // If the current transaction has been committed/aborted and it is not being
             // re-committed/re-aborted, reset the transaction's state to None.
             if matches!(
@@ -359,6 +348,16 @@ impl Client {
                         .or_else(|| op_target.selection_criteria())
                     }
                 };
+            }
+            if selection_criteria
+                .and_then(|sc| sc.as_read_pref())
+                .is_some_and(|rp| rp != &ReadPreference::Primary)
+                && session.as_ref().map_or(false, |s| s.in_transaction())
+            {
+                return Err(ErrorKind::Transaction {
+                    message: "read preference in a transaction must be primary".into(),
+                }
+                .into());
             }
 
             let (server, effective_criteria) = match self

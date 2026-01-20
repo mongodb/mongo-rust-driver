@@ -186,7 +186,6 @@ fn target_bson(target: &OperationTarget) -> Bson {
         OperationTarget::Database(_) => Bson::Int32(1),
         OperationTarget::Collection(coll) => Bson::String(coll.name().to_owned()),
         OperationTarget::Disowned(ns) => Bson::String(ns.coll.to_owned()),
-        OperationTarget::Null => panic!("invalid aggregate target"),
     }
 }
 
@@ -195,6 +194,5 @@ fn target_db_name(target: &OperationTarget) -> &str {
         OperationTarget::Database(db) => db.name(),
         OperationTarget::Collection(coll) => coll.db().name(),
         OperationTarget::Disowned(ns) => &ns.db,
-        OperationTarget::Null => panic!("invalid aggregate target"),
     }
 }

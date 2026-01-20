@@ -277,8 +277,7 @@ impl<'a> Action for RunCursorCommand<'a, ExplicitSession<'a>> {
 }
 
 impl<'a> RunCursorCommand<'a, ExplicitSession<'a>> {
-    async fn exec_generic<C: crate::cursor::NewCursor>(mut self) -> Result<C> {
-        resolve_selection_criteria_with_session!(self.db, self.options, Some(&mut *self.session.0));
+    async fn exec_generic<C: crate::cursor::NewCursor>(self) -> Result<C> {
         let selection_criteria = self
             .options
             .as_ref()

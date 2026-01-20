@@ -195,6 +195,7 @@ pub(crate) trait Operation {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub(crate) enum Feature<T> {
     Set(T),
     Inherit,
@@ -210,22 +211,11 @@ impl<T> From<Option<T>> for Feature<T> {
     }
 }
 
-impl<T> Feature<T> {
-    pub(crate) fn and_then<U>(self, f: impl FnOnce(T) -> Option<U>) -> Option<U> {
-        match self {
-            Self::Set(v) => f(v),
-            Self::Inherit => None,
-            Self::NotSupported => None,
-        }
-    }
-}
-
 pub(crate) type OverrideCriteriaFn =
     fn(&SelectionCriteria, &crate::sdam::TopologyDescription) -> Option<SelectionCriteria>;
 
 #[derive(Debug, Clone)]
 pub(crate) enum OperationTarget {
-    Null,
     Database(Database),
     Collection(crate::Collection<Document>),
     Disowned(Namespace),
@@ -238,7 +228,7 @@ impl OperationTarget {
 
     pub(crate) fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         match self {
-            Self::Null | Self::Disowned(_) => None,
+            Self::Disowned(_) => None,
             Self::Database(db) => db.selection_criteria(),
             Self::Collection(coll) => coll.selection_criteria(),
         }
