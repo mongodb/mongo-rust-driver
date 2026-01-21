@@ -725,7 +725,19 @@ impl Client {
     ) -> Result<crate::cmap::Command> {
         let stream_description = connection.stream_description()?;
         let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
+        // Validate user-set read concern
+        if session.as_ref().map_or(false, |s| s.in_transaction()) {
+            if matches!(op.read_concern(), Feature::Set(_)) {
+                return Err(Error::invalid_argument(
+                    "Cannot set read concern after starting a transaction",
+                ));
+            }
+        }
         let mut cmd = op.build(stream_description)?;
+        // Clear inherited read concern when in a transaction
+        if session.as_ref().map_or(false, |s| s.in_transaction()) {
+            cmd.clear_read_concern();
+        }
         self.inner.topology.watcher().update_command_with_read_pref(
             connection.address(),
             &mut cmd,

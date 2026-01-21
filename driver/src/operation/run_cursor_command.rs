@@ -61,6 +61,10 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.is_acknowledged()
     }
 
+    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
+        self.run_command.read_concern()
+    }
+
     fn write_concern(&self) -> Option<&WriteConcern> {
         self.run_command.write_concern()
     }

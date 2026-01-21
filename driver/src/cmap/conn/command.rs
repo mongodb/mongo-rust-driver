@@ -1,4 +1,7 @@
-use crate::bson::{RawDocument, RawDocumentBuf};
+use crate::{
+    bson::{RawDocument, RawDocumentBuf},
+    operation::{Feature, Operation},
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::wire::{message::DocumentSequence, Message};
@@ -99,6 +102,33 @@ impl Command {
         }
     }
 
+    pub(crate) fn new_read2<Op: Operation>(op: &Op, body: RawDocumentBuf) -> Self {
+        let target = op.target();
+        let read_concern = match op.read_concern() {
+            Feature::Set(v) => Some(v),
+            Feature::NotSupported => None,
+            Feature::Inherit => target.read_concern(),
+        }
+        .cloned()
+        .map(ReadConcernInternal::from);
+        Self {
+            name: crate::bson_compat::cstr_to_str(Op::NAME).to_owned(),
+            target_db: target.db_name().to_owned(),
+            exhaust_allowed: false,
+            body,
+            document_sequences: Vec::new(),
+            lsid: None,
+            cluster_time: None,
+            server_api: None,
+            read_preference: None,
+            txn_number: None,
+            start_transaction: None,
+            autocommit: None,
+            read_concern,
+            recovery_token: None,
+        }
+    }
+
     pub(crate) fn add_document_sequence(
         &mut self,
         identifier: impl ToString,
@@ -140,6 +170,10 @@ impl Command {
 
     pub(crate) fn set_autocommit(&mut self) {
         self.autocommit = Some(false);
+    }
+
+    pub(crate) fn clear_read_concern(&mut self) {
+        self.read_concern = None;
     }
 
     /// Sets the read concern level for this command.

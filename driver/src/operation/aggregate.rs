@@ -63,12 +63,7 @@ impl OperationWithDefaults for Aggregate {
             }
         }
 
-        Ok(Command::new_read(
-            Self::NAME,
-            target_db_name(&self.target),
-            self.options.as_ref().and_then(|o| o.read_concern.clone()),
-            (&body).try_into()?,
-        ))
+        Ok(Command::new_read2(self, (&body).try_into()?))
     }
 
     fn extract_at_cluster_time(
@@ -110,6 +105,13 @@ impl OperationWithDefaults for Aggregate {
         self.options
             .as_ref()
             .and_then(|opts| opts.selection_criteria.as_ref())
+            .into()
+    }
+
+    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
+        self.options
+            .as_ref()
+            .and_then(|opts| opts.read_concern.as_ref())
             .into()
     }
 
@@ -186,13 +188,5 @@ fn target_bson(target: &OperationTarget) -> Bson {
         OperationTarget::Database(_) => Bson::Int32(1),
         OperationTarget::Collection(coll) => Bson::String(coll.name().to_owned()),
         OperationTarget::Disowned(ns) => Bson::String(ns.coll.to_owned()),
-    }
-}
-
-fn target_db_name(target: &OperationTarget) -> &str {
-    match target {
-        OperationTarget::Database(db) => db.name(),
-        OperationTarget::Collection(coll) => coll.db().name(),
-        OperationTarget::Disowned(ns) => &ns.db,
     }
 }

@@ -52,7 +52,7 @@ use crate::{
         WriteConcernError,
         WriteFailure,
     },
-    options::{ClientOptions, WriteConcern},
+    options::{ClientOptions, ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
     BoxFuture,
     ClientSession,
@@ -159,6 +159,9 @@ pub(crate) trait Operation {
     /// Whether or not this operation will request acknowledgment from the server.
     fn is_acknowledged(&self) -> bool;
 
+    /// The read concern to use for this operation, if any.
+    fn read_concern(&self) -> Feature<&ReadConcern>;
+
     /// The write concern to use for this operation, if any.
     fn write_concern(&self) -> Option<&WriteConcern>;
 
@@ -226,11 +229,27 @@ impl OperationTarget {
         Self::Database(client.database("admin"))
     }
 
+    pub(crate) fn db_name(&self) -> &str {
+        match self {
+            Self::Database(db) => db.name(),
+            Self::Collection(coll) => coll.db().name(),
+            Self::Disowned(ns) => &ns.db,
+        }
+    }
+
     pub(crate) fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         match self {
-            Self::Disowned(_) => None,
             Self::Database(db) => db.selection_criteria(),
             Self::Collection(coll) => coll.selection_criteria(),
+            Self::Disowned(_) => None,
+        }
+    }
+
+    pub(crate) fn read_concern(&self) -> Option<&ReadConcern> {
+        match self {
+            Self::Database(db) => db.read_concern(),
+            Self::Collection(coll) => coll.read_concern(),
+            Self::Disowned(_) => None,
         }
     }
 }
@@ -322,6 +341,11 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
             .unwrap_or(true)
     }
 
+    /// The read concern to use for this operation, if any.
+    fn read_concern(&self) -> Feature<&ReadConcern> {
+        Feature::NotSupported
+    }
+
     /// The write concern to use for this operation, if any.
     fn write_concern(&self) -> Option<&WriteConcern> {
         None
@@ -394,6 +418,9 @@ where
     }
     fn is_acknowledged(&self) -> bool {
         self.is_acknowledged()
+    }
+    fn read_concern(&self) -> Feature<&ReadConcern> {
+        self.read_concern()
     }
     fn write_concern(&self) -> Option<&WriteConcern> {
         self.write_concern()

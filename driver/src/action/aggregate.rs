@@ -169,11 +169,7 @@ impl<'a, Session, T> Aggregate<'a, Session, T> {
 
 macro_rules! agg_exec_generic {
     ($agg:expr) => {{
-        resolve_options!(
-            $agg.target,
-            $agg.options,
-            [read_concern, write_concern, selection_criteria]
-        );
+        resolve_options!($agg.target, $agg.options, [write_concern]);
 
         let mut aggregate = crate::operation::aggregate::Aggregate::new(
             (&$agg.target).into(),
@@ -218,7 +214,6 @@ impl<'a, T> Action for Aggregate<'a, ImplicitSession, T> {
 
 macro_rules! agg_exec_generic_session {
     ($agg:expr) => {{
-        resolve_read_concern_with_session!($agg.target, $agg.options, Some(&mut *$agg.session.0));
         resolve_write_concern_with_session!($agg.target, $agg.options, Some(&mut *$agg.session.0));
 
         let mut aggregate = crate::operation::aggregate::Aggregate::new(
@@ -264,24 +259,10 @@ impl AggregateTargetRef<'_> {
         }
     }
 
-    fn read_concern(&self) -> Option<&ReadConcern> {
-        match self {
-            Self::Collection(cr) => cr.read_concern(),
-            Self::Database(db) => db.read_concern(),
-        }
-    }
-
     fn write_concern(&self) -> Option<&WriteConcern> {
         match self {
             Self::Collection(cr) => cr.write_concern(),
             Self::Database(db) => db.write_concern(),
-        }
-    }
-
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        match self {
-            Self::Collection(cr) => cr.selection_criteria(),
-            Self::Database(db) => db.selection_criteria(),
         }
     }
 }

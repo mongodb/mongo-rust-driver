@@ -51,6 +51,10 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.is_acknowledged()
     }
 
+    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
+        self.0.read_concern()
+    }
+
     fn write_concern(&self) -> Option<&crate::options::WriteConcern> {
         self.0.write_concern()
     }
