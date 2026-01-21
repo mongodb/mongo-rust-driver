@@ -766,7 +766,7 @@ impl Client {
                         session.transaction.state,
                         TransactionState::None | TransactionState::Starting
                     )
-                    && op.supports_read_concern(stream_description)
+                    && op.supports_read_concern()
                 {
                     cmd.set_after_cluster_time(session);
                 }

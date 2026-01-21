@@ -65,8 +65,8 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.write_concern()
     }
 
-    fn supports_read_concern(&self, description: &StreamDescription) -> bool {
-        self.run_command.supports_read_concern(description)
+    fn supports_read_concern(&self) -> bool {
+        self.run_command.supports_read_concern()
     }
 
     fn supports_sessions(&self) -> bool {

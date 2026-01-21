@@ -87,7 +87,7 @@ impl OperationWithDefaults for Distinct {
         Retryability::Read
     }
 
-    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
+    fn supports_read_concern(&self) -> bool {
         true
     }
 

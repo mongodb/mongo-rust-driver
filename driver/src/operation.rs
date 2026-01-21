@@ -163,7 +163,7 @@ pub(crate) trait Operation {
     fn write_concern(&self) -> Option<&WriteConcern>;
 
     /// Returns whether or not this command supports the `readConcern` field.
-    fn supports_read_concern(&self, description: &StreamDescription) -> bool;
+    fn supports_read_concern(&self) -> bool;
 
     /// Whether this operation supports sessions or not.
     fn supports_sessions(&self) -> bool;
@@ -328,7 +328,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     }
 
     /// Returns whether or not this command supports the `readConcern` field.
-    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
+    fn supports_read_concern(&self) -> bool {
         false
     }
 
@@ -398,8 +398,8 @@ where
     fn write_concern(&self) -> Option<&WriteConcern> {
         self.write_concern()
     }
-    fn supports_read_concern(&self, description: &StreamDescription) -> bool {
-        self.supports_read_concern(description)
+    fn supports_read_concern(&self) -> bool {
+        self.supports_read_concern()
     }
     fn supports_sessions(&self) -> bool {
         self.supports_sessions()

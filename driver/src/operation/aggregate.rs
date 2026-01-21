@@ -113,7 +113,7 @@ impl OperationWithDefaults for Aggregate {
             .into()
     }
 
-    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
+    fn supports_read_concern(&self) -> bool {
         // for aggregates that write, read concern is supported in MongoDB 4.2+.
         true
     }

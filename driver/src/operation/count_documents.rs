@@ -105,8 +105,8 @@ impl OperationWithDefaults for CountDocuments {
         Retryability::Read
     }
 
-    fn supports_read_concern(&self, description: &StreamDescription) -> bool {
-        self.aggregate.supports_read_concern(description)
+    fn supports_read_concern(&self) -> bool {
+        self.aggregate.supports_read_concern()
     }
 
     fn target(&self) -> super::OperationTarget {

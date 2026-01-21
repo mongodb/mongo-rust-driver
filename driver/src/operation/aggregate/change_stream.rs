@@ -126,8 +126,8 @@ impl OperationWithDefaults for ChangeStreamAggregate {
         self.inner.selection_criteria()
     }
 
-    fn supports_read_concern(&self, description: &StreamDescription) -> bool {
-        self.inner.supports_read_concern(description)
+    fn supports_read_concern(&self) -> bool {
+        self.inner.supports_read_concern()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

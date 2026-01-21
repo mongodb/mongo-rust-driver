@@ -69,7 +69,7 @@ impl OperationWithDefaults for CreateSearchIndexes {
         false
     }
 
-    fn supports_read_concern(&self, _description: &crate::cmap::StreamDescription) -> bool {
+    fn supports_read_concern(&self) -> bool {
         false
     }
 
@@ -133,7 +133,7 @@ impl OperationWithDefaults for UpdateSearchIndex {
         false
     }
 
-    fn supports_read_concern(&self, _description: &crate::cmap::StreamDescription) -> bool {
+    fn supports_read_concern(&self) -> bool {
         false
     }
 
@@ -195,7 +195,7 @@ impl OperationWithDefaults for DropSearchIndex {
         false
     }
 
-    fn supports_read_concern(&self, _description: &crate::cmap::StreamDescription) -> bool {
+    fn supports_read_concern(&self) -> bool {
         false
     }
 
