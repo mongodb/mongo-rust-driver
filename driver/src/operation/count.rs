@@ -72,10 +72,6 @@ impl OperationWithDefaults for Count {
             .into()
     }
 
-    fn supports_read_concern(&self) -> bool {
-        true
-    }
-
     fn retryability(&self) -> Retryability {
         Retryability::Read
     }

@@ -69,10 +69,6 @@ impl OperationWithDefaults for CreateSearchIndexes {
         false
     }
 
-    fn supports_read_concern(&self) -> bool {
-        false
-    }
-
     fn target(&self) -> super::OperationTarget {
         (&self.target).into()
     }
@@ -133,10 +129,6 @@ impl OperationWithDefaults for UpdateSearchIndex {
         false
     }
 
-    fn supports_read_concern(&self) -> bool {
-        false
-    }
-
     fn target(&self) -> super::OperationTarget {
         (&self.target).into()
     }
@@ -192,10 +184,6 @@ impl OperationWithDefaults for DropSearchIndex {
     }
 
     fn supports_sessions(&self) -> bool {
-        false
-    }
-
-    fn supports_read_concern(&self) -> bool {
         false
     }
 

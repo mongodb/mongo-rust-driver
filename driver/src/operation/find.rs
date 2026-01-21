@@ -118,10 +118,6 @@ impl OperationWithDefaults for Find {
             .into()
     }
 
-    fn supports_read_concern(&self) -> bool {
-        true
-    }
-
     fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
         self.options
             .as_ref()

@@ -115,11 +115,6 @@ impl OperationWithDefaults for Aggregate {
             .into()
     }
 
-    fn supports_read_concern(&self) -> bool {
-        // for aggregates that write, read concern is supported in MongoDB 4.2+.
-        true
-    }
-
     fn write_concern(&self) -> Option<&WriteConcern> {
         self.options
             .as_ref()

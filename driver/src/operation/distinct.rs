@@ -82,10 +82,6 @@ impl OperationWithDefaults for Distinct {
         Retryability::Read
     }
 
-    fn supports_read_concern(&self) -> bool {
-        true
-    }
-
     fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
         self.options
             .as_ref()

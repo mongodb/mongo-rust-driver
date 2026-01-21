@@ -165,9 +165,6 @@ pub(crate) trait Operation {
     /// The write concern to use for this operation, if any.
     fn write_concern(&self) -> Option<&WriteConcern>;
 
-    /// Returns whether or not this command supports the `readConcern` field.
-    fn supports_read_concern(&self) -> bool;
-
     /// Whether this operation supports sessions or not.
     fn supports_sessions(&self) -> bool;
 
@@ -210,6 +207,15 @@ impl<T> From<Option<T>> for Feature<T> {
         match value {
             Some(c) => Self::Set(c),
             None => Self::Inherit,
+        }
+    }
+}
+
+impl<T> Feature<T> {
+    pub(crate) fn supported(&self) -> bool {
+        match self {
+            Self::NotSupported => false,
+            _ => true,
         }
     }
 }
@@ -351,11 +357,6 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         None
     }
 
-    /// Returns whether or not this command supports the `readConcern` field.
-    fn supports_read_concern(&self) -> bool {
-        false
-    }
-
     /// Whether this operation supports sessions or not.
     fn supports_sessions(&self) -> bool {
         true
@@ -424,9 +425,6 @@ where
     }
     fn write_concern(&self) -> Option<&WriteConcern> {
         self.write_concern()
-    }
-    fn supports_read_concern(&self) -> bool {
-        self.supports_read_concern()
     }
     fn supports_sessions(&self) -> bool {
         self.supports_sessions()
