@@ -38,12 +38,7 @@ impl OperationWithDefaults for Count {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new_read(
-            Self::NAME,
-            self.target.db().name(),
-            self.options.as_ref().and_then(|o| o.read_concern.clone()),
-            body,
-        ))
+        Ok(Command::new_read(self, body))
     }
 
     fn handle_response<'a>(
@@ -67,6 +62,13 @@ impl OperationWithDefaults for Count {
         self.options
             .as_ref()
             .and_then(|o| o.selection_criteria.as_ref())
+            .into()
+    }
+
+    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
+        self.options
+            .as_ref()
+            .and_then(|o| o.read_concern.as_ref())
             .into()
     }
 

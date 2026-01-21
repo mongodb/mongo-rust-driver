@@ -50,12 +50,7 @@ impl OperationWithDefaults for Distinct {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new_read(
-            Self::NAME,
-            &self.target.db().name(),
-            self.options.as_ref().and_then(|o| o.read_concern.clone()),
-            body,
-        ))
+        Ok(Command::new_read(self, body))
     }
 
     fn extract_at_cluster_time(
@@ -89,6 +84,13 @@ impl OperationWithDefaults for Distinct {
 
     fn supports_read_concern(&self) -> bool {
         true
+    }
+
+    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
+        self.options
+            .as_ref()
+            .and_then(|o| o.read_concern.as_ref())
+            .into()
     }
 
     fn target(&self) -> super::OperationTarget {

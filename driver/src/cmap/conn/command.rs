@@ -1,17 +1,13 @@
-use crate::{
-    bson::{RawDocument, RawDocumentBuf},
-    operation::{Feature, Operation},
-};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::wire::{message::DocumentSequence, Message};
 use crate::{
-    bson::Document,
+    bson::{Document, RawDocument, RawDocumentBuf},
     client::{options::ServerApi, ClusterTime},
     error::{Error, ErrorKind, Result},
     hello::{HelloCommandResponse, HelloReply},
-    operation::{CommandErrorBody, CommandResponse},
-    options::{ReadConcern, ReadConcernInternal, ReadConcernLevel, ServerAddress},
+    operation::{CommandErrorBody, CommandResponse, Feature, Operation},
+    options::{ReadConcernInternal, ReadConcernLevel, ServerAddress},
     selection_criteria::ReadPreference,
     ClientSession,
 };
@@ -78,31 +74,7 @@ impl Command {
         }
     }
 
-    pub(crate) fn new_read(
-        name: impl ToString,
-        target_db: impl ToString,
-        read_concern: Option<ReadConcern>,
-        body: RawDocumentBuf,
-    ) -> Self {
-        Self {
-            name: name.to_string(),
-            target_db: target_db.to_string(),
-            exhaust_allowed: false,
-            body,
-            document_sequences: Vec::new(),
-            lsid: None,
-            cluster_time: None,
-            server_api: None,
-            read_preference: None,
-            txn_number: None,
-            start_transaction: None,
-            autocommit: None,
-            read_concern: read_concern.map(Into::into),
-            recovery_token: None,
-        }
-    }
-
-    pub(crate) fn new_read2<Op: Operation>(op: &Op, body: RawDocumentBuf) -> Self {
+    pub(crate) fn new_read<Op: Operation>(op: &Op, body: RawDocumentBuf) -> Self {
         let target = op.target();
         let read_concern = match op.read_concern() {
             Feature::Set(v) => Some(v),
