@@ -78,12 +78,7 @@ impl OperationWithDefaults for Find {
         let raw_filter: RawDocumentBuf = (&self.filter).try_into()?;
         body.append(cstr!("filter"), raw_filter);
 
-        Ok(Command::new_read(
-            Self::NAME,
-            self.target.db().name(),
-            self.options.as_ref().and_then(|o| o.read_concern.clone()),
-            body,
-        ))
+        Ok(Command::new_read2(self, body))
     }
 
     fn extract_at_cluster_time(
@@ -114,6 +109,13 @@ impl OperationWithDefaults for Find {
             self.options.as_ref().and_then(|opts| opts.max_await_time),
             comment,
         )
+    }
+
+    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
+        self.options
+            .as_ref()
+            .and_then(|opts| opts.read_concern.as_ref())
+            .into()
     }
 
     fn supports_read_concern(&self) -> bool {
