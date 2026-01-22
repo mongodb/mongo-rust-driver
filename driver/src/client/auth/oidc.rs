@@ -159,23 +159,25 @@ impl Callback {
 
     /// Create azure callback.
     #[cfg(feature = "azure-oidc")]
-    fn azure_callback(client_id: Option<&str>, resource: &str) -> Function {
+    fn azure_callback(client_id: Option<&str>, resource: &str) -> Result<Function> {
         use futures_util::FutureExt;
-        let resource = resource.to_string();
-        let client_id = client_id.map(|s| s.to_string());
-        let mut url = format!(
-            "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource={resource}"
-        );
-        if let Some(ref client_id) = client_id {
-            url.push_str(&format!("&client_id={client_id}"));
+
+        let mut url = reqwest::Url::parse(
+            "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01",
+        )
+        .map_err(|e| Error::internal(format!("invalid azure url: {e}")))?;
+        url.query_pairs_mut().append_pair("resource", resource);
+        if let Some(client_id) = client_id {
+            url.query_pairs_mut().append_pair("client_id", client_id);
         }
-        Self::new_function(
+
+        Ok(Self::new_function(
             move |_| {
                 let url = url.clone();
                 async move {
                     let url = url.clone();
                     let response = crate::runtime::HttpClient::default()
-                        .get(&url)
+                        .get(url)
                         .headers(&[("Metadata", "true"), ("Accept", "application/json")])
                         .send::<Document>()
                         .await
@@ -220,23 +222,27 @@ impl Callback {
                 .boxed()
             },
             CallbackKind::Machine,
-        )
+        ))
     }
 
     /// Create gcp callback.
     #[cfg(feature = "gcp-oidc")]
-    fn gcp_callback(resource: &str) -> Function {
+    fn gcp_callback(resource: &str) -> Result<Function> {
         use futures_util::FutureExt;
-        let url = format!(
-            "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity?audience={resource}"
-        );
-        Self::new_function(
+
+        let mut url = reqwest::Url::parse(
+            "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity",
+        )
+        .map_err(|e| Error::internal(format!("invalid gcp url: {e}")))?;
+        url.query_pairs_mut().append_pair("audience", resource);
+
+        Ok(Self::new_function(
             move |_| {
                 let url = url.clone();
                 async move {
                     let url = url.clone();
                     let response = crate::runtime::HttpClient::default()
-                        .get(&url)
+                        .get(url)
                         .headers(&[("Metadata-Flavor", "Google")])
                         .send_and_get_string()
                         .await
@@ -256,7 +262,7 @@ impl Callback {
                 .boxed()
             },
             CallbackKind::Machine,
-        )
+        ))
     }
 
     fn k8s_callback() -> Function {
@@ -556,7 +562,7 @@ fn get_automatic_provider_callback(credential: &Credential) -> Result<CallbackIn
         #[cfg(feature = "azure-oidc")]
         Some(AZURE_ENVIRONMENT_VALUE_STR) => {
             let client_id = credential.username.as_deref();
-            Callback::azure_callback(client_id, token_resource?)
+            Callback::azure_callback(client_id, token_resource?)?
         }
         #[cfg(not(feature = "azure-oidc"))]
         Some(AZURE_ENVIRONMENT_VALUE_STR) => {
@@ -565,7 +571,7 @@ fn get_automatic_provider_callback(credential: &Credential) -> Result<CallbackIn
             ));
         }
         #[cfg(feature = "gcp-oidc")]
-        Some(GCP_ENVIRONMENT_VALUE_STR) => Callback::gcp_callback(token_resource?),
+        Some(GCP_ENVIRONMENT_VALUE_STR) => Callback::gcp_callback(token_resource?)?,
         #[cfg(not(feature = "gcp-oidc"))]
         Some(GCP_ENVIRONMENT_VALUE_STR) => {
             return Err(auth_error(
