@@ -6,11 +6,11 @@ use crate::{
     bson::{doc, Document, RawDocument},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, Result},
-    operation::aggregate::Aggregate,
+    operation::{aggregate::Aggregate, Operation},
     options::{AggregateOptions, CountOptions, SelectionCriteria},
 };
 
-use super::{ExecutionContext, OperationWithDefaults, Retryability, SingleCursorResult};
+use super::{ExecutionContext, Retryability, SingleCursorResult};
 
 pub(crate) struct CountDocuments {
     aggregate: Aggregate,
@@ -72,10 +72,12 @@ impl CountDocuments {
     }
 }
 
-impl OperationWithDefaults for CountDocuments {
+impl Operation for CountDocuments {
     type O = u64;
 
     const NAME: &'static crate::bson_compat::CStr = Aggregate::NAME;
+
+    const ZERO_COPY: bool = false;
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.aggregate.build(description)
@@ -90,11 +92,15 @@ impl OperationWithDefaults for CountDocuments {
 
     fn handle_response<'a>(
         &'a self,
-        response: &'a RawCommandResponse,
+        response: std::borrow::Cow<'a, RawCommandResponse>,
         _context: ExecutionContext<'a>,
-    ) -> Result<Self::O> {
-        let response: SingleCursorResult<Body> = response.body()?;
-        Ok(response.0.map(|r| r.n).unwrap_or(0))
+    ) -> crate::BoxFuture<'a, Result<Self::O>> {
+        use futures_util::FutureExt;
+        async move {
+            let response: SingleCursorResult<Body> = response.body()?;
+            Ok(response.0.map(|r| r.n).unwrap_or(0))
+        }
+        .boxed()
     }
 
     fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
@@ -107,6 +113,42 @@ impl OperationWithDefaults for CountDocuments {
 
     fn target(&self) -> super::OperationTarget {
         self.aggregate.target()
+    }
+
+    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
+        self.aggregate.read_concern()
+    }
+
+    fn handle_error(&self, error: Error) -> Result<Self::O> {
+        Err(error)
+    }
+
+    fn is_acknowledged(&self) -> bool {
+        self.aggregate.is_acknowledged()
+    }
+
+    fn write_concern(&self) -> Option<&crate::options::WriteConcern> {
+        self.aggregate.write_concern()
+    }
+
+    fn supports_sessions(&self) -> bool {
+        self.aggregate.supports_sessions()
+    }
+
+    fn update_for_retry(&mut self) {
+        self.aggregate.update_for_retry();
+    }
+
+    fn override_criteria(&self) -> super::OverrideCriteriaFn {
+        self.aggregate.override_criteria()
+    }
+
+    fn pinned_connection(&self) -> Option<&crate::cmap::conn::PinnedConnectionHandle> {
+        self.aggregate.pinned_connection()
+    }
+
+    fn name(&self) -> &crate::bson_compat::CStr {
+        self.aggregate.name()
     }
 
     #[cfg(feature = "opentelemetry")]
