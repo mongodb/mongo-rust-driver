@@ -112,8 +112,15 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
         }
     }
 
-    fn write_concern(&self) -> Option<&WriteConcern> {
-        self.options.as_ref().and_then(|o| o.write_concern.as_ref())
+    fn write_concern(&self) -> super::Feature<&WriteConcern> {
+        self.options
+            .as_ref()
+            .and_then(|o| o.write_concern.as_ref())
+            .into()
+    }
+
+    fn set_write_concern(&mut self, wc: WriteConcern) {
+        self.options.get_or_insert_default().write_concern = Some(wc);
     }
 
     fn retryability(&self) -> Retryability {

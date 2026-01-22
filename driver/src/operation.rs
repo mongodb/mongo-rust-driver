@@ -156,14 +156,15 @@ pub(crate) trait Operation {
     /// Criteria to use for selecting the server that this operation will be executed on.
     fn selection_criteria(&self) -> Feature<&SelectionCriteria>;
 
-    /// Whether or not this operation will request acknowledgment from the server.
-    fn is_acknowledged(&self) -> bool;
-
     /// The read concern to use for this operation, if any.
     fn read_concern(&self) -> Feature<&ReadConcern>;
 
-    /// The write concern to use for this operation, if any.
-    fn write_concern(&self) -> Option<&WriteConcern>;
+    /// The write concern to use for this operation, if any.  If this is implemented,
+    /// `set_write_concern` MUST also be.
+    fn write_concern(&self) -> Feature<&WriteConcern>;
+
+    /// Update the write concern for this operation.
+    fn set_write_concern(&mut self, wc: WriteConcern);
 
     /// Whether this operation supports sessions or not.
     fn supports_sessions(&self) -> bool;
@@ -212,6 +213,14 @@ impl<T> From<Option<T>> for Feature<T> {
 }
 
 impl<T> Feature<T> {
+    pub(crate) fn is_set(&self) -> bool {
+        matches!(self, Self::Set(_))
+    }
+
+    pub(crate) fn is_inherit(&self) -> bool {
+        matches!(self, Self::Inherit)
+    }
+
     pub(crate) fn supported(&self) -> bool {
         match self {
             Self::NotSupported => false,
@@ -255,6 +264,14 @@ impl OperationTarget {
         match self {
             Self::Database(db) => db.read_concern(),
             Self::Collection(coll) => coll.read_concern(),
+            Self::Disowned(_) => None,
+        }
+    }
+
+    pub(crate) fn write_concern(&self) -> Option<&WriteConcern> {
+        match self {
+            Self::Database(db) => db.write_concern(),
+            Self::Collection(coll) => coll.write_concern(),
             Self::Disowned(_) => None,
         }
     }
@@ -340,21 +357,23 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         Feature::NotSupported
     }
 
-    /// Whether or not this operation will request acknowledgment from the server.
-    fn is_acknowledged(&self) -> bool {
-        self.write_concern()
-            .map(WriteConcern::is_acknowledged)
-            .unwrap_or(true)
-    }
-
     /// The read concern to use for this operation, if any.
     fn read_concern(&self) -> Feature<&ReadConcern> {
         Feature::NotSupported
     }
 
-    /// The write concern to use for this operation, if any.
-    fn write_concern(&self) -> Option<&WriteConcern> {
-        None
+    /// The write concern to use for this operation, if any.  If this is implemented,
+    /// `set_write_concern` MUST also be.
+    fn write_concern(&self) -> Feature<&WriteConcern> {
+        Feature::NotSupported
+    }
+
+    /// Update the write concern for this operation.
+    fn set_write_concern(&mut self, _wc: WriteConcern) {
+        panic!(
+            "set_write_concern called on unsupported operation {}",
+            self.name()
+        )
     }
 
     /// Whether this operation supports sessions or not.
@@ -417,14 +436,14 @@ where
     fn selection_criteria(&self) -> Feature<&SelectionCriteria> {
         self.selection_criteria()
     }
-    fn is_acknowledged(&self) -> bool {
-        self.is_acknowledged()
-    }
     fn read_concern(&self) -> Feature<&ReadConcern> {
         self.read_concern()
     }
-    fn write_concern(&self) -> Option<&WriteConcern> {
+    fn write_concern(&self) -> Feature<&WriteConcern> {
         self.write_concern()
+    }
+    fn set_write_concern(&mut self, wc: WriteConcern) {
+        self.set_write_concern(wc);
     }
     fn supports_sessions(&self) -> bool {
         self.supports_sessions()

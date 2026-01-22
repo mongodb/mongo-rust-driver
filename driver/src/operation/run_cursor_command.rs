@@ -57,16 +57,16 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.selection_criteria()
     }
 
-    fn is_acknowledged(&self) -> bool {
-        self.run_command.is_acknowledged()
-    }
-
     fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
         self.run_command.read_concern()
     }
 
-    fn write_concern(&self) -> Option<&WriteConcern> {
+    fn write_concern(&self) -> super::Feature<&WriteConcern> {
         self.run_command.write_concern()
+    }
+
+    fn set_write_concern(&mut self, wc: WriteConcern) {
+        self.run_command.set_write_concern(wc);
     }
 
     fn supports_sessions(&self) -> bool {

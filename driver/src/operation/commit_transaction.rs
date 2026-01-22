@@ -50,10 +50,15 @@ impl OperationWithDefaults for CommitTransaction {
         response.validate()
     }
 
-    fn write_concern(&self) -> Option<&WriteConcern> {
+    fn write_concern(&self) -> super::Feature<&WriteConcern> {
         self.options
             .as_ref()
-            .and_then(|opts| opts.write_concern.as_ref())
+            .and_then(|o| o.write_concern.as_ref())
+            .into()
+    }
+
+    fn set_write_concern(&mut self, wc: WriteConcern) {
+        self.options.get_or_insert_default().write_concern = Some(wc);
     }
 
     fn retryability(&self) -> Retryability {

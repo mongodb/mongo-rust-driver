@@ -123,12 +123,12 @@ impl Operation for CountDocuments {
         Err(error)
     }
 
-    fn is_acknowledged(&self) -> bool {
-        self.aggregate.is_acknowledged()
+    fn write_concern(&self) -> super::Feature<&crate::options::WriteConcern> {
+        self.aggregate.write_concern()
     }
 
-    fn write_concern(&self) -> Option<&crate::options::WriteConcern> {
-        self.aggregate.write_concern()
+    fn set_write_concern(&mut self, wc: crate::options::WriteConcern) {
+        self.aggregate.set_write_concern(wc);
     }
 
     fn supports_sessions(&self) -> bool {

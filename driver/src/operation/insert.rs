@@ -170,8 +170,12 @@ impl OperationWithDefaults for Insert<'_> {
         Ok(InsertManyResult { inserted_ids: map })
     }
 
-    fn write_concern(&self) -> Option<&WriteConcern> {
-        self.options.write_concern.as_ref()
+    fn write_concern(&self) -> super::Feature<&WriteConcern> {
+        self.options.write_concern.as_ref().into()
+    }
+
+    fn set_write_concern(&mut self, wc: WriteConcern) {
+        self.options.write_concern = Some(wc);
     }
 
     fn retryability(&self) -> Retryability {

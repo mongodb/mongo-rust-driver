@@ -133,8 +133,12 @@ impl Operation for ChangeStreamAggregate {
         self.inner.selection_criteria()
     }
 
-    fn write_concern(&self) -> Option<&WriteConcern> {
+    fn write_concern(&self) -> crate::operation::Feature<&WriteConcern> {
         self.inner.write_concern()
+    }
+
+    fn set_write_concern(&mut self, wc: WriteConcern) {
+        self.inner.set_write_concern(wc);
     }
 
     fn retryability(&self) -> Retryability {
@@ -147,10 +151,6 @@ impl Operation for ChangeStreamAggregate {
 
     fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {
         Err(error)
-    }
-
-    fn is_acknowledged(&self) -> bool {
-        self.inner.is_acknowledged()
     }
 
     fn read_concern(&self) -> crate::operation::Feature<&crate::options::ReadConcern> {

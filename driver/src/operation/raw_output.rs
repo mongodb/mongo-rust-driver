@@ -47,16 +47,16 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.selection_criteria()
     }
 
-    fn is_acknowledged(&self) -> bool {
-        self.0.is_acknowledged()
-    }
-
     fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
         self.0.read_concern()
     }
 
-    fn write_concern(&self) -> Option<&crate::options::WriteConcern> {
+    fn write_concern(&self) -> super::Feature<&crate::options::WriteConcern> {
         self.0.write_concern()
+    }
+
+    fn set_write_concern(&mut self, wc: crate::options::WriteConcern) {
+        self.0.set_write_concern(wc);
     }
 
     fn supports_sessions(&self) -> bool {

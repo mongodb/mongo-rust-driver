@@ -144,37 +144,56 @@ impl Client {
         if self.inner.shutdown.executed.load(Ordering::SeqCst) {
             return Err(ErrorKind::Shutdown.into());
         }
-        // TODO RUST-9: remove this validation
-        if !op.is_acknowledged() {
-            return Err(ErrorKind::InvalidArgument {
-                message: "Unacknowledged write concerns are not supported".to_string(),
+
+        if session.as_ref().map_or(false, |s| s.in_transaction()) {
+            if op.read_concern().is_set() {
+                return Err(Error::invalid_argument(
+                    "Cannot set read concern after starting a transaction",
+                ));
             }
-            .into());
-        }
-        if let Some(write_concern) = op.write_concern() {
-            write_concern.validate()?;
+            if op.write_concern().is_set() {
+                return Err(Error::invalid_argument(
+                    "Cannot set write concern after starting a transaction",
+                ));
+            }
         }
 
-        let op_target;
+        let op_target = op.target();
+        // Apply write concern inheritance
+        if op.write_concern().is_inherit() {
+            if let Some(wc) = op_target.write_concern() {
+                op.set_write_concern(wc.clone());
+            }
+        }
+
+        if let Feature::Set(wc) = op.write_concern() {
+            // TODO RUST-9: remove this validation
+            if !wc.is_acknowledged() {
+                return Err(ErrorKind::InvalidArgument {
+                    message: "Unacknowledged write concerns are not supported".to_string(),
+                }
+                .into());
+            }
+
+            wc.validate()?;
+        }
+
         let selection_criteria = match op.selection_criteria() {
             Feature::Set(s) => Some(s),
             Feature::NotSupported => None,
-            Feature::Inherit => {
-                op_target = op.target();
-                session
-                    .as_ref()
-                    .and_then(|s| {
-                        if s.in_transaction() {
-                            s.transaction
-                                .options
-                                .as_ref()
-                                .and_then(|o| o.selection_criteria.as_ref())
-                        } else {
-                            None
-                        }
-                    })
-                    .or_else(|| op_target.selection_criteria())
-            }
+            Feature::Inherit => session
+                .as_ref()
+                .and_then(|s| {
+                    if s.in_transaction() {
+                        s.transaction
+                            .options
+                            .as_ref()
+                            .and_then(|o| o.selection_criteria.as_ref())
+                    } else {
+                        None
+                    }
+                })
+                .or_else(|| op_target.selection_criteria()),
         }
         .cloned();
 
@@ -428,7 +447,7 @@ impl Client {
             if conn.supports_sessions()
                 && session.is_none()
                 && op.supports_sessions()
-                && op.is_acknowledged()
+                && op.write_concern().is_acknowledged()
             {
                 implicit_session = Some(ClientSession::new(self.clone(), None, true).await);
                 session = implicit_session.as_mut();
@@ -745,7 +764,9 @@ impl Client {
         );
 
         match session {
-            Some(ref mut session) if op.supports_sessions() && op.is_acknowledged() => {
+            Some(ref mut session)
+                if op.supports_sessions() && op.write_concern().is_acknowledged() =>
+            {
                 cmd.set_session(session);
                 if let Some(txn_number) = txn_number {
                     cmd.set_txn_number(txn_number);
@@ -825,7 +846,9 @@ impl Client {
                 }
                 .into());
             }
-            Some(ref session) if !op.is_acknowledged() && !session.is_implicit() => {
+            Some(ref session)
+                if !op.write_concern().is_acknowledged() && !session.is_implicit() =>
+            {
                 return Err(ErrorKind::InvalidArgument {
                     message: "Cannot use ClientSessions with unacknowledged write concern"
                         .to_string(),
@@ -1171,6 +1194,15 @@ impl RetryHelper for Option<ExecutionRetry> {
         match self.take() {
             Some(r) => Err(r.first_error),
             None => Ok(()),
+        }
+    }
+}
+
+impl Feature<&crate::options::WriteConcern> {
+    fn is_acknowledged(&self) -> bool {
+        match self {
+            Feature::Set(wc) => wc.is_acknowledged(),
+            _ => true,
         }
     }
 }

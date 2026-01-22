@@ -41,7 +41,7 @@ impl OperationWithDefaults for AbortTransaction {
         let mut body = rawdoc! {
             Self::NAME: 1,
         };
-        if let Some(ref write_concern) = self.write_concern() {
+        if let Some(ref write_concern) = self.write_concern {
             if !write_concern.is_empty() {
                 append_ser(&mut body, cstr!("writeConcern"), write_concern)?;
             }
@@ -73,8 +73,12 @@ impl OperationWithDefaults for AbortTransaction {
         }
     }
 
-    fn write_concern(&self) -> Option<&WriteConcern> {
-        self.write_concern.as_ref()
+    fn write_concern(&self) -> super::Feature<&WriteConcern> {
+        self.write_concern.as_ref().into()
+    }
+
+    fn set_write_concern(&mut self, wc: WriteConcern) {
+        self.write_concern = Some(wc);
     }
 
     fn retryability(&self) -> Retryability {
