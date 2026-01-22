@@ -57,11 +57,26 @@ impl ClientSession {
                     }
                     None => self.default_transaction_options().cloned(),
                 };
-                resolve_options!(
-                    self.client,
-                    options,
-                    [read_concern, write_concern, selection_criteria]
-                );
+                // Manually resolve inherited options since this doesn't go through the operation
+                // executor.
+                if let Some(rc) = self.client.read_concern() {
+                    options
+                        .get_or_insert_default()
+                        .read_concern
+                        .get_or_insert_with(|| rc.clone());
+                }
+                if let Some(wc) = self.client.write_concern() {
+                    options
+                        .get_or_insert_default()
+                        .write_concern
+                        .get_or_insert_with(|| wc.clone());
+                }
+                if let Some(sc) = self.client.selection_criteria() {
+                    options
+                        .get_or_insert_default()
+                        .selection_criteria
+                        .get_or_insert_with(|| sc.clone());
+                }
 
                 if let Some(ref options) = options {
                     if !options
