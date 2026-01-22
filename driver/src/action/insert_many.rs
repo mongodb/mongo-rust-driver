@@ -89,8 +89,6 @@ impl<'a> Action for InsertMany<'a> {
     type Future = InsertManyFuture;
 
     async fn execute(mut self) -> Result<InsertManyResult> {
-        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref());
-
         let ds = self.docs?;
         if ds.is_empty() {
             return Err(ErrorKind::InvalidArgument {

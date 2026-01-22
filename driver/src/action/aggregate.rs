@@ -169,8 +169,6 @@ impl<'a, Session, T> Aggregate<'a, Session, T> {
 
 macro_rules! agg_exec_generic {
     ($agg:expr) => {{
-        resolve_options!($agg.target, $agg.options, [write_concern]);
-
         let mut aggregate = crate::operation::aggregate::Aggregate::new(
             (&$agg.target).into(),
             $agg.pipeline,
@@ -198,7 +196,7 @@ impl<'a, T> Aggregate<'a, ImplicitSession, T> {
 
     /// Execute the aggregate command, returning a cursor that provides results in zero-copy raw
     /// batches.
-    pub async fn batch(mut self) -> Result<crate::raw_batch_cursor::RawBatchCursor> {
+    pub async fn batch(self) -> Result<crate::raw_batch_cursor::RawBatchCursor> {
         agg_exec_generic!(self)
     }
 }
@@ -207,15 +205,13 @@ impl<'a, T> Aggregate<'a, ImplicitSession, T> {
 impl<'a, T> Action for Aggregate<'a, ImplicitSession, T> {
     type Future = AggregateFuture;
 
-    async fn execute(mut self) -> Result<Cursor<T>> {
+    async fn execute(self) -> Result<Cursor<T>> {
         agg_exec_generic!(self)
     }
 }
 
 macro_rules! agg_exec_generic_session {
     ($agg:expr) => {{
-        resolve_write_concern_with_session!($agg.target, $agg.options, Some(&mut *$agg.session.0));
-
         let mut aggregate = crate::operation::aggregate::Aggregate::new(
             (&$agg.target).into(),
             $agg.pipeline,
@@ -232,7 +228,7 @@ macro_rules! agg_exec_generic_session {
 impl<'a, T> Aggregate<'a, ExplicitSession<'a>, T> {
     /// Execute the aggregate command, returning a cursor that provides results in zero-copy raw
     /// batches.
-    pub async fn batch(mut self) -> Result<crate::raw_batch_cursor::SessionRawBatchCursor> {
+    pub async fn batch(self) -> Result<crate::raw_batch_cursor::SessionRawBatchCursor> {
         agg_exec_generic_session!(self)
     }
 }
@@ -241,7 +237,7 @@ impl<'a, T> Aggregate<'a, ExplicitSession<'a>, T> {
 impl<'a, T> Action for Aggregate<'a, ExplicitSession<'a>, T> {
     type Future = AggregateSessionFuture;
 
-    async fn execute(mut self) -> Result<SessionCursor<T>> {
+    async fn execute(self) -> Result<SessionCursor<T>> {
         agg_exec_generic_session!(self)
     }
 }
@@ -256,13 +252,6 @@ impl AggregateTargetRef<'_> {
         match self {
             Self::Collection(cr) => cr.client(),
             Self::Database(db) => db.client(),
-        }
-    }
-
-    fn write_concern(&self) -> Option<&WriteConcern> {
-        match self {
-            Self::Collection(cr) => cr.write_concern(),
-            Self::Database(db) => db.write_concern(),
         }
     }
 }

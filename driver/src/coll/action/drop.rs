@@ -9,8 +9,6 @@ impl<'a> Action for DropCollection<'a> {
     type Future = DropCollectionFuture;
 
     async fn execute(mut self) -> Result<()> {
-        resolve_options!(self.cr, self.options, [write_concern]);
-
         #[cfg(feature = "in-use-encryption")]
         self.cr
             .drop_aux_collections(self.options.as_ref(), self.session.as_deref_mut())

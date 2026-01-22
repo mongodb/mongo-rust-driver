@@ -94,7 +94,7 @@ impl<'a> DropIndex<'a> {
 impl<'a> Action for DropIndex<'a> {
     type Future = DropIndexFuture;
 
-    async fn execute(mut self) -> Result<()> {
+    async fn execute(self) -> Result<()> {
         if matches!(self.name.as_deref(), Some("*")) {
             return Err(ErrorKind::InvalidArgument {
                 message: "Cannot pass name \"*\" to drop_index since more than one index would be \
@@ -103,8 +103,6 @@ impl<'a> Action for DropIndex<'a> {
             }
             .into());
         }
-        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref());
-
         // If there is no provided name, that means we should drop all indexes.
         let index_name = self.name.unwrap_or_else(|| "*".to_string());
 

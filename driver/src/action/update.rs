@@ -142,12 +142,10 @@ impl<'a> Update<'a> {
 impl<'a> Action for Update<'a> {
     type Future = UpdateFuture;
 
-    async fn execute(mut self) -> Result<UpdateResult> {
+    async fn execute(self) -> Result<UpdateResult> {
         if let UpdateModifications::Document(d) = &self.update {
             crate::bson_util::update_document_check(d)?;
         }
-        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref());
-
         let op = Op::with_update(
             self.coll.clone(),
             self.query,

@@ -31,11 +31,9 @@ impl<T: DeserializeOwned + Send + Sync> Collection<T> {
         &self,
         filter: Document,
         modification: Modification,
-        mut options: Option<FindAndModifyOptions>,
+        options: Option<FindAndModifyOptions>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<T>> {
-        resolve_write_concern_with_session!(self, options, session.as_ref());
-
         let op = Op::<T>::with_modification(self.clone_with_type(), filter, modification, options)?;
         self.client().execute_operation(op, session).await
     }

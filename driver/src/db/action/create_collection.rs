@@ -13,8 +13,6 @@ impl<'a> Action for CreateCollection<'a> {
     type Future = CreateCollectionFuture;
 
     async fn execute(mut self) -> Result<()> {
-        resolve_options!(self.db, self.options, [write_concern]);
-
         let coll = self.db.collection::<Document>(&self.name);
 
         #[cfg(feature = "in-use-encryption")]
