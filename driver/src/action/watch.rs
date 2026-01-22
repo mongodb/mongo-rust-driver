@@ -262,11 +262,6 @@ impl<'a, T: DeserializeOwned + Unpin + Send + Sync> Action for Watch<'a, T, Impl
     type Future = WatchFuture;
 
     async fn execute(mut self) -> Result<ChangeStream<ChangeStreamEvent<T>>> {
-        resolve_options!(
-            self.client,
-            self.options,
-            [read_concern, selection_criteria]
-        );
         if self.cluster {
             self.options
                 .get_or_insert_with(Default::default)
@@ -283,7 +278,6 @@ impl<'a, T: DeserializeOwned + Unpin + Send + Sync> Action for Watch<'a, T, Expl
     type Future = WatchSessionFuture;
 
     async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<T>>> {
-        resolve_read_concern_with_session!(self.client, self.options, Some(&mut *self.session.0));
         if self.cluster {
             self.options
                 .get_or_insert_with(Default::default)

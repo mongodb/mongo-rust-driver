@@ -68,15 +68,6 @@ macro_rules! merge_options {
 }
 
 /// Updates the read concern of an options struct. If a transaction is starting or in progress,
-/// return an error if a read concern was specified for the operation. Otherwise, inherit the read
-/// concern from the collection/database.
-macro_rules! resolve_read_concern_with_session {
-    ($obj:expr, $opts:expr, $session:expr) => {{
-        resolve_rw_concern_with_session!($obj, $opts, $session, read_concern, "read")
-    }};
-}
-
-/// Updates the read concern of an options struct. If a transaction is starting or in progress,
 /// return an error if a write concern was specified for the operation. Otherwise, inherit the write
 /// concern from the collection/database.
 macro_rules! resolve_write_concern_with_session {
