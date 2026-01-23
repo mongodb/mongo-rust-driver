@@ -106,7 +106,7 @@ impl OperationWithDefaults for RunCommand<'_> {
     }
 
     fn name(&self) -> &CStr {
-        self.command_name().unwrap_or(&Self::NAME)
+        self.command_name().unwrap_or(Self::NAME)
     }
 
     #[cfg(feature = "opentelemetry")]

@@ -5,6 +5,7 @@ use futures_util::stream::TryStreamExt;
 
 use crate::{
     coll::options::ListIndexesOptions,
+    cursor::NewCursor,
     error::Result,
     operation::ListIndexes as Op,
     ClientSession,
@@ -99,7 +100,7 @@ pub struct ListIndexes<'a, Mode = ListSpecifications, Session = ImplicitSession>
 #[option_setters(crate::coll::options::ListIndexesOptions)]
 #[export_doc(list_indexes, extra = [session, batch])]
 impl<'a, Session: ActionSession<'a>> ListIndexes<'a, ListSpecifications, Session> {
-    async fn exec_generic<C: crate::cursor::NewCursor>(self) -> Result<C> {
+    async fn exec_generic<C: NewCursor>(self) -> Result<C> {
         let mut op = Op::new(self.coll.clone(), self.options);
         self.coll
             .client()

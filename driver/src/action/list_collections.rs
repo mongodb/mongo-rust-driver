@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use crate::{
     action::ActionSession,
     bson::{Bson, Document},
+    cursor::NewCursor,
 };
 use futures_util::TryStreamExt;
 
@@ -113,7 +114,7 @@ impl<'a, M> ListCollections<'a, M, ImplicitSession> {
 #[option_setters(crate::db::options::ListCollectionsOptions)]
 #[export_doc(list_collections, extra = [session, batch])]
 impl<'a, S: ActionSession<'a>> ListCollections<'a, ListSpecifications, S> {
-    async fn exec_generic<C: crate::cursor::NewCursor>(self) -> Result<C> {
+    async fn exec_generic<C: NewCursor>(self) -> Result<C> {
         let mut list_collections = op::ListCollections::new(self.db.clone(), false, self.options);
         self.db
             .client()

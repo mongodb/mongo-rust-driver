@@ -326,7 +326,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         response: Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        self.handle_response(&*response, context)
+        self.handle_response(&response, context)
     }
 
     /// Interprets the server response to the command. This method should only be implemented when
