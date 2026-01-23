@@ -22,7 +22,6 @@ use crate::{
     options::{ClientOptions, ServerAddress, DEFAULT_PORT},
     Client,
     ClientSession,
-    Namespace,
 };
 
 #[cfg(test)]
@@ -293,25 +292,6 @@ fn record_error<T>(context: &Context, result: &Result<T>) {
     });
 }
 
-impl OperationTarget {
-    fn name(&self) -> TargetName<'_> {
-        match self {
-            OperationTarget::Database(db) => TargetName {
-                database: db.name(),
-                collection: None,
-            },
-            OperationTarget::Collection(coll) => TargetName {
-                database: coll.db().name(),
-                collection: Some(coll.name()),
-            },
-            OperationTarget::Namespace(ns) => TargetName {
-                database: &ns.db,
-                collection: Some(&ns.coll),
-            },
-        }
-    }
-}
-
 fn op_target(op: &impl OtelInfo) -> String {
     let target = op.target();
     let name = target.name();
@@ -423,20 +403,21 @@ pub(crate) struct TargetName<'a> {
     pub(crate) collection: Option<&'a str>,
 }
 
-impl<'a> From<&'a str> for TargetName<'a> {
-    fn from(value: &'a str) -> Self {
-        TargetName {
-            database: value,
-            collection: None,
-        }
-    }
-}
-
-impl<'a> From<&'a Namespace> for TargetName<'a> {
-    fn from(value: &'a Namespace) -> Self {
-        TargetName {
-            database: &value.db,
-            collection: Some(&value.coll),
+impl OperationTarget {
+    fn name(&self) -> TargetName<'_> {
+        match self {
+            OperationTarget::Database(db) => TargetName {
+                database: db.name(),
+                collection: None,
+            },
+            OperationTarget::Collection(coll) => TargetName {
+                database: coll.db().name(),
+                collection: Some(coll.name()),
+            },
+            OperationTarget::Namespace(ns) => TargetName {
+                database: &ns.db,
+                collection: Some(&ns.coll),
+            },
         }
     }
 }
