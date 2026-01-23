@@ -423,14 +423,6 @@ pub(crate) struct TargetName<'a> {
     pub(crate) collection: Option<&'a str>,
 }
 
-impl TargetName<'static> {
-    #[expect(unused)]
-    pub(crate) const ADMIN: Self = TargetName {
-        database: "admin",
-        collection: None,
-    };
-}
-
 impl<'a> From<&'a str> for TargetName<'a> {
     fn from(value: &'a str) -> Self {
         TargetName {
