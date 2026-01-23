@@ -145,6 +145,7 @@ impl Client {
             return Err(ErrorKind::Shutdown.into());
         }
 
+        let op_target = op.target();
         if session.as_ref().map_or(false, |s| s.in_transaction()) {
             if op.read_concern().is_set() {
                 return Err(Error::invalid_argument(
@@ -156,13 +157,12 @@ impl Client {
                     "Cannot set write concern after starting a transaction",
                 ));
             }
-        }
-
-        let op_target = op.target();
-        // Apply write concern inheritance
-        if op.write_concern().is_inherit() {
-            if let Some(wc) = op_target.write_concern() {
-                op.set_write_concern(wc.clone());
+        } else {
+            // Apply write concern inheritance
+            if op.write_concern().is_inherit() {
+                if let Some(wc) = op_target.write_concern() {
+                    op.set_write_concern(wc.clone());
+                }
             }
         }
 
