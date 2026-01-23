@@ -7,7 +7,7 @@ use std::{
 use serde::Serialize;
 
 #[cfg(feature = "bson-3")]
-use crate::bson_compat::{RawBsonRefExt as _, RawDocumentBufExt as _};
+use crate::bson_compat::RawBsonRefExt as _;
 use crate::{
     bson::{
         oid::ObjectId,
@@ -227,25 +227,6 @@ pub(crate) fn extend_raw_document_buf(
         }
         this.append(k, v.to_raw_bson());
     }
-    Ok(())
-}
-
-pub(crate) fn append_ser(
-    this: &mut RawDocumentBuf,
-    key: impl AsRef<crate::bson_compat::CStr>,
-    value: impl Serialize,
-) -> Result<()> {
-    #[derive(Serialize)]
-    struct Helper<T> {
-        value: T,
-    }
-    let raw_doc = crate::bson_compat::serialize_to_raw_document_buf(&Helper { value })?;
-    this.append_ref(
-        key,
-        raw_doc
-            .get("value")?
-            .ok_or_else(|| Error::internal("no value"))?,
-    );
     Ok(())
 }
 
