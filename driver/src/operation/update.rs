@@ -136,15 +136,6 @@ impl OperationWithDefaults for Update {
                 body.append(cstr!("bypassDocumentValidation"), bypass_doc_validation);
             }
 
-            if let Some(ref write_concern) = options.write_concern {
-                if !write_concern.is_empty() {
-                    body.append(
-                        cstr!("writeConcern"),
-                        crate::bson_compat::serialize_to_raw_document_buf(write_concern)?,
-                    );
-                }
-            }
-
             if let Some(ref let_vars) = options.let_vars {
                 body.append(cstr!("let"), RawDocumentBuf::try_from(let_vars)?);
             }
