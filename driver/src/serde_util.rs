@@ -6,7 +6,6 @@ use crate::{
     bson::{doc, Bson, Document},
     bson_util::get_u64,
     error::{Error, Result},
-    options::WriteConcern,
     serde_util,
 };
 
@@ -147,12 +146,6 @@ pub(crate) fn serialize_result_error_as_string<S: Serializer, T: Serialize>(
     val.as_ref()
         .map_err(|e| e.to_string())
         .serialize(serializer)
-}
-
-pub(crate) fn write_concern_is_empty(write_concern: &Option<WriteConcern>) -> bool {
-    write_concern
-        .as_ref()
-        .is_none_or(|write_concern| write_concern.is_empty())
 }
 
 #[cfg(test)]

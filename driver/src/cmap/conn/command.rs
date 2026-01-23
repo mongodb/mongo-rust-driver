@@ -7,7 +7,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
     hello::{HelloCommandResponse, HelloReply},
     operation::{CommandErrorBody, CommandResponse, Feature, Operation},
-    options::{ReadConcernInternal, ReadConcernLevel, ServerAddress},
+    options::{ReadConcernInternal, ReadConcernLevel, ServerAddress, WriteConcern},
     selection_criteria::ReadPreference,
     ClientSession,
 };
@@ -51,7 +51,16 @@ pub(crate) struct Command {
 
     read_concern: Option<ReadConcernInternal>,
 
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
+    write_concern: Option<WriteConcern>,
+
     recovery_token: Option<Document>,
+}
+
+fn write_concern_is_empty(write_concern: &Option<WriteConcern>) -> bool {
+    write_concern
+        .as_ref()
+        .is_none_or(|write_concern| write_concern.is_empty())
 }
 
 impl Command {
@@ -74,6 +83,7 @@ impl Command {
             start_transaction: None,
             autocommit: None,
             read_concern: None,
+            write_concern: None,
             recovery_token: None,
         }
     }
@@ -87,6 +97,12 @@ impl Command {
         }
         .cloned()
         .map(ReadConcernInternal::from);
+        let write_concern = match op.write_concern() {
+            Feature::Set(v) => Some(v),
+            Feature::NotSupported => None,
+            Feature::Inherit => target.write_concern(),
+        }
+        .cloned();
         Self {
             name: crate::bson_compat::cstr_to_str(op.name()).to_owned(),
             target_db: target.db_name().to_owned(),
@@ -101,6 +117,7 @@ impl Command {
             start_transaction: None,
             autocommit: None,
             read_concern,
+            write_concern,
             recovery_token: None,
         }
     }
