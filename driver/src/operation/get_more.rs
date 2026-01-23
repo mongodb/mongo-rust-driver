@@ -113,7 +113,7 @@ impl OperationWithDefaults for GetMore<'_> {
     }
 
     fn target(&self) -> super::OperationTarget {
-        super::OperationTarget::Disowned(self.ns.clone())
+        super::OperationTarget::Namespace(self.ns.clone())
     }
 
     #[cfg(feature = "opentelemetry")]

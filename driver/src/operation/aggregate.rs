@@ -187,6 +187,6 @@ fn target_bson(target: &OperationTarget) -> Bson {
     match target {
         OperationTarget::Database(_) => Bson::Int32(1),
         OperationTarget::Collection(coll) => Bson::String(coll.name().to_owned()),
-        OperationTarget::Disowned(ns) => Bson::String(ns.coll.to_owned()),
+        OperationTarget::Namespace(ns) => Bson::String(ns.coll.to_owned()),
     }
 }

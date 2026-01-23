@@ -236,7 +236,7 @@ pub(crate) type OverrideCriteriaFn =
 pub(crate) enum OperationTarget {
     Database(Database),
     Collection(crate::Collection<Document>),
-    Disowned(Namespace),
+    Namespace(Namespace),
 }
 
 impl OperationTarget {
@@ -248,7 +248,7 @@ impl OperationTarget {
         match self {
             Self::Database(db) => db.name(),
             Self::Collection(coll) => coll.db().name(),
-            Self::Disowned(ns) => &ns.db,
+            Self::Namespace(ns) => &ns.db,
         }
     }
 
@@ -256,7 +256,7 @@ impl OperationTarget {
         match self {
             Self::Database(db) => db.selection_criteria(),
             Self::Collection(coll) => coll.selection_criteria(),
-            Self::Disowned(_) => None,
+            Self::Namespace(_) => None,
         }
     }
 
@@ -264,7 +264,7 @@ impl OperationTarget {
         match self {
             Self::Database(db) => db.read_concern(),
             Self::Collection(coll) => coll.read_concern(),
-            Self::Disowned(_) => None,
+            Self::Namespace(_) => None,
         }
     }
 
@@ -272,7 +272,7 @@ impl OperationTarget {
         match self {
             Self::Database(db) => db.write_concern(),
             Self::Collection(coll) => coll.write_concern(),
-            Self::Disowned(_) => None,
+            Self::Namespace(_) => None,
         }
     }
 }
