@@ -145,7 +145,6 @@ impl Client {
             return Err(ErrorKind::Shutdown.into());
         }
 
-        let op_target = op.target();
         if session.as_ref().map_or(false, |s| s.in_transaction()) {
             if op.read_concern().is_set() {
                 return Err(Error::invalid_argument(
@@ -156,13 +155,6 @@ impl Client {
                 return Err(Error::invalid_argument(
                     "Cannot set write concern after starting a transaction",
                 ));
-            }
-        } else {
-            // Apply write concern inheritance
-            if op.write_concern().is_inherit() {
-                if let Some(wc) = op_target.write_concern() {
-                    op.set_write_concern(wc.clone());
-                }
             }
         }
 
@@ -178,6 +170,7 @@ impl Client {
             wc.validate()?;
         }
 
+        let op_target = op.target();
         let selection_criteria = match op.selection_criteria() {
             Feature::Set(s) => Some(s),
             Feature::NotSupported => None,
@@ -744,18 +737,10 @@ impl Client {
     ) -> Result<crate::cmap::Command> {
         let stream_description = connection.stream_description()?;
         let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
-        // Validate user-set read concern
-        if session.as_ref().map_or(false, |s| s.in_transaction()) {
-            if matches!(op.read_concern(), Feature::Set(_)) {
-                return Err(Error::invalid_argument(
-                    "Cannot set read concern after starting a transaction",
-                ));
-            }
-        }
         let mut cmd = op.build(stream_description)?;
-        // Clear inherited read concern when in a transaction
+        // Clear inherited read/writeconcern when in a transaction
         if session.as_ref().map_or(false, |s| s.in_transaction()) {
-            cmd.clear_read_concern();
+            cmd.clear_concerns();
         }
         self.inner.topology.watcher().update_command_with_read_pref(
             connection.address(),

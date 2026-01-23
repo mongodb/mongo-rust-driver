@@ -85,10 +85,6 @@ impl OperationWithDefaults for CreateIndexes {
             .into()
     }
 
-    fn set_write_concern(&mut self, wc: WriteConcern) {
-        self.options.get_or_insert_default().write_concern = Some(wc);
-    }
-
     fn target(&self) -> super::OperationTarget {
         (&self.target).into()
     }

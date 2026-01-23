@@ -77,10 +77,6 @@ impl OperationWithDefaults for AbortTransaction {
         self.write_concern.as_ref().into()
     }
 
-    fn set_write_concern(&mut self, wc: WriteConcern) {
-        self.write_concern = Some(wc);
-    }
-
     fn retryability(&self) -> Retryability {
         Retryability::Write
     }

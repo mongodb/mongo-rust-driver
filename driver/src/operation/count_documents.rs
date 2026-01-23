@@ -127,10 +127,6 @@ impl Operation for CountDocuments {
         self.aggregate.write_concern()
     }
 
-    fn set_write_concern(&mut self, wc: crate::options::WriteConcern) {
-        self.aggregate.set_write_concern(wc);
-    }
-
     fn supports_sessions(&self) -> bool {
         self.aggregate.supports_sessions()
     }

@@ -65,10 +65,6 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.write_concern()
     }
 
-    fn set_write_concern(&mut self, wc: WriteConcern) {
-        self.run_command.set_write_concern(wc);
-    }
-
     fn supports_sessions(&self) -> bool {
         self.run_command.supports_sessions()
     }

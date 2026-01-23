@@ -494,6 +494,13 @@ where
         }
     }
 
+    fn write_concern(&self) -> super::Feature<&crate::options::WriteConcern> {
+        self.options
+            .as_ref()
+            .and_then(|o| o.write_concern.as_ref())
+            .into()
+    }
+
     fn target(&self) -> super::OperationTarget {
         super::OperationTarget::admin(&self.client)
     }

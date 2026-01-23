@@ -206,10 +206,6 @@ impl OperationWithDefaults for Update {
             .into()
     }
 
-    fn set_write_concern(&mut self, wc: WriteConcern) {
-        self.options.get_or_insert_default().write_concern = Some(wc);
-    }
-
     fn retryability(&self) -> Retryability {
         if self.multi != Some(true) {
             Retryability::Write

@@ -163,9 +163,6 @@ pub(crate) trait Operation {
     /// `set_write_concern` MUST also be.
     fn write_concern(&self) -> Feature<&WriteConcern>;
 
-    /// Update the write concern for this operation.
-    fn set_write_concern(&mut self, wc: WriteConcern);
-
     /// Whether this operation supports sessions or not.
     fn supports_sessions(&self) -> bool;
 
@@ -215,10 +212,6 @@ impl<T> From<Option<T>> for Feature<T> {
 impl<T> Feature<T> {
     pub(crate) fn is_set(&self) -> bool {
         matches!(self, Self::Set(_))
-    }
-
-    pub(crate) fn is_inherit(&self) -> bool {
-        matches!(self, Self::Inherit)
     }
 
     pub(crate) fn supported(&self) -> bool {
@@ -362,18 +355,9 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         Feature::NotSupported
     }
 
-    /// The write concern to use for this operation, if any.  If this is implemented,
-    /// `set_write_concern` MUST also be.
+    /// The write concern to use for this operation, if any.
     fn write_concern(&self) -> Feature<&WriteConcern> {
         Feature::NotSupported
-    }
-
-    /// Update the write concern for this operation.
-    fn set_write_concern(&mut self, _wc: WriteConcern) {
-        panic!(
-            "set_write_concern called on unsupported operation {}",
-            self.name()
-        )
     }
 
     /// Whether this operation supports sessions or not.
@@ -441,9 +425,6 @@ where
     }
     fn write_concern(&self) -> Feature<&WriteConcern> {
         self.write_concern()
-    }
-    fn set_write_concern(&mut self, wc: WriteConcern) {
-        self.set_write_concern(wc);
     }
     fn supports_sessions(&self) -> bool {
         self.supports_sessions()

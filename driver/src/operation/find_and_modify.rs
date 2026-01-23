@@ -119,10 +119,6 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
             .into()
     }
 
-    fn set_write_concern(&mut self, wc: WriteConcern) {
-        self.options.get_or_insert_default().write_concern = Some(wc);
-    }
-
     fn retryability(&self) -> Retryability {
         Retryability::Write
     }

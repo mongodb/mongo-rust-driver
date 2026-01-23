@@ -165,8 +165,9 @@ impl Command {
         self.autocommit = Some(false);
     }
 
-    pub(crate) fn clear_read_concern(&mut self) {
+    pub(crate) fn clear_concerns(&mut self) {
         self.read_concern = None;
+        self.write_concern = None;
     }
 
     /// Sets the read concern level for this command.

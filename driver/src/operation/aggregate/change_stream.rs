@@ -137,10 +137,6 @@ impl Operation for ChangeStreamAggregate {
         self.inner.write_concern()
     }
 
-    fn set_write_concern(&mut self, wc: WriteConcern) {
-        self.inner.set_write_concern(wc);
-    }
-
     fn retryability(&self) -> Retryability {
         self.inner.retryability()
     }

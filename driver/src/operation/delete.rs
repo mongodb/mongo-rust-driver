@@ -93,10 +93,6 @@ impl OperationWithDefaults for Delete {
             .into()
     }
 
-    fn set_write_concern(&mut self, wc: WriteConcern) {
-        self.options.get_or_insert_default().write_concern = Some(wc);
-    }
-
     fn retryability(&self) -> Retryability {
         if self.limit == 1 {
             Retryability::Write

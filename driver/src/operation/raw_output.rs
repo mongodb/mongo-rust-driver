@@ -55,10 +55,6 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.write_concern()
     }
 
-    fn set_write_concern(&mut self, wc: crate::options::WriteConcern) {
-        self.0.set_write_concern(wc);
-    }
-
     fn supports_sessions(&self) -> bool {
         self.0.supports_sessions()
     }

@@ -174,10 +174,6 @@ impl OperationWithDefaults for Insert<'_> {
         self.options.write_concern.as_ref().into()
     }
 
-    fn set_write_concern(&mut self, wc: WriteConcern) {
-        self.options.write_concern = Some(wc);
-    }
-
     fn retryability(&self) -> Retryability {
         Retryability::Write
     }
