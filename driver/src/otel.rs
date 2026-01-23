@@ -395,11 +395,6 @@ pub(crate) trait OtelInfoDefaults: Operation {
         crate::bson_compat::cstr_to_str(self.name())
     }
 
-    #[expect(unused)]
-    fn target(&self) -> crate::otel::TargetName<'_> {
-        unimplemented!()
-    }
-
     fn cursor_id(&self) -> Option<i64> {
         None
     }
