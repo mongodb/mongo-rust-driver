@@ -167,7 +167,7 @@ impl OperationWithDefaults for Update {
         body.append(cstr!("updates"), updates);
         body.append(cstr!("ordered"), true); // command monitoring tests expect this (SPEC-1130)
 
-        Ok(Command::new(Self::NAME, &self.target.db().name(), body))
+        Ok(Command::from_operation(self, body))
     }
 
     fn handle_response<'a>(

@@ -35,7 +35,7 @@ impl OperationWithDefaults for DropDatabase {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(Self::NAME, self.target_db.name(), body))
+        Ok(Command::from_operation(self, body))
     }
 
     fn handle_response<'a>(

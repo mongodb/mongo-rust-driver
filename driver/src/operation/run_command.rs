@@ -5,7 +5,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     client::SESSIONS_UNSUPPORTED_COMMANDS,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
-    error::{ErrorKind, Result},
+    error::{Error, Result},
     selection_criteria::SelectionCriteria,
     Database,
 };
@@ -52,17 +52,13 @@ impl OperationWithDefaults for RunCommand<'_> {
     const NAME: &'static CStr = cstr!("$genericRunCommand");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
-        let command_name = self
-            .command_name()
-            .ok_or_else(|| ErrorKind::InvalidArgument {
-                message: "an empty document cannot be passed to a run_command operation".into(),
-            })?;
+        if self.command_name().is_none() {
+            return Err(Error::invalid_argument(
+                "an empty document cannot be passed to a run_command operation",
+            ));
+        }
 
-        Ok(Command::new(
-            command_name,
-            &self.db.name(),
-            self.command.clone(),
-        ))
+        Ok(Command::from_operation(self, self.command.clone()))
     }
 
     fn extract_at_cluster_time(
@@ -107,6 +103,10 @@ impl OperationWithDefaults for RunCommand<'_> {
 
     fn target(&self) -> super::OperationTarget {
         (&self.db).into()
+    }
+
+    fn name(&self) -> &CStr {
+        self.command_name().unwrap_or(&Self::NAME)
     }
 
     #[cfg(feature = "opentelemetry")]

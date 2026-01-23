@@ -78,7 +78,7 @@ impl OperationWithDefaults for Find {
         let raw_filter: RawDocumentBuf = (&self.filter).try_into()?;
         body.append(cstr!("filter"), raw_filter);
 
-        Ok(Command::new_read(self, body))
+        Ok(Command::from_operation(self, body))
     }
 
     fn extract_at_cluster_time(

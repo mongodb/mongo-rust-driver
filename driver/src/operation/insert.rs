@@ -120,9 +120,9 @@ impl OperationWithDefaults for Insert<'_> {
         if self.encrypted {
             // Auto-encryption does not support document sequences
             body.append(cstr!("documents"), vec_to_raw_array_buf(docs));
-            Ok(Command::new(Self::NAME, self.target.db().name(), body))
+            Ok(Command::from_operation(self, body))
         } else {
-            let mut command = Command::new(Self::NAME, self.target.db().name(), body);
+            let mut command = Command::from_operation(self, body);
             command.add_document_sequence("documents", docs);
             Ok(command)
         }

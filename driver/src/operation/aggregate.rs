@@ -63,7 +63,7 @@ impl OperationWithDefaults for Aggregate {
             }
         }
 
-        Ok(Command::new_read(self, (&body).try_into()?))
+        Ok(Command::from_operation(self, (&body).try_into()?))
     }
 
     fn extract_at_cluster_time(

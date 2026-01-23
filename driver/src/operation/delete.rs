@@ -70,11 +70,7 @@ impl OperationWithDefaults for Delete {
 
         append_options(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(
-            Self::NAME,
-            &self.target.db().name(),
-            (&body).try_into()?,
-        ))
+        Ok(Command::from_operation(self, (&body).try_into()?))
     }
 
     fn handle_response<'a>(

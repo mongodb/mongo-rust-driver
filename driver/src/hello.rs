@@ -68,7 +68,7 @@ pub(crate) fn hello_command(
         );
     }
 
-    let mut command = Command::new(command_name, "admin", body);
+    let mut command = Command::new_raw(command_name, "admin", body);
     if let Some(server_api) = server_api {
         command.set_server_api(server_api);
     }

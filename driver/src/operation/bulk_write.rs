@@ -285,7 +285,7 @@ where
             )));
         }
 
-        let mut command = Command::new(Self::NAME, "admin", command_body);
+        let mut command = Command::from_operation(self, command_body);
         namespace_info
             .namespaces
             .add_to_command(NS_INFO, &mut command);

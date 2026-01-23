@@ -55,7 +55,11 @@ pub(crate) struct Command {
 }
 
 impl Command {
-    pub(crate) fn new(name: impl ToString, target_db: impl ToString, body: RawDocumentBuf) -> Self {
+    pub(crate) fn new_raw(
+        name: impl ToString,
+        target_db: impl ToString,
+        body: RawDocumentBuf,
+    ) -> Self {
         Self {
             name: name.to_string(),
             target_db: target_db.to_string(),
@@ -74,7 +78,7 @@ impl Command {
         }
     }
 
-    pub(crate) fn new_read<Op: Operation>(op: &Op, body: RawDocumentBuf) -> Self {
+    pub(crate) fn from_operation<Op: Operation>(op: &Op, body: RawDocumentBuf) -> Self {
         let target = op.target();
         let read_concern = match op.read_concern() {
             Feature::Set(v) => Some(v),
@@ -84,7 +88,7 @@ impl Command {
         .cloned()
         .map(ReadConcernInternal::from);
         Self {
-            name: crate::bson_compat::cstr_to_str(Op::NAME).to_owned(),
+            name: crate::bson_compat::cstr_to_str(op.name()).to_owned(),
             target_db: target.db_name().to_owned(),
             exhaust_allowed: false,
             body,

@@ -50,7 +50,7 @@ impl OperationWithDefaults for Distinct {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new_read(self, body))
+        Ok(Command::from_operation(self, body))
     }
 
     fn extract_at_cluster_time(

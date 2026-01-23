@@ -47,7 +47,7 @@ impl OperationWithDefaults for AbortTransaction {
             }
         }
 
-        Ok(Command::new(Self::NAME, "admin", body))
+        Ok(Command::from_operation(self, body))
     }
 
     fn handle_response<'a>(

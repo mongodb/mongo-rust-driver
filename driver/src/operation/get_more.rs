@@ -75,7 +75,7 @@ impl OperationWithDefaults for GetMore<'_> {
             body.append(cstr!("comment"), raw_comment);
         }
 
-        Ok(Command::new(Self::NAME, &self.ns.db, body))
+        Ok(Command::from_operation(self, body))
     }
 
     fn handle_response_cow<'a>(

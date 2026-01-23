@@ -29,9 +29,8 @@ impl OperationWithDefaults for CreateSearchIndexes {
     const NAME: &'static CStr = cstr!("createSearchIndexes");
 
     fn build(&mut self, _description: &crate::cmap::StreamDescription) -> Result<Command> {
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            self.target.db().name(),
+        Ok(Command::from_operation(
+            self,
             rawdoc! {
                 Self::NAME: self.target.name(),
                 "indexes": to_raw_bson_array_ser(&self.indexes)?,
@@ -106,9 +105,8 @@ impl OperationWithDefaults for UpdateSearchIndex {
         _description: &crate::cmap::StreamDescription,
     ) -> crate::error::Result<crate::cmap::Command> {
         let raw_def: RawDocumentBuf = (&self.definition).try_into()?;
-        Ok(Command::new(
-            Self::NAME,
-            &self.target.db().name(),
+        Ok(Command::from_operation(
+            self,
             rawdoc! {
                 Self::NAME: self.target.name(),
                 "name": self.name.as_str(),
@@ -157,9 +155,8 @@ impl OperationWithDefaults for DropSearchIndex {
     const NAME: &'static CStr = cstr!("dropSearchIndex");
 
     fn build(&mut self, _description: &crate::cmap::StreamDescription) -> Result<Command> {
-        Ok(Command::new(
-            Self::NAME,
-            &self.target.db().name(),
+        Ok(Command::from_operation(
+            self,
             rawdoc! {
                 Self::NAME: self.target.name(),
                 "name": self.name.as_str(),
