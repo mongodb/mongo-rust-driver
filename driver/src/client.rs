@@ -141,12 +141,46 @@ struct ClientInner {
     shutdown: Shutdown,
     dropped: AtomicBool,
     end_sessions_token: std::sync::Mutex<AsyncDropToken>,
+    token_bucket: TokenBucket,
     #[cfg(feature = "in-use-encryption")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
     #[cfg(feature = "opentelemetry")]
     tracer: opentelemetry::global::BoxedTracer,
     #[cfg(test)]
     disable_command_events: AtomicBool,
+}
+
+/// A token bucket for retries. Note that the values used are scaled by a factor of 10 from those
+/// defined in the spec to allow for the use of integers.
+#[derive(Debug)]
+struct TokenBucket(tokio::sync::Mutex<u32>);
+const MAX_BUCKET_CAPACITY: u32 = 10_000;
+const TOKEN_CONSUMPTION: u32 = 10;
+
+impl TokenBucket {
+    fn new() -> Self {
+        Self(tokio::sync::Mutex::new(MAX_BUCKET_CAPACITY))
+    }
+
+    async fn deposit_first_success(&self) {
+        let mut tokens = self.0.lock().await;
+        *tokens = std::cmp::min(*tokens + 1, MAX_BUCKET_CAPACITY);
+    }
+
+    async fn deposit_retry_success(&self) {
+        let mut tokens = self.0.lock().await;
+        *tokens = std::cmp::min(*tokens + 10, MAX_BUCKET_CAPACITY);
+    }
+
+    async fn consume(&self) -> bool {
+        let mut tokens = self.0.lock().await;
+        if *tokens >= TOKEN_CONSUMPTION {
+            *tokens -= TOKEN_CONSUMPTION;
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -196,6 +230,7 @@ impl Client {
             },
             dropped: AtomicBool::new(false),
             end_sessions_token,
+            token_bucket: TokenBucket::new(),
             #[cfg(feature = "in-use-encryption")]
             csfle: Default::default(),
             #[cfg(feature = "opentelemetry")]
