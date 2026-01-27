@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use crate::bson::Document;
+use crate::{bson::Document, test::spec::unified_runner::run_unified_tests};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -1138,4 +1138,9 @@ async fn socks5_proxy_skip_ci() {
         .unwrap();
     let (started, _) = client.events.get_successful_command_execution("ping");
     assert_eq!(&started.connection.address.to_string(), mapped_host);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn backpressure_run_unified() {
+    run_unified_tests(&["client-backpressure"]).await;
 }

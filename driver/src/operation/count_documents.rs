@@ -7,7 +7,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, Result},
     operation::{aggregate::Aggregate, Operation},
-    options::{AggregateOptions, CountOptions, SelectionCriteria},
+    options::{AggregateOptions, ClientOptions, CountOptions, SelectionCriteria},
 };
 
 use super::{ExecutionContext, Retryability, SingleCursorResult};
@@ -109,6 +109,10 @@ impl Operation for CountDocuments {
 
     fn retryability(&self) -> Retryability {
         Retryability::Read
+    }
+
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        options.retry_reads != Some(false)
     }
 
     fn target(&self) -> super::OperationTarget {

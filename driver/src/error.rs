@@ -48,6 +48,8 @@ pub const UNKNOWN_TRANSACTION_COMMIT_RESULT: &str = "UnknownTransactionCommitRes
 pub const SYSTEM_OVERLOADED_ERROR: &str = "SystemOverloadedError";
 /// Indicates that an error is retryable.
 pub const RETRYABLE_ERROR: &str = "RetryableError";
+/// Indicates that no writes were performed before the error occurred.
+pub const NO_WRITES_PERFORMED: &str = "NoWritesPerformed";
 
 /// The result type for all methods that can return an error in the `mongodb` crate.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -595,7 +597,8 @@ impl Error {
             | ErrorKind::Authentication { .. }
             | ErrorKind::Custom(_)
             | ErrorKind::Shutdown
-            | ErrorKind::GridFs(_) => {}
+            | ErrorKind::GridFs(_)
+            | ErrorKind::Overload => {}
             #[cfg(feature = "socks5-proxy")]
             ErrorKind::ProxyConnect { .. } => {}
             #[cfg(feature = "in-use-encryption")]
@@ -796,6 +799,10 @@ pub enum ErrorKind {
     #[error("Client has been shut down")]
     Shutdown,
 
+    /// An operation could not be executed because the server was overloaded.
+    #[error("Server is overloaded")]
+    Overload,
+
     /// An error occurred when connecting to a proxy host.
     #[error("An error occurred when connecting to a proxy host: {message}")]
     #[non_exhaustive]
@@ -855,6 +862,7 @@ impl ErrorKind {
             ErrorKind::Encryption(..) => "Encryption",
             ErrorKind::Custom(..) => "Custom",
             ErrorKind::Shutdown => "Shutdown",
+            ErrorKind::Overload => "Overload",
             #[cfg(feature = "socks5-proxy")]
             ErrorKind::ProxyConnect { .. } => "ProxyConnect",
         }

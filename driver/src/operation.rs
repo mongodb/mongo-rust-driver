@@ -169,6 +169,8 @@ pub(crate) trait Operation {
     /// The level of retryability the operation supports.
     fn retryability(&self) -> Retryability;
 
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool;
+
     /// Updates this operation as needed for a retry.
     fn update_for_retry(&mut self);
 
@@ -370,6 +372,13 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         Retryability::None
     }
 
+    /// Whether this operation is retryable when retrying system overloaded errors. For read/write
+    /// operations, the operation is retryable if retryReads/retryWrites was set to true. Operations
+    /// with special behavior defined in the backpressure specification should override this method.
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        self.retryability().with_options(options) != Retryability::None
+    }
+
     /// Updates this operation as needed for a retry.
     fn update_for_retry(&mut self) {}
 
@@ -431,6 +440,9 @@ where
     }
     fn retryability(&self) -> Retryability {
         self.retryability()
+    }
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        self.is_backpressure_retryable(options)
     }
     fn update_for_retry(&mut self) {
         self.update_for_retry()

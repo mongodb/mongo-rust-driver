@@ -259,6 +259,6 @@ fn predicate_omits_unavailable() {
     }
     .into_topology_description(None);
     assert!(desc
-        .filter_servers_by_selection_criteria(&criteria, &[])
+        .filter_servers_by_selection_criteria(&criteria, None)
         .is_empty());
 }

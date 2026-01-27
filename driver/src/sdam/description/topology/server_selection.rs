@@ -1,7 +1,13 @@
 #[cfg(test)]
 mod test;
 
-use std::{collections::HashMap, fmt, ops::Deref, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 
 use super::TopologyDescription;
 use crate::{
@@ -32,11 +38,6 @@ impl SelectedServer {
         server.increment_operation_count();
         Self { server }
     }
-
-    #[cfg(feature = "tracing-unstable")]
-    pub(crate) fn address(&self) -> &ServerAddress {
-        &self.server.address
-    }
 }
 
 impl Deref for SelectedServer {
@@ -59,7 +60,7 @@ pub(crate) fn attempt_to_select_server<'a>(
     criteria: &'a SelectionCriteria,
     topology_description: &'a TopologyDescription,
     servers: &'a HashMap<ServerAddress, Arc<Server>>,
-    deprioritized: &[&ServerAddress],
+    deprioritized: Option<&HashSet<ServerAddress>>,
 ) -> Result<Option<SelectedServer>> {
     if let Some(message) = topology_description.compatibility_error() {
         return Err(ErrorKind::ServerSelection {
@@ -113,13 +114,13 @@ impl TopologyDescription {
     pub(crate) fn filter_servers_by_selection_criteria(
         &self,
         selection_criteria: &SelectionCriteria,
-        deprioritized: &[&ServerAddress],
+        deprioritized: Option<&HashSet<ServerAddress>>,
     ) -> Vec<&ServerDescription> {
         let mut servers_matching_criteria =
             self.filter_servers_by_selection_criteria_inner(selection_criteria, deprioritized);
-        if servers_matching_criteria.is_empty() && !deprioritized.is_empty() {
+        if servers_matching_criteria.is_empty() && deprioritized.is_some_and(|d| !d.is_empty()) {
             servers_matching_criteria =
-                self.filter_servers_by_selection_criteria_inner(selection_criteria, &[]);
+                self.filter_servers_by_selection_criteria_inner(selection_criteria, None);
         }
         servers_matching_criteria
     }
@@ -127,10 +128,10 @@ impl TopologyDescription {
     fn filter_servers_by_selection_criteria_inner(
         &self,
         selection_criteria: &SelectionCriteria,
-        deprioritized: &[&ServerAddress],
+        deprioritized: Option<&HashSet<ServerAddress>>,
     ) -> Vec<&ServerDescription> {
         let prioritized = self.servers.iter().filter_map(|(address, description)| {
-            if !deprioritized.contains(&address) {
+            if deprioritized.is_none_or(|d| !d.contains(address)) {
                 Some(description)
             } else {
                 None

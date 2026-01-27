@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     convert::{TryFrom, TryInto},
     time::Duration,
 };
@@ -101,10 +102,10 @@ async fn run_test(test_file: TestFile) {
         let deprioritized = test_file
             .deprioritized_servers
             .iter()
-            .map(|d| &d.address)
-            .collect::<Vec<_>>();
-        let mut suitable_servers =
-            topology.filter_servers_by_selection_criteria(&read_preference.into(), &deprioritized);
+            .map(|d| d.address.clone())
+            .collect::<HashSet<_>>();
+        let mut suitable_servers = topology
+            .filter_servers_by_selection_criteria(&read_preference.into(), Some(&deprioritized));
 
         assert_eq!(
             get_sorted_addresses!(&suitable_servers),

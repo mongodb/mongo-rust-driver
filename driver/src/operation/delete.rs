@@ -5,7 +5,7 @@ use crate::{
     collation::Collation,
     error::{convert_insert_many_error, Result},
     operation::{append_options, OperationWithDefaults, Retryability, WriteResponseBody},
-    options::{DeleteOptions, Hint, WriteConcern},
+    options::{ClientOptions, DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
     Collection,
 };
@@ -99,6 +99,10 @@ impl OperationWithDefaults for Delete {
         } else {
             Retryability::None
         }
+    }
+
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        options.retry_writes != Some(false)
     }
 
     fn target(&self) -> super::OperationTarget {

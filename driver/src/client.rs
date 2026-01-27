@@ -7,6 +7,7 @@ pub mod options;
 pub mod session;
 
 use std::{
+    collections::HashSet,
     sync::{
         atomic::{AtomicBool, Ordering},
         Mutex as SyncMutex,
@@ -153,33 +154,29 @@ struct ClientInner {
 /// A token bucket for retries. Note that the values used are scaled by a factor of 10 from those
 /// defined in the spec to allow for the use of integers.
 #[derive(Debug)]
-struct TokenBucket(tokio::sync::Mutex<u32>);
-const MAX_BUCKET_CAPACITY: u32 = 10_000;
-const TOKEN_CONSUMPTION: u32 = 10;
+struct TokenBucket(tokio::sync::Mutex<u16>);
+const MAX_BUCKET_CAPACITY: u16 = 10_000;
 
-impl TokenBucket {
-    fn new() -> Self {
-        Self(tokio::sync::Mutex::new(MAX_BUCKET_CAPACITY))
-    }
-
-    async fn deposit_first_success(&self) {
-        let mut tokens = self.0.lock().await;
-        *tokens = std::cmp::min(*tokens + 1, MAX_BUCKET_CAPACITY);
-    }
-
-    async fn deposit_retry_success(&self) {
-        let mut tokens = self.0.lock().await;
-        *tokens = std::cmp::min(*tokens + 10, MAX_BUCKET_CAPACITY);
-    }
-
-    async fn consume(&self) -> bool {
-        let mut tokens = self.0.lock().await;
-        if *tokens >= TOKEN_CONSUMPTION {
-            *tokens -= TOKEN_CONSUMPTION;
+impl Client {
+    pub(crate) async fn consume_from_bucket(&self) -> bool {
+        let mut tokens = self.inner.token_bucket.0.lock().await;
+        if *tokens >= 10 {
+            *tokens -= 10;
             true
         } else {
             false
         }
+    }
+
+    pub(crate) async fn deposit_success_in_bucket(&self, is_retry: bool) {
+        let deposit = if is_retry { 10 } else { 1 };
+        let mut tokens = self.inner.token_bucket.0.lock().await;
+        *tokens = std::cmp::min(*tokens + deposit, MAX_BUCKET_CAPACITY);
+    }
+
+    pub(crate) async fn deposit_retry_error_in_bucket(&self) {
+        let mut tokens = self.inner.token_bucket.0.lock().await;
+        *tokens = std::cmp::min(*tokens + 1, MAX_BUCKET_CAPACITY);
     }
 }
 
@@ -230,7 +227,7 @@ impl Client {
             },
             dropped: AtomicBool::new(false),
             end_sessions_token,
-            token_bucket: TokenBucket::new(),
+            token_bucket: TokenBucket(tokio::sync::Mutex::new(MAX_BUCKET_CAPACITY)),
             #[cfg(feature = "in-use-encryption")]
             csfle: Default::default(),
             #[cfg(feature = "opentelemetry")]
@@ -506,7 +503,7 @@ impl Client {
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
         let (server, _) = self
-            .select_server(criteria, &[], OpSelectionInfo::new("Test select server"))
+            .select_server(criteria, None, OpSelectionInfo::new("Test select server"))
             .await?;
         Ok(server.address.clone())
     }
@@ -516,7 +513,7 @@ impl Client {
     async fn select_server(
         &self,
         criteria: Option<&SelectionCriteria>,
-        deprioritized: &[&ServerAddress],
+        deprioritized: Option<&HashSet<ServerAddress>>,
         op_info: OpSelectionInfo<'_>,
     ) -> Result<(SelectedServer, SelectionCriteria)> {
         let criteria =
@@ -694,7 +691,7 @@ impl Client {
                 &selection_criteria,
                 &state.description,
                 &state.servers(),
-                &[],
+                None,
             ) else {
                 // If a suitable server is not available, do not proceed with the operation to avoid
                 // spinning for server_selection_timeout.

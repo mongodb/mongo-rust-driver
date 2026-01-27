@@ -205,6 +205,10 @@ impl OperationWithDefaults for Update {
         }
     }
 
+    fn is_backpressure_retryable(&self, options: &crate::options::ClientOptions) -> bool {
+        options.retry_writes != Some(false)
+    }
+
     fn target(&self) -> super::OperationTarget {
         (&self.target).into()
     }
