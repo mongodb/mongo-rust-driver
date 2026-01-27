@@ -1,25 +1,28 @@
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, Collection};
 
 use crate::{
+    bson::Document,
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, Result},
     operation::{append_options_to_raw_document, OperationWithDefaults, WriteConcernOnlyBody},
     options::{DropCollectionOptions, WriteConcern},
-    Namespace,
 };
 
 use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct DropCollection {
-    ns: Namespace,
+    target: Collection<Document>,
     options: Option<DropCollectionOptions>,
 }
 
 impl DropCollection {
-    pub(crate) fn new(ns: Namespace, options: Option<DropCollectionOptions>) -> Self {
-        DropCollection { ns, options }
+    pub(crate) fn new(
+        target: Collection<Document>,
+        options: Option<DropCollectionOptions>,
+    ) -> Self {
+        DropCollection { target, options }
     }
 }
 
@@ -30,12 +33,12 @@ impl OperationWithDefaults for DropCollection {
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
-            Self::NAME: self.ns.coll.clone(),
+            Self::NAME: self.target.name(),
         };
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(Self::NAME, &self.ns.db, body))
+        Ok(Command::from_operation(self, body))
     }
 
     fn handle_response<'a>(
@@ -55,10 +58,15 @@ impl OperationWithDefaults for DropCollection {
         }
     }
 
-    fn write_concern(&self) -> Option<&WriteConcern> {
+    fn write_concern(&self) -> super::Feature<&WriteConcern> {
         self.options
             .as_ref()
             .and_then(|opts| opts.write_concern.as_ref())
+            .into()
+    }
+
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
     }
 
     #[cfg(feature = "opentelemetry")]
@@ -69,10 +77,5 @@ impl OperationWithDefaults for DropCollection {
 impl crate::otel::OtelInfoDefaults for DropCollection {
     fn log_name(&self) -> &str {
         "dropCollection"
-    }
-
-    #[cfg(feature = "opentelemetry")]
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        (&self.ns).into()
     }
 }

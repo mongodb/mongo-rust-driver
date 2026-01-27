@@ -75,11 +75,8 @@ impl<'a> Action for Distinct<'a> {
     type Future = DistinctFuture;
 
     async fn execute(mut self) -> Result<Vec<Bson>> {
-        resolve_read_concern_with_session!(self.coll, self.options, self.session.as_ref());
-        resolve_selection_criteria_with_session!(self.coll, self.options, self.session.as_ref());
-
         let op = Op::new(
-            self.coll.namespace(),
+            self.coll.clone(),
             self.field_name,
             self.filter,
             self.options,

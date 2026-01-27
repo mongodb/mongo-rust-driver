@@ -3,6 +3,7 @@ use crate::bson::RawDocumentBuf;
 use crate::{
     bson::{doc, RawBsonRef, RawDocument, Timestamp},
     cursor::{CursorInformation, CursorSpecification},
+    operation::{Feature, OperationTarget},
 };
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
@@ -53,7 +54,7 @@ use crate::{
     },
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
-        aggregate::{change_stream::ChangeStreamAggregate, AggregateTarget},
+        aggregate::change_stream::ChangeStreamAggregate,
         AbortTransaction,
         CommandErrorBody,
         CommitTransaction,
@@ -143,16 +144,51 @@ impl Client {
         if self.inner.shutdown.executed.load(Ordering::SeqCst) {
             return Err(ErrorKind::Shutdown.into());
         }
-        // TODO RUST-9: remove this validation
-        if !op.is_acknowledged() {
-            return Err(ErrorKind::InvalidArgument {
-                message: "Unacknowledged write concerns are not supported".to_string(),
+
+        if session.as_ref().map_or(false, |s| s.in_transaction()) {
+            if op.read_concern().is_set() {
+                return Err(Error::invalid_argument(
+                    "Cannot set read concern after starting a transaction",
+                ));
             }
-            .into());
+            if op.write_concern().is_set() {
+                return Err(Error::invalid_argument(
+                    "Cannot set write concern after starting a transaction",
+                ));
+            }
         }
-        if let Some(write_concern) = op.write_concern() {
-            write_concern.validate()?;
+
+        if let Feature::Set(wc) = op.write_concern() {
+            // TODO RUST-9: remove this validation
+            if !wc.is_acknowledged() {
+                return Err(ErrorKind::InvalidArgument {
+                    message: "Unacknowledged write concerns are not supported".to_string(),
+                }
+                .into());
+            }
+
+            wc.validate()?;
         }
+
+        let op_target = op.target();
+        let selection_criteria = match op.selection_criteria() {
+            Feature::Set(s) => Some(s),
+            Feature::NotSupported => None,
+            Feature::Inherit => session
+                .as_ref()
+                .and_then(|s| {
+                    if s.in_transaction() {
+                        s.transaction
+                            .options
+                            .as_ref()
+                            .and_then(|o| o.selection_criteria.as_ref())
+                    } else {
+                        None
+                    }
+                })
+                .or_else(|| op_target.selection_criteria()),
+        }
+        .cloned();
 
         // Validate the session and update its transaction status if needed.
         if let Some(ref mut session) = session {
@@ -162,8 +198,8 @@ impl Client {
                      the collection/database on which the operation is being performed",
                 ));
             }
-            if op
-                .selection_criteria()
+            if selection_criteria
+                .as_ref()
                 .and_then(|sc| sc.as_read_pref())
                 .is_some_and(|rp| rp != &ReadPreference::Primary)
                 && session.in_transaction()
@@ -186,7 +222,11 @@ impl Client {
             }
         }
 
-        Box::pin(async { self.execute_operation_with_retry(op, session).await }).await
+        Box::pin(async {
+            self.execute_operation_with_retry(op, selection_criteria, session)
+                .await
+        })
+        .await
     }
 
     /// Execute the given operation, returning the cursor created by the operation.
@@ -245,7 +285,7 @@ impl Client {
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
-        target: AggregateTarget,
+        target: OperationTarget,
         mut resume_data: Option<ChangeStreamData>,
     ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
     where
@@ -283,7 +323,7 @@ impl Client {
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
-        target: AggregateTarget,
+        target: OperationTarget,
         resume_data: Option<ChangeStreamData>,
         session: &mut ClientSession,
     ) -> Result<SessionChangeStream<ChangeStreamEvent<T>>>
@@ -321,10 +361,12 @@ impl Client {
     async fn execute_operation_with_retry<T: Operation>(
         &self,
         op: &mut T,
+        selection_criteria: Option<SelectionCriteria>,
         mut session: Option<&mut ClientSession>,
     ) -> Result<ExecutionDetails<T>> {
         let mut retry: Option<ExecutionRetry> = None;
         let mut implicit_session: Option<ClientSession> = None;
+
         loop {
             if retry.is_some() {
                 op.update_for_retry();
@@ -333,17 +375,16 @@ impl Client {
             let selection_criteria = session
                 .as_ref()
                 .and_then(|s| s.transaction.pinned_mongos())
-                .or_else(|| op.selection_criteria());
+                .or_else(|| selection_criteria.as_ref());
 
             let (server, effective_criteria) = match self
                 .select_server(
                     selection_criteria,
-                    crate::bson_compat::cstr_to_str(op.name()),
                     &retry
                         .as_ref()
                         .map(|r| vec![&r.first_server])
                         .unwrap_or_default(),
-                    op.override_criteria(),
+                    (&*op).into(),
                 )
                 .await
             {
@@ -399,7 +440,7 @@ impl Client {
             if conn.supports_sessions()
                 && session.is_none()
                 && op.supports_sessions()
-                && op.is_acknowledged()
+                && op.write_concern().is_acknowledged()
             {
                 implicit_session = Some(ClientSession::new(self.clone(), None, true).await);
                 session = implicit_session.as_mut();
@@ -697,6 +738,10 @@ impl Client {
         let stream_description = connection.stream_description()?;
         let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
         let mut cmd = op.build(stream_description)?;
+        // Clear inherited read/writeconcern when in a transaction
+        if session.as_ref().map_or(false, |s| s.in_transaction()) {
+            cmd.clear_concerns();
+        }
         self.inner.topology.watcher().update_command_with_read_pref(
             connection.address(),
             &mut cmd,
@@ -704,7 +749,9 @@ impl Client {
         );
 
         match session {
-            Some(ref mut session) if op.supports_sessions() && op.is_acknowledged() => {
+            Some(ref mut session)
+                if op.supports_sessions() && op.write_concern().is_acknowledged() =>
+            {
                 cmd.set_session(session);
                 if let Some(txn_number) = txn_number {
                     cmd.set_txn_number(txn_number);
@@ -737,7 +784,7 @@ impl Client {
                         session.transaction.state,
                         TransactionState::None | TransactionState::Starting
                     )
-                    && op.supports_read_concern(stream_description)
+                    && op.read_concern().supported()
                 {
                     cmd.set_after_cluster_time(session);
                 }
@@ -784,7 +831,9 @@ impl Client {
                 }
                 .into());
             }
-            Some(ref session) if !op.is_acknowledged() && !session.is_implicit() => {
+            Some(ref session)
+                if !op.write_concern().is_acknowledged() && !session.is_implicit() =>
+            {
                 return Err(ErrorKind::InvalidArgument {
                     message: "Cannot use ClientSessions with unacknowledged write concern"
                         .to_string(),
@@ -936,7 +985,11 @@ impl Client {
                 || server_type.is_data_bearing()
         }));
         let _ = self
-            .select_server(Some(&criteria), operation_name, &[], |_, _| None)
+            .select_server(
+                Some(&criteria),
+                &[],
+                crate::client::OpSelectionInfo::new(operation_name),
+            )
             .await?;
         Ok(())
     }
@@ -1126,6 +1179,15 @@ impl RetryHelper for Option<ExecutionRetry> {
         match self.take() {
             Some(r) => Err(r.first_error),
             None => Ok(()),
+        }
+    }
+}
+
+impl Feature<&crate::options::WriteConcern> {
+    fn is_acknowledged(&self) -> bool {
+        match self {
+            Feature::Set(wc) => wc.is_acknowledged(),
+            _ => true,
         }
     }
 }

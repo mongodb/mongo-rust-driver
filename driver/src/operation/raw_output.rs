@@ -4,6 +4,7 @@ use crate::{
     bson_compat::CStr,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
+    options::SelectionCriteria,
     BoxFuture,
 };
 
@@ -42,20 +43,16 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         Err(error)
     }
 
-    fn selection_criteria(&self) -> Option<&crate::selection_criteria::SelectionCriteria> {
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
         self.0.selection_criteria()
     }
 
-    fn is_acknowledged(&self) -> bool {
-        self.0.is_acknowledged()
+    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
+        self.0.read_concern()
     }
 
-    fn write_concern(&self) -> Option<&crate::options::WriteConcern> {
+    fn write_concern(&self) -> super::Feature<&crate::options::WriteConcern> {
         self.0.write_concern()
-    }
-
-    fn supports_read_concern(&self, description: &StreamDescription) -> bool {
-        self.0.supports_read_concern(description)
     }
 
     fn supports_sessions(&self) -> bool {
@@ -82,6 +79,10 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.name()
     }
 
+    fn target(&self) -> super::OperationTarget {
+        self.0.target()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
@@ -90,10 +91,6 @@ impl<Op: Operation> Operation for RawOutput<Op> {
 impl<Op: Operation> crate::otel::OtelInfo for RawOutput<Op> {
     fn log_name(&self) -> &str {
         self.0.otel().log_name()
-    }
-
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        self.0.otel().target()
     }
 
     fn cursor_id(&self) -> Option<i64> {

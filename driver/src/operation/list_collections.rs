@@ -1,26 +1,26 @@
-use crate::bson::rawdoc;
-
 use crate::{
+    bson::rawdoc,
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
     operation::{OperationWithDefaults, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
+    Database,
 };
 
 use super::{append_options_to_raw_document, ExecutionContext};
 
 #[derive(Debug)]
 pub(crate) struct ListCollections {
-    db: String,
+    db: Database,
     name_only: bool,
     options: Option<ListCollectionsOptions>,
 }
 
 impl ListCollections {
     pub(crate) fn new(
-        db: String,
+        db: Database,
         name_only: bool,
         options: Option<ListCollectionsOptions>,
     ) -> Self {
@@ -54,7 +54,7 @@ impl OperationWithDefaults for ListCollections {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(Self::NAME, &self.db, body))
+        Ok(Command::from_operation(self, body))
     }
 
     fn handle_response_cow<'a>(
@@ -75,12 +75,16 @@ impl OperationWithDefaults for ListCollections {
         )
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        Some(SelectionCriteria::ReadPreference(ReadPreference::Primary)).as_ref()
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
+        super::Feature::Set(&SelectionCriteria::ReadPreference(ReadPreference::Primary))
     }
 
     fn retryability(&self) -> Retryability {
         Retryability::Read
+    }
+
+    fn target(&self) -> super::OperationTarget {
+        (&self.db).into()
     }
 
     #[cfg(feature = "opentelemetry")]
@@ -91,10 +95,5 @@ impl OperationWithDefaults for ListCollections {
 impl crate::otel::OtelInfoDefaults for ListCollections {
     fn output_cursor_id(output: &Self::O) -> Option<i64> {
         Some(output.id())
-    }
-
-    #[cfg(feature = "opentelemetry")]
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        self.db.as_str().into()
     }
 }

@@ -66,11 +66,26 @@ impl ClientSession {
                     }
                     None => self.default_transaction_options().cloned(),
                 };
-                resolve_options!(
-                    self.client,
-                    options,
-                    [read_concern, write_concern, selection_criteria]
-                );
+                // Manually resolve inherited options since this doesn't go through the operation
+                // executor.
+                if let Some(rc) = self.client.read_concern() {
+                    options
+                        .get_or_insert_default()
+                        .read_concern
+                        .get_or_insert_with(|| rc.clone());
+                }
+                if let Some(wc) = self.client.write_concern() {
+                    options
+                        .get_or_insert_default()
+                        .write_concern
+                        .get_or_insert_with(|| wc.clone());
+                }
+                if let Some(sc) = self.client.selection_criteria() {
+                    options
+                        .get_or_insert_default()
+                        .selection_criteria
+                        .get_or_insert_with(|| sc.clone());
+                }
 
                 if let Some(ref options) = options {
                     if !options
@@ -426,8 +441,10 @@ impl<'a> Action for CommitTransaction<'a> {
                 Ok(())
             }
             TransactionState::InProgress => {
-                let commit_transaction =
-                    operation::CommitTransaction::new(self.session.transaction.options.clone());
+                let commit_transaction = operation::CommitTransaction::new(
+                    &self.session.client(),
+                    self.session.transaction.options.clone(),
+                );
                 self.session.transaction.commit(true);
                 let out = self
                     .session
@@ -441,8 +458,10 @@ impl<'a> Action for CommitTransaction<'a> {
             TransactionState::Committed {
                 data_committed: true,
             } => {
-                let mut commit_transaction =
-                    operation::CommitTransaction::new(self.session.transaction.options.clone());
+                let mut commit_transaction = operation::CommitTransaction::new(
+                    &self.session.client(),
+                    self.session.transaction.options.clone(),
+                );
                 commit_transaction.update_for_retry();
                 self.session
                     .client
@@ -489,6 +508,7 @@ impl<'a> Action for AbortTransaction<'a> {
                     .and_then(|options| options.write_concern.as_ref())
                     .cloned();
                 let abort_transaction = operation::AbortTransaction::new(
+                    &self.session.client(),
                     write_concern,
                     self.session.transaction.pinned.take(),
                 );

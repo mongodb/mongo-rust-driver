@@ -84,12 +84,10 @@ impl<'a> Action for InsertOne<'a> {
     type Future = InsertOneFuture;
 
     async fn execute(mut self) -> Result<InsertOneResult> {
-        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref());
-
         let doc = self.doc?;
 
         let insert = Op::new(
-            self.coll.namespace(),
+            self.coll.clone(),
             vec![doc.deref()],
             self.options.map(InsertManyOptions::from_insert_one_options),
             self.coll.client().should_auto_encrypt().await,

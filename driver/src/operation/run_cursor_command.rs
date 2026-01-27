@@ -7,8 +7,7 @@ use crate::{
     cursor::CursorSpecification,
     error::{Error, Result},
     operation::{run_command::RunCommand, Operation, SERVER_4_4_0_WIRE_VERSION},
-    options::RunCursorCommandOptions,
-    selection_criteria::SelectionCriteria,
+    options::{RunCursorCommandOptions, SelectionCriteria},
     BoxFuture,
 };
 
@@ -54,20 +53,16 @@ impl Operation for RunCursorCommand<'_> {
         Err(error)
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
         self.run_command.selection_criteria()
     }
 
-    fn is_acknowledged(&self) -> bool {
-        self.run_command.is_acknowledged()
+    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
+        self.run_command.read_concern()
     }
 
-    fn write_concern(&self) -> Option<&WriteConcern> {
+    fn write_concern(&self) -> super::Feature<&WriteConcern> {
         self.run_command.write_concern()
-    }
-
-    fn supports_read_concern(&self, description: &StreamDescription) -> bool {
-        self.run_command.supports_read_concern(description)
     }
 
     fn supports_sessions(&self) -> bool {
@@ -92,6 +87,10 @@ impl Operation for RunCursorCommand<'_> {
 
     fn name(&self) -> &CStr {
         self.run_command.name()
+    }
+
+    fn target(&self) -> super::OperationTarget {
+        self.run_command.target()
     }
 
     fn handle_response<'a>(
@@ -128,10 +127,6 @@ impl Operation for RunCursorCommand<'_> {
 impl crate::otel::OtelInfo for RunCursorCommand<'_> {
     fn log_name(&self) -> &str {
         self.run_command.otel().log_name()
-    }
-
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        self.run_command.otel().target()
     }
 
     fn cursor_id(&self) -> Option<i64> {

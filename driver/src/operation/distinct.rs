@@ -4,16 +4,17 @@ use crate::{
     bson::{doc, rawdoc, Bson, Document, RawBsonRef, RawDocumentBuf},
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
-    coll::{options::DistinctOptions, Namespace},
+    coll::options::DistinctOptions,
     error::Result,
     operation::{OperationWithDefaults, Retryability},
-    selection_criteria::SelectionCriteria,
+    options::SelectionCriteria,
+    Collection,
 };
 
 use super::{append_options_to_raw_document, ExecutionContext};
 
 pub(crate) struct Distinct {
-    ns: Namespace,
+    target: Collection<Document>,
     field_name: String,
     query: Document,
     options: Option<DistinctOptions>,
@@ -21,13 +22,13 @@ pub(crate) struct Distinct {
 
 impl Distinct {
     pub fn new(
-        ns: Namespace,
+        target: Collection<Document>,
         field_name: String,
         query: Document,
         options: Option<DistinctOptions>,
     ) -> Self {
         Distinct {
-            ns,
+            target,
             field_name,
             query,
             options,
@@ -42,19 +43,14 @@ impl OperationWithDefaults for Distinct {
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
-            Self::NAME: self.ns.coll.clone(),
+            Self::NAME: self.target.name(),
             "key": self.field_name.clone(),
             "query": RawDocumentBuf::try_from(&self.query)?,
         };
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new_read(
-            Self::NAME,
-            &self.ns.db,
-            self.options.as_ref().and_then(|o| o.read_concern.clone()),
-            body,
-        ))
+        Ok(Command::from_operation(self, body))
     }
 
     fn extract_at_cluster_time(
@@ -75,19 +71,26 @@ impl OperationWithDefaults for Distinct {
         Ok(response.values)
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        if let Some(ref options) = self.options {
-            return options.selection_criteria.as_ref();
-        }
-        None
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
+        self.options
+            .as_ref()
+            .and_then(|o| o.selection_criteria.as_ref())
+            .into()
     }
 
     fn retryability(&self) -> Retryability {
         Retryability::Read
     }
 
-    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
-        true
+    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
+        self.options
+            .as_ref()
+            .and_then(|o| o.read_concern.as_ref())
+            .into()
+    }
+
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
     }
 
     #[cfg(feature = "opentelemetry")]
@@ -95,11 +98,7 @@ impl OperationWithDefaults for Distinct {
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for Distinct {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        (&self.ns).into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for Distinct {}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Response {

@@ -6,7 +6,7 @@ use crate::{
     coll::options::{AggregateOptions, Hint},
     collation::Collation,
     error::Result,
-    operation::aggregate::AggregateTarget,
+    operation::OperationTarget,
     options::{ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
     Client,
@@ -169,14 +169,8 @@ impl<'a, Session, T> Aggregate<'a, Session, T> {
 
 macro_rules! agg_exec_generic {
     ($agg:expr) => {{
-        resolve_options!(
-            $agg.target,
-            $agg.options,
-            [read_concern, write_concern, selection_criteria]
-        );
-
         let mut aggregate = crate::operation::aggregate::Aggregate::new(
-            $agg.target.target(),
+            (&$agg.target).into(),
             $agg.pipeline,
             $agg.options,
         );
@@ -202,7 +196,7 @@ impl<'a, T> Aggregate<'a, ImplicitSession, T> {
 
     /// Execute the aggregate command, returning a cursor that provides results in zero-copy raw
     /// batches.
-    pub async fn batch(mut self) -> Result<crate::raw_batch_cursor::RawBatchCursor> {
+    pub async fn batch(self) -> Result<crate::raw_batch_cursor::RawBatchCursor> {
         agg_exec_generic!(self)
     }
 }
@@ -211,23 +205,15 @@ impl<'a, T> Aggregate<'a, ImplicitSession, T> {
 impl<'a, T> Action for Aggregate<'a, ImplicitSession, T> {
     type Future = AggregateFuture;
 
-    async fn execute(mut self) -> Result<Cursor<T>> {
+    async fn execute(self) -> Result<Cursor<T>> {
         agg_exec_generic!(self)
     }
 }
 
 macro_rules! agg_exec_generic_session {
     ($agg:expr) => {{
-        resolve_read_concern_with_session!($agg.target, $agg.options, Some(&mut *$agg.session.0));
-        resolve_write_concern_with_session!($agg.target, $agg.options, Some(&mut *$agg.session.0));
-        resolve_selection_criteria_with_session!(
-            $agg.target,
-            $agg.options,
-            Some(&mut *$agg.session.0)
-        );
-
         let mut aggregate = crate::operation::aggregate::Aggregate::new(
-            $agg.target.target(),
+            (&$agg.target).into(),
             $agg.pipeline,
             $agg.options,
         );
@@ -242,7 +228,7 @@ macro_rules! agg_exec_generic_session {
 impl<'a, T> Aggregate<'a, ExplicitSession<'a>, T> {
     /// Execute the aggregate command, returning a cursor that provides results in zero-copy raw
     /// batches.
-    pub async fn batch(mut self) -> Result<crate::raw_batch_cursor::SessionRawBatchCursor> {
+    pub async fn batch(self) -> Result<crate::raw_batch_cursor::SessionRawBatchCursor> {
         agg_exec_generic_session!(self)
     }
 }
@@ -251,7 +237,7 @@ impl<'a, T> Aggregate<'a, ExplicitSession<'a>, T> {
 impl<'a, T> Action for Aggregate<'a, ExplicitSession<'a>, T> {
     type Future = AggregateSessionFuture;
 
-    async fn execute(mut self) -> Result<SessionCursor<T>> {
+    async fn execute(self) -> Result<SessionCursor<T>> {
         agg_exec_generic_session!(self)
     }
 }
@@ -262,38 +248,19 @@ enum AggregateTargetRef<'a> {
 }
 
 impl AggregateTargetRef<'_> {
-    fn target(&self) -> AggregateTarget {
-        match self {
-            Self::Collection(cr) => AggregateTarget::Collection(cr.namespace()),
-            Self::Database(db) => AggregateTarget::Database(db.name().to_string()),
-        }
-    }
-
     fn client(&self) -> &Client {
         match self {
             Self::Collection(cr) => cr.client(),
             Self::Database(db) => db.client(),
         }
     }
+}
 
-    fn read_concern(&self) -> Option<&ReadConcern> {
-        match self {
-            Self::Collection(cr) => cr.read_concern(),
-            Self::Database(db) => db.read_concern(),
-        }
-    }
-
-    fn write_concern(&self) -> Option<&WriteConcern> {
-        match self {
-            Self::Collection(cr) => cr.write_concern(),
-            Self::Database(db) => db.write_concern(),
-        }
-    }
-
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        match self {
-            Self::Collection(cr) => cr.selection_criteria(),
-            Self::Database(db) => db.selection_criteria(),
+impl From<&AggregateTargetRef<'_>> for OperationTarget {
+    fn from(value: &AggregateTargetRef<'_>) -> Self {
+        match value {
+            AggregateTargetRef::Collection(cr) => OperationTarget::Collection((*cr).clone()),
+            AggregateTargetRef::Database(db) => OperationTarget::Database((*db).clone()),
         }
     }
 }

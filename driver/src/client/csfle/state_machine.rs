@@ -131,10 +131,15 @@ impl CryptExecutor {
                     let db = db.as_ref().ok_or_else(|| {
                         Error::internal("db required for NeedMongoMarkings state")
                     })?;
-                    let op = RawOutput(RunCommand::new(db.to_string(), command, None, None));
                     let mongocryptd_client = self.mongocryptd_client.as_ref().ok_or_else(|| {
                         Error::invalid_argument("this operation requires mongocryptd")
                     })?;
+                    let op = RawOutput(RunCommand::new(
+                        mongocryptd_client.database(db),
+                        command,
+                        None,
+                        None,
+                    ));
                     let result = mongocryptd_client.execute_operation(op.clone(), None).await;
                     let response = match result {
                         Ok(r) => r,

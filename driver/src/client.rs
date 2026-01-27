@@ -471,7 +471,7 @@ impl Client {
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
         let (server, _) = self
-            .select_server(criteria, "Test select server", &[], |_, _| None)
+            .select_server(criteria, &[], OpSelectionInfo::new("Test select server"))
             .await?;
         Ok(server.address.clone())
     }
@@ -481,10 +481,8 @@ impl Client {
     async fn select_server(
         &self,
         criteria: Option<&SelectionCriteria>,
-        #[allow(unused_variables)] // we only use the operation_name for tracing.
-        operation_name: &str,
         deprioritized: &[&ServerAddress],
-        override_criteria: OverrideCriteriaFn,
+        op_info: OpSelectionInfo<'_>,
     ) -> Result<(SelectedServer, SelectionCriteria)> {
         let criteria =
             criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
@@ -500,7 +498,7 @@ impl Client {
         let event_emitter = ServerSelectionTracingEventEmitter::new(
             self.inner.topology.id,
             criteria,
-            operation_name,
+            op_info.name,
             start_time,
             timeout,
             self.options().tracing_max_document_length_bytes,
@@ -516,7 +514,7 @@ impl Client {
             let state = watcher.observe_latest();
             let override_slot;
             let effective_criteria =
-                if let Some(oc) = override_criteria(criteria, &state.description) {
+                if let Some(oc) = (op_info.override_criteria)(criteria, &state.description) {
                     override_slot = oc;
                     &override_slot
                 } else {
@@ -738,6 +736,31 @@ impl Drop for Client {
                 .spawn(async move {
                     client.end_all_sessions().await;
                 });
+        }
+    }
+}
+
+/// Operation-specific parameters to server selection
+pub(crate) struct OpSelectionInfo<'a> {
+    #[allow(unused)]
+    name: &'a str,
+    override_criteria: OverrideCriteriaFn,
+}
+
+impl<'a, T: crate::operation::Operation> From<&'a T> for OpSelectionInfo<'a> {
+    fn from(op: &'a T) -> Self {
+        Self {
+            name: crate::bson_compat::cstr_to_str(op.name()),
+            override_criteria: op.override_criteria(),
+        }
+    }
+}
+
+impl<'a> OpSelectionInfo<'a> {
+    fn new(name: &'a str) -> Self {
+        Self {
+            name,
+            override_criteria: |_, _| None,
         }
     }
 }

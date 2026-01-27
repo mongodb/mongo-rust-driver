@@ -1,26 +1,28 @@
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, options::SelectionCriteria, Collection};
 use serde::Deserialize;
 
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
-    coll::{options::EstimatedDocumentCountOptions, Namespace},
+    coll::options::EstimatedDocumentCountOptions,
     error::{Error, Result},
     operation::{OperationWithDefaults, Retryability},
-    selection_criteria::SelectionCriteria,
 };
 
 use super::{append_options_to_raw_document, ExecutionContext};
 
 pub(crate) struct Count {
-    ns: Namespace,
+    target: Collection<Document>,
     options: Option<EstimatedDocumentCountOptions>,
 }
 
 impl Count {
-    pub fn new(ns: Namespace, options: Option<EstimatedDocumentCountOptions>) -> Self {
-        Count { ns, options }
+    pub fn new(
+        target: Collection<Document>,
+        options: Option<EstimatedDocumentCountOptions>,
+    ) -> Self {
+        Count { target, options }
     }
 }
 
@@ -31,17 +33,12 @@ impl OperationWithDefaults for Count {
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
-            Self::NAME: self.ns.coll.clone(),
+            Self::NAME: self.target.name(),
         };
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new_read(
-            Self::NAME,
-            &self.ns.db,
-            self.options.as_ref().and_then(|o| o.read_concern.clone()),
-            body,
-        ))
+        Ok(Command::from_operation(self, body))
     }
 
     fn handle_response<'a>(
@@ -61,19 +58,26 @@ impl OperationWithDefaults for Count {
         }
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        if let Some(ref options) = self.options {
-            return options.selection_criteria.as_ref();
-        }
-        None
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
+        self.options
+            .as_ref()
+            .and_then(|o| o.selection_criteria.as_ref())
+            .into()
     }
 
-    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
-        true
+    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
+        self.options
+            .as_ref()
+            .and_then(|o| o.read_concern.as_ref())
+            .into()
     }
 
     fn retryability(&self) -> Retryability {
         Retryability::Read
+    }
+
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
     }
 
     #[cfg(feature = "opentelemetry")]
@@ -81,11 +85,7 @@ impl OperationWithDefaults for Count {
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for Count {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        (&self.ns).into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for Count {}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ResponseBody {

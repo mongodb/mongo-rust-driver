@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, Client};
 
 use crate::{
     bson_compat::{cstr, CStr},
@@ -14,11 +14,15 @@ use super::{ExecutionContext, WriteConcernOnlyBody};
 
 pub(crate) struct CommitTransaction {
     options: Option<TransactionOptions>,
+    target: Client,
 }
 
 impl CommitTransaction {
-    pub(crate) fn new(options: Option<TransactionOptions>) -> Self {
-        Self { options }
+    pub(crate) fn new(client: &Client, options: Option<TransactionOptions>) -> Self {
+        Self {
+            options,
+            target: client.clone(),
+        }
     }
 }
 
@@ -34,7 +38,7 @@ impl OperationWithDefaults for CommitTransaction {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(Self::NAME, "admin", body))
+        Ok(Command::from_operation(self, body))
     }
 
     fn handle_response<'a>(
@@ -46,10 +50,11 @@ impl OperationWithDefaults for CommitTransaction {
         response.validate()
     }
 
-    fn write_concern(&self) -> Option<&WriteConcern> {
+    fn write_concern(&self) -> super::Feature<&WriteConcern> {
         self.options
             .as_ref()
-            .and_then(|opts| opts.write_concern.as_ref())
+            .and_then(|o| o.write_concern.as_ref())
+            .into()
     }
 
     fn retryability(&self) -> Retryability {
@@ -81,13 +86,13 @@ impl OperationWithDefaults for CommitTransaction {
         }
     }
 
+    fn target(&self) -> super::OperationTarget {
+        super::OperationTarget::admin(&self.target)
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for CommitTransaction {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        crate::otel::OperationTarget::ADMIN
-    }
-}
+impl crate::otel::OtelInfoDefaults for CommitTransaction {}

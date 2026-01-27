@@ -111,8 +111,7 @@ impl<'a> Action for EstimatedDocumentCount<'a> {
     type Future = EstimatedDocumentCountFuture;
 
     async fn execute(mut self) -> Result<u64> {
-        resolve_options!(self.cr, self.options, [read_concern, selection_criteria]);
-        let op = crate::operation::count::Count::new(self.cr.namespace(), self.options);
+        let op = crate::operation::count::Count::new(self.cr.clone(), self.options);
         self.cr.client().execute_operation(op, None).await
     }
 }
@@ -141,11 +140,8 @@ impl<'a> Action for CountDocuments<'a> {
     type Future = CountDocumentsFuture;
 
     async fn execute(mut self) -> Result<u64> {
-        resolve_read_concern_with_session!(self.cr, self.options, self.session.as_ref());
-        resolve_selection_criteria_with_session!(self.cr, self.options, self.session.as_ref());
-
         let op = crate::operation::count_documents::CountDocuments::new(
-            self.cr.namespace(),
+            self.cr.inner(),
             self.filter,
             self.options,
         )?;

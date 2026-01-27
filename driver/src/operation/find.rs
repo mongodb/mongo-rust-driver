@@ -1,29 +1,31 @@
-use crate::bson::RawDocumentBuf;
-
 use crate::{
-    bson::{rawdoc, Document},
+    bson::{rawdoc, Document, RawDocumentBuf},
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{Error, Result},
     operation::{OperationWithDefaults, Retryability, SERVER_4_4_0_WIRE_VERSION},
     options::{CursorType, FindOptions, SelectionCriteria},
-    Namespace,
+    Collection,
 };
 
 use super::{append_options_to_raw_document, ExecutionContext};
 
 #[derive(Debug)]
 pub(crate) struct Find {
-    ns: Namespace,
+    target: Collection<Document>,
     filter: Document,
     options: Option<Box<FindOptions>>,
 }
 
 impl Find {
-    pub(crate) fn new(ns: Namespace, filter: Document, options: Option<FindOptions>) -> Self {
+    pub(crate) fn new(
+        target: Collection<Document>,
+        filter: Document,
+        options: Option<FindOptions>,
+    ) -> Self {
         Self {
-            ns,
+            target,
             filter,
             options: options.map(Box::new),
         }
@@ -37,7 +39,7 @@ impl OperationWithDefaults for Find {
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
-            Self::NAME: self.ns.coll.clone(),
+            Self::NAME: self.target.name(),
         };
 
         if let Some(ref mut options) = self.options {
@@ -76,12 +78,7 @@ impl OperationWithDefaults for Find {
         let raw_filter: RawDocumentBuf = (&self.filter).try_into()?;
         body.append(cstr!("filter"), raw_filter);
 
-        Ok(Command::new_read(
-            Self::NAME,
-            &self.ns.db,
-            self.options.as_ref().and_then(|o| o.read_concern.clone()),
-            body,
-        ))
+        Ok(Command::from_operation(self, body))
     }
 
     fn extract_at_cluster_time(
@@ -114,18 +111,26 @@ impl OperationWithDefaults for Find {
         )
     }
 
-    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
-        true
+    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
+        self.options
+            .as_ref()
+            .and_then(|opts| opts.read_concern.as_ref())
+            .into()
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
         self.options
             .as_ref()
             .and_then(|opts| opts.selection_criteria.as_ref())
+            .into()
     }
 
     fn retryability(&self) -> Retryability {
         Retryability::Read
+    }
+
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
     }
 
     #[cfg(feature = "opentelemetry")]
@@ -134,10 +139,6 @@ impl OperationWithDefaults for Find {
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for Find {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        (&self.ns).into()
-    }
-
     fn output_cursor_id(output: &Self::O) -> Option<i64> {
         Some(output.id())
     }

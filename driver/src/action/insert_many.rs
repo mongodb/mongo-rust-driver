@@ -89,8 +89,6 @@ impl<'a> Action for InsertMany<'a> {
     type Future = InsertManyFuture;
 
     async fn execute(mut self) -> Result<InsertManyResult> {
-        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref());
-
         let ds = self.docs?;
         if ds.is_empty() {
             return Err(ErrorKind::InvalidArgument {
@@ -113,7 +111,7 @@ impl<'a> Action for InsertMany<'a> {
 
         while n_attempted < ds.len() {
             let docs: Vec<_> = ds.iter().skip(n_attempted).map(Deref::deref).collect();
-            let insert = Op::new(self.coll.namespace(), docs, self.options.clone(), encrypted);
+            let insert = Op::new(self.coll.clone(), docs, self.options.clone(), encrypted);
 
             match self
                 .coll

@@ -28,7 +28,7 @@ pub(crate) fn build_client_first(
         auth_command_doc.append(cstr!("username"), username.as_str());
     }
 
-    let mut command = Command::new("authenticate", "$external", auth_command_doc);
+    let mut command = Command::new_raw("authenticate", "$external", auth_command_doc);
     if let Some(server_api) = server_api {
         command.set_server_api(server_api);
     }

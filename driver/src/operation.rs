@@ -52,10 +52,13 @@ use crate::{
         WriteConcernError,
         WriteFailure,
     },
-    options::{ClientOptions, WriteConcern},
+    options::{ClientOptions, ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
     BoxFuture,
     ClientSession,
+    Collection,
+    Database,
+    Namespace,
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
@@ -151,16 +154,14 @@ pub(crate) trait Operation {
     fn handle_error(&self, error: Error) -> Result<Self::O>;
 
     /// Criteria to use for selecting the server that this operation will be executed on.
-    fn selection_criteria(&self) -> Option<&SelectionCriteria>;
+    fn selection_criteria(&self) -> Feature<&SelectionCriteria>;
 
-    /// Whether or not this operation will request acknowledgment from the server.
-    fn is_acknowledged(&self) -> bool;
+    /// The read concern to use for this operation, if any.
+    fn read_concern(&self) -> Feature<&ReadConcern>;
 
-    /// The write concern to use for this operation, if any.
-    fn write_concern(&self) -> Option<&WriteConcern>;
-
-    /// Returns whether or not this command supports the `readConcern` field.
-    fn supports_read_concern(&self, description: &StreamDescription) -> bool;
+    /// The write concern to use for this operation, if any.  If this is implemented,
+    /// `set_write_concern` MUST also be.
+    fn write_concern(&self) -> Feature<&WriteConcern>;
 
     /// Whether this operation supports sessions or not.
     fn supports_sessions(&self) -> bool;
@@ -180,6 +181,9 @@ pub(crate) trait Operation {
     /// The name of the server side command associated with this operation.
     fn name(&self) -> &CStr;
 
+    /// The noun to this operation's verb.
+    fn target(&self) -> OperationTarget;
+
     #[cfg(feature = "opentelemetry")]
     type Otel: crate::otel::OtelWitness<Op = Self>;
 
@@ -189,8 +193,94 @@ pub(crate) trait Operation {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum Feature<T> {
+    Set(T),
+    Inherit,
+    NotSupported,
+}
+
+impl<T> From<Option<T>> for Feature<T> {
+    fn from(value: Option<T>) -> Self {
+        match value {
+            Some(c) => Self::Set(c),
+            None => Self::Inherit,
+        }
+    }
+}
+
+impl<T> Feature<T> {
+    pub(crate) fn is_set(&self) -> bool {
+        matches!(self, Self::Set(_))
+    }
+
+    pub(crate) fn supported(&self) -> bool {
+        match self {
+            Self::NotSupported => false,
+            _ => true,
+        }
+    }
+}
+
 pub(crate) type OverrideCriteriaFn =
     fn(&SelectionCriteria, &crate::sdam::TopologyDescription) -> Option<SelectionCriteria>;
+
+#[derive(Debug, Clone)]
+pub(crate) enum OperationTarget {
+    Database(Database),
+    Collection(crate::Collection<Document>),
+    Namespace(Namespace),
+}
+
+impl OperationTarget {
+    pub(crate) fn admin(client: &crate::Client) -> Self {
+        Self::Database(client.database("admin"))
+    }
+
+    pub(crate) fn db_name(&self) -> &str {
+        match self {
+            Self::Database(db) => db.name(),
+            Self::Collection(coll) => coll.db().name(),
+            Self::Namespace(ns) => &ns.db,
+        }
+    }
+
+    pub(crate) fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        match self {
+            Self::Database(db) => db.selection_criteria(),
+            Self::Collection(coll) => coll.selection_criteria(),
+            Self::Namespace(_) => None,
+        }
+    }
+
+    pub(crate) fn read_concern(&self) -> Option<&ReadConcern> {
+        match self {
+            Self::Database(db) => db.read_concern(),
+            Self::Collection(coll) => coll.read_concern(),
+            Self::Namespace(_) => None,
+        }
+    }
+
+    pub(crate) fn write_concern(&self) -> Option<&WriteConcern> {
+        match self {
+            Self::Database(db) => db.write_concern(),
+            Self::Collection(coll) => coll.write_concern(),
+            Self::Namespace(_) => None,
+        }
+    }
+}
+
+impl From<&Database> for OperationTarget {
+    fn from(value: &Database) -> Self {
+        Self::Database(value.clone())
+    }
+}
+
+impl<T: Send + Sync> From<&Collection<T>> for OperationTarget {
+    fn from(value: &Collection<T>) -> Self {
+        Self::Collection(value.clone_with_type())
+    }
+}
 
 // A mirror of the `Operation` trait, with default behavior where appropriate.  Should only be
 // implemented by operation types that do not delegate to other operations.
@@ -256,25 +346,18 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     }
 
     /// Criteria to use for selecting the server that this operation will be executed on.
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        None
+    fn selection_criteria(&self) -> Feature<&SelectionCriteria> {
+        Feature::NotSupported
     }
 
-    /// Whether or not this operation will request acknowledgment from the server.
-    fn is_acknowledged(&self) -> bool {
-        self.write_concern()
-            .map(WriteConcern::is_acknowledged)
-            .unwrap_or(true)
+    /// The read concern to use for this operation, if any.
+    fn read_concern(&self) -> Feature<&ReadConcern> {
+        Feature::NotSupported
     }
 
     /// The write concern to use for this operation, if any.
-    fn write_concern(&self) -> Option<&WriteConcern> {
-        None
-    }
-
-    /// Returns whether or not this command supports the `readConcern` field.
-    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
-        false
+    fn write_concern(&self) -> Feature<&WriteConcern> {
+        Feature::NotSupported
     }
 
     /// Whether this operation supports sessions or not.
@@ -305,6 +388,8 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
         Self::NAME
     }
 
+    fn target(&self) -> OperationTarget;
+
     #[cfg(feature = "opentelemetry")]
     type Otel: crate::otel::OtelWitness<Op = Self>;
 }
@@ -332,17 +417,14 @@ where
     fn handle_error(&self, error: Error) -> Result<Self::O> {
         self.handle_error(error)
     }
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+    fn selection_criteria(&self) -> Feature<&SelectionCriteria> {
         self.selection_criteria()
     }
-    fn is_acknowledged(&self) -> bool {
-        self.is_acknowledged()
+    fn read_concern(&self) -> Feature<&ReadConcern> {
+        self.read_concern()
     }
-    fn write_concern(&self) -> Option<&WriteConcern> {
+    fn write_concern(&self) -> Feature<&WriteConcern> {
         self.write_concern()
-    }
-    fn supports_read_concern(&self, description: &StreamDescription) -> bool {
-        self.supports_read_concern(description)
     }
     fn supports_sessions(&self) -> bool {
         self.supports_sessions()
@@ -361,6 +443,9 @@ where
     }
     fn name(&self) -> &CStr {
         self.name()
+    }
+    fn target(&self) -> OperationTarget {
+        self.target()
     }
     #[cfg(feature = "opentelemetry")]
     type Otel = <Self as OperationWithDefaults>::Otel;

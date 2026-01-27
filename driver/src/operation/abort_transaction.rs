@@ -1,14 +1,12 @@
-use crate::bson::rawdoc;
-
 use crate::{
+    bson::rawdoc,
     bson_compat::{cstr, CStr},
-    bson_util::append_ser,
     client::session::TransactionPin,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::Retryability,
-    options::WriteConcern,
-    selection_criteria::SelectionCriteria,
+    options::{SelectionCriteria, WriteConcern},
+    Client,
 };
 
 use super::{ExecutionContext, OperationWithDefaults, WriteConcernOnlyBody};
@@ -16,13 +14,19 @@ use super::{ExecutionContext, OperationWithDefaults, WriteConcernOnlyBody};
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
     pinned: Option<TransactionPin>,
+    target: Client,
 }
 
 impl AbortTransaction {
-    pub(crate) fn new(write_concern: Option<WriteConcern>, pinned: Option<TransactionPin>) -> Self {
+    pub(crate) fn new(
+        client: &Client,
+        write_concern: Option<WriteConcern>,
+        pinned: Option<TransactionPin>,
+    ) -> Self {
         Self {
             write_concern,
             pinned,
+            target: client.clone(),
         }
     }
 }
@@ -33,16 +37,11 @@ impl OperationWithDefaults for AbortTransaction {
     const NAME: &'static CStr = cstr!("abortTransaction");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
-        let mut body = rawdoc! {
+        let body = rawdoc! {
             Self::NAME: 1,
         };
-        if let Some(ref write_concern) = self.write_concern() {
-            if !write_concern.is_empty() {
-                append_ser(&mut body, cstr!("writeConcern"), write_concern)?;
-            }
-        }
 
-        Ok(Command::new(Self::NAME, "admin", body))
+        Ok(Command::from_operation(self, body))
     }
 
     fn handle_response<'a>(
@@ -54,10 +53,10 @@ impl OperationWithDefaults for AbortTransaction {
         response.validate()
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
         match &self.pinned {
-            Some(TransactionPin::Mongos(s)) => Some(s),
-            _ => None,
+            Some(TransactionPin::Mongos(s)) => super::Feature::Set(s),
+            _ => super::Feature::NotSupported,
         }
     }
 
@@ -68,8 +67,8 @@ impl OperationWithDefaults for AbortTransaction {
         }
     }
 
-    fn write_concern(&self) -> Option<&WriteConcern> {
-        self.write_concern.as_ref()
+    fn write_concern(&self) -> super::Feature<&WriteConcern> {
+        self.write_concern.as_ref().into()
     }
 
     fn retryability(&self) -> Retryability {
@@ -81,13 +80,13 @@ impl OperationWithDefaults for AbortTransaction {
         self.pinned = None;
     }
 
+    fn target(&self) -> super::OperationTarget {
+        crate::operation::OperationTarget::admin(&self.target)
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for AbortTransaction {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        crate::otel::OperationTarget::ADMIN
-    }
-}
+impl crate::otel::OtelInfoDefaults for AbortTransaction {}

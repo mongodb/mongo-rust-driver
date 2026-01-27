@@ -80,11 +80,9 @@ impl<'a> ReplaceOne<'a> {
 impl<'a> Action for ReplaceOne<'a> {
     type Future = ReplaceOneFuture;
 
-    async fn execute(mut self) -> Result<UpdateResult> {
-        resolve_write_concern_with_session!(self.coll, self.options, self.session.as_ref());
-
+    async fn execute(self) -> Result<UpdateResult> {
         let update = Op::with_replace_raw(
-            self.coll.namespace(),
+            self.coll.clone(),
             self.query,
             self.replacement?,
             false,

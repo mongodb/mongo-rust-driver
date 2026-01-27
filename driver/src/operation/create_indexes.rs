@@ -1,6 +1,7 @@
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, Collection};
 
 use crate::{
+    bson::Document,
     bson_compat::{cstr, CStr},
     bson_util::to_raw_bson_array_ser,
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -9,26 +10,25 @@ use crate::{
     operation::{append_options_to_raw_document, OperationWithDefaults},
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
-    Namespace,
 };
 
 use super::{ExecutionContext, WriteConcernOnlyBody};
 
 #[derive(Debug)]
 pub(crate) struct CreateIndexes {
-    ns: Namespace,
+    target: Collection<Document>,
     indexes: Vec<IndexModel>,
     options: Option<CreateIndexOptions>,
 }
 
 impl CreateIndexes {
     pub(crate) fn new(
-        ns: Namespace,
+        target: Collection<Document>,
         indexes: Vec<IndexModel>,
         options: Option<CreateIndexOptions>,
     ) -> Self {
         Self {
-            ns,
+            target,
             indexes,
             options,
         }
@@ -58,13 +58,13 @@ impl OperationWithDefaults for CreateIndexes {
         self.indexes.iter_mut().for_each(|i| i.update_name()); // Generate names for unnamed indexes.
         let indexes = to_raw_bson_array_ser(&self.indexes)?;
         let mut body = rawdoc! {
-            Self::NAME: self.ns.coll.clone(),
+            Self::NAME: self.target.name(),
             "indexes": indexes,
         };
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(Self::NAME, &self.ns.db, body))
+        Ok(Command::from_operation(self, body))
     }
 
     fn handle_response<'a>(
@@ -78,10 +78,15 @@ impl OperationWithDefaults for CreateIndexes {
         Ok(CreateIndexesResult { index_names })
     }
 
-    fn write_concern(&self) -> Option<&WriteConcern> {
+    fn write_concern(&self) -> super::Feature<&WriteConcern> {
         self.options
             .as_ref()
-            .and_then(|opts| opts.write_concern.as_ref())
+            .and_then(|o| o.write_concern.as_ref())
+            .into()
+    }
+
+    fn target(&self) -> super::OperationTarget {
+        (&self.target).into()
     }
 
     #[cfg(feature = "opentelemetry")]
@@ -89,8 +94,4 @@ impl OperationWithDefaults for CreateIndexes {
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for CreateIndexes {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        (&self.ns).into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for CreateIndexes {}

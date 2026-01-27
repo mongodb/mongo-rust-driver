@@ -1,14 +1,13 @@
-use crate::bson::{RawDocument, RawDocumentBuf};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::wire::{message::DocumentSequence, Message};
 use crate::{
-    bson::Document,
+    bson::{Document, RawDocument, RawDocumentBuf},
     client::{options::ServerApi, ClusterTime},
     error::{Error, ErrorKind, Result},
     hello::{HelloCommandResponse, HelloReply},
-    operation::{CommandErrorBody, CommandResponse},
-    options::{ReadConcern, ReadConcernInternal, ReadConcernLevel, ServerAddress},
+    operation::{CommandErrorBody, CommandResponse, Feature, Operation},
+    options::{ReadConcernInternal, ReadConcernLevel, ServerAddress, WriteConcern},
     selection_criteria::ReadPreference,
     ClientSession,
 };
@@ -52,33 +51,22 @@ pub(crate) struct Command {
 
     read_concern: Option<ReadConcernInternal>,
 
+    #[serde(skip_serializing_if = "write_concern_is_empty")]
+    write_concern: Option<WriteConcern>,
+
     recovery_token: Option<Document>,
 }
 
-impl Command {
-    pub(crate) fn new(name: impl ToString, target_db: impl ToString, body: RawDocumentBuf) -> Self {
-        Self {
-            name: name.to_string(),
-            target_db: target_db.to_string(),
-            exhaust_allowed: false,
-            body,
-            document_sequences: Vec::new(),
-            lsid: None,
-            cluster_time: None,
-            server_api: None,
-            read_preference: None,
-            txn_number: None,
-            start_transaction: None,
-            autocommit: None,
-            read_concern: None,
-            recovery_token: None,
-        }
-    }
+fn write_concern_is_empty(write_concern: &Option<WriteConcern>) -> bool {
+    write_concern
+        .as_ref()
+        .is_none_or(|write_concern| write_concern.is_empty())
+}
 
-    pub(crate) fn new_read(
+impl Command {
+    pub(crate) fn new_raw(
         name: impl ToString,
         target_db: impl ToString,
-        read_concern: Option<ReadConcern>,
         body: RawDocumentBuf,
     ) -> Self {
         Self {
@@ -94,7 +82,42 @@ impl Command {
             txn_number: None,
             start_transaction: None,
             autocommit: None,
-            read_concern: read_concern.map(Into::into),
+            read_concern: None,
+            write_concern: None,
+            recovery_token: None,
+        }
+    }
+
+    pub(crate) fn from_operation<Op: Operation>(op: &Op, body: RawDocumentBuf) -> Self {
+        let target = op.target();
+        let read_concern = match op.read_concern() {
+            Feature::Set(v) => Some(v),
+            Feature::NotSupported => None,
+            Feature::Inherit => target.read_concern(),
+        }
+        .cloned()
+        .map(ReadConcernInternal::from);
+        let write_concern = match op.write_concern() {
+            Feature::Set(v) => Some(v),
+            Feature::NotSupported => None,
+            Feature::Inherit => target.write_concern(),
+        }
+        .cloned();
+        Self {
+            name: crate::bson_compat::cstr_to_str(op.name()).to_owned(),
+            target_db: target.db_name().to_owned(),
+            exhaust_allowed: false,
+            body,
+            document_sequences: Vec::new(),
+            lsid: None,
+            cluster_time: None,
+            server_api: None,
+            read_preference: None,
+            txn_number: None,
+            start_transaction: None,
+            autocommit: None,
+            read_concern,
+            write_concern,
             recovery_token: None,
         }
     }
@@ -140,6 +163,11 @@ impl Command {
 
     pub(crate) fn set_autocommit(&mut self) {
         self.autocommit = Some(false);
+    }
+
+    pub(crate) fn clear_concerns(&mut self) {
+        self.read_concern = None;
+        self.write_concern = None;
     }
 
     /// Sets the read concern level for this command.

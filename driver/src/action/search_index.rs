@@ -187,7 +187,7 @@ impl<'a> Action for CreateSearchIndex<'a, Multiple> {
     type Future = CreateSearchIndexesFuture;
 
     async fn execute(self) -> Result<Vec<String>> {
-        let op = operation::CreateSearchIndexes::new(self.coll.namespace(), self.models);
+        let op = operation::CreateSearchIndexes::new(self.coll.clone(), self.models);
         self.coll.client().execute_operation(op, None).await
     }
 }
@@ -228,8 +228,7 @@ impl<'a> Action for UpdateSearchIndex<'a> {
     type Future = UpdateSearchIndexFuture;
 
     async fn execute(self) -> Result<()> {
-        let op =
-            operation::UpdateSearchIndex::new(self.coll.namespace(), self.name, self.definition);
+        let op = operation::UpdateSearchIndex::new(self.coll.clone(), self.name, self.definition);
         self.coll.client().execute_operation(op, None).await
     }
 }
@@ -251,7 +250,7 @@ impl<'a> Action for DropSearchIndex<'a> {
     type Future = DropSearchIndexFuture;
 
     async fn execute(self) -> Result<()> {
-        let op = operation::DropSearchIndex::new(self.coll.namespace(), self.name);
+        let op = operation::DropSearchIndex::new(self.coll.clone(), self.name);
         self.coll.client().execute_operation(op, None).await
     }
 }

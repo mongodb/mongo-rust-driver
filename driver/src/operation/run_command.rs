@@ -5,15 +5,16 @@ use crate::{
     bson_compat::{cstr, CStr},
     client::SESSIONS_UNSUPPORTED_COMMANDS,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
-    error::{ErrorKind, Result},
+    error::{Error, Result},
     selection_criteria::SelectionCriteria,
+    Database,
 };
 
 use super::{ExecutionContext, OperationWithDefaults};
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCommand<'conn> {
-    db: String,
+    db: Database,
     command: RawDocumentBuf,
     selection_criteria: Option<SelectionCriteria>,
     pinned_connection: Option<&'conn PinnedConnectionHandle>,
@@ -21,7 +22,7 @@ pub(crate) struct RunCommand<'conn> {
 
 impl<'conn> RunCommand<'conn> {
     pub(crate) fn new(
-        db: String,
+        db: Database,
         command: RawDocumentBuf,
         selection_criteria: Option<SelectionCriteria>,
         pinned_connection: Option<&'conn PinnedConnectionHandle>,
@@ -51,13 +52,13 @@ impl OperationWithDefaults for RunCommand<'_> {
     const NAME: &'static CStr = cstr!("$genericRunCommand");
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
-        let command_name = self
-            .command_name()
-            .ok_or_else(|| ErrorKind::InvalidArgument {
-                message: "an empty document cannot be passed to a run_command operation".into(),
-            })?;
+        if self.command_name().is_none() {
+            return Err(Error::invalid_argument(
+                "an empty document cannot be passed to a run_command operation",
+            ));
+        }
 
-        Ok(Command::new(command_name, &self.db, self.command.clone()))
+        Ok(Command::from_operation(self, self.command.clone()))
     }
 
     fn extract_at_cluster_time(
@@ -79,8 +80,13 @@ impl OperationWithDefaults for RunCommand<'_> {
         Ok(response.raw_body().try_into()?)
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        self.selection_criteria.as_ref()
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
+        // Per spec, runCommand MUST ignore any default read preference from client, database or
+        // collection configuration
+        match &self.selection_criteria {
+            Some(s) => super::Feature::Set(s),
+            None => super::Feature::NotSupported,
+        }
     }
 
     fn supports_sessions(&self) -> bool {
@@ -95,13 +101,17 @@ impl OperationWithDefaults for RunCommand<'_> {
         self.pinned_connection
     }
 
+    fn target(&self) -> super::OperationTarget {
+        (&self.db).into()
+    }
+
+    fn name(&self) -> &CStr {
+        self.command_name().unwrap_or(&Self::NAME)
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for RunCommand<'_> {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        self.db.as_str().into()
-    }
-}
+impl crate::otel::OtelInfoDefaults for RunCommand<'_> {}

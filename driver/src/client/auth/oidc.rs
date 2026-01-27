@@ -482,7 +482,7 @@ fn make_spec_auth_command(
         "db": "$external",
     };
 
-    let mut command = Command::new("saslStart", source, body);
+    let mut command = Command::new_raw("saslStart", source, body);
     if let Some(server_api) = server_api {
         command.set_server_api(server_api);
     }

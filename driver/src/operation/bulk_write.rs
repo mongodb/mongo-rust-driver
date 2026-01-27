@@ -138,8 +138,12 @@ where
                             "killCursors": namespace.db.clone(),
                             "cursors": [cursor_specification.info.id],
                         };
-                        let mut run_command =
-                            RunCommand::new(namespace.db.clone(), kill_cursors, None, None);
+                        let mut run_command = RunCommand::new(
+                            self.client.database(&namespace.db),
+                            kill_cursors,
+                            None,
+                            None,
+                        );
                         let _ = self
                             .client
                             .execute_operation_on_connection(
@@ -281,7 +285,7 @@ where
             )));
         }
 
-        let mut command = Command::new(Self::NAME, "admin", command_body);
+        let mut command = Command::from_operation(self, command_body);
         namespace_info
             .namespaces
             .add_to_command(NS_INFO, &mut command);
@@ -490,13 +494,20 @@ where
         }
     }
 
+    fn write_concern(&self) -> super::Feature<&crate::options::WriteConcern> {
+        self.options
+            .as_ref()
+            .and_then(|o| o.write_concern.as_ref())
+            .into()
+    }
+
+    fn target(&self) -> super::OperationTarget {
+        super::OperationTarget::admin(&self.client)
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
 #[cfg(feature = "opentelemetry")]
-impl<R: BulkWriteResult> crate::otel::OtelInfoDefaults for BulkWrite<'_, R> {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        crate::otel::OperationTarget::ADMIN
-    }
-}
+impl<R: BulkWriteResult> crate::otel::OtelInfoDefaults for BulkWrite<'_, R> {}

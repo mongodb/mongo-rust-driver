@@ -1,16 +1,11 @@
 use std::time::Duration;
 
 use crate::{
-    bson::{rawdoc, RawBson},
+    bson::{rawdoc, Bson, RawBson},
     bson_compat::{cstr, CStr},
-    cursor::CursorReply,
-};
-
-use crate::{
-    bson::Bson,
     checked::Checked,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
-    cursor::CursorInformation,
+    cursor::{CursorInformation, CursorReply},
     error::Result,
     operation::OperationWithDefaults,
     options::SelectionCriteria,
@@ -80,7 +75,7 @@ impl OperationWithDefaults for GetMore<'_> {
             body.append(cstr!("comment"), raw_comment);
         }
 
-        Ok(Command::new(Self::NAME, &self.ns.db, body))
+        Ok(Command::from_operation(self, body))
     }
 
     fn handle_response_cow<'a>(
@@ -109,12 +104,16 @@ impl OperationWithDefaults for GetMore<'_> {
         })
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        Some(&self.selection_criteria)
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
+        super::Feature::Set(&self.selection_criteria)
     }
 
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.pinned_connection
+    }
+
+    fn target(&self) -> super::OperationTarget {
+        super::OperationTarget::Namespace(self.ns.clone())
     }
 
     #[cfg(feature = "opentelemetry")]
@@ -123,10 +122,6 @@ impl OperationWithDefaults for GetMore<'_> {
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for GetMore<'_> {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        (&self.ns).into()
-    }
-
     #[cfg(feature = "opentelemetry")]
     fn cursor_id(&self) -> Option<i64> {
         Some(self.cursor_id)

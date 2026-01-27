@@ -1,6 +1,9 @@
 use std::{marker::PhantomData, time::Duration};
 
-use crate::bson::{Bson, Document, Timestamp};
+use crate::{
+    bson::{Bson, Document, Timestamp},
+    operation::OperationTarget,
+};
 use serde::de::DeserializeOwned;
 
 use super::{
@@ -21,7 +24,6 @@ use crate::{
     },
     collation::Collation,
     error::Result,
-    operation::aggregate::AggregateTarget,
     options::ReadConcern,
     selection_criteria::SelectionCriteria,
     Client,
@@ -84,10 +86,7 @@ impl Database {
     #[deeplink]
     #[options_doc(watch)]
     pub fn watch(&self) -> Watch<'_> {
-        Watch::new(
-            self.client(),
-            AggregateTarget::Database(self.name().to_string()),
-        )
+        Watch::new(self.client(), self.into())
     }
 }
 
@@ -112,7 +111,7 @@ where
     #[deeplink]
     #[options_doc(watch)]
     pub fn watch(&self) -> Watch<'_, T> {
-        Watch::new(self.client(), self.namespace().into())
+        Watch::new(self.client(), self.into())
     }
 }
 
@@ -176,7 +175,7 @@ where
 #[must_use]
 pub struct Watch<'a, T = Document, S = ImplicitSession> {
     client: &'a Client,
-    target: AggregateTarget,
+    target: OperationTarget,
     pipeline: Vec<Document>,
     options: Option<ChangeStreamOptions>,
     session: S,
@@ -185,7 +184,7 @@ pub struct Watch<'a, T = Document, S = ImplicitSession> {
 }
 
 impl<'a, T> Watch<'a, T, ImplicitSession> {
-    fn new(client: &'a Client, target: AggregateTarget) -> Self {
+    fn new(client: &'a Client, target: OperationTarget) -> Self {
         Self {
             client,
             target,
@@ -200,7 +199,7 @@ impl<'a, T> Watch<'a, T, ImplicitSession> {
     fn new_cluster(client: &'a Client) -> Self {
         Self {
             client,
-            target: AggregateTarget::Database("admin".to_string()),
+            target: OperationTarget::admin(client),
             pipeline: vec![],
             options: None,
             session: ImplicitSession,
@@ -263,11 +262,6 @@ impl<'a, T: DeserializeOwned + Unpin + Send + Sync> Action for Watch<'a, T, Impl
     type Future = WatchFuture;
 
     async fn execute(mut self) -> Result<ChangeStream<ChangeStreamEvent<T>>> {
-        resolve_options!(
-            self.client,
-            self.options,
-            [read_concern, selection_criteria]
-        );
         if self.cluster {
             self.options
                 .get_or_insert_with(Default::default)
@@ -284,12 +278,6 @@ impl<'a, T: DeserializeOwned + Unpin + Send + Sync> Action for Watch<'a, T, Expl
     type Future = WatchSessionFuture;
 
     async fn execute(mut self) -> Result<SessionChangeStream<ChangeStreamEvent<T>>> {
-        resolve_read_concern_with_session!(self.client, self.options, Some(&mut *self.session.0));
-        resolve_selection_criteria_with_session!(
-            self.client,
-            self.options,
-            Some(&mut *self.session.0)
-        );
         if self.cluster {
             self.options
                 .get_or_insert_with(Default::default)

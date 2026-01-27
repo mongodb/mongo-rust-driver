@@ -18,11 +18,10 @@ use crate::{
     bson::Bson,
     cmap::{conn::wire::Message, Command, ConnectionInfo, StreamDescription},
     error::{ErrorKind, Result},
-    operation::{aggregate::AggregateTarget, Operation},
+    operation::{Operation, OperationTarget},
     options::{ClientOptions, ServerAddress, DEFAULT_PORT},
     Client,
     ClientSession,
-    Namespace,
 };
 
 #[cfg(test)]
@@ -295,20 +294,22 @@ fn record_error<T>(context: &Context, result: &Result<T>) {
 
 fn op_target(op: &impl OtelInfo) -> String {
     let target = op.target();
-    if let Some(coll) = target.collection {
-        format!("{}.{}", target.database, coll)
+    let name = target.name();
+    if let Some(coll) = name.collection {
+        format!("{}.{}", name.database, coll)
     } else {
-        target.database.to_owned()
+        name.database.to_owned()
     }
 }
 
 fn common_attrs(op: &impl OtelInfo) -> Vec<KeyValue> {
     let target = op.target();
+    let name = target.name();
     let mut attrs = vec![
         KeyValue::new("db.system", "mongodb"),
-        KeyValue::new("db.namespace", target.database.to_owned()),
+        KeyValue::new("db.namespace", name.database.to_owned()),
     ];
-    if let Some(coll) = target.collection {
+    if let Some(coll) = name.collection {
         attrs.push(KeyValue::new("db.collection.name", coll.to_owned()));
     }
     attrs
@@ -364,8 +365,6 @@ impl<T: OtelInfo> OtelWitness for Witness<T> {
 pub(crate) trait OtelInfo: Operation {
     fn log_name(&self) -> &str;
 
-    fn target(&self) -> crate::otel::OperationTarget<'_>;
-
     fn cursor_id(&self) -> Option<i64>;
 
     fn output_cursor_id(output: &<Self as Operation>::O) -> Option<i64>;
@@ -375,8 +374,6 @@ pub(crate) trait OtelInfoDefaults: Operation {
     fn log_name(&self) -> &str {
         crate::bson_compat::cstr_to_str(self.name())
     }
-
-    fn target(&self) -> crate::otel::OperationTarget<'_>;
 
     fn cursor_id(&self) -> Option<i64> {
         None
@@ -392,10 +389,6 @@ impl<T: OtelInfoDefaults> OtelInfo for T {
         self.log_name()
     }
 
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        self.target()
-    }
-
     fn cursor_id(&self) -> Option<i64> {
         self.cursor_id()
     }
@@ -405,41 +398,26 @@ impl<T: OtelInfoDefaults> OtelInfo for T {
     }
 }
 
-pub(crate) struct OperationTarget<'a> {
+pub(crate) struct TargetName<'a> {
     pub(crate) database: &'a str,
     pub(crate) collection: Option<&'a str>,
 }
 
-impl OperationTarget<'static> {
-    pub(crate) const ADMIN: Self = OperationTarget {
-        database: "admin",
-        collection: None,
-    };
-}
-
-impl<'a> From<&'a str> for OperationTarget<'a> {
-    fn from(value: &'a str) -> Self {
-        OperationTarget {
-            database: value,
-            collection: None,
-        }
-    }
-}
-
-impl<'a> From<&'a Namespace> for OperationTarget<'a> {
-    fn from(value: &'a Namespace) -> Self {
-        OperationTarget {
-            database: &value.db,
-            collection: Some(&value.coll),
-        }
-    }
-}
-
-impl<'a> From<&'a AggregateTarget> for OperationTarget<'a> {
-    fn from(value: &'a AggregateTarget) -> Self {
-        match value {
-            AggregateTarget::Database(db) => db.as_str().into(),
-            AggregateTarget::Collection(ns) => ns.into(),
+impl OperationTarget {
+    fn name(&self) -> TargetName<'_> {
+        match self {
+            OperationTarget::Database(db) => TargetName {
+                database: db.name(),
+                collection: None,
+            },
+            OperationTarget::Collection(coll) => TargetName {
+                database: coll.db().name(),
+                collection: Some(coll.name()),
+            },
+            OperationTarget::Namespace(ns) => TargetName {
+                database: &ns.db,
+                collection: Some(&ns.coll),
+            },
         }
     }
 }

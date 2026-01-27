@@ -1,4 +1,4 @@
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, Client};
 use serde::Deserialize;
 
 use crate::{
@@ -15,13 +15,18 @@ use super::{append_options_to_raw_document, ExecutionContext};
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
+    client: Client,
     name_only: bool,
     options: Option<ListDatabasesOptions>,
 }
 
 impl ListDatabases {
-    pub fn new(name_only: bool, options: Option<ListDatabasesOptions>) -> Self {
-        ListDatabases { name_only, options }
+    pub fn new(client: Client, name_only: bool, options: Option<ListDatabasesOptions>) -> Self {
+        ListDatabases {
+            client,
+            name_only,
+            options,
+        }
     }
 }
 
@@ -38,7 +43,7 @@ impl OperationWithDefaults for ListDatabases {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(Self::NAME, "admin", body))
+        Ok(Command::from_operation(self, body))
     }
 
     fn handle_response<'a>(
@@ -50,12 +55,16 @@ impl OperationWithDefaults for ListDatabases {
         Ok(response.databases)
     }
 
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        Some(SelectionCriteria::ReadPreference(ReadPreference::Primary)).as_ref()
+    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
+        super::Feature::Set(&SelectionCriteria::ReadPreference(ReadPreference::Primary))
     }
 
     fn retryability(&self) -> Retryability {
         Retryability::Read
+    }
+
+    fn target(&self) -> super::OperationTarget {
+        super::OperationTarget::admin(&self.client)
     }
 
     #[cfg(feature = "opentelemetry")]
@@ -63,11 +72,7 @@ impl OperationWithDefaults for ListDatabases {
 }
 
 #[cfg(feature = "opentelemetry")]
-impl crate::otel::OtelInfoDefaults for ListDatabases {
-    fn target(&self) -> crate::otel::OperationTarget<'_> {
-        crate::otel::OperationTarget::ADMIN
-    }
-}
+impl crate::otel::OtelInfoDefaults for ListDatabases {}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Response {
