@@ -104,7 +104,7 @@ impl Operation for CountDocuments {
     }
 
     fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
-        self.aggregate.selection_criteria().into()
+        self.aggregate.selection_criteria()
     }
 
     fn retryability(&self) -> Retryability {

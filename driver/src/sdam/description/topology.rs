@@ -755,10 +755,11 @@ pub(crate) fn choose_n<T>(values: &[T], n: usize) -> impl Iterator<Item = &T> {
 }
 
 /// Enum representing whether transactions are supported by the topology.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub(crate) enum TransactionSupportStatus {
     /// It is not known yet whether the topology supports transactions. This is possible if no
     /// data-bearing servers have updated the `TopologyDescription` yet.
+    #[default]
     Undetermined,
 
     /// Transactions are not supported by this topology.
@@ -771,12 +772,6 @@ pub(crate) enum TransactionSupportStatus {
     /// Note that meeting these conditions does not guarantee that a deployment
     /// supports transactions; any other missing qualification will be reported by the server.
     Supported,
-}
-
-impl Default for TransactionSupportStatus {
-    fn default() -> Self {
-        Self::Undetermined
-    }
 }
 
 /// A struct representing the diff between two `TopologyDescription`s.

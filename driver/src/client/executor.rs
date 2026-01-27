@@ -145,7 +145,7 @@ impl Client {
             return Err(ErrorKind::Shutdown.into());
         }
 
-        if session.as_ref().map_or(false, |s| s.in_transaction()) {
+        if session.as_ref().is_some_and(|s| s.in_transaction()) {
             if op.read_concern().is_set() {
                 return Err(Error::invalid_argument(
                     "Cannot set read concern after starting a transaction",
@@ -375,7 +375,7 @@ impl Client {
             let selection_criteria = session
                 .as_ref()
                 .and_then(|s| s.transaction.pinned_mongos())
-                .or_else(|| selection_criteria.as_ref());
+                .or(selection_criteria.as_ref());
 
             let (server, effective_criteria) = match self
                 .select_server(
@@ -739,7 +739,7 @@ impl Client {
         let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
         let mut cmd = op.build(stream_description)?;
         // Clear inherited read/writeconcern when in a transaction
-        if session.as_ref().map_or(false, |s| s.in_transaction()) {
+        if session.as_ref().is_some_and(|s| s.in_transaction()) {
             cmd.clear_concerns();
         }
         self.inner.topology.watcher().update_command_with_read_pref(
