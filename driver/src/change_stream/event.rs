@@ -262,6 +262,7 @@ impl Serialize for OperationType {
 }
 
 /// Identifies the collection or database on which an event occurred.
+#[serde_with::skip_serializing_none]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ChangeNamespace {

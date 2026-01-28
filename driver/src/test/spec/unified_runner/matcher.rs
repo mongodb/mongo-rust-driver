@@ -462,6 +462,7 @@ fn results_match_inner(
         },
         _ => match actual {
             Some(actual) => match_eq(actual, expected),
+            None if *expected == Bson::Null => Ok(()),
             None => Err(format!("expected {expected:?}, got None")),
         },
     }
@@ -496,7 +497,14 @@ fn special_operator_matches(
     entities: Option<&EntityMap>,
 ) -> Result<(), String> {
     match key.as_ref() {
-        "$$exists" => match_eq(&actual.is_some(), &value.as_bool().unwrap()),
+        "$$exists" => {
+            let expected = value.as_bool().unwrap();
+            // Allow `Some(Bson::Null)` to count as not existing
+            if !expected && actual == Some(&Bson::Null) {
+                return Ok(());
+            }
+            match_eq(&actual.is_some(), &expected)
+        }
         "$$type" => {
             if let Some(actual) = actual {
                 type_matches(value, actual)
