@@ -8,7 +8,7 @@ use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 
 use crate::{
     bson::{Bson, Document},
-    change_stream::ChangeStream,
+    change_stream::{event::ChangeStreamEvent, ChangeStream},
     client::{options::ClientOptions, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     error::{Error, Result},
     event::command::{CommandEvent, CommandStartedEvent},
@@ -92,7 +92,7 @@ pub(crate) enum TestCursor {
         session_id: String,
     },
     // `ChangeStream` has the same issue with 59245 as `Cursor`.
-    ChangeStream(Mutex<ChangeStream<Document>>),
+    ChangeStream(Mutex<TestChangeStream>),
     Closed,
 }
 
@@ -116,6 +116,38 @@ impl TestCursor {
             }
             Self::Closed => panic!("cannot set a kill_watcher on a closed cursor"),
         }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum TestChangeStream {
+    Event(ChangeStream<ChangeStreamEvent<Document>>),
+    Doc(ChangeStream<Document>),
+}
+
+impl TestChangeStream {
+    pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) {
+        match self {
+            Self::Event(cse) => cse.set_kill_watcher(tx),
+            Self::Doc(csd) => csd.set_kill_watcher(tx),
+        }
+    }
+    pub(crate) fn client(&self) -> &crate::Client {
+        match self {
+            Self::Event(cse) => cse.client(),
+            Self::Doc(csd) => csd.client(),
+        }
+    }
+    pub(crate) async fn next_if_any(&mut self) -> Result<()> {
+        match self {
+            Self::Event(cse) => {
+                cse.next_if_any().await?;
+            }
+            Self::Doc(csd) => {
+                csd.next_if_any().await?;
+            }
+        }
+        Ok(())
     }
 }
 

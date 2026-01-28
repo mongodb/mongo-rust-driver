@@ -36,6 +36,7 @@ use crate::{
     bson::{doc, Bson, Document},
     error::{ErrorKind, Result},
     options::ChangeStreamOptions,
+    test::spec::unified_runner::entity::TestChangeStream,
 };
 
 use super::{results_match, Entity, ExpectError, TestCursor, TestFileEntity, TestRunner};
@@ -70,6 +71,15 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
         _test_runner: &'a TestRunner,
     ) -> BoxFuture<'a, ()> {
         panic!("execute_test_runner_operation called on unsupported operation {self:?}")
+    }
+
+    fn execute_entity_operation_named<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a TestRunner,
+        _description: &'a str,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        self.execute_entity_operation(id, test_runner)
     }
 
     fn execute_entity_operation<'a>(
@@ -178,7 +188,9 @@ impl Operation {
                 Ok(())
             }
             OperationObject::Entity(ref id) => {
-                let result = self.execute_entity_operation(id, test_runner).await;
+                let result = self
+                    .execute_entity_operation_named(id, test_runner, description)
+                    .await;
                 let error = result.as_ref().map_or_else(|e| Err(e.clone()), |_| Ok(()));
 
                 match &self.expectation {
@@ -467,10 +479,11 @@ pub(super) struct CreateChangeStream {
 }
 
 impl TestOperation for CreateChangeStream {
-    fn execute_entity_operation<'a>(
+    fn execute_entity_operation_named<'a>(
         &'a self,
         id: &'a str,
         test_runner: &'a TestRunner,
+        description: &'a str,
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let entities = test_runner.entities.read().await;
@@ -496,8 +509,21 @@ impl TestOperation for CreateChangeStream {
                 }
                 _ => panic!("Invalid entity for createChangeStream"),
             };
+            // These particular tests require unknown fields to be passed through to the result.
+            let tcs = if [
+                "Test newField added in response MUST NOT err",
+                "Test new structure in ns document MUST NOT err",
+                "Test modified structure in ns document MUST NOT err",
+                "Test projection in change stream returns expected fields",
+            ]
+            .contains(&description)
+            {
+                TestChangeStream::Doc(stream.with_type())
+            } else {
+                TestChangeStream::Event(stream)
+            };
             Ok(Some(Entity::Cursor(TestCursor::ChangeStream(Mutex::new(
-                stream.with_type::<Document>(),
+                tcs,
             )))))
         }
         .boxed()
