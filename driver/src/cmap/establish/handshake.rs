@@ -42,26 +42,14 @@ pub(crate) struct ClientMetadata {
     pub(crate) appended: HashSet<DriverInfo>,
 }
 
-fn exclude_delimiter(input: &str) -> Result<()> {
-    if input.contains('|') {
-        return Err(Error::invalid_argument(
-            "client metadata must not contain '|'",
-        ));
-    }
-    Ok(())
-}
-
 impl ClientMetadata {
     pub(crate) fn append(&mut self, driver_info: DriverInfo) -> Result<()> {
         if self.appended.contains(&driver_info) {
             return Ok(());
         }
 
-        exclude_delimiter(&driver_info.name)?;
         let version = driver_info.spec_version();
-        exclude_delimiter(version)?;
         let platform = driver_info.spec_platform();
-        exclude_delimiter(platform)?;
 
         self.driver.name.push('|');
         self.driver.name.push_str(&driver_info.name);
