@@ -1,7 +1,13 @@
 use crate::{
     bson::Bson,
     error::Result,
-    test::spec::unified_runner::{operation::TestOperation, Entity, TestCursor, TestRunner},
+    test::spec::unified_runner::{
+        entity::TestChangeStream,
+        operation::TestOperation,
+        Entity,
+        TestCursor,
+        TestRunner,
+    },
 };
 use futures::{future::BoxFuture, StreamExt};
 use futures_util::FutureExt;
@@ -83,12 +89,15 @@ impl TestOperation for IterateUntilDocumentOrError {
                 }
                 TestCursor::ChangeStream(stream) => {
                     let mut stream = stream.lock().await;
-                    stream.next().await.map(|res| {
-                        res.map(|ev| match crate::bson_compat::serialize_to_bson(&ev) {
-                            Ok(Bson::Document(doc)) => doc,
-                            _ => panic!("invalid serialization result"),
-                        })
-                    })
+                    match &mut *stream {
+                        TestChangeStream::Event(cse) => cse.next().await.map(|res| {
+                            res.map(|ev| match crate::bson_compat::serialize_to_bson(&ev) {
+                                Ok(Bson::Document(doc)) => doc,
+                                _ => panic!("invalid serialization result"),
+                            })
+                        }),
+                        TestChangeStream::Doc(csd) => csd.next().await,
+                    }
                 }
                 TestCursor::Closed => None,
             };

@@ -141,7 +141,7 @@ pub struct UpdateDescription {
     /// When an update event reports changes involving ambiguous fields, the disambiguatedPaths
     /// document provides the path key with an array listing each path component.
     /// Note: The disambiguatedPaths field is only available on change streams started with the
-    /// showExpandedEvents option
+    /// `show_expanded_events` option.
     pub disambiguated_paths: Option<Document>,
 }
 
