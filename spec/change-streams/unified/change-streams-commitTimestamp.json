@@ -25,30 +25,30 @@
       }
     },
     {
-      "collection": {
-        "id": "collection0",
-        "database": "database0",
-        "collectionName": "collection0"
-      }
-    },
-    {
       "session": {
         "id": "session0",
         "client": "client0"
       }
     }
   ],
-  "initialData": [
-    {
-      "collectionName": "collection0",
-      "databaseName": "database0",
-      "documents": []
-    }
-  ],
   "tests": [
     {
       "description": "when showExpandedEvents is true, commitTimestamp is included for operations in a transaction",
       "operations": [
+        {
+          "name": "dropCollection",
+          "object": "database0",
+          "arguments": {
+            "collection": "collection0"
+          }
+        },
+        {
+          "name": "createCollection",
+          "object": "database0",
+          "arguments": {
+            "collection": "collection0"
+          }
+        },
         {
           "name": "createChangeStream",
           "object": "collection0",
