@@ -17,7 +17,7 @@ fi
 
 MONGO_ORCHESTRATION_HOME="${DRIVERS_TOOLS}/.evergreen/orchestration"
 MONGODB_BINARIES="${DRIVERS_TOOLS}/mongodb/bin"
-UPLOAD_BUCKET="${project}"
+UPLOAD_BUCKET="mongo-rust-driver"
 PROJECT_DIRECTORY="$(pwd)"
 LIBMONGOCRYPT_SUFFIX_DIR="lib"
 # The RHEL path is 'lib64', not 'lib'
