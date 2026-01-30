@@ -1,0 +1,119 @@
+{
+  "description": "change-streams-commitTimestamp",
+  "schemaVersion": "1.7",
+  "runOnRequirements": [
+    {
+      "minServerVersion": "8.2.0",
+      "topologies": [
+        "replicaset",
+        "sharded"
+      ],
+      "serverless": "forbid"
+    }
+  ],
+  "createEntities": [
+    {
+      "client": {
+        "id": "client0"
+      }
+    },
+    {
+      "database": {
+        "id": "database0",
+        "client": "client0",
+        "databaseName": "database0"
+      }
+    },
+    {
+      "collection": {
+        "id": "collection0",
+        "database": "database0",
+        "collectionName": "collection0"
+      }
+    },
+    {
+      "session": {
+        "id": "session0",
+        "client": "client0"
+      }
+    }
+  ],
+  "initialData": [
+    {
+      "collectionName": "collection0",
+      "databaseName": "database0",
+      "documents": []
+    }
+  ],
+  "tests": [
+    {
+      "description": "when showExpandedEvents is true, commitTimestamp is included for operations in a transaction",
+      "operations": [
+        {
+          "name": "createChangeStream",
+          "object": "collection0",
+          "arguments": {
+            "pipeline": [],
+            "showExpandedEvents": true
+          },
+          "saveResultAsEntity": "changeStream0"
+        },
+        {
+          "name": "startTransaction",
+          "object": "session0"
+        },
+        {
+          "name": "insertOne",
+          "object": "collection0",
+          "arguments": {
+            "document": {
+              "x": 1
+            },
+            "session": "session0"
+          }
+        },
+        {
+          "name": "commitTransaction",
+          "object": "session0"
+        },
+        {
+          "name": "iterateUntilDocumentOrError",
+          "object": "changeStream0",
+          "expectResult": {
+            "operationType": "insert",
+            "ns": {
+              "db": "database0",
+              "coll": "collection0"
+            },
+            "commitTimestamp": {
+              "$$exists": true
+            }
+          }
+        },
+        {
+          "name": "insertOne",
+          "object": "collection0",
+          "arguments": {
+            "document": {
+              "x": 1
+            }
+          }
+        },
+        {
+          "name": "iterateUntilDocumentOrError",
+          "object": "changeStream0",
+          "expectResult": {
+            "operationType": "insert",
+            "ns": {
+              "db": "database0",
+              "coll": "collection0"
+            },
+            "commitTimestamp": {
+              "$$exists": false
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
