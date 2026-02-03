@@ -121,6 +121,11 @@ async fn custom_key_material() -> Result<()> {
 // Prose test 4. BSON Size Limits and Batch Splitting
 #[tokio::test]
 async fn bson_size_limits() -> Result<()> {
+    if *DISABLE_CRYPT_SHARED && server_version_gte(7, 0).await {
+        log_uncaptured("skipping BSON size limits test on mongocryptd due to SERVER-118428: server >= 7.0");
+        return Ok(());
+    }
+
     const STRING_LEN_2_MIB: usize = 2_097_152;
 
     // Setup: db initialization.
