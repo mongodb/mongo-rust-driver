@@ -358,7 +358,7 @@ buildvariants:
 
   - name: in-use-encryption-disable-crypt-shared
     display_name: "In-Use Encryption (disable crypt_shared)"
-    patchable: true
+    patchable: false
     run_on:
       - rhel8-latest-small
     expansions:
