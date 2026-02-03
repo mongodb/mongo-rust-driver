@@ -12,6 +12,10 @@ createEntities:
       id: &database0 database0
       client: *client0
       databaseName: *database0
+  - collection:
+      id: &collection0 collection0
+      database: *database0
+      collectionName: *collection0
   - session:
       id: &session0 session0
       client: *client0
@@ -22,7 +26,7 @@ tests:
       - name: dropCollection
         object: *database0
         arguments:
-          collection: &collection0 collection0
+          collection: *collection0
       - name: createCollection
         object: *database0
         arguments:
@@ -33,7 +37,6 @@ tests:
           pipeline: []
           showExpandedEvents: true
         saveResultAsEntity: &changeStream0 changeStream0
-      
       - name: startTransaction
         object: *session0
       - name: insertOne

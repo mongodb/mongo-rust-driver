@@ -25,6 +25,13 @@
       }
     },
     {
+      "collection": {
+        "id": "collection0",
+        "database": "database0",
+        "collectionName": "collection0"
+      }
+    },
+    {
       "session": {
         "id": "session0",
         "client": "client0"
