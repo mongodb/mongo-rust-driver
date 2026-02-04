@@ -122,7 +122,9 @@ async fn custom_key_material() -> Result<()> {
 #[tokio::test]
 async fn bson_size_limits() -> Result<()> {
     if *DISABLE_CRYPT_SHARED && server_version_gte(7, 0).await {
-        log_uncaptured("skipping BSON size limits test on mongocryptd due to SERVER-118428: server >= 7.0");
+        log_uncaptured(
+            "skipping BSON size limits test on mongocryptd due to SERVER-118428: server >= 7.0",
+        );
         return Ok(());
     }
 
