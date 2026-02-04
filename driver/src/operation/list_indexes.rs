@@ -3,7 +3,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification,
+    cursor::common::CursorSpecification,
     error::Result,
     operation::OperationWithDefaults,
     options::ListIndexesOptions,

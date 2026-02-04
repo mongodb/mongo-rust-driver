@@ -3,17 +3,16 @@
 mod change_stream;
 mod client;
 mod coll;
-mod cursor;
 mod db;
 pub mod gridfs;
 
 #[cfg(test)]
 mod test;
 
+pub use crate::cursor::sync::{Cursor, SessionCursor, SessionCursorIter};
 pub use change_stream::{ChangeStream, SessionChangeStream};
 pub use client::{session::ClientSession, Client};
 pub use coll::Collection;
-pub use cursor::{Cursor, SessionCursor, SessionCursorIter};
 pub use db::Database;
 
 #[cfg(feature = "sync")]

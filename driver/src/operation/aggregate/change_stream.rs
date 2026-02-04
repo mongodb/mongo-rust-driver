@@ -1,8 +1,11 @@
 use crate::{
     bson::{doc, Document},
-    change_stream::{event::ResumeToken, ChangeStreamData, WatchArgs},
+    change_stream::{
+        common::{ChangeStreamData, WatchArgs},
+        event::ResumeToken,
+    },
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification,
+    cursor::common::CursorSpecification,
     error::Result,
     operation::{append_options, ExecutionContext, Operation, Retryability},
     options::{ChangeStreamOptions, SelectionCriteria, WriteConcern},

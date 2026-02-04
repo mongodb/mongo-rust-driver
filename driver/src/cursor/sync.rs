@@ -1,13 +1,15 @@
 use futures_util::stream::StreamExt;
 use serde::de::{Deserialize, DeserializeOwned};
 
-use super::ClientSession;
 use crate::{
     bson::{Document, RawDocument},
     error::Result,
+    sync::ClientSession,
+};
+
+use super::{
+    session::{SessionCursor as AsyncSessionCursor, SessionCursorStream},
     Cursor as AsyncCursor,
-    SessionCursor as AsyncSessionCursor,
-    SessionCursorStream,
 };
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
@@ -354,9 +356,10 @@ where
     async_stream: SessionCursorStream<'cursor, 'session, T>,
 }
 
-impl<T> Iterator for SessionCursorIter<'_, '_, T>
+impl<'cursor, 'session, T> Iterator for SessionCursorIter<'cursor, 'session, T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
+    'session: 'cursor,
 {
     type Item = Result<T>;
 

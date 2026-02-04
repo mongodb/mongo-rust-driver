@@ -4,7 +4,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     concern::WriteConcern,
-    cursor::CursorSpecification,
+    cursor::common::CursorSpecification,
     error::{Error, Result},
     operation::{run_command::RunCommand, Operation, SERVER_4_4_0_WIRE_VERSION},
     options::{RunCursorCommandOptions, SelectionCriteria},

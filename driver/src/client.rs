@@ -709,10 +709,6 @@ impl AsyncDropToken {
             panic!("exhausted AsyncDropToken");
         }
     }
-
-    pub(crate) fn take(&mut self) -> Self {
-        Self { tx: self.tx.take() }
-    }
 }
 
 impl Drop for Client {

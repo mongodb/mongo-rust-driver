@@ -6,7 +6,7 @@ use std::convert::TryInto;
 use crate::{bson::Bson, bson_compat::RawError};
 use crate::{
     bson::{DateTime, Document, RawBson, RawDocumentBuf, Timestamp},
-    cursor::CursorSpecification,
+    cursor::common::CursorSpecification,
     options::ChangeStreamOptions,
 };
 
