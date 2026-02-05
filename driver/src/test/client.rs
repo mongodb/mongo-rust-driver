@@ -1142,5 +1142,12 @@ async fn socks5_proxy_skip_ci() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn backpressure_run_unified() {
-    run_unified_tests(&["client-backpressure"]).await;
+    run_unified_tests(&["client-backpressure"])
+        .skip_tests(&[
+            // need to ignore killCursors events
+            "client.createChangeStream retries using operation loop",
+            "database.createChangeStream retries using operation loop",
+            "collection.createChangeStream retries using operation loop",
+        ])
+        .await;
 }

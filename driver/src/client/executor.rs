@@ -8,7 +8,7 @@ use crate::{
         common::{CursorInformation, CursorSpecification},
         NewCursor,
     },
-    error::{NO_WRITES_PERFORMED, SYSTEM_OVERLOADED_ERROR},
+    error::SYSTEM_OVERLOADED_ERROR,
     operation::{Feature, OperationTarget},
 };
 #[cfg(feature = "in-use-encryption")]
@@ -23,7 +23,7 @@ use std::{
     time::Instant,
 };
 
-use super::{options::ServerAddress, session::TransactionState, Client, ClientSession};
+use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
     change_stream::{
@@ -359,177 +359,6 @@ impl Client {
             Ok(SessionChangeStream::new(cursor, args, cs_data))
         })
         .await
-    }
-
-    /// Selects a server and executes the given operation on it, optionally using a provided
-    /// session. Retries the operation upon failure if retryability is supported or after
-    /// reauthenticating if reauthentication is required.
-    #[allow(unused)]
-    async fn execute_operation_with_retry2<T: Operation>(
-        &self,
-        op: &mut T,
-        selection_criteria: Option<SelectionCriteria>,
-        mut session: Option<&mut ClientSession>,
-    ) -> Result<ExecutionDetails<T>> {
-        let mut retry: Option<ExecutionRetry> = None;
-        let mut implicit_session: Option<ClientSession> = None;
-
-        loop {
-            if retry.is_some() {
-                op.update_for_retry();
-            }
-
-            let selection_criteria = session
-                .as_ref()
-                .and_then(|s| s.transaction.pinned_mongos())
-                .or(selection_criteria.as_ref());
-
-            let (server, effective_criteria) = match self
-                .select_server(selection_criteria, None, (&*op).into())
-                .await
-            {
-                Ok(out) => out,
-                Err(mut err) => {
-                    retry.first_error()?;
-
-                    err.add_labels_and_update_pin(None, &mut session, None);
-                    return Err(err);
-                }
-            };
-            let server_addr = server.address.clone();
-
-            let mut conn = match get_connection(&session, op, &server.pool).await {
-                Ok(c) => c,
-                Err(mut err) => {
-                    retry.first_error()?;
-
-                    err.add_labels_and_update_pin(None, &mut session, None);
-                    if err.is_read_retryable() && self.inner.options.retry_writes != Some(false) {
-                        err.add_label(RETRYABLE_WRITE_ERROR);
-                    }
-
-                    let retryability = op.retryability().with_options(self.options());
-                    let can_retry = match retryability {
-                        // Read-retryable operations should be retried on pool cleared errors during
-                        // connection checkout regardless of transaction status.
-                        Retryability::Read if err.is_pool_cleared() => true,
-                        _ => {
-                            retryability.can_retry_error(&err)
-                                && !session
-                                    .as_ref()
-                                    .is_some_and(|session| session.in_transaction())
-                        }
-                    };
-                    if can_retry {
-                        retry = Some(ExecutionRetry {
-                            prior_txn_number: None,
-                            first_error: err,
-                            first_server: server_addr.clone(),
-                        });
-                        continue;
-                    } else {
-                        return Err(err);
-                    }
-                }
-            };
-
-            if !conn.supports_sessions() && session.is_some() {
-                return Err(ErrorKind::SessionsNotSupported.into());
-            }
-
-            if conn.supports_sessions()
-                && session.is_none()
-                && op.supports_sessions()
-                && op.write_concern().is_acknowledged()
-            {
-                implicit_session = Some(ClientSession::new(self.clone(), None, true).await);
-                session = implicit_session.as_mut();
-            }
-
-            let retryability = self.get_retryability(op, &session, conn.stream_description()?);
-            if retryability == Retryability::None {
-                retry.first_error()?;
-            }
-
-            let txn_number =
-                if let Some(txn_number) = retry.as_ref().and_then(|r| r.prior_txn_number) {
-                    Some(txn_number)
-                } else {
-                    session
-                        .as_mut()
-                        .and_then(|s| s.get_txn_number_for_operation(retryability))
-                };
-
-            let details = match self
-                .execute_operation_on_connection(
-                    op,
-                    &mut conn,
-                    &mut session,
-                    txn_number,
-                    retryability,
-                    effective_criteria,
-                )
-                .await
-            {
-                Ok(output) => ExecutionDetails {
-                    output,
-                    connection: conn,
-                    implicit_session,
-                },
-                Err(mut err) => {
-                    err.wire_version = conn.stream_description()?.max_wire_version;
-
-                    // Retryable writes are only supported by storage engines with document-level
-                    // locking, so users need to disable retryable writes if using mmapv1.
-                    if let ErrorKind::Command(ref mut command_error) = *err.kind {
-                        if command_error.code == 20
-                            && command_error.message.starts_with("Transaction numbers")
-                        {
-                            command_error.message = "This MongoDB deployment does not support \
-                                                     retryable writes. Please add \
-                                                     retryWrites=false to your connection string."
-                                .to_string();
-                        }
-                    }
-
-                    self.inner
-                        .topology
-                        .updater()
-                        .handle_application_error(
-                            server_addr.clone(),
-                            err.clone(),
-                            HandshakePhase::after_completion(&conn),
-                        )
-                        .await;
-                    // release the connection to be processed by the connection pool
-                    drop(conn);
-                    // release the selected server to decrement its operation count
-                    drop(server);
-
-                    if let Some(r) = retry {
-                        if (err.is_server_error()
-                            || err.is_read_retryable()
-                            || err.is_write_retryable())
-                            && !err.contains_label(NO_WRITES_PERFORMED)
-                        {
-                            return Err(err);
-                        } else {
-                            return Err(r.first_error);
-                        }
-                    } else if retryability.can_retry_error(&err) {
-                        retry = Some(ExecutionRetry {
-                            prior_txn_number: txn_number,
-                            first_error: err,
-                            first_server: server_addr.clone(),
-                        });
-                        continue;
-                    } else {
-                        return Err(err);
-                    }
-                }
-            };
-            return Ok(details);
-        }
     }
 
     async fn execute_operation_with_retry<T: Operation>(
@@ -1323,27 +1152,6 @@ struct ExecutionDetails<T: Operation> {
     output: T::O,
     connection: PooledConnection,
     implicit_session: Option<ClientSession>,
-}
-
-#[derive(Debug)]
-#[allow(unused)]
-struct ExecutionRetry {
-    prior_txn_number: Option<i64>,
-    first_error: Error,
-    first_server: ServerAddress,
-}
-
-trait RetryHelper {
-    fn first_error(&mut self) -> Result<()>;
-}
-
-impl RetryHelper for Option<ExecutionRetry> {
-    fn first_error(&mut self) -> Result<()> {
-        match self.take() {
-            Some(r) => Err(r.first_error),
-            None => Ok(()),
-        }
-    }
 }
 
 impl Feature<&crate::options::WriteConcern> {

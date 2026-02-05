@@ -54,6 +54,10 @@ impl OperationWithDefaults for DropIndexes {
         Ok(())
     }
 
+    fn is_backpressure_retryable(&self, options: &crate::options::ClientOptions) -> bool {
+        options.retry_writes != Some(false)
+    }
+
     fn write_concern(&self) -> super::Feature<&WriteConcern> {
         self.options
             .as_ref()
