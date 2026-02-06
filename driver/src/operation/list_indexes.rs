@@ -6,7 +6,7 @@ use crate::{
     cursor::common::CursorSpecification,
     error::Result,
     operation::OperationWithDefaults,
-    options::ListIndexesOptions,
+    options::{ClientOptions, ListIndexesOptions},
     selection_criteria::{ReadPreference, SelectionCriteria},
     Collection,
 };
@@ -66,8 +66,8 @@ impl OperationWithDefaults for ListIndexes {
         super::Feature::Set(&SelectionCriteria::ReadPreference(ReadPreference::Primary))
     }
 
-    fn retryability(&self) -> Retryability {
-        Retryability::Read
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        Retryability::read(options)
     }
 
     fn target(&self) -> super::OperationTarget {

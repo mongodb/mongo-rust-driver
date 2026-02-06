@@ -404,7 +404,7 @@ impl Client {
                 Ok(selected) => selected,
                 Err(mut error) => {
                     retry::return_last_error(&mut retry)?;
-                    error.add_labels_and_update_pin(None, &mut session, None);
+                    error.add_labels_and_update_pin(Retryability::None, &mut session);
                     return Err(error);
                 }
             };
@@ -414,7 +414,7 @@ impl Client {
             let mut connection = match get_connection(&session, op, &server.pool).await {
                 Ok(connection) => connection,
                 Err(mut error) => {
-                    error.add_labels_and_update_pin(None, &mut session, None);
+                    error.add_labels_and_update_pin(op.retryability(self.options()), &mut session);
                     retry = Some(retry::handle_connection_establishment_failure(
                         retry,
                         error,
@@ -634,12 +634,7 @@ impl Client {
                         }
                     }
 
-                    err.add_labels_and_update_pin(
-                        Some(connection.stream_description()?),
-                        session,
-                        Some(retryability),
-                    );
-
+                    err.add_labels_and_update_pin(retryability, session);
                     op.handle_error(err)
                 }
                 Ok(response) => {
@@ -690,11 +685,7 @@ impl Client {
                     match handle_result {
                         Ok(op_out) => Ok(op_out),
                         Err(mut err) => {
-                            err.add_labels_and_update_pin(
-                                Some(connection.stream_description()?),
-                                session,
-                                Some(retryability),
-                            );
+                            err.add_labels_and_update_pin(retryability, session);
                             Err(err)
                         }
                     }
@@ -1011,12 +1002,6 @@ impl Client {
         session: &Option<&mut ClientSession>,
         stream_description: &StreamDescription,
     ) -> Retryability {
-        // commitTransaction and abortTransaction are always retried, regardless of the value of
-        // retry_writes.
-        if op.name() == CommitTransaction::NAME || op.name() == AbortTransaction::NAME {
-            return Retryability::Write;
-        }
-
         if session
             .as_ref()
             .is_some_and(|session| session.in_transaction())
@@ -1024,7 +1009,7 @@ impl Client {
             return Retryability::None;
         }
 
-        match op.retryability().with_options(self.options()) {
+        match op.retryability(self.options()) {
             Retryability::Write if stream_description.supports_retryable_writes() => {
                 Retryability::Write
             }
@@ -1094,15 +1079,12 @@ impl Error {
     /// ClientSession should be unpinned.
     fn add_labels_and_update_pin(
         &mut self,
-        stream_description: Option<&StreamDescription>,
+        retryability: Retryability,
         session: &mut Option<&mut ClientSession>,
-        retryability: Option<Retryability>,
     ) {
         let transaction_state = session.as_ref().map_or(&TransactionState::None, |session| {
             &session.transaction.state
         });
-        let max_wire_version = stream_description.and_then(|sd| sd.max_wire_version);
-        let server_type = stream_description.map(|sd| sd.initial_server_type);
 
         match transaction_state {
             TransactionState::Starting | TransactionState::InProgress => {
@@ -1111,28 +1093,22 @@ impl Error {
                 }
             }
             TransactionState::Committed { .. } => {
-                if let Some(max_wire_version) = max_wire_version {
-                    if self.should_add_retryable_write_label(max_wire_version, server_type) {
-                        self.add_label(RETRYABLE_WRITE_ERROR);
-                    }
+                if self.should_add_retryable_write_label() {
+                    self.add_label(RETRYABLE_WRITE_ERROR);
                 }
                 if self.should_add_unknown_transaction_commit_result_label() {
                     self.add_label(UNKNOWN_TRANSACTION_COMMIT_RESULT);
                 }
             }
             TransactionState::Aborted => {
-                if let Some(max_wire_version) = max_wire_version {
-                    if self.should_add_retryable_write_label(max_wire_version, server_type) {
-                        self.add_label(RETRYABLE_WRITE_ERROR);
-                    }
+                if self.should_add_retryable_write_label() {
+                    self.add_label(RETRYABLE_WRITE_ERROR);
                 }
             }
             TransactionState::None => {
-                if retryability == Some(Retryability::Write) {
-                    if let Some(max_wire_version) = max_wire_version {
-                        if self.should_add_retryable_write_label(max_wire_version, server_type) {
-                            self.add_label(RETRYABLE_WRITE_ERROR);
-                        }
+                if retryability == Retryability::Write {
+                    if self.should_add_retryable_write_label() {
+                        self.add_label(RETRYABLE_WRITE_ERROR);
                     }
                 }
             }

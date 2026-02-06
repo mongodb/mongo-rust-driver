@@ -18,7 +18,7 @@ use crate::{
         OperationWithDefaults,
         Retryability,
     },
-    options::WriteConcern,
+    options::{ClientOptions, WriteConcern},
     Collection,
 };
 
@@ -119,8 +119,8 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
             .into()
     }
 
-    fn retryability(&self) -> Retryability {
-        Retryability::Write
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        Retryability::write(options)
     }
 
     fn target(&self) -> super::OperationTarget {

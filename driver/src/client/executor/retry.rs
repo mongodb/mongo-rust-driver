@@ -105,7 +105,7 @@ fn handle_failure<T: Operation>(
     {
         true
     } else {
-        let retryability = op.retryability().with_options(options);
+        let retryability = op.retryability(options);
         // Pool cleared errors should be retried for reads regardless of transaction status.
         retryability == Retryability::Read && error.is_pool_cleared()
             || retryability.can_retry_error(&error) && !in_transaction

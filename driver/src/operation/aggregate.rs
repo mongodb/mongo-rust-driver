@@ -8,7 +8,7 @@ use crate::{
     cursor::common::CursorSpecification,
     error::Result,
     operation::{append_options, OperationTarget, Retryability},
-    options::{AggregateOptions, ReadPreference, SelectionCriteria, WriteConcern},
+    options::{AggregateOptions, ClientOptions, ReadPreference, SelectionCriteria, WriteConcern},
 };
 
 use super::{
@@ -122,11 +122,11 @@ impl OperationWithDefaults for Aggregate {
             .into()
     }
 
-    fn retryability(&self) -> Retryability {
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
         if self.is_out_or_merge() {
             Retryability::None
         } else {
-            Retryability::Read
+            Retryability::read(options)
         }
     }
 

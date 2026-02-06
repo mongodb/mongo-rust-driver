@@ -140,8 +140,8 @@ impl Operation for ChangeStreamAggregate {
         self.inner.write_concern()
     }
 
-    fn retryability(&self) -> Retryability {
-        self.inner.retryability()
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        self.inner.retryability(options)
     }
 
     fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {

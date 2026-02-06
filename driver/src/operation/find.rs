@@ -5,7 +5,7 @@ use crate::{
     cursor::common::CursorSpecification,
     error::{Error, Result},
     operation::{OperationWithDefaults, Retryability, SERVER_4_4_0_WIRE_VERSION},
-    options::{CursorType, FindOptions, SelectionCriteria},
+    options::{ClientOptions, CursorType, FindOptions, SelectionCriteria},
     Collection,
 };
 
@@ -125,8 +125,8 @@ impl OperationWithDefaults for Find {
             .into()
     }
 
-    fn retryability(&self) -> Retryability {
-        Retryability::Read
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        Retryability::read(options)
     }
 
     fn target(&self) -> super::OperationTarget {

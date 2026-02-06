@@ -59,8 +59,8 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.supports_sessions()
     }
 
-    fn retryability(&self) -> super::Retryability {
-        self.0.retryability()
+    fn retryability(&self, options: &ClientOptions) -> super::Retryability {
+        self.0.retryability(options)
     }
 
     fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {

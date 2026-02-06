@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::{bson::rawdoc, Client};
+use crate::{bson::rawdoc, options::ClientOptions, Client};
 
 use crate::{
     bson_compat::{cstr, CStr},
@@ -57,7 +57,8 @@ impl OperationWithDefaults for CommitTransaction {
             .into()
     }
 
-    fn retryability(&self) -> Retryability {
+    fn retryability(&self, _options: &ClientOptions) -> Retryability {
+        // commitTransaction is retryable regardless of the value of retryWrites
         Retryability::Write
     }
 

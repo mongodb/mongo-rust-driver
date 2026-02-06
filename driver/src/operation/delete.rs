@@ -93,9 +93,9 @@ impl OperationWithDefaults for Delete {
             .into()
     }
 
-    fn retryability(&self) -> Retryability {
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
         if self.limit == 1 {
-            Retryability::Write
+            Retryability::write(options)
         } else {
             Retryability::None
         }

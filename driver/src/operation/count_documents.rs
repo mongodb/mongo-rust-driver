@@ -107,8 +107,8 @@ impl Operation for CountDocuments {
         self.aggregate.selection_criteria()
     }
 
-    fn retryability(&self) -> Retryability {
-        Retryability::Read
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        Retryability::read(options)
     }
 
     fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {

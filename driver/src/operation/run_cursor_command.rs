@@ -69,8 +69,8 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.supports_sessions()
     }
 
-    fn retryability(&self) -> crate::operation::Retryability {
-        self.run_command.retryability()
+    fn retryability(&self, options: &ClientOptions) -> crate::operation::Retryability {
+        self.run_command.retryability(options)
     }
 
     fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
