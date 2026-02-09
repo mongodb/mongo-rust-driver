@@ -10,6 +10,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     bson_util::{self, RawDocumentCollection},
     checked::Checked,
+    client::session::TransactionState,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::{common::CursorSpecification, NewCursor},
     error::{BulkWriteError, Error, ErrorKind, Result},
@@ -431,6 +432,14 @@ where
                 None,
                 self.options.and_then(|options| options.comment.clone()),
             )?;
+
+            // The transaction state needs to be transitioned here to avoid adding
+            // startTransaction:true to getMore commands.
+            if let Some(ref mut session) = context.session {
+                if session.transaction.state == TransactionState::Starting {
+                    session.transaction.state = TransactionState::InProgress;
+                }
+            }
 
             let iteration_result = if self.client.is_load_balanced() {
                 // Using a cursor with a pinned connection is not feasible here; see RUST-2131 for

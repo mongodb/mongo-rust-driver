@@ -164,8 +164,8 @@ impl Operation for ChangeStreamAggregate {
         self.inner.supports_sessions()
     }
 
-    fn update_for_retry(&mut self) {
-        self.inner.update_for_retry();
+    fn update_for_retry(&mut self, overloaded: bool) {
+        self.inner.update_for_retry(overloaded);
     }
 
     fn override_criteria(&self) -> crate::operation::OverrideCriteriaFn {

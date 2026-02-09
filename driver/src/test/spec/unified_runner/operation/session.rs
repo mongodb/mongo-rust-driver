@@ -54,7 +54,7 @@ impl TestOperation for AssertSessionTransactionState {
                         TransactionState::None => "none",
                         TransactionState::Starting => "starting",
                         TransactionState::InProgress => "in_progress",
-                        TransactionState::Committed { data_committed: _ } => "committed",
+                        TransactionState::Committed { .. } => "committed",
                         TransactionState::Aborted => "aborted",
                     }
                 })

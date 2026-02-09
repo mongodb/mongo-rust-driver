@@ -94,6 +94,80 @@ pub(crate) static HELLO_COMMAND_NAMES: LazyLock<HashSet<&'static str>> = LazyLoc
     hash_set
 });
 
+enum ExecutionSession<'a> {
+    Explicit(&'a mut ClientSession),
+    Implicit(ClientSession),
+    None,
+}
+
+impl<'a> ExecutionSession<'a> {
+    fn explicit(session: impl Into<Option<&'a mut ClientSession>>) -> Self {
+        match session.into() {
+            Some(session) => Self::Explicit(session),
+            None => Self::None,
+        }
+    }
+
+    fn implicit(session: impl Into<Option<ClientSession>>) -> Self {
+        match session.into() {
+            Some(session) => Self::Implicit(session),
+            None => Self::None,
+        }
+    }
+
+    fn set_implicit(&mut self, implicit_session: ClientSession) {
+        *self = Self::Implicit(implicit_session)
+    }
+
+    fn into_implicit(self) -> Option<ClientSession> {
+        match self {
+            Self::Implicit(implicit) => Some(implicit),
+            _ => None,
+        }
+    }
+
+    fn as_ref_option(&self) -> Option<&ClientSession> {
+        match self {
+            Self::Explicit(explicit) => Some(*explicit),
+            Self::Implicit(implicit) => Some(&implicit),
+            Self::None => None,
+        }
+    }
+
+    fn as_ref_mut_option(&mut self) -> Option<&mut ClientSession> {
+        match self {
+            Self::Explicit(explicit) => Some(explicit),
+            Self::Implicit(ref mut implicit) => Some(implicit),
+            Self::None => None,
+        }
+    }
+
+    fn is_set(&self) -> bool {
+        !matches!(self, Self::None)
+    }
+
+    fn in_transaction(&self) -> bool {
+        match self {
+            Self::Explicit(session) => session.in_transaction(),
+            _ => false,
+        }
+    }
+
+    fn transaction_selection_criteria(&self) -> Option<&SelectionCriteria> {
+        let Self::Explicit(session) = self else {
+            return None;
+        };
+        if !session.in_transaction() {
+            return None;
+        }
+        session
+            .transaction
+            .options
+            .as_ref()
+            .and_then(|o| o.selection_criteria.as_ref())
+    }
+}
+
 impl Client {
     /// Execute the given operation.
     ///
@@ -105,31 +179,138 @@ impl Client {
         mut op: impl BorrowMut<T>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<T::O> {
-        self.execute_operation_with_details(op.borrow_mut(), session)
+        let mut session = ExecutionSession::explicit(session.into());
+        self.execute_operation_with_details(op.borrow_mut(), &mut session)
             .await
             .map(|details| details.output)
+    }
+
+    /// Execute the given operation, returning the cursor created by the operation.
+    ///
+    /// Server selection be will performed using the criteria specified on the operation, if any.
+    pub(crate) async fn execute_cursor_operation<Op, C>(
+        &self,
+        op: &mut Op,
+        session: Option<&mut ClientSession>,
+    ) -> Result<C>
+    where
+        Op: Operation<O = CursorSpecification>,
+        C: crate::cursor::NewCursor,
+    {
+        Box::pin(async {
+            let mut session = ExecutionSession::explicit(session);
+            let mut details = self
+                .execute_operation_with_details(op, &mut session)
+                .await?;
+            let pinned = self.pin_connection_for_cursor(
+                &details.output.info,
+                &mut details.connection,
+                session.as_ref_mut_option(),
+            )?;
+            C::generic_new(
+                self.clone(),
+                details.output,
+                session.into_implicit(),
+                pinned,
+            )
+        })
+        .await
+    }
+
+    pub(crate) async fn execute_watch<T>(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+        target: OperationTarget,
+        mut resume_data: Option<ChangeStreamData>,
+    ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
+    where
+        T: DeserializeOwned + Unpin + Send + Sync,
+    {
+        Box::pin(async {
+            let pipeline: Vec<_> = pipeline.into_iter().collect();
+            let args = WatchArgs {
+                pipeline,
+                target,
+                options,
+            };
+
+            let implicit_session = resume_data
+                .as_mut()
+                .and_then(|rd| rd.implicit_session.take());
+            let mut session = ExecutionSession::implicit(implicit_session);
+
+            let mut op = ChangeStreamAggregate::new(&args, resume_data)?;
+
+            let mut details = self
+                .execute_operation_with_details(&mut op, &mut session)
+                .await?;
+            let (cursor_spec, cs_data) = details.output;
+            let pinned =
+                self.pin_connection_for_cursor(&cursor_spec.info, &mut details.connection, None)?;
+            let cursor =
+                Cursor::generic_new(self.clone(), cursor_spec, session.into_implicit(), pinned)?;
+
+            Ok(ChangeStream::new(cursor, args, cs_data))
+        })
+        .await
+    }
+
+    pub(crate) async fn execute_watch_with_session<T>(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+        target: OperationTarget,
+        resume_data: Option<ChangeStreamData>,
+        session: &mut ClientSession,
+    ) -> Result<SessionChangeStream<ChangeStreamEvent<T>>>
+    where
+        T: DeserializeOwned + Unpin + Send + Sync,
+    {
+        Box::pin(async {
+            let pipeline: Vec<_> = pipeline.into_iter().collect();
+            let args = WatchArgs {
+                pipeline,
+                target,
+                options,
+            };
+            let mut session = ExecutionSession::explicit(session);
+
+            let mut op = ChangeStreamAggregate::new(&args, resume_data)?;
+            let mut details = self
+                .execute_operation_with_details(&mut op, &mut session)
+                .await?;
+
+            let (cursor_spec, cs_data) = details.output;
+            let pinned = self.pin_connection_for_cursor(
+                &cursor_spec.info,
+                &mut details.connection,
+                session.as_ref_mut_option(),
+            )?;
+            let cursor = SessionCursor::generic_new(self.clone(), cursor_spec, None, pinned)?;
+            Ok(SessionChangeStream::new(cursor, args, cs_data))
+        })
+        .await
     }
 
     #[cfg(not(feature = "opentelemetry"))]
     async fn execute_operation_with_details<T: Operation>(
         &self,
         op: &mut T,
-        session: impl Into<Option<&mut ClientSession>>,
+        session: &mut ExecutionSession<'_>,
     ) -> Result<ExecutionDetails<T>> {
-        self.execute_operation_with_details_inner(op, session.into())
-            .await
+        self.execute_operation_with_details_inner(op, session).await
     }
 
     #[cfg(feature = "opentelemetry")]
     async fn execute_operation_with_details<T: Operation>(
         &self,
         op: &mut T,
-        session: impl Into<Option<&mut ClientSession>>,
+        session: &mut ExecutionSession<'_>,
     ) -> Result<ExecutionDetails<T>> {
         use crate::otel::FutureExt as _;
 
-        let session = session.into();
-        let span = self.start_operation_span(op, session.as_deref());
+        let span = self.start_operation_span(op, session.as_ref_option());
         let result = self
             .execute_operation_with_details_inner(op, session)
             .with_span(&span)
@@ -142,7 +323,7 @@ impl Client {
     async fn execute_operation_with_details_inner<T: Operation>(
         &self,
         op: &mut T,
-        mut session: Option<&mut ClientSession>,
+        session: &mut ExecutionSession<'_>,
     ) -> Result<ExecutionDetails<T>> {
         // Validate inputs that can be checked before server selection and connection
         // checkout.
@@ -150,7 +331,7 @@ impl Client {
             return Err(ErrorKind::Shutdown.into());
         }
 
-        if session.as_ref().is_some_and(|s| s.in_transaction()) {
+        if session.in_transaction() {
             if op.read_concern().is_set() {
                 return Err(Error::invalid_argument(
                     "Cannot set read concern after starting a transaction",
@@ -180,23 +361,13 @@ impl Client {
             Feature::Set(s) => Some(s),
             Feature::NotSupported => None,
             Feature::Inherit => session
-                .as_ref()
-                .and_then(|s| {
-                    if s.in_transaction() {
-                        s.transaction
-                            .options
-                            .as_ref()
-                            .and_then(|o| o.selection_criteria.as_ref())
-                    } else {
-                        None
-                    }
-                })
+                .transaction_selection_criteria()
                 .or_else(|| op_target.selection_criteria()),
         }
         .cloned();
 
         // Validate the session and update its transaction status if needed.
-        if let Some(ref mut session) = session {
+        if let Some(session) = session.as_ref_mut_option() {
             if !TrackingArc::ptr_eq(&self.inner, &session.client().inner) {
                 return Err(Error::invalid_argument(
                     "the session provided to an operation must be created from the same client as \
@@ -227,148 +398,28 @@ impl Client {
             }
         }
 
-        Box::pin(async {
+        let result = Box::pin(async {
             self.execute_operation_with_retry(op, selection_criteria, session)
                 .await
         })
-        .await
-    }
+        .await;
 
-    /// Execute the given operation, returning the cursor created by the operation.
-    ///
-    /// Server selection be will performed using the criteria specified on the operation, if any.
-    pub(crate) async fn execute_cursor_operation<Op, C>(
-        &self,
-        op: &mut Op,
-        mut session: Option<&mut ClientSession>,
-    ) -> Result<C>
-    where
-        Op: Operation<O = CursorSpecification>,
-        C: crate::cursor::NewCursor,
-    {
-        Box::pin(async {
-            let mut details = self
-                .execute_operation_with_details(op, session.as_deref_mut())
-                .await?;
-            let pinned = self.pin_connection_for_cursor(
-                &details.output.info,
-                &mut details.connection,
-                session,
-            )?;
-            C::generic_new(
-                self.clone(),
-                details.output,
-                details.implicit_session,
-                pinned,
-            )
-        })
-        .await
-    }
-
-    pub(crate) fn is_load_balanced(&self) -> bool {
-        self.inner.options.load_balanced.unwrap_or(false)
-    }
-
-    pub(crate) fn pin_connection_for_cursor(
-        &self,
-        info: &CursorInformation,
-        conn: &mut PooledConnection,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<PinnedConnectionHandle>> {
-        if let Some(handle) = session.and_then(|s| s.transaction.pinned_connection()) {
-            // Cursor operations on a transaction share the same pinned connection.
-            Ok(Some(handle.replicate()))
-        } else if self.is_load_balanced() && info.id != 0 {
-            // Cursor operations on load balanced topologies always pin connections.
-            Ok(Some(conn.pin()?))
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub(crate) async fn execute_watch<T>(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: Option<ChangeStreamOptions>,
-        target: OperationTarget,
-        mut resume_data: Option<ChangeStreamData>,
-    ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
-    where
-        T: DeserializeOwned + Unpin + Send + Sync,
-    {
-        Box::pin(async {
-            let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let args = WatchArgs {
-                pipeline,
-                target,
-                options,
-            };
-            let mut implicit_session = resume_data
-                .as_mut()
-                .and_then(|rd| rd.implicit_session.take());
-            let mut op = ChangeStreamAggregate::new(&args, resume_data)?;
-
-            let mut details = self
-                .execute_operation_with_details(&mut op, implicit_session.as_mut())
-                .await?;
-            if let Some(session) = implicit_session {
-                details.implicit_session = Some(session);
+        if let Some(session) = session.as_ref_mut_option() {
+            if session.transaction.state == TransactionState::Starting {
+                session.transaction.state = TransactionState::InProgress;
             }
-            let (cursor_spec, cs_data) = details.output;
-            let pinned =
-                self.pin_connection_for_cursor(&cursor_spec.info, &mut details.connection, None)?;
-            let cursor =
-                Cursor::generic_new(self.clone(), cursor_spec, details.implicit_session, pinned)?;
+        }
 
-            Ok(ChangeStream::new(cursor, args, cs_data))
-        })
-        .await
-    }
-
-    pub(crate) async fn execute_watch_with_session<T>(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: Option<ChangeStreamOptions>,
-        target: OperationTarget,
-        resume_data: Option<ChangeStreamData>,
-        session: &mut ClientSession,
-    ) -> Result<SessionChangeStream<ChangeStreamEvent<T>>>
-    where
-        T: DeserializeOwned + Unpin + Send + Sync,
-    {
-        Box::pin(async {
-            let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let args = WatchArgs {
-                pipeline,
-                target,
-                options,
-            };
-            let mut op = ChangeStreamAggregate::new(&args, resume_data)?;
-
-            let mut details = self
-                .execute_operation_with_details(&mut op, &mut *session)
-                .await?;
-            let (cursor_spec, cs_data) = details.output;
-            let pinned = self.pin_connection_for_cursor(
-                &cursor_spec.info,
-                &mut details.connection,
-                Some(session),
-            )?;
-            let cursor = SessionCursor::generic_new(self.clone(), cursor_spec, None, pinned)?;
-
-            Ok(SessionChangeStream::new(cursor, args, cs_data))
-        })
-        .await
+        result
     }
 
     async fn execute_operation_with_retry<T: Operation>(
         &self,
         op: &mut T,
         selection_criteria: Option<SelectionCriteria>,
-        mut session: Option<&mut ClientSession>,
+        session: &mut ExecutionSession<'_>,
     ) -> Result<ExecutionDetails<T>> {
         let mut retry: Option<retry::Retry> = None;
-        let mut implicit_session: Option<ClientSession> = None;
 
         loop {
             match retry {
@@ -376,7 +427,7 @@ impl Client {
                     return Err(retry.last_error);
                 }
                 Some(ref retry) => {
-                    op.update_for_retry();
+                    op.update_for_retry(retry.overloaded);
                     if retry.overloaded {
                         if !self.consume_from_bucket().await {
                             return Err(ErrorKind::Overload.into());
@@ -389,7 +440,7 @@ impl Client {
             }
 
             let selection_criteria = session
-                .as_ref()
+                .as_ref_option()
                 .and_then(|s| s.transaction.pinned_mongos())
                 .or(selection_criteria.as_ref());
 
@@ -404,44 +455,51 @@ impl Client {
                 Ok(selected) => selected,
                 Err(mut error) => {
                     retry::return_last_error(&mut retry)?;
-                    error.add_labels_and_update_pin(Retryability::None, &mut session);
+                    error.add_labels_and_update_pin(
+                        Retryability::None,
+                        &mut session.as_ref_mut_option(),
+                    );
                     return Err(error);
                 }
             };
 
-            let in_transaction = session.as_ref().is_some_and(|s| s.in_transaction());
+            let mut connection =
+                match get_connection(&session.as_ref_mut_option(), op, &server.pool).await {
+                    Ok(connection) => connection,
+                    Err(mut error) => {
+                        error.add_labels_and_update_pin(
+                            op.retryability(self.options()),
+                            &mut session.as_ref_mut_option(),
+                        );
+                        retry = Some(retry::handle_connection_establishment_failure(
+                            retry,
+                            error,
+                            op,
+                            self.options(),
+                            server.address.clone(),
+                            session.in_transaction(),
+                        )?);
+                        continue;
+                    }
+                };
 
-            let mut connection = match get_connection(&session, op, &server.pool).await {
-                Ok(connection) => connection,
-                Err(mut error) => {
-                    error.add_labels_and_update_pin(op.retryability(self.options()), &mut session);
-                    retry = Some(retry::handle_connection_establishment_failure(
-                        retry,
-                        error,
-                        op,
-                        self.options(),
-                        server.address.clone(),
-                        in_transaction,
-                    )?);
-                    continue;
-                }
-            };
-
-            if !connection.supports_sessions() && session.is_some() {
+            if !connection.supports_sessions() && session.is_set() {
                 return Err(ErrorKind::SessionsNotSupported.into());
             }
 
             if connection.supports_sessions()
-                && session.is_none()
+                && !session.is_set()
                 && op.supports_sessions()
                 && op.write_concern().is_acknowledged()
             {
-                implicit_session = Some(ClientSession::new(self.clone(), None, true).await);
-                session = implicit_session.as_mut();
+                session.set_implicit(ClientSession::new(self.clone(), None, true).await);
             }
 
-            let retryability =
-                self.get_retryability(op, &session, connection.stream_description()?);
+            let retryability = self.get_retryability(
+                op,
+                &session.as_ref_mut_option(),
+                connection.stream_description()?,
+            );
             let overloaded = retry.as_ref().map(|r| r.overloaded).unwrap_or(false);
             if overloaded && !op.is_backpressure_retryable(self.options())
                 || !overloaded && retryability == Retryability::None
@@ -451,7 +509,7 @@ impl Client {
 
             let txn_number = retry::txn_number(&retry).or_else(|| {
                 session
-                    .as_mut()
+                    .as_ref_mut_option()
                     .and_then(|s| s.get_txn_number_for_operation(retryability))
             });
 
@@ -459,7 +517,7 @@ impl Client {
                 .execute_operation_on_connection(
                     op,
                     &mut connection,
-                    &mut session,
+                    &mut session.as_ref_mut_option(),
                     txn_number,
                     retryability,
                     effective_criteria,
@@ -468,11 +526,7 @@ impl Client {
             match execution_result {
                 Ok(output) => {
                     self.deposit_success_in_bucket(retry.is_some()).await;
-                    return Ok(ExecutionDetails {
-                        output,
-                        connection,
-                        implicit_session,
-                    });
+                    return Ok(ExecutionDetails { output, connection });
                 }
                 Err(mut error) => {
                     if retry.is_some() && !error.contains_label(SYSTEM_OVERLOADED_ERROR) {
@@ -514,7 +568,7 @@ impl Client {
                         op,
                         self.options(),
                         server_address,
-                        in_transaction,
+                        session.in_transaction(),
                         txn_number,
                     )?);
                     continue;
@@ -789,12 +843,10 @@ impl Client {
                         } else if is_sharded {
                             session.pin_mongos(connection.address().clone());
                         }
-                        session.transaction.state = TransactionState::InProgress;
                     }
                     TransactionState::InProgress => cmd.set_autocommit(),
                     TransactionState::Committed { .. } | TransactionState::Aborted => {
                         cmd.set_autocommit();
-
                         // Append the recovery token to the command if we are committing or aborting
                         // on a sharded transaction.
                         if is_sharded {
@@ -956,6 +1008,27 @@ impl Client {
                         message: format!("error deserializing command error: {e}"),
                     })
                 }))
+        }
+    }
+
+    pub(crate) fn is_load_balanced(&self) -> bool {
+        self.inner.options.load_balanced.unwrap_or(false)
+    }
+
+    pub(crate) fn pin_connection_for_cursor(
+        &self,
+        info: &CursorInformation,
+        conn: &mut PooledConnection,
+        session: Option<&mut ClientSession>,
+    ) -> Result<Option<PinnedConnectionHandle>> {
+        if let Some(handle) = session.and_then(|s| s.transaction.pinned_connection()) {
+            // Cursor operations on a transaction share the same pinned connection.
+            Ok(Some(handle.replicate()))
+        } else if self.is_load_balanced() && info.id != 0 {
+            // Cursor operations on load balanced topologies always pin connections.
+            Ok(Some(conn.pin()?))
+        } else {
+            Ok(None)
         }
     }
 
@@ -1127,7 +1200,6 @@ impl Error {
 struct ExecutionDetails<T: Operation> {
     output: T::O,
     connection: PooledConnection,
-    implicit_session: Option<ClientSession>,
 }
 
 impl Feature<&crate::options::WriteConcern> {

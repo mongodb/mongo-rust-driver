@@ -179,7 +179,7 @@ pub(crate) trait Operation {
     fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool;
 
     /// Updates this operation as needed for a retry.
-    fn update_for_retry(&mut self);
+    fn update_for_retry(&mut self, overloaded: bool);
 
     /// Returns a function handle to potentially override selection criteria based on server
     /// topology.
@@ -387,7 +387,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     }
 
     /// Updates this operation as needed for a retry.
-    fn update_for_retry(&mut self) {}
+    fn update_for_retry(&mut self, _overloaded: bool) {}
 
     /// Returns a function handle to potentially override selection criteria based on server
     /// topology.
@@ -451,8 +451,8 @@ where
     fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
         self.is_backpressure_retryable(options)
     }
-    fn update_for_retry(&mut self) {
-        self.update_for_retry()
+    fn update_for_retry(&mut self, overloaded: bool) {
+        self.update_for_retry(overloaded)
     }
     fn override_criteria(&self) -> OverrideCriteriaFn {
         self.override_criteria()

@@ -135,8 +135,8 @@ impl Operation for CountDocuments {
         self.aggregate.supports_sessions()
     }
 
-    fn update_for_retry(&mut self) {
-        self.aggregate.update_for_retry();
+    fn update_for_retry(&mut self, overloaded: bool) {
+        self.aggregate.update_for_retry(overloaded);
     }
 
     fn override_criteria(&self) -> super::OverrideCriteriaFn {

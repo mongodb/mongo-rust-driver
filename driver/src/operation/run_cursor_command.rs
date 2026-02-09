@@ -77,8 +77,8 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.is_backpressure_retryable(options)
     }
 
-    fn update_for_retry(&mut self) {
-        self.run_command.update_for_retry()
+    fn update_for_retry(&mut self, overloaded: bool) {
+        self.run_command.update_for_retry(overloaded)
     }
 
     fn override_criteria(&self) -> super::OverrideCriteriaFn {

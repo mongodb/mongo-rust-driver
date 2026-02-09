@@ -76,7 +76,7 @@ impl OperationWithDefaults for AbortTransaction {
         Retryability::Write
     }
 
-    fn update_for_retry(&mut self) {
+    fn update_for_retry(&mut self, _overloaded: bool) {
         // The session must be "unpinned" before server selection for a retry.
         self.pinned = None;
     }

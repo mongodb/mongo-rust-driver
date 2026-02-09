@@ -67,8 +67,8 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.is_backpressure_retryable(options)
     }
 
-    fn update_for_retry(&mut self) {
-        self.0.update_for_retry()
+    fn update_for_retry(&mut self, overloaded: bool) {
+        self.0.update_for_retry(overloaded)
     }
 
     fn override_criteria(&self) -> super::OverrideCriteriaFn {
