@@ -1291,8 +1291,8 @@ mod basic {
             }))
             .build()
             .into();
-        let client = Client::with_options(opts)?;
         opts.app_name = Some("rust-oidc".to_string());
+        let client = Client::with_options(opts)?;
 
         client
             .database("test")
