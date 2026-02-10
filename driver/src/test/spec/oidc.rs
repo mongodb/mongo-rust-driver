@@ -398,8 +398,9 @@ mod basic {
         let admin_client = Client::with_uri_str(&*MONGODB_URI).await?;
 
         // Now set a failpoint for find with 391 error code
-        let fail_point =
-            FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(391).app_name("rust-oidc");
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
+            .error_code(391)
+            .app_name("rust-oidc");
         let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
 
         // we need to assert the callback count
@@ -466,8 +467,9 @@ mod basic {
 
         collection.find_one(doc! {}).await?;
 
-        let fail_point =
-            FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(391).app_name("rust-oidc");
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
+            .error_code(391)
+            .app_name("rust-oidc");
         let _guard = client.enable_fail_point(fail_point).await?;
 
         collection.find_one(doc! {}).await.unwrap_err();
@@ -508,8 +510,9 @@ mod basic {
 
         collection.insert_one(doc! { "x": 1 }).await?;
 
-        let fail_point =
-            FailPoint::fail_command(&["insert"], FailPointMode::Times(1)).error_code(391).app_name("rust-oidc");
+        let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
+            .error_code(391)
+            .app_name("rust-oidc");
         let _guard = client.enable_fail_point(fail_point).await?;
 
         collection.insert_one(doc! { "y": 2 }).await.unwrap_err();
@@ -554,8 +557,9 @@ mod basic {
         let sasl_start_events = event_buffer.get_command_started_events(&["saslStart"]);
         assert!(sasl_start_events.is_empty());
 
-        let fail_point =
-            FailPoint::fail_command(&["insert"], FailPointMode::Times(1)).error_code(391).app_name("rust-oidc");
+        let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
+            .error_code(391)
+            .app_name("rust-oidc");
         let _guard = client.enable_fail_point(fail_point).await?;
 
         collection.insert_one(doc! { "y": 2 }).await?;
@@ -573,8 +577,9 @@ mod basic {
         let admin_client = Client::with_uri_str(&*MONGODB_URI).await?;
 
         // Now set a failpoint for find with 391 error code
-        let fail_point =
-            FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(391).app_name("rust-oidc");
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
+            .error_code(391)
+            .app_name("rust-oidc");
         let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
 
         // we need to assert the callback count
@@ -996,8 +1001,9 @@ mod basic {
         // we use 5 times just because AlwaysOn is dangerous if for some reason we don't run
         // the cleanup, since we will not be able to auth a new connection to turn
         // off the failpoint.
-        let fail_point =
-            FailPoint::fail_command(&["saslStart"], FailPointMode::Times(5)).error_code(20).app_name("rust-oidc");
+        let fail_point = FailPoint::fail_command(&["saslStart"], FailPointMode::Times(5))
+            .error_code(20)
+            .app_name("rust-oidc");
         let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
 
         // Now find should succeed even though we have a fail point on saslStart because the spec
@@ -1020,8 +1026,9 @@ mod basic {
         let admin_client = Client::with_uri_str(&*MONGODB_URI).await?;
 
         // Now set a failpoint for find
-        let fail_point =
-            FailPoint::fail_command(&["saslStart"], FailPointMode::Times(5)).error_code(20).app_name("rust-oidc");
+        let fail_point = FailPoint::fail_command(&["saslStart"], FailPointMode::Times(5))
+            .error_code(20)
+            .app_name("rust-oidc");
         let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
         // we need to assert the callback count
         let call_count = Arc::new(Mutex::new(0));
@@ -1106,8 +1113,9 @@ mod basic {
             .await?;
 
         // Now set a failpoint for find with 391 error code
-        let fail_point =
-            FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(391).app_name("rust-oidc");
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
+            .error_code(391)
+            .app_name("rust-oidc");
         let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
 
         client
@@ -1192,8 +1200,9 @@ mod basic {
             .await?;
 
         // Now set a failpoint for find with 391 error code
-        let fail_point =
-            FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(391).app_name("rust-oidc");
+        let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
+            .error_code(391)
+            .app_name("rust-oidc");
         let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
 
         client
@@ -1243,7 +1252,8 @@ mod basic {
         assert_eq!(1, *(*call_count).lock().await);
 
         // Now set a failpoint for find with 391 error code
-        let fail_point = FailPoint::fail_command(&["find", "saslStart"], FailPointMode::Times(2)).app_name("rust-oidc")
+        let fail_point = FailPoint::fail_command(&["find", "saslStart"], FailPointMode::Times(2))
+            .app_name("rust-oidc")
             .error_code(391);
         let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
 
@@ -1303,7 +1313,8 @@ mod basic {
         assert_eq!(1, *(*call_count).lock().await);
 
         // Now set a failpoint for find with 391 error code
-        let fail_point = FailPoint::fail_command(&["find", "saslStart"], FailPointMode::Times(3)).app_name("rust-oidc")
+        let fail_point = FailPoint::fail_command(&["find", "saslStart"], FailPointMode::Times(3))
+            .app_name("rust-oidc")
             .error_code(391);
         let _guard = admin_client.enable_fail_point(fail_point).await.unwrap();
 
