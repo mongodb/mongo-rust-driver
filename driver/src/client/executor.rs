@@ -94,9 +94,14 @@ pub(crate) static HELLO_COMMAND_NAMES: LazyLock<HashSet<&'static str>> = LazyLoc
     hash_set
 });
 
+struct ExecutionDetails<T: Operation> {
+    output: T::O,
+    connection: PooledConnection,
+}
+
 enum ExecutionSession<'a> {
     Explicit(&'a mut ClientSession),
-    Implicit(ClientSession),
+    Implicit(Box<ClientSession>),
     None,
 }
 
@@ -110,18 +115,18 @@ impl<'a> ExecutionSession<'a> {
 
     fn implicit(session: impl Into<Option<ClientSession>>) -> Self {
         match session.into() {
-            Some(session) => Self::Implicit(session),
+            Some(session) => Self::Implicit(Box::new(session)),
             None => Self::None,
         }
     }
 
     fn set_implicit(&mut self, implicit_session: ClientSession) {
-        *self = Self::Implicit(implicit_session)
+        *self = Self::Implicit(Box::new(implicit_session))
     }
 
     fn into_implicit(self) -> Option<ClientSession> {
         match self {
-            Self::Implicit(implicit) => Some(implicit),
+            Self::Implicit(implicit) => Some(*implicit),
             _ => None,
         }
     }
@@ -129,7 +134,7 @@ impl<'a> ExecutionSession<'a> {
     fn as_ref_option(&self) -> Option<&ClientSession> {
         match self {
             Self::Explicit(explicit) => Some(*explicit),
-            Self::Implicit(implicit) => Some(&implicit),
+            Self::Implicit(implicit) => Some(implicit),
             Self::None => None,
         }
     }
@@ -147,16 +152,13 @@ impl<'a> ExecutionSession<'a> {
     }
 
     fn in_transaction(&self) -> bool {
-        match self {
-            Self::Explicit(session) => session.in_transaction(),
-            _ => false,
-        }
+        self.as_ref_option()
+            .map(|s| s.in_transaction())
+            .unwrap_or(false)
     }
 
     fn transaction_selection_criteria(&self) -> Option<&SelectionCriteria> {
-        let Self::Explicit(session) = self else {
-            return None;
-        };
+        let session = self.as_ref_option()?;
         if !session.in_transaction() {
             return None;
         }
@@ -420,7 +422,6 @@ impl Client {
         session: &mut ExecutionSession<'_>,
     ) -> Result<ExecutionDetails<T>> {
         let mut retry: Option<retry::Retry> = None;
-
         loop {
             match retry {
                 Some(retry) if retry.max_retries_reached() => {
@@ -455,21 +456,19 @@ impl Client {
                 Ok(selected) => selected,
                 Err(mut error) => {
                     retry::return_last_error(&mut retry)?;
-                    error.add_labels_and_update_pin(
-                        Retryability::None,
-                        &mut session.as_ref_mut_option(),
-                    );
+                    error
+                        .add_labels_and_update_pin(Retryability::None, session.as_ref_mut_option());
                     return Err(error);
                 }
             };
 
             let mut connection =
-                match get_connection(&session.as_ref_mut_option(), op, &server.pool).await {
+                match get_connection(session.as_ref_option(), op, &server.pool).await {
                     Ok(connection) => connection,
                     Err(mut error) => {
                         error.add_labels_and_update_pin(
                             op.retryability(self.options()),
-                            &mut session.as_ref_mut_option(),
+                            session.as_ref_mut_option(),
                         );
                         retry = Some(retry::handle_connection_establishment_failure(
                             retry,
@@ -688,7 +687,7 @@ impl Client {
                         }
                     }
 
-                    err.add_labels_and_update_pin(retryability, session);
+                    err.add_labels_and_update_pin(retryability, session.as_deref_mut());
                     op.handle_error(err)
                 }
                 Ok(response) => {
@@ -739,7 +738,7 @@ impl Client {
                     match handle_result {
                         Ok(op_out) => Ok(op_out),
                         Err(mut err) => {
-                            err.add_labels_and_update_pin(retryability, session);
+                            err.add_labels_and_update_pin(retryability, session.as_deref_mut());
                             Err(err)
                         }
                     }
@@ -1118,7 +1117,7 @@ impl Client {
 }
 
 async fn get_connection<T: Operation>(
-    session: &Option<&mut ClientSession>,
+    session: Option<&ClientSession>,
     op: &T,
     pool: &ConnectionPool,
 ) -> Result<PooledConnection> {
@@ -1153,7 +1152,7 @@ impl Error {
     fn add_labels_and_update_pin(
         &mut self,
         retryability: Retryability,
-        session: &mut Option<&mut ClientSession>,
+        session: Option<&mut ClientSession>,
     ) {
         let transaction_state = session.as_ref().map_or(&TransactionState::None, |session| {
             &session.transaction.state
@@ -1179,15 +1178,13 @@ impl Error {
                 }
             }
             TransactionState::None => {
-                if retryability == Retryability::Write {
-                    if self.should_add_retryable_write_label() {
-                        self.add_label(RETRYABLE_WRITE_ERROR);
-                    }
+                if retryability == Retryability::Write && self.should_add_retryable_write_label() {
+                    self.add_label(RETRYABLE_WRITE_ERROR);
                 }
             }
         }
 
-        if let Some(ref mut session) = session {
+        if let Some(session) = session {
             if self.contains_label(TRANSIENT_TRANSACTION_ERROR)
                 || self.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT)
             {
@@ -1195,11 +1192,6 @@ impl Error {
             }
         }
     }
-}
-
-struct ExecutionDetails<T: Operation> {
-    output: T::O,
-    connection: PooledConnection,
 }
 
 impl Feature<&crate::options::WriteConcern> {
