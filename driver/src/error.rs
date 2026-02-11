@@ -16,7 +16,7 @@ use crate::{
     bson::{doc, rawdoc, Bson, Document, RawDocumentBuf},
     cmap::RawCommandResponse,
     options::ServerAddress,
-    sdam::TopologyVersion,
+    sdam::{ServerType, TopologyVersion},
 };
 
 pub use bulk_write::{BulkWriteError, PartialBulkWriteResult};
@@ -26,6 +26,9 @@ const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
 const SHUTTING_DOWN_CODES: [i32; 2] = [11600, 91];
 const RETRYABLE_READ_CODES: [i32; 13] = [
     11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 134, 262,
+];
+const RETRYABLE_WRITE_CODES: [i32; 12] = [
+    11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 262,
 ];
 const UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL_CODES: [i32; 3] = [50, 64, 91];
 const REAUTHENTICATION_REQUIRED_CODE: i32 = 391;
@@ -222,8 +225,47 @@ impl Error {
         self.contains_label(RETRYABLE_WRITE_ERROR)
     }
 
-    pub(crate) fn should_add_retryable_write_label(&self) -> bool {
-        self.is_network_error()
+    fn is_write_concern_error(&self) -> bool {
+        match *self.kind {
+            ErrorKind::Write(WriteFailure::WriteConcernError(_)) => true,
+            ErrorKind::InsertMany(ref insert_many_error)
+                if insert_many_error.write_concern_error.is_some() =>
+            {
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Whether a "RetryableWriteError" label should be added to this error. If max_wire_version
+    /// indicates a 4.4+ server, a label should only be added if the error is a network error.
+    /// Otherwise, a label should be added if the error is a network error or the error code
+    /// matches one of the retryable write codes.
+    pub(crate) fn should_add_retryable_write_label(
+        &self,
+        max_wire_version: Option<i32>,
+        server_type: Option<ServerType>,
+    ) -> bool {
+        const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
+
+        if max_wire_version
+            .map(|mwv| mwv > SERVER_4_2_0_WIRE_VERSION)
+            .unwrap_or(true)
+        {
+            return self.is_network_error();
+        }
+        if self.is_network_error() {
+            return true;
+        }
+
+        if server_type == Some(ServerType::Mongos) && self.is_write_concern_error() {
+            return false;
+        }
+
+        match &self.sdam_code() {
+            Some(code) => RETRYABLE_WRITE_CODES.contains(code),
+            None => false,
+        }
     }
 
     pub(crate) fn should_add_unknown_transaction_commit_result_label(&self) -> bool {

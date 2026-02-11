@@ -95,10 +95,13 @@ fn handle_failure<T: Operation>(
     op: &T,
     options: &ClientOptions,
     server: ServerAddress,
-    in_transaction: bool,
+    is_transaction_op: bool,
     txn_number: Option<i64>,
     error_is_connection_establishment: bool,
 ) -> Result<Retry> {
+    if op.name() == "commitTransaction" {
+        dbg!(error.labels());
+    }
     let can_retry = if error.contains_label(SYSTEM_OVERLOADED_ERROR)
         && error.contains_label(RETRYABLE_ERROR)
         && op.is_backpressure_retryable(options)
@@ -108,7 +111,7 @@ fn handle_failure<T: Operation>(
         let retryability = op.retryability(options);
         // Pool cleared errors should be retried for reads regardless of transaction status.
         retryability == Retryability::Read && error.is_pool_cleared()
-            || retryability.can_retry_error(&error) && !in_transaction
+            || retryability.can_retry_error(&error) && !is_transaction_op
     };
     let overloaded = error.contains_label(SYSTEM_OVERLOADED_ERROR);
 

@@ -9,7 +9,7 @@ use crate::{
         NewCursor,
     },
     error::SYSTEM_OVERLOADED_ERROR,
-    operation::{Feature, OperationTarget},
+    operation::{is_commit_or_abort, Feature, OperationTarget},
 };
 #[cfg(feature = "in-use-encryption")]
 use futures_core::future::BoxFuture;
@@ -376,11 +376,11 @@ impl Client {
                      the collection/database on which the operation is being performed",
                 ));
             }
-            if selection_criteria
-                .as_ref()
-                .and_then(|sc| sc.as_read_pref())
-                .is_some_and(|rp| rp != &ReadPreference::Primary)
-                && session.in_transaction()
+            if session.in_transaction()
+                && selection_criteria
+                    .as_ref()
+                    .and_then(|sc| sc.as_read_pref())
+                    .is_some_and(|rp| rp != &ReadPreference::Primary)
             {
                 return Err(ErrorKind::Transaction {
                     message: "read preference in a transaction must be primary".into(),
@@ -456,11 +456,16 @@ impl Client {
                 Ok(selected) => selected,
                 Err(mut error) => {
                     retry::return_last_error(&mut retry)?;
-                    error
-                        .add_labels_and_update_pin(Retryability::None, session.as_ref_mut_option());
+                    error.add_labels_and_update_pin(
+                        Retryability::None,
+                        session.as_ref_mut_option(),
+                        None,
+                    );
                     return Err(error);
                 }
             };
+
+            let is_transaction_op = session.in_transaction() && !is_commit_or_abort(op);
 
             let mut connection =
                 match get_connection(session.as_ref_option(), op, &server.pool).await {
@@ -469,6 +474,7 @@ impl Client {
                         error.add_labels_and_update_pin(
                             op.retryability(self.options()),
                             session.as_ref_mut_option(),
+                            None,
                         );
                         retry = Some(retry::handle_connection_establishment_failure(
                             retry,
@@ -476,7 +482,7 @@ impl Client {
                             op,
                             self.options(),
                             server.address.clone(),
-                            session.in_transaction(),
+                            is_transaction_op,
                         )?);
                         continue;
                     }
@@ -567,7 +573,7 @@ impl Client {
                         op,
                         self.options(),
                         server_address,
-                        session.in_transaction(),
+                        is_transaction_op,
                         txn_number,
                     )?);
                     continue;
@@ -687,7 +693,11 @@ impl Client {
                         }
                     }
 
-                    err.add_labels_and_update_pin(retryability, session.as_deref_mut());
+                    err.add_labels_and_update_pin(
+                        retryability,
+                        session.as_deref_mut(),
+                        Some(connection.stream_description()?),
+                    );
                     op.handle_error(err)
                 }
                 Ok(response) => {
@@ -738,7 +748,11 @@ impl Client {
                     match handle_result {
                         Ok(op_out) => Ok(op_out),
                         Err(mut err) => {
-                            err.add_labels_and_update_pin(retryability, session.as_deref_mut());
+                            err.add_labels_and_update_pin(
+                                retryability,
+                                session.as_deref_mut(),
+                                Some(connection.stream_description()?),
+                            );
                             Err(err)
                         }
                     }
@@ -1153,7 +1167,10 @@ impl Error {
         &mut self,
         retryability: Retryability,
         session: Option<&mut ClientSession>,
+        stream_description: Option<&StreamDescription>,
     ) {
+        let max_wire_version = stream_description.and_then(|sd| sd.max_wire_version);
+        let server_type = stream_description.map(|sd| sd.initial_server_type);
         let transaction_state = session.as_ref().map_or(&TransactionState::None, |session| {
             &session.transaction.state
         });
@@ -1165,7 +1182,7 @@ impl Error {
                 }
             }
             TransactionState::Committed { .. } => {
-                if self.should_add_retryable_write_label() {
+                if self.should_add_retryable_write_label(max_wire_version, server_type) {
                     self.add_label(RETRYABLE_WRITE_ERROR);
                 }
                 if self.should_add_unknown_transaction_commit_result_label() {
@@ -1173,12 +1190,14 @@ impl Error {
                 }
             }
             TransactionState::Aborted => {
-                if self.should_add_retryable_write_label() {
+                if self.should_add_retryable_write_label(max_wire_version, server_type) {
                     self.add_label(RETRYABLE_WRITE_ERROR);
                 }
             }
             TransactionState::None => {
-                if retryability == Retryability::Write && self.should_add_retryable_write_label() {
+                if retryability == Retryability::Write
+                    && self.should_add_retryable_write_label(max_wire_version, server_type)
+                {
                     self.add_label(RETRYABLE_WRITE_ERROR);
                 }
             }

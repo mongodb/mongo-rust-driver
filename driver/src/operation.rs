@@ -689,3 +689,8 @@ where
         Ok(SingleCursorResult(full_body.cursor.first_batch.pop()))
     }
 }
+
+pub(crate) fn is_commit_or_abort<T: Operation>(op: &T) -> bool {
+    op.name() == <CommitTransaction as Operation>::NAME
+        || op.name() == <AbortTransaction as Operation>::NAME
+}

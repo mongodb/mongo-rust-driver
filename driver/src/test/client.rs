@@ -6,7 +6,10 @@ use std::{
     time::Duration,
 };
 
-use crate::{bson::Document, test::spec::unified_runner::run_unified_tests};
+use crate::{
+    bson::Document,
+    test::{spec::unified_runner::run_unified_tests, topology_is_load_balanced},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -1142,6 +1145,11 @@ async fn socks5_proxy_skip_ci() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn backpressure_run_unified() {
+    let mut skipped_files = Vec::new();
+    if topology_is_sharded().await || topology_is_load_balanced().await {
+        // needs to set useMultipleMongoses:false
+        skipped_files.push("getMore-retried.json");
+    }
     run_unified_tests(&["client-backpressure"])
         .skip_tests(&[
             // need to ignore killCursors events
@@ -1149,5 +1157,6 @@ async fn backpressure_run_unified() {
             "database.createChangeStream retries using operation loop",
             "collection.createChangeStream retries using operation loop",
         ])
+        .skip_files(&skipped_files)
         .await;
 }
