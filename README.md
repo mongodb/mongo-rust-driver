@@ -76,10 +76,6 @@ A simple CRUD API example using Axum and MongoDB can be found [here](https://git
 
 The Rocket web framework provides built-in support for MongoDB via the Rust driver. The documentation for the [`rocket_db_pools`](https://api.rocket.rs/v0.5/rocket_db_pools/index.html) crate contains instructions for using MongoDB with your Rocket application.
 
-## Note on connecting to Atlas deployments
-
-In order to connect to a pre-4.2 Atlas instance that's M2 or bigger, the `openssl-tls` feature flag must be enabled. The flag is not required for clusters smaller than M2 or running server versions 4.2 or newer.
-
 ## Windows DNS note
 
 On Windows, there is a known issue in the `hickory-resolver` crate, which the driver uses to perform DNS lookups, that causes severe performance degradation in resolvers that use the system configuration. Since the driver uses the system configuration by default, users are recommended to specify an alternate resolver configuration on Windows (e.g. `ResolverConfig::cloudflare()`) until that issue is resolved. This only has an effect when connecting to deployments using a `mongodb+srv` connection string.
