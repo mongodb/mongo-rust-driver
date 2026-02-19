@@ -447,6 +447,11 @@ impl ServerDescription {
     }
 
     pub(crate) fn matches_tag_set(&self, tag_set: &TagSet) -> bool {
+        // An empty tag set matches any server.
+        if tag_set.is_empty() {
+            return true;
+        }
+
         let reply = match self.reply.as_ref() {
             Ok(Some(ref reply)) => reply,
             _ => return false,
