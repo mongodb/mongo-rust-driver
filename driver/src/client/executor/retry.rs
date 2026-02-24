@@ -4,7 +4,8 @@ use crate::{
     bson_util::round_clamp,
     error::{Error, Result, NO_WRITES_PERFORMED, RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
     operation::{Operation, Retryability},
-    options::{ClientOptions, ServerAddress},
+    options::ServerAddress,
+    Client,
 };
 
 /// The maximum number of retries that can be performed when the system is overloaded.
@@ -48,38 +49,29 @@ pub(super) fn handle_connection_establishment_failure<T: Operation>(
     retry: Option<Retry>,
     error: Error,
     op: &T,
-    options: &ClientOptions,
+    client: &Client,
     server: ServerAddress,
     in_transaction: bool,
 ) -> Result<Retry> {
-    handle_failure(
-        retry,
-        error,
-        op,
-        options,
-        server,
-        in_transaction,
-        None,
-        true,
-    )
+    handle_failure(retry, error, op, client, server, in_transaction, None, true)
 }
 
 pub(super) fn handle_execution_failure<T: Operation>(
     retry: Option<Retry>,
     error: Error,
     op: &T,
-    options: &ClientOptions,
+    client: &Client,
     server: ServerAddress,
-    in_transaction: bool,
+    is_transaction_op: bool,
     txn_number: Option<i64>,
 ) -> Result<Retry> {
     handle_failure(
         retry,
         error,
         op,
-        options,
+        client,
         server,
-        in_transaction,
+        is_transaction_op,
         txn_number,
         false,
     )
@@ -93,27 +85,29 @@ fn handle_failure<T: Operation>(
     retry: Option<Retry>,
     error: Error,
     op: &T,
-    options: &ClientOptions,
+    client: &Client,
     server: ServerAddress,
     is_transaction_op: bool,
     txn_number: Option<i64>,
     error_is_connection_establishment: bool,
 ) -> Result<Retry> {
-    if op.name() == "commitTransaction" {
-        dbg!(error.labels());
-    }
     let can_retry = if error.contains_label(SYSTEM_OVERLOADED_ERROR)
         && error.contains_label(RETRYABLE_ERROR)
-        && op.is_backpressure_retryable(options)
+        && op.is_backpressure_retryable(client.options())
     {
         true
     } else {
-        let retryability = op.retryability(options);
+        let retryability = op.retryability(client.options());
         // Pool cleared errors should be retried for reads regardless of transaction status.
         retryability == Retryability::Read && error.is_pool_cleared()
             || retryability.can_retry_error(&error) && !is_transaction_op
     };
     let overloaded = error.contains_label(SYSTEM_OVERLOADED_ERROR);
+    let deprioritized = if client.is_sharded() || overloaded {
+        Some(server)
+    } else {
+        None
+    };
 
     match retry {
         Some(mut retry) => {
@@ -131,7 +125,9 @@ fn handle_failure<T: Operation>(
                 return Err(better_error);
             }
             retry.attempt += 1;
-            retry.deprioritized_servers.insert(server);
+            if let Some(server) = deprioritized {
+                retry.deprioritized_servers.insert(server);
+            }
             retry.last_error = better_error;
             if txn_number.is_some() && retry.txn_number.is_none() {
                 retry.txn_number = txn_number;
@@ -145,7 +141,9 @@ fn handle_failure<T: Operation>(
             }
             Ok(Retry {
                 attempt: 1,
-                deprioritized_servers: HashSet::from([server]),
+                deprioritized_servers: deprioritized
+                    .map(|server| HashSet::from([server]))
+                    .unwrap_or_default(),
                 last_error: error,
                 txn_number,
                 overloaded,

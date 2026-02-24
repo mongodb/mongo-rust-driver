@@ -3,18 +3,21 @@ use std::{future::IntoFuture, sync::Arc, time::Duration};
 use crate::bson::doc;
 
 use crate::{
-    error::Result,
+    bson::Document,
+    error::{Result, RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
     event::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
-    options::SelectionCriteria,
+    options::{ReadPreference, SelectionCriteria},
     runtime::{self, AsyncJoinHandle},
     test::{
         get_client_options,
         log_uncaptured,
+        server_version_lt,
         spec::unified_runner::run_unified_tests,
         topology_is_load_balanced,
+        topology_is_replica_set,
         topology_is_sharded,
         util::{
             event_buffer::EventBuffer,
@@ -277,4 +280,78 @@ async fn retry_read_same_mongos() {
     );
 
     drop(fp_guard); // enforce lifetime
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn overload_error_retried_on_different_server() {
+    if server_version_lt(4, 4).await || !topology_is_replica_set().await {
+        log_uncaptured(
+            "skipping overload_error_retried_on_different_server: requires 4.4+ replica set",
+        );
+        return;
+    }
+
+    let mut options = get_client_options().await.clone();
+    options.retry_reads = Some(true);
+    options.selection_criteria = Some(ReadPreference::PrimaryPreferred { options: None }.into());
+    let client = Client::for_test().options(options).monitor_events().await;
+
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
+        .error_labels(vec![RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR])
+        .error_code(6);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let coll = client
+        .database("retryable-reads")
+        .collection::<Document>("coll");
+    coll.find(doc! {}).await.unwrap();
+
+    let events = client.events.get_command_events(&["find"]);
+    // started, failed, started, succeeded
+    assert_eq!(events.len(), 4);
+
+    let failed = events[1].as_command_failed().unwrap();
+    let failed_server = &failed.connection.address;
+
+    let succeeded = events[3].as_command_succeeded().unwrap();
+    let succeeded_server = &succeeded.connection.address;
+
+    assert_ne!(failed_server, succeeded_server);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn non_overload_error_retried_on_same_server() {
+    if server_version_lt(4, 4).await || !topology_is_replica_set().await {
+        log_uncaptured(
+            "skipping non_overload_error_retried_on_same_server: requires 4.4+ replica set",
+        );
+        return;
+    }
+
+    let mut options = get_client_options().await.clone();
+    options.retry_reads = Some(true);
+    options.selection_criteria = Some(ReadPreference::PrimaryPreferred { options: None }.into());
+    let client = Client::for_test().options(options).monitor_events().await;
+
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
+        .error_labels(vec![RETRYABLE_ERROR])
+        .error_code(6);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let coll = client
+        .database("retryable-reads")
+        .collection::<Document>("coll");
+    coll.find(doc! {}).await.unwrap();
+
+    let events = client.events.get_command_events(&["find"]);
+    // started, failed, started, succeeded
+    assert_eq!(events.len(), 4);
+
+    let failed = events[1].as_command_failed().unwrap();
+    let failed_server = &failed.connection.address;
+
+    let succeeded = events[3].as_command_succeeded().unwrap();
+    let succeeded_server = &succeeded.connection.address;
+
+    assert_eq!(failed_server, succeeded_server);
 }

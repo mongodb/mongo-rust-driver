@@ -53,6 +53,7 @@ use crate::{
     tracking_arc::TrackingArc,
     BoxFuture,
     ClientSession,
+    TopologyType,
 };
 
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
@@ -625,6 +626,10 @@ impl Client {
     #[cfg(test)]
     pub(crate) fn topology_description(&self) -> crate::sdam::TopologyDescription {
         self.inner.topology.latest().description.clone()
+    }
+
+    pub(crate) fn is_sharded(&self) -> bool {
+        self.inner.topology.latest().description.topology_type == TopologyType::Sharded
     }
 
     #[cfg(test)]

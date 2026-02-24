@@ -94,11 +94,13 @@ pub(crate) static HELLO_COMMAND_NAMES: LazyLock<HashSet<&'static str>> = LazyLoc
     hash_set
 });
 
+/// Details regarding the execution of an operation.
 struct ExecutionDetails<T: Operation> {
     output: T::O,
     connection: PooledConnection,
 }
 
+/// The session used in the execution of an operation.
 enum ExecutionSession<'a> {
     Explicit(&'a mut ClientSession),
     Implicit(Box<ClientSession>),
@@ -480,7 +482,7 @@ impl Client {
                             retry,
                             error,
                             op,
-                            self.options(),
+                            self,
                             server.address.clone(),
                             is_transaction_op,
                         )?);
@@ -571,7 +573,7 @@ impl Client {
                         retry,
                         error,
                         op,
-                        self.options(),
+                        self,
                         server_address,
                         is_transaction_op,
                         txn_number,
