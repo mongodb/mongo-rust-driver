@@ -677,6 +677,9 @@ pub struct ClientOptions {
     #[cfg(feature = "socks5-proxy")]
     pub socks5_proxy: Option<Socks5Proxy>,
 
+    /// isabeltodo
+    pub use_token_bucket: Option<bool>,
+
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(setter(skip))]
     #[serde(skip)]

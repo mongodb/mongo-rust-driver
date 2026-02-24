@@ -432,9 +432,7 @@ impl Client {
                 Some(ref retry) => {
                     op.update_for_retry(retry.overloaded);
                     if retry.overloaded {
-                        if !self.consume_from_bucket().await {
-                            return Err(ErrorKind::Overload.into());
-                        }
+                        self.consume_from_token_bucket().await?;
                         let backoff = retry.calculate_backoff();
                         tokio::time::sleep(backoff).await;
                     }
@@ -532,12 +530,12 @@ impl Client {
                 .await;
             match execution_result {
                 Ok(output) => {
-                    self.deposit_success_in_bucket(retry.is_some()).await;
+                    self.deposit_success_in_token_bucket(retry.is_some()).await;
                     return Ok(ExecutionDetails { output, connection });
                 }
                 Err(mut error) => {
                     if retry.is_some() && !error.contains_label(SYSTEM_OVERLOADED_ERROR) {
-                        self.deposit_retry_error_in_bucket().await;
+                        self.deposit_retry_error_in_token_bucket().await;
                     }
 
                     error.wire_version = connection.stream_description()?.max_wire_version;

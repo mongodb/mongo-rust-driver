@@ -143,7 +143,7 @@ struct ClientInner {
     shutdown: Shutdown,
     dropped: AtomicBool,
     end_sessions_token: std::sync::Mutex<AsyncDropToken>,
-    token_bucket: TokenBucket,
+    token_bucket: Option<tokio::sync::Mutex<u16>>,
     #[cfg(feature = "in-use-encryption")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
     #[cfg(feature = "opentelemetry")]
@@ -154,29 +154,35 @@ struct ClientInner {
 
 /// A token bucket for retries. Note that the values used are scaled by a factor of 10 from those
 /// defined in the spec to allow for the use of integers.
-#[derive(Debug)]
-struct TokenBucket(tokio::sync::Mutex<u16>);
 const MAX_BUCKET_CAPACITY: u16 = 10_000;
-
 impl Client {
-    pub(crate) async fn consume_from_bucket(&self) -> bool {
-        let mut tokens = self.inner.token_bucket.0.lock().await;
+    pub(crate) async fn consume_from_token_bucket(&self) -> Result<()> {
+        let Some(ref bucket) = self.inner.token_bucket else {
+            return Ok(());
+        };
+        let mut tokens = bucket.lock().await;
         if *tokens >= 10 {
             *tokens -= 10;
-            true
+            Ok(())
         } else {
-            false
+            Err(ErrorKind::Overload.into())
         }
     }
 
-    pub(crate) async fn deposit_success_in_bucket(&self, is_retry: bool) {
+    pub(crate) async fn deposit_success_in_token_bucket(&self, is_retry: bool) {
+        let Some(ref bucket) = self.inner.token_bucket else {
+            return;
+        };
         let deposit = if is_retry { 10 } else { 1 };
-        let mut tokens = self.inner.token_bucket.0.lock().await;
+        let mut tokens = bucket.lock().await;
         *tokens = std::cmp::min(*tokens + deposit, MAX_BUCKET_CAPACITY);
     }
 
-    pub(crate) async fn deposit_retry_error_in_bucket(&self) {
-        let mut tokens = self.inner.token_bucket.0.lock().await;
+    pub(crate) async fn deposit_retry_error_in_token_bucket(&self) {
+        let Some(ref bucket) = self.inner.token_bucket else {
+            return;
+        };
+        let mut tokens = bucket.lock().await;
         *tokens = std::cmp::min(*tokens + 1, MAX_BUCKET_CAPACITY);
     }
 }
@@ -218,6 +224,12 @@ impl Client {
         #[cfg(feature = "opentelemetry")]
         let tracer = options.tracer();
 
+        let token_bucket = options
+            .use_token_bucket
+            // isabeltodo flip this to false when tests are updated
+            .unwrap_or(true)
+            .then(|| tokio::sync::Mutex::new(MAX_BUCKET_CAPACITY));
+
         let inner = TrackingArc::new(ClientInner {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
@@ -228,7 +240,7 @@ impl Client {
             },
             dropped: AtomicBool::new(false),
             end_sessions_token,
-            token_bucket: TokenBucket(tokio::sync::Mutex::new(MAX_BUCKET_CAPACITY)),
+            token_bucket,
             #[cfg(feature = "in-use-encryption")]
             csfle: Default::default(),
             #[cfg(feature = "opentelemetry")]

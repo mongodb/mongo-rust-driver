@@ -171,6 +171,8 @@ impl ClientOptions {
             tracing: None,
             #[cfg(feature = "socks5-proxy")]
             socks5_proxy: conn_str.socks5_proxy,
+            // isabeltodo uri option?
+            use_token_bucket: None,
         }
     }
 }
