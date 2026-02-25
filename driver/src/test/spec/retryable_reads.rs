@@ -294,6 +294,7 @@ async fn overload_error_retried_on_different_server() {
     let mut options = get_client_options().await.clone();
     options.retry_reads = Some(true);
     options.selection_criteria = Some(ReadPreference::PrimaryPreferred { options: None }.into());
+    options.local_threshold = Some(Duration::from_secs(1)); // see RUST-2337
     let client = Client::for_test().options(options).monitor_events().await;
 
     let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
