@@ -852,7 +852,10 @@ impl Client {
                             }
                         }
                         if self.is_load_balanced() {
-                            session.pin_connection(connection.pin()?);
+                            // The connection is already pinned if a retry is being performed.
+                            if !connection.is_pinned() {
+                                session.pin_connection(connection.pin()?);
+                            }
                         } else if is_sharded {
                             session.pin_mongos(connection.address().clone());
                         }
