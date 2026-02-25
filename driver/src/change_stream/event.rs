@@ -121,6 +121,10 @@ pub struct ChangeStreamEvent<T> {
     /// change stream. If `WhenAvailable` was specified but the pre-image is unavailable, this
     /// will be explicitly set to `None`.
     pub full_document_before_change: Option<T>,
+
+    /// When this operation was committed.  Only available for events in a transaction and only on
+    /// change streams started with the `show_expanded_events` option.
+    pub commit_timestamp: Option<Timestamp>,
 }
 
 /// Describes which fields have been updated or removed from a document.
