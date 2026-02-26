@@ -20,6 +20,7 @@ pub use self::csfle::client_builder::*;
 use derive_where::derive_where;
 use futures_core::Future;
 use futures_util::FutureExt;
+use tokio::sync::Mutex;
 
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
@@ -143,7 +144,7 @@ struct ClientInner {
     shutdown: Shutdown,
     dropped: AtomicBool,
     end_sessions_token: std::sync::Mutex<AsyncDropToken>,
-    token_bucket: Option<tokio::sync::Mutex<u16>>,
+    token_bucket: Option<Mutex<u16>>,
     #[cfg(feature = "in-use-encryption")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
     #[cfg(feature = "opentelemetry")]
@@ -225,10 +226,9 @@ impl Client {
         let tracer = options.tracer();
 
         let token_bucket = options
-            .use_token_bucket
-            // isabeltodo flip this to false when tests are updated
-            .unwrap_or(true)
-            .then(|| tokio::sync::Mutex::new(MAX_BUCKET_CAPACITY));
+            .adaptive_retries
+            .unwrap_or(false)
+            .then(|| Mutex::new(MAX_BUCKET_CAPACITY));
 
         let inner = TrackingArc::new(ClientInner {
             topology: Topology::new(options.clone())?,
