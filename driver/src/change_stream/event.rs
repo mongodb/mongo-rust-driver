@@ -2,12 +2,16 @@
 #[cfg(test)]
 use std::convert::TryInto;
 
-use crate::{cursor::CursorSpecification, options::ChangeStreamOptions};
-
-use crate::bson::{DateTime, Document, RawBson, RawDocumentBuf, Timestamp};
 #[cfg(test)]
 use crate::{bson::Bson, bson_compat::RawError};
+use crate::{
+    bson::{DateTime, Document, RawBson, RawDocumentBuf, Timestamp},
+    cursor::CursorSpecification,
+    options::ChangeStreamOptions,
+};
+
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 /// An opaque token used for resuming an interrupted
 /// [`ChangeStream`](crate::change_stream::ChangeStream).
@@ -50,6 +54,7 @@ impl ResumeToken {
 
 /// A `ChangeStreamEvent` represents a
 /// [change event](https://www.mongodb.com/docs/manual/reference/change-events/) in the associated change stream.
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
