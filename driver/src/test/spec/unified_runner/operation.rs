@@ -509,12 +509,17 @@ impl TestOperation for CreateChangeStream {
                 }
                 _ => panic!("Invalid entity for createChangeStream"),
             };
-            // These particular tests require unknown fields to be passed through to the result.
+
             let tcs = if [
+                // These tests require unknown fields to be passed through to the result.
                 "Test newField added in response MUST NOT err",
                 "Test new structure in ns document MUST NOT err",
                 "Test modified structure in ns document MUST NOT err",
                 "Test projection in change stream returns expected fields",
+                // These tests require that a field set to null be passed through as null rather
+                // than unset.
+                "fullDocument:whenAvailable with changeStreamPreAndPostImages disabled",
+                "fullDocumentBeforeChange:whenAvailable with changeStreamPreAndPostImages disabled",
             ]
             .contains(&description)
             {
