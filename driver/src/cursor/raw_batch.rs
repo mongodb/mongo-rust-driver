@@ -46,23 +46,19 @@ use std::{
 
 use crate::{
     bson::{RawArray, RawBsonRef, RawDocument},
-    cursor::CursorSpecification,
+    cursor::common::CursorSpecification,
     operation::GetMore,
 };
 use futures_core::{future::BoxFuture, Future, Stream};
+#[cfg(test)]
+use tokio::sync::oneshot;
 
 use crate::{
     bson::RawDocumentBuf,
     change_stream::event::ResumeToken,
     client::{options::ServerAddress, AsyncDropToken},
     cmap::conn::PinnedConnectionHandle,
-    cursor::common::{
-        kill_cursor,
-        ClientSessionHandle,
-        ExplicitClientSessionHandle,
-        ImplicitClientSessionHandle,
-        PinnedConnection,
-    },
+    cursor::common::{kill_cursor, PinnedConnection},
     error::{Error, ErrorKind, Result},
     Client,
     ClientSession,
@@ -120,7 +116,17 @@ pub struct RawBatchCursor {
     info: CursorInformation,
     state: RawBatchCursorState,
     drop_address: Option<ServerAddress>,
+    #[cfg(test)]
+    kill_watcher: Option<oneshot::Sender<()>>,
 }
+
+#[allow(dead_code, unreachable_code, clippy::diverging_sub_expression)]
+const _: fn() = || {
+    fn assert_unpin<T: Unpin>(_t: T) {}
+
+    let _rb: RawBatchCursor = todo!();
+    assert_unpin(_rb);
+};
 
 struct RawBatchCursorState {
     exhausted: bool,
@@ -154,6 +160,8 @@ impl RawBatchCursor {
             drop_token: client.register_async_drop(),
             info: spec.info,
             drop_address: None,
+            #[cfg(test)]
+            kill_watcher: None,
             state: RawBatchCursorState {
                 exhausted,
                 pinned_connection: PinnedConnection::new(pin),
@@ -172,9 +180,43 @@ impl RawBatchCursor {
         self.state.exhausted
     }
 
+    pub(crate) fn has_next(&self) -> bool {
+        self.state.initial_reply.is_some() || !self.is_exhausted()
+    }
+
+    pub(crate) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
+        self.state.post_batch_resume_token.as_ref()
+    }
+
+    pub(crate) fn address(&self) -> &ServerAddress {
+        &self.info.address
+    }
+
+    pub(crate) fn set_drop_address(&mut self, address: ServerAddress) {
+        self.drop_address = Some(address);
+    }
+
+    pub(crate) fn client(&self) -> &Client {
+        &self.client
+    }
+
     fn mark_exhausted(&mut self) {
         self.state.exhausted = true;
         self.state.pinned_connection = PinnedConnection::Unpinned;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) {
+        assert!(
+            self.kill_watcher.is_none(),
+            "cursor already has a kill_watcher"
+        );
+        self.kill_watcher = Some(tx);
+    }
+
+    /// Extracts the stored implicit [`ClientSession`], if any.
+    pub(crate) fn take_implicit_session(&mut self) -> Option<ClientSession> {
+        self.state.provider.take_implicit_session()
     }
 }
 
@@ -204,6 +246,11 @@ impl Stream for RawBatchCursor {
                                 if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
                                 {
                                     self.mark_exhausted();
+                                }
+                                if e.is_network_error() {
+                                    // Flag the connection as invalid, preventing a killCursors
+                                    // command, but leave the connection pinned.
+                                    self.state.pinned_connection.invalidate();
                                 }
                                 let exhausted_now = self.state.exhausted;
                                 self.state
@@ -257,7 +304,7 @@ impl Drop for RawBatchCursor {
             self.state.pinned_connection.replicate(),
             self.drop_address.take(),
             #[cfg(test)]
-            None,
+            self.kill_watcher.take(),
         );
     }
 }
@@ -271,8 +318,10 @@ pub struct SessionRawBatchCursor {
     exhausted: bool,
     pinned_connection: PinnedConnection,
     post_batch_resume_token: Option<ResumeToken>,
-    initial_reply: Option<RawDocumentBuf>,
+    buffered_reply: Option<RawDocumentBuf>,
     drop_address: Option<ServerAddress>,
+    #[cfg(test)]
+    kill_watcher: Option<oneshot::Sender<()>>,
 }
 
 impl super::NewCursor for SessionRawBatchCursor {
@@ -300,8 +349,10 @@ impl SessionRawBatchCursor {
             exhausted,
             pinned_connection: PinnedConnection::new(pinned),
             post_batch_resume_token: spec.post_batch_resume_token,
-            initial_reply: Some(spec.initial_reply),
+            buffered_reply: Some(spec.initial_reply),
             drop_address: None,
+            #[cfg(test)]
+            kill_watcher: None,
         }
     }
 
@@ -317,18 +368,38 @@ impl SessionRawBatchCursor {
         }
     }
 
-    #[expect(unused)]
     pub(crate) fn address(&self) -> &ServerAddress {
         &self.info.address
     }
 
-    #[expect(unused)]
     pub(crate) fn set_drop_address(&mut self, address: ServerAddress) {
         self.drop_address = Some(address);
     }
 
+    fn mark_exhausted(&mut self) {
+        self.exhausted = true;
+        self.pinned_connection = PinnedConnection::Unpinned;
+    }
+
     pub(crate) fn is_exhausted(&self) -> bool {
         self.exhausted
+    }
+
+    pub(crate) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
+        self.post_batch_resume_token.as_ref()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) {
+        assert!(
+            self.kill_watcher.is_none(),
+            "cursor already has a kill_watcher"
+        );
+        self.kill_watcher = Some(tx);
+    }
+
+    pub(crate) fn client(&self) -> &Client {
+        &self.client
     }
 }
 
@@ -345,7 +416,7 @@ impl Drop for SessionRawBatchCursor {
             self.pinned_connection.replicate(),
             self.drop_address.take(),
             #[cfg(test)]
-            None,
+            self.kill_watcher.take(),
         );
     }
 }
@@ -370,7 +441,7 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
                         match get_more_out.result {
                             Ok(out) => {
                                 if out.exhausted {
-                                    self.parent.exhausted = true;
+                                    self.parent.mark_exhausted();
                                 }
                                 if out.id != 0 {
                                     self.parent.info.id = out.id;
@@ -378,12 +449,17 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
                                 self.parent.info.ns = out.ns;
                                 self.parent.post_batch_resume_token = out.post_batch_resume_token;
                                 // Buffer next reply to yield on following polls.
-                                self.parent.initial_reply = Some(out.raw_reply);
+                                self.parent.buffered_reply = Some(out.raw_reply);
                             }
                             Err(e) => {
                                 if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
                                 {
-                                    self.parent.exhausted = true;
+                                    self.parent.mark_exhausted();
+                                }
+                                if e.is_network_error() {
+                                    // Flag the connection as invalid, preventing a killCursors
+                                    // command, but leave the connection pinned.
+                                    self.parent.pinned_connection.invalidate();
                                 }
                                 let exhausted_now = self.parent.exhausted;
                                 self.provider
@@ -399,7 +475,7 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
             }
 
             // Yield any buffered reply.
-            if let Some(reply) = self.parent.initial_reply.take() {
+            if let Some(reply) = self.parent.buffered_reply.take() {
                 return Poll::Ready(Some(Ok(RawBatch::new(reply))));
             }
 
@@ -425,6 +501,7 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
     }
 }
 
+#[derive(Debug)]
 struct GetMoreRawResultAndSession<S> {
     result: Result<crate::results::GetMoreResult>,
     session: S,
@@ -434,6 +511,17 @@ enum GetMoreRawProvider<'s, S> {
     Executing(BoxFuture<'s, GetMoreRawResultAndSession<S>>),
     Idle(Box<S>),
     Done,
+}
+
+impl GetMoreRawProvider<'static, ImplicitClientSessionHandle> {
+    /// Extracts the stored implicit [`ClientSession`], if any.
+    /// The provider cannot be started again after this call.
+    fn take_implicit_session(&mut self) -> Option<ClientSession> {
+        match self {
+            Self::Idle(session) => session.take_implicit_session(),
+            Self::Executing(..) | Self::Done => None,
+        }
+    }
 }
 
 impl<'s, S: ClientSessionHandle<'s>> GetMoreRawProvider<'s, S> {
@@ -506,4 +594,41 @@ mod tests {
         let docs: Vec<_> = batch.doc_slices().unwrap().into_iter().collect();
         assert_eq!(docs.len(), 2);
     }
+}
+
+#[derive(Debug)]
+pub(super) struct ImplicitClientSessionHandle(pub(super) Option<ClientSession>);
+
+impl ImplicitClientSessionHandle {
+    fn take_implicit_session(&mut self) -> Option<ClientSession> {
+        self.0.take()
+    }
+}
+
+impl ClientSessionHandle<'_> for ImplicitClientSessionHandle {
+    fn is_implicit(&self) -> bool {
+        true
+    }
+
+    fn borrow_mut(&mut self) -> Option<&mut ClientSession> {
+        self.0.as_mut()
+    }
+}
+
+pub(super) struct ExplicitClientSessionHandle<'a>(pub(super) &'a mut ClientSession);
+
+impl<'a> ClientSessionHandle<'a> for ExplicitClientSessionHandle<'a> {
+    fn is_implicit(&self) -> bool {
+        false
+    }
+
+    fn borrow_mut(&mut self) -> Option<&mut ClientSession> {
+        Some(self.0)
+    }
+}
+
+pub(super) trait ClientSessionHandle<'a>: Send + 'a {
+    fn is_implicit(&self) -> bool;
+
+    fn borrow_mut(&mut self) -> Option<&mut ClientSession>;
 }

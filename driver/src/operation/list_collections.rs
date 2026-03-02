@@ -2,7 +2,7 @@ use crate::{
     bson::rawdoc,
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::CursorSpecification,
+    cursor::common::CursorSpecification,
     error::Result,
     operation::{OperationWithDefaults, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},

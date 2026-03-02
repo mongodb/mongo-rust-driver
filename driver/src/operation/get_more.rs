@@ -5,7 +5,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     checked::Checked,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
-    cursor::{CursorInformation, CursorReply},
+    cursor::common::{CursorInformation, CursorReply},
     error::Result,
     operation::OperationWithDefaults,
     options::SelectionCriteria,

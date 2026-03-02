@@ -1,16 +1,10 @@
 //! Types for change streams using sessions.
 use serde::de::DeserializeOwned;
 
-use crate::{
-    cursor::{BatchValue, NextInBatchFuture},
-    error::Result,
-    ClientSession,
-    SessionCursor,
-};
+use crate::{error::Result, ClientSession, SessionCursor};
 
 use super::{
     event::{ChangeStreamEvent, ResumeToken},
-    get_resume_token,
     ChangeStreamData,
     WatchArgs,
 };
@@ -42,17 +36,21 @@ pub struct SessionChangeStream<T>
 where
     T: DeserializeOwned + Unpin,
 {
-    cursor: SessionCursor<T>,
-    args: WatchArgs,
-    data: ChangeStreamData,
+    inner: CursorWrapper,
+    _marker: std::marker::PhantomData<fn() -> T>,
 }
+
+type CursorWrapper = super::common::CursorWrapper<SessionCursor<()>>;
 
 impl<T> SessionChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(cursor: SessionCursor<T>, args: WatchArgs, data: ChangeStreamData) -> Self {
-        Self { cursor, args, data }
+    pub(crate) fn new(cursor: SessionCursor<()>, args: WatchArgs, data: ChangeStreamData) -> Self {
+        Self {
+            inner: CursorWrapper::new(cursor, args, data),
+            _marker: std::marker::PhantomData,
+        }
     }
 
     /// Returns the cached resume token that can be used to resume after the most recently returned
@@ -62,12 +60,15 @@ where
     /// [here](https://www.mongodb.com/docs/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
     pub fn resume_token(&self) -> Option<ResumeToken> {
-        self.data.resume_token.clone()
+        self.inner.data.resume_token.clone()
     }
 
     /// Update the type streamed values will be parsed as.
     pub fn with_type<D: DeserializeOwned + Unpin + Send + Sync>(self) -> SessionChangeStream<D> {
-        SessionChangeStream::new(self.cursor.with_type(), self.args, self.data)
+        SessionChangeStream {
+            inner: self.inner,
+            _marker: std::marker::PhantomData,
+        }
     }
 
     /// Retrieve the next result from the change stream.
@@ -103,7 +104,7 @@ where
 
     /// Returns whether the change stream will continue to receive events.
     pub fn is_alive(&self) -> bool {
-        !self.cursor.is_exhausted()
+        !self.inner.cursor.raw().is_exhausted()
     }
 
     /// Retrieve the next result from the change stream, if any.
@@ -132,52 +133,48 @@ where
     /// # }
     /// ```
     pub async fn next_if_any(&mut self, session: &mut ClientSession) -> Result<Option<T>> {
-        loop {
-            let (next, post_batch_token, client) = {
-                let mut stream = self.cursor.stream(session);
-                let next = NextInBatchFuture::new(&mut stream).await;
-                let post_batch_token = stream.post_batch_resume_token().cloned();
-                let client = stream.client().clone();
-                (next, post_batch_token, client)
-            };
-            match next {
-                Ok(bv) => {
-                    if let Some(token) = get_resume_token(&bv, post_batch_token.as_ref())? {
-                        self.data.resume_token = Some(token);
-                    }
-                    match bv {
-                        BatchValue::Some { doc, .. } => {
-                            self.data.document_returned = true;
-                            return Ok(Some(crate::bson_compat::deserialize_from_slice(
-                                doc.as_bytes(),
-                            )?));
-                        }
-                        BatchValue::Empty | BatchValue::Exhausted => return Ok(None),
-                    }
-                }
-                Err(e) if e.is_resumable() && !self.data.resume_attempted => {
-                    self.data.resume_attempted = true;
-                    let args = self.args.clone();
-                    let new_stream: SessionChangeStream<ChangeStreamEvent<()>> = client
-                        .execute_watch_with_session(
-                            args.pipeline,
-                            args.options,
-                            args.target,
-                            Some(self.data.take()),
-                            session,
-                        )
-                        .await?;
-                    let new_stream = new_stream.with_type::<T>();
-                    self.cursor
-                        .set_drop_address(new_stream.cursor.address().clone());
-                    self.cursor = new_stream.cursor;
-                    self.args = new_stream.args;
-                    // After a successful resume, another resume must be allowed.
-                    self.data.resume_attempted = false;
-                    continue;
-                }
-                Err(e) => return Err(e),
-            }
-        }
+        self.inner.next_if_any(session).await
+    }
+}
+
+impl super::common::InnerCursor for SessionCursor<()> {
+    type Session = ClientSession;
+
+    async fn try_advance(&mut self, session: &mut Self::Session) -> Result<bool> {
+        self.try_advance(session).await
+    }
+
+    fn get_resume_token(&self) -> Result<Option<ResumeToken>> {
+        super::common::get_resume_token(self.batch(), self.raw().post_batch_resume_token())
+    }
+
+    fn current(&self) -> &crate::bson::RawDocument {
+        self.current()
+    }
+
+    async fn execute_watch(
+        &mut self,
+        args: WatchArgs,
+        data: ChangeStreamData,
+        session: &mut Self::Session,
+    ) -> Result<(Self, WatchArgs)> {
+        let new_stream: SessionChangeStream<ChangeStreamEvent<()>> = self
+            .raw()
+            .client()
+            .execute_watch_with_session(
+                args.pipeline,
+                args.options,
+                args.target,
+                Some(data),
+                session,
+            )
+            .await?;
+        let new_inner = new_stream.inner;
+        Ok((new_inner.cursor, new_inner.args))
+    }
+
+    fn set_drop_address(&mut self, from: &Self) {
+        self.raw_mut()
+            .set_drop_address(from.raw().address().clone());
     }
 }

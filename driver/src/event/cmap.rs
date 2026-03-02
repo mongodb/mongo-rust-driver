@@ -176,6 +176,8 @@ pub struct ConnectionClosedEvent {
     #[serde(skip)]
     #[derive_where(skip)]
     pub(crate) error: Option<crate::error::Error>,
+
+    pub(crate) service_id: Option<ObjectId>,
 }
 
 /// The reasons that a connection may be closed.

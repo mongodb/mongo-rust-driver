@@ -861,6 +861,8 @@ async fn find_one_and_delete_serde_consistency() {
         .database("find_one_and_delete_serde_consistency")
         .collection("test");
 
+    coll.drop().await.unwrap();
+
     #[derive(Debug, Serialize, Deserialize)]
     struct Foo {
         #[serde(with = "serde_hex::SerHexSeq::<serde_hex::StrictPfx>")]

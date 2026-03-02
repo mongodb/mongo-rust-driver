@@ -323,6 +323,7 @@ impl PooledConnection {
             reason,
             #[cfg(feature = "tracing-unstable")]
             error: self.connection.error.clone(),
+            service_id: self.service_id(),
         }
     }
 }

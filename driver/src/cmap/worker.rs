@@ -716,6 +716,7 @@ async fn establish_connection(
                     connection_id,
                     #[cfg(feature = "tracing-unstable")]
                     error: Some(e.cause.clone()),
+                    service_id: None,
                 }
                 .into()
             });
