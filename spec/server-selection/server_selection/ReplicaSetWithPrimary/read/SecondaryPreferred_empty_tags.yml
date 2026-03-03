@@ -1,4 +1,5 @@
 # Attempt to select the secondary using an empty tag set. Expect empty tag set to match.
+# This is a regression test for RUST-2363.
 ---
 topology_description:
   type: ReplicaSetWithPrimary
