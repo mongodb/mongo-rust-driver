@@ -3,11 +3,12 @@ use std::{
     collections::HashMap,
     future::IntoFuture,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crate::{
     bson::Document,
+    error::{RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
     test::{spec::unified_runner::run_unified_tests, topology_is_load_balanced},
 };
 use serde::{Deserialize, Serialize};
@@ -1091,4 +1092,94 @@ async fn backpressure_run_unified() {
         ])
         .skip_files(&skipped_files)
         .await;
+}
+
+// backpressure prose test #1
+#[tokio::test(flavor = "multi_thread")]
+async fn operation_retry_uses_exponential_backoff() {
+    let mut options = get_client_options().await.clone();
+    options.test_options_mut().jitter = Some(0f64);
+    let client = Client::for_test().options(options).await;
+    let coll = client.database("db").collection("coll");
+
+    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::AlwaysOn)
+        .error_code(2)
+        .error_labels(vec![SYSTEM_OVERLOADED_ERROR, RETRYABLE_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let start = Instant::now();
+    coll.insert_one(doc! { "a": 1 }).await.unwrap_err();
+    let duration_no_backoff = start.elapsed();
+
+    let mut options = get_client_options().await.clone();
+    options.test_options_mut().jitter = Some(1f64);
+    let client = Client::for_test().options(options).await;
+    let coll = client.database("db").collection("coll");
+
+    let start = Instant::now();
+    coll.insert_one(doc! { "a": 1 }).await.unwrap_err();
+    let duration_with_backoff = start.elapsed();
+
+    assert!(duration_with_backoff - duration_no_backoff >= Duration::from_millis(2100));
+}
+
+// backpressure prose test #2
+#[tokio::test]
+async fn token_bucket_capacity_enforced() {
+    const MAX_BUCKET_CAPACITY: u16 = 10_000;
+
+    let mut options = get_client_options().await.clone();
+    options.adaptive_retries = Some(true);
+    let client = Client::for_test().options(options).await;
+    let tokens = client.get_num_tokens_in_bucket().await.unwrap();
+    assert_eq!(tokens, MAX_BUCKET_CAPACITY);
+
+    client
+        .database("db")
+        .run_command(doc! { "ping": 1 })
+        .await
+        .unwrap();
+    let tokens = client.get_num_tokens_in_bucket().await.unwrap();
+    assert_eq!(tokens, MAX_BUCKET_CAPACITY);
+}
+
+// backpressure prose test #3
+#[tokio::test(flavor = "multi_thread")]
+async fn overload_errors_retried_max_retries_times() {
+    let client = Client::for_test().monitor_events().await;
+    let coll = client.database("db").collection::<Document>("coll");
+
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn)
+        .error_code(462)
+        .error_labels(vec![SYSTEM_OVERLOADED_ERROR, RETRYABLE_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let error = coll.find(doc! {}).await.unwrap_err();
+    assert!(error.contains_label(SYSTEM_OVERLOADED_ERROR));
+    assert!(error.contains_label(RETRYABLE_ERROR));
+
+    let events = client.events.get_command_started_events(&["find"]);
+    assert_eq!(events.len(), 6);
+}
+
+// backpressure prose test #4
+#[tokio::test(flavor = "multi_thread")]
+async fn adaptive_retries_limited_by_token_bucket_tokens() {
+    let mut options = get_client_options().await.clone();
+    options.adaptive_retries = Some(true);
+    let client = Client::for_test().options(options).monitor_events().await;
+    client.set_num_tokens_in_bucket(20).await;
+    let coll = client.database("db").collection::<Document>("coll");
+
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(3))
+        .error_code(462)
+        .error_labels(vec![SYSTEM_OVERLOADED_ERROR, RETRYABLE_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let error = coll.find(doc! {}).await.unwrap_err();
+    assert!(error.contains_label(SYSTEM_OVERLOADED_ERROR));
+    assert!(error.contains_label(RETRYABLE_ERROR));
+
+    let events = client.events.get_command_started_events(&["find"]);
+    assert_eq!(events.len(), 3);
 }

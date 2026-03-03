@@ -172,7 +172,7 @@ impl ClientOptions {
             #[cfg(feature = "socks5-proxy")]
             socks5_proxy: conn_str.socks5_proxy,
             // isabeltodo add uri option
-            adaptive_retries: None,
+            adaptive_retries: conn_str.adaptive_retries,
         }
     }
 }

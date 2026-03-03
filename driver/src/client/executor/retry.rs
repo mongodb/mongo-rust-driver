@@ -30,12 +30,14 @@ impl Retry {
         }
     }
 
-    pub(super) fn calculate_backoff(&self) -> Duration {
+    pub(super) fn calculate_backoff(&self, #[cfg(test)] test_jitter: Option<f64>) -> Duration {
         const BACKOFF_INITIAL_MS: f64 = 100f64;
         const BACKOFF_MAX_MS: f64 = 10_000f64;
         const RETRY_BASE: f64 = 2f64;
 
         let jitter = rand::random_range(0f64..1f64);
+        #[cfg(test)]
+        let jitter = test_jitter.unwrap_or(jitter);
 
         let computed_backoff =
             jitter * BACKOFF_INITIAL_MS * RETRY_BASE.powf(f64::from(self.attempt - 1));

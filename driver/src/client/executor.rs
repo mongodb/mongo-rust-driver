@@ -429,15 +429,20 @@ impl Client {
                 Some(retry) if retry.max_retries_reached() => {
                     return Err(retry.last_error);
                 }
+                Some(retry) if retry.overloaded && !self.consume_from_token_bucket().await => {
+                    return Err(retry.last_error);
+                }
                 Some(ref retry) => {
                     op.update_for_retry(retry.overloaded);
                     if retry.overloaded {
-                        self.consume_from_token_bucket().await?;
-                        let backoff = retry.calculate_backoff();
+                        let backoff = retry.calculate_backoff(
+                            #[cfg(test)]
+                            self.options().test_options.as_ref().and_then(|o| o.jitter),
+                        );
                         tokio::time::sleep(backoff).await;
                     }
                 }
-                _ => {}
+                None => {}
             }
 
             let selection_criteria = session

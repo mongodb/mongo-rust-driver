@@ -602,8 +602,7 @@ impl Error {
             | ErrorKind::Authentication { .. }
             | ErrorKind::Custom(_)
             | ErrorKind::Shutdown
-            | ErrorKind::GridFs(_)
-            | ErrorKind::Overload => {}
+            | ErrorKind::GridFs(_) => {}
             #[cfg(feature = "socks5-proxy")]
             ErrorKind::ProxyConnect { .. } => {}
             #[cfg(feature = "in-use-encryption")]
@@ -804,10 +803,6 @@ pub enum ErrorKind {
     #[error("Client has been shut down")]
     Shutdown,
 
-    /// An operation could not be executed because the server was overloaded.
-    #[error("Server is overloaded")]
-    Overload,
-
     /// An error occurred when connecting to a proxy host.
     #[error("An error occurred when connecting to a proxy host: {message}")]
     #[non_exhaustive]
@@ -867,7 +862,6 @@ impl ErrorKind {
             ErrorKind::Encryption(..) => "Encryption",
             ErrorKind::Custom(..) => "Custom",
             ErrorKind::Shutdown => "Shutdown",
-            ErrorKind::Overload => "Overload",
             #[cfg(feature = "socks5-proxy")]
             ErrorKind::ProxyConnect { .. } => "ProxyConnect",
         }

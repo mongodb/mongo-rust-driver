@@ -153,41 +153,6 @@ struct ClientInner {
     disable_command_events: AtomicBool,
 }
 
-/// A token bucket for retries. Note that the values used are scaled by a factor of 10 from those
-/// defined in the spec to allow for the use of integers.
-const MAX_BUCKET_CAPACITY: u16 = 10_000;
-impl Client {
-    pub(crate) async fn consume_from_token_bucket(&self) -> Result<()> {
-        let Some(ref bucket) = self.inner.token_bucket else {
-            return Ok(());
-        };
-        let mut tokens = bucket.lock().await;
-        if *tokens >= 10 {
-            *tokens -= 10;
-            Ok(())
-        } else {
-            Err(ErrorKind::Overload.into())
-        }
-    }
-
-    pub(crate) async fn deposit_success_in_token_bucket(&self, is_retry: bool) {
-        let Some(ref bucket) = self.inner.token_bucket else {
-            return;
-        };
-        let deposit = if is_retry { 10 } else { 1 };
-        let mut tokens = bucket.lock().await;
-        *tokens = std::cmp::min(*tokens + deposit, MAX_BUCKET_CAPACITY);
-    }
-
-    pub(crate) async fn deposit_retry_error_in_token_bucket(&self) {
-        let Some(ref bucket) = self.inner.token_bucket else {
-            return;
-        };
-        let mut tokens = bucket.lock().await;
-        *tokens = std::cmp::min(*tokens + 1, MAX_BUCKET_CAPACITY);
-    }
-}
-
 #[derive(Debug)]
 struct Shutdown {
     pending_drops: SyncMutex<IdSet<crate::runtime::AsyncJoinHandle<()>>>,
@@ -807,5 +772,54 @@ impl<'a> OpSelectionInfo<'a> {
             name,
             override_criteria: |_, _| None,
         }
+    }
+}
+
+/// Retry token bucket functionality. Note that the values used are scaled by a factor of 10 from
+/// those defined in the spec to allow for the use of integers.
+const MAX_BUCKET_CAPACITY: u16 = 10_000;
+impl Client {
+    pub(crate) async fn consume_from_token_bucket(&self) -> bool {
+        let Some(ref bucket) = self.inner.token_bucket else {
+            return true;
+        };
+        let mut tokens = bucket.lock().await;
+        if *tokens >= 10 {
+            *tokens -= 10;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub(crate) async fn deposit_success_in_token_bucket(&self, is_retry: bool) {
+        let Some(ref bucket) = self.inner.token_bucket else {
+            return;
+        };
+        let deposit = if is_retry { 10 } else { 1 };
+        let mut tokens = bucket.lock().await;
+        *tokens = std::cmp::min(*tokens + deposit, MAX_BUCKET_CAPACITY);
+    }
+
+    pub(crate) async fn deposit_retry_error_in_token_bucket(&self) {
+        let Some(ref bucket) = self.inner.token_bucket else {
+            return;
+        };
+        let mut tokens = bucket.lock().await;
+        *tokens = std::cmp::min(*tokens + 1, MAX_BUCKET_CAPACITY);
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn get_num_tokens_in_bucket(&self) -> Option<u16> {
+        let bucket = self.inner.token_bucket.as_ref()?;
+        Some(*bucket.lock().await)
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn set_num_tokens_in_bucket(&self, tokens: u16) {
+        let Some(ref bucket) = self.inner.token_bucket else {
+            return;
+        };
+        *bucket.lock().await = tokens;
     }
 }

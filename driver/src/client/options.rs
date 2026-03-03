@@ -677,7 +677,7 @@ pub struct ClientOptions {
     #[cfg(feature = "socks5-proxy")]
     pub socks5_proxy: Option<Socks5Proxy>,
 
-    /// isabeltodo
+    /// Enable a per-client token bucket to limit overload error retry attempts. Defaults to false.
     pub adaptive_retries: Option<bool>,
 
     /// Information from the SRV URI that generated these client options, if applicable.
@@ -727,6 +727,8 @@ pub(crate) struct TestOptions {
 
     /// Callback to receive hello commands.
     pub(crate) hello_cb: Option<EventHandler<crate::cmap::Command>>,
+
+    pub(crate) jitter: Option<f64>,
 }
 
 pub(crate) type TestEventSender = tokio::sync::mpsc::Sender<
@@ -1051,6 +1053,9 @@ pub struct ConnectionString {
     #[cfg(feature = "socks5-proxy")]
     #[serde(serialize_with = "Socks5Proxy::serialize")]
     pub socks5_proxy: Option<Socks5Proxy>,
+
+    /// Enable a per-client token bucket to limit overload error retry attempts. Defaults to false.
+    pub adaptive_retries: Option<bool>,
 
     #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
     wait_queue_timeout: Option<Duration>,
@@ -1851,6 +1856,7 @@ impl ConnectionString {
             tls_insecure,
             #[cfg(feature = "socks5-proxy")]
             socks5_proxy,
+            adaptive_retries,
             #[cfg(test)]
                 original_uri: _,
         } = self;
@@ -2163,6 +2169,10 @@ impl ConnectionString {
                     "&proxyUsername={username}&proxyPassword={password}"
                 ));
             }
+        }
+
+        if let Some(adaptive_retries) = adaptive_retries {
+            opts.push_str(&format!("&adaptiveRetries={adaptive_retries}"));
         }
 
         if !opts.is_empty() {
