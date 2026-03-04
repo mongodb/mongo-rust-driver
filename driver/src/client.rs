@@ -778,14 +778,16 @@ impl<'a> OpSelectionInfo<'a> {
 /// Retry token bucket functionality. Note that the values used are scaled by a factor of 10 from
 /// those defined in the spec to allow for the use of integers.
 const MAX_BUCKET_CAPACITY: u16 = 10_000;
+const RETRY_TOKEN_RETURN_RATE: u16 = 1;
+const RETRY_TOKEN_CONSUME_RATE: u16 = 10;
 impl Client {
     pub(crate) async fn consume_from_token_bucket(&self) -> bool {
         let Some(ref bucket) = self.inner.token_bucket else {
             return true;
         };
         let mut tokens = bucket.lock().await;
-        if *tokens >= 10 {
-            *tokens -= 10;
+        if *tokens >= RETRY_TOKEN_CONSUME_RATE {
+            *tokens -= RETRY_TOKEN_CONSUME_RATE;
             true
         } else {
             false
@@ -796,7 +798,10 @@ impl Client {
         let Some(ref bucket) = self.inner.token_bucket else {
             return;
         };
-        let deposit = if is_retry { 10 } else { 1 };
+        let mut deposit = RETRY_TOKEN_RETURN_RATE;
+        if is_retry {
+            deposit += 10;
+        }
         let mut tokens = bucket.lock().await;
         *tokens = std::cmp::min(*tokens + deposit, MAX_BUCKET_CAPACITY);
     }
@@ -806,7 +811,7 @@ impl Client {
             return;
         };
         let mut tokens = bucket.lock().await;
-        *tokens = std::cmp::min(*tokens + 1, MAX_BUCKET_CAPACITY);
+        *tokens = std::cmp::min(*tokens + RETRY_TOKEN_RETURN_RATE, MAX_BUCKET_CAPACITY);
     }
 
     #[cfg(test)]
