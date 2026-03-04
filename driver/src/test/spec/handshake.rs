@@ -469,3 +469,18 @@ async fn append_metadata_duplicate_empty_strings_initial() {
         assert_eq!(initial_client_metadata, updated_client_metadata);
     }
 }
+
+#[tokio::test]
+async fn handshake_includes_backpressure_true() {
+    let mut options = get_client_options().await.clone();
+    let hello = watch_hello(&mut options);
+    let client = Client::for_test().options(options).await;
+    client
+        .database("db")
+        .run_command(doc! { "ping": 1 })
+        .await
+        .unwrap();
+
+    let command = hello.lock().unwrap();
+    assert!(command.body.get_bool("backpressure").unwrap());
+}

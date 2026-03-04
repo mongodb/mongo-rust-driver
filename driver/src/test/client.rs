@@ -9,7 +9,7 @@ use std::{
 use crate::{
     bson::Document,
     error::{RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
-    test::{spec::unified_runner::run_unified_tests, topology_is_load_balanced},
+    test::spec::unified_runner::run_unified_tests,
 };
 use serde::{Deserialize, Serialize};
 
@@ -1078,26 +1078,21 @@ async fn socks5_proxy_skip_ci() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn backpressure_run_unified() {
-    let mut skipped_files = Vec::new();
-    if topology_is_sharded().await || topology_is_load_balanced().await {
-        // needs to set useMultipleMongoses:false
-        skipped_files.push("getMore-retried.json");
-    }
-    run_unified_tests(&["client-backpressure"])
-        .skip_tests(&[
-            // need to ignore killCursors events
-            "client.createChangeStream retries using operation loop",
-            "database.createChangeStream retries using operation loop",
-            "collection.createChangeStream retries using operation loop",
-        ])
-        .skip_files(&skipped_files)
-        .await;
+    run_unified_tests(&["client-backpressure"]).await;
 }
 
 // backpressure prose test #1
 #[tokio::test(flavor = "multi_thread")]
 async fn operation_retry_uses_exponential_backoff() {
+    if server_version_lt(4, 4).await {
+        log_uncaptured("skipping operation_retry_uses_exponential_backoff: requires 4.4+");
+        return;
+    }
+
     let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
     options.test_options_mut().jitter = Some(0f64);
     let client = Client::for_test().options(options).await;
     let coll = client.database("db").collection("coll");
@@ -1112,6 +1107,9 @@ async fn operation_retry_uses_exponential_backoff() {
     let duration_no_backoff = start.elapsed();
 
     let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
     options.test_options_mut().jitter = Some(1f64);
     let client = Client::for_test().options(options).await;
     let coll = client.database("db").collection("coll");
@@ -1146,7 +1144,16 @@ async fn token_bucket_capacity_enforced() {
 // backpressure prose test #3
 #[tokio::test(flavor = "multi_thread")]
 async fn overload_errors_retried_max_retries_times() {
-    let client = Client::for_test().monitor_events().await;
+    if server_version_lt(4, 4).await {
+        log_uncaptured("skipping overload_errors_retried_max_retries_times: requires 4.4+");
+        return;
+    }
+
+    let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
+    let client = Client::for_test().options(options).monitor_events().await;
     let coll = client.database("db").collection::<Document>("coll");
 
     let fail_point = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn)
@@ -1165,7 +1172,15 @@ async fn overload_errors_retried_max_retries_times() {
 // backpressure prose test #4
 #[tokio::test(flavor = "multi_thread")]
 async fn adaptive_retries_limited_by_token_bucket_tokens() {
+    if server_version_lt(4, 4).await {
+        log_uncaptured("skipping adaptive_retries_limited_by_token_bucket_tokens: requires 4.4+");
+        return;
+    }
+
     let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
     options.adaptive_retries = Some(true);
     let client = Client::for_test().options(options).monitor_events().await;
     client.set_num_tokens_in_bucket(20).await;
