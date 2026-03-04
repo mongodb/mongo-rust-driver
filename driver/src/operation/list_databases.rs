@@ -1,4 +1,4 @@
-use crate::{bson::rawdoc, Client};
+use crate::{bson::rawdoc, options::ClientOptions, Client};
 use serde::Deserialize;
 
 use crate::{
@@ -59,8 +59,8 @@ impl OperationWithDefaults for ListDatabases {
         super::Feature::Set(&SelectionCriteria::ReadPreference(ReadPreference::Primary))
     }
 
-    fn retryability(&self) -> Retryability {
-        Retryability::Read
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        Retryability::read(options)
     }
 
     fn target(&self) -> super::OperationTarget {

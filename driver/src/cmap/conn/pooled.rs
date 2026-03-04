@@ -206,6 +206,10 @@ impl PooledConnection {
         Instant::now().duration_since(available_time) >= max_idle_time
     }
 
+    pub(crate) fn is_pinned(&self) -> bool {
+        matches!(self.state, PooledConnectionState::Pinned { .. })
+    }
+
     /// Whether this connection is to a mongos.
     pub(crate) fn is_sharded(&self) -> Result<bool> {
         Ok(self.stream_description()?.initial_server_type == ServerType::Mongos)

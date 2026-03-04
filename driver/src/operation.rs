@@ -100,12 +100,19 @@ pub(crate) enum Retryability {
 }
 
 impl Retryability {
-    /// Returns this level of retryability in tandem with the client options.
-    pub(crate) fn with_options(&self, options: &ClientOptions) -> Self {
-        match self {
-            Self::Write if options.retry_writes != Some(false) => Self::Write,
-            Self::Read if options.retry_reads != Some(false) => Self::Read,
-            _ => Self::None,
+    pub(crate) fn write(options: &ClientOptions) -> Self {
+        if options.retry_writes != Some(false) {
+            Self::Write
+        } else {
+            Self::None
+        }
+    }
+
+    pub(crate) fn read(options: &ClientOptions) -> Self {
+        if options.retry_reads != Some(false) {
+            Self::Read
+        } else {
+            Self::None
         }
     }
 
@@ -167,10 +174,12 @@ pub(crate) trait Operation {
     fn supports_sessions(&self) -> bool;
 
     /// The level of retryability the operation supports.
-    fn retryability(&self) -> Retryability;
+    fn retryability(&self, options: &ClientOptions) -> Retryability;
+
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool;
 
     /// Updates this operation as needed for a retry.
-    fn update_for_retry(&mut self);
+    fn update_for_retry(&mut self, overloaded: bool);
 
     /// Returns a function handle to potentially override selection criteria based on server
     /// topology.
@@ -366,12 +375,19 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     }
 
     /// The level of retryability the operation supports.
-    fn retryability(&self) -> Retryability {
+    fn retryability(&self, _options: &ClientOptions) -> Retryability {
         Retryability::None
     }
 
+    /// Whether this operation is retryable when retrying system overloaded errors. For read/write
+    /// operations, the operation is retryable if retryReads/retryWrites was set to true. Operations
+    /// with special behavior defined in the backpressure specification should override this method.
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        self.retryability(options) != Retryability::None
+    }
+
     /// Updates this operation as needed for a retry.
-    fn update_for_retry(&mut self) {}
+    fn update_for_retry(&mut self, _overloaded: bool) {}
 
     /// Returns a function handle to potentially override selection criteria based on server
     /// topology.
@@ -429,11 +445,14 @@ where
     fn supports_sessions(&self) -> bool {
         self.supports_sessions()
     }
-    fn retryability(&self) -> Retryability {
-        self.retryability()
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        self.retryability(options)
     }
-    fn update_for_retry(&mut self) {
-        self.update_for_retry()
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        self.is_backpressure_retryable(options)
+    }
+    fn update_for_retry(&mut self, overloaded: bool) {
+        self.update_for_retry(overloaded)
     }
     fn override_criteria(&self) -> OverrideCriteriaFn {
         self.override_criteria()
@@ -669,4 +688,9 @@ where
         let mut full_body = FullCursorBody::deserialize(deserializer)?;
         Ok(SingleCursorResult(full_body.cursor.first_batch.pop()))
     }
+}
+
+pub(crate) fn is_commit_or_abort<T: Operation>(op: &T) -> bool {
+    op.name() == <CommitTransaction as Operation>::NAME
+        || op.name() == <AbortTransaction as Operation>::NAME
 }

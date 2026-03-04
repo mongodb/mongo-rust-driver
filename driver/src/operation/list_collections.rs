@@ -5,7 +5,7 @@ use crate::{
     cursor::common::CursorSpecification,
     error::Result,
     operation::{OperationWithDefaults, Retryability},
-    options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
+    options::{ClientOptions, ListCollectionsOptions, ReadPreference, SelectionCriteria},
     Database,
 };
 
@@ -79,8 +79,8 @@ impl OperationWithDefaults for ListCollections {
         super::Feature::Set(&SelectionCriteria::ReadPreference(ReadPreference::Primary))
     }
 
-    fn retryability(&self) -> Retryability {
-        Retryability::Read
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        Retryability::read(options)
     }
 
     fn target(&self) -> super::OperationTarget {

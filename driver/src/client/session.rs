@@ -273,8 +273,10 @@ impl ClientSession {
 
     /// Whether this session is currently in a transaction.
     pub(crate) fn in_transaction(&self) -> bool {
-        self.transaction.state == TransactionState::Starting
-            || self.transaction.state == TransactionState::InProgress
+        matches!(
+            self.transaction.state,
+            TransactionState::Starting | TransactionState::InProgress
+        )
     }
 
     /// The highest seen cluster time this session has seen so far.

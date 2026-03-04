@@ -7,7 +7,7 @@ use crate::{
     cursor::common::CursorSpecification,
     error::{Error, Result},
     operation::{run_command::RunCommand, Operation, SERVER_4_4_0_WIRE_VERSION},
-    options::{RunCursorCommandOptions, SelectionCriteria},
+    options::{ClientOptions, RunCursorCommandOptions, SelectionCriteria},
     BoxFuture,
 };
 
@@ -69,12 +69,16 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.supports_sessions()
     }
 
-    fn retryability(&self) -> crate::operation::Retryability {
-        self.run_command.retryability()
+    fn retryability(&self, options: &ClientOptions) -> crate::operation::Retryability {
+        self.run_command.retryability(options)
     }
 
-    fn update_for_retry(&mut self) {
-        self.run_command.update_for_retry()
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        self.run_command.is_backpressure_retryable(options)
+    }
+
+    fn update_for_retry(&mut self, overloaded: bool) {
+        self.run_command.update_for_retry(overloaded)
     }
 
     fn override_criteria(&self) -> super::OverrideCriteriaFn {

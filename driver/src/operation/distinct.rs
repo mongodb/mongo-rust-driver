@@ -7,7 +7,7 @@ use crate::{
     coll::options::DistinctOptions,
     error::Result,
     operation::{OperationWithDefaults, Retryability},
-    options::SelectionCriteria,
+    options::{ClientOptions, SelectionCriteria},
     Collection,
 };
 
@@ -78,8 +78,8 @@ impl OperationWithDefaults for Distinct {
             .into()
     }
 
-    fn retryability(&self) -> Retryability {
-        Retryability::Read
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        Retryability::read(options)
     }
 
     fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {

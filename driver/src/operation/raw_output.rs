@@ -4,7 +4,7 @@ use crate::{
     bson_compat::CStr,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    options::SelectionCriteria,
+    options::{ClientOptions, SelectionCriteria},
     BoxFuture,
 };
 
@@ -59,12 +59,16 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.supports_sessions()
     }
 
-    fn retryability(&self) -> super::Retryability {
-        self.0.retryability()
+    fn retryability(&self, options: &ClientOptions) -> super::Retryability {
+        self.0.retryability(options)
     }
 
-    fn update_for_retry(&mut self) {
-        self.0.update_for_retry()
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        self.0.is_backpressure_retryable(options)
+    }
+
+    fn update_for_retry(&mut self, overloaded: bool) {
+        self.0.update_for_retry(overloaded)
     }
 
     fn override_criteria(&self) -> super::OverrideCriteriaFn {

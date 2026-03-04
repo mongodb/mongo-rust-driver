@@ -48,6 +48,8 @@ pub const UNKNOWN_TRANSACTION_COMMIT_RESULT: &str = "UnknownTransactionCommitRes
 pub const SYSTEM_OVERLOADED_ERROR: &str = "SystemOverloadedError";
 /// Indicates that an error is retryable.
 pub const RETRYABLE_ERROR: &str = "RetryableError";
+/// Indicates that no writes were performed before the error occurred.
+pub const NO_WRITES_PERFORMED: &str = "NoWritesPerformed";
 
 /// The result type for all methods that can return an error in the `mongodb` crate.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -241,10 +243,15 @@ impl Error {
     /// matches one of the retryable write codes.
     pub(crate) fn should_add_retryable_write_label(
         &self,
-        max_wire_version: i32,
+        max_wire_version: Option<i32>,
         server_type: Option<ServerType>,
     ) -> bool {
-        if max_wire_version > 8 {
+        const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
+
+        if max_wire_version
+            .map(|mwv| mwv > SERVER_4_2_0_WIRE_VERSION)
+            .unwrap_or(true)
+        {
             return self.is_network_error();
         }
         if self.is_network_error() {

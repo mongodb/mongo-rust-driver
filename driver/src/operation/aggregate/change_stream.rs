@@ -8,7 +8,7 @@ use crate::{
     cursor::common::CursorSpecification,
     error::Result,
     operation::{append_options, ExecutionContext, Operation, Retryability},
-    options::{ChangeStreamOptions, SelectionCriteria, WriteConcern},
+    options::{ChangeStreamOptions, ClientOptions, SelectionCriteria, WriteConcern},
 };
 
 use super::Aggregate;
@@ -140,8 +140,12 @@ impl Operation for ChangeStreamAggregate {
         self.inner.write_concern()
     }
 
-    fn retryability(&self) -> Retryability {
-        self.inner.retryability()
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        self.inner.retryability(options)
+    }
+
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        self.inner.is_backpressure_retryable(options)
     }
 
     fn target(&self) -> crate::operation::OperationTarget {
@@ -160,8 +164,8 @@ impl Operation for ChangeStreamAggregate {
         self.inner.supports_sessions()
     }
 
-    fn update_for_retry(&mut self) {
-        self.inner.update_for_retry();
+    fn update_for_retry(&mut self, overloaded: bool) {
+        self.inner.update_for_retry(overloaded);
     }
 
     fn override_criteria(&self) -> crate::operation::OverrideCriteriaFn {

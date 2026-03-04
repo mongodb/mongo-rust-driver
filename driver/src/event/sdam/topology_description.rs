@@ -38,7 +38,7 @@ impl TopologyDescription {
     pub fn has_readable_server(&self, selection_criteria: Option<SelectionCriteria>) -> bool {
         let mut servers = self.description.filter_servers_by_selection_criteria(
             &selection_criteria.unwrap_or(ReadPreference::Primary.into()),
-            &[],
+            None,
         );
         self.description
             .retain_servers_within_latency_window(&mut servers);

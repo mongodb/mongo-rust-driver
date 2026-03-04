@@ -108,7 +108,23 @@ fn assert_other_fields_eq(metadata_a: &Document, metadata_b: &Document) {
     let mut metadata_b = metadata_b.clone();
     metadata_b.remove("driver");
     metadata_b.remove("platform");
-    assert_eq!(metadata_a, metadata_b);
+
+    assert_eq!(metadata_a.len(), metadata_b.len());
+    for (k, mut v) in metadata_a {
+        // The "architecture" field in the "os" document may be removed during truncation.
+        if k == "os" {
+            let os_a = v.as_document_mut().unwrap();
+            let os_b = metadata_b.get_document_mut("os").unwrap();
+            if let (Some(architecture_a), Some(architecture_b)) =
+                (os_a.remove("architecture"), os_b.remove("architecture"))
+            {
+                assert_eq!(architecture_a, architecture_b);
+            }
+            assert_eq!(os_a, os_b);
+        } else {
+            assert_eq!(&v, metadata_b.get(k).unwrap());
+        }
+    }
 }
 
 fn extract_driver_info(metadata: &Document) -> (&str, &str, &str) {
@@ -452,4 +468,19 @@ async fn append_metadata_duplicate_empty_strings_initial() {
 
         assert_eq!(initial_client_metadata, updated_client_metadata);
     }
+}
+
+#[tokio::test]
+async fn handshake_includes_backpressure_true() {
+    let mut options = get_client_options().await.clone();
+    let hello = watch_hello(&mut options);
+    let client = Client::for_test().options(options).await;
+    client
+        .database("db")
+        .run_command(doc! { "ping": 1 })
+        .await
+        .unwrap();
+
+    let command = hello.lock().unwrap();
+    assert!(command.body.get_bool("backpressure").unwrap());
 }

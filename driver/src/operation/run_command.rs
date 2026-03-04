@@ -6,6 +6,7 @@ use crate::{
     client::SESSIONS_UNSUPPORTED_COMMANDS,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{Error, Result},
+    options::ClientOptions,
     selection_criteria::SelectionCriteria,
     Database,
 };
@@ -95,6 +96,10 @@ impl OperationWithDefaults for RunCommand<'_> {
                 !SESSIONS_UNSUPPORTED_COMMANDS.contains(command_name.to_lowercase().as_str())
             })
             .unwrap_or(false)
+    }
+
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        options.retry_reads != Some(false) && options.retry_writes != Some(false)
     }
 
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
