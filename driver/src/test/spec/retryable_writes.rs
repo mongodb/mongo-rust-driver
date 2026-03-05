@@ -1,15 +1,21 @@
 use std::{sync::Arc, time::Duration};
 
-use crate::{bson::Bson, options::SelectionCriteria};
 use tokio::sync::Mutex;
 
 use crate::{
-    bson::{doc, Document},
-    error::{Result, RETRYABLE_WRITE_ERROR},
+    bson::{doc, Bson, Document},
+    error::{
+        Result,
+        NO_WRITES_PERFORMED,
+        RETRYABLE_ERROR,
+        RETRYABLE_WRITE_ERROR,
+        SYSTEM_OVERLOADED_ERROR,
+    },
     event::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
+    options::SelectionCriteria,
     runtime::{self, spawn, AcknowledgedMessage, AsyncJoinHandle},
     test::{
         get_client_options,
@@ -80,7 +86,7 @@ async fn label_not_added(retry_reads: bool) {
     assert!(!err.contains_label("RetryableWriteError"));
 }
 
-/// Prose test from retryable writes spec verifying that PoolClearedErrors are retried.
+/// retryable writes prose test #2
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_pool_cleared() {
     if topology_is_standalone().await {
@@ -166,8 +172,7 @@ async fn retry_write_pool_cleared() {
     assert_eq!(buffer.get_command_started_events(&["insert"]).len(), 3);
 }
 
-/// Prose test from retryable writes spec verifying that the original error is returned after
-/// encountering a WriteConcernError with a RetryableWriteError label.
+/// retryable writes prose test #3
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_retryable_write_error() {
     if !topology_is_replica_set().await || server_version_lt(6, 0).await {
@@ -248,7 +253,7 @@ async fn retry_write_retryable_write_error() {
     let _ = fp_rx.recv().await;
 }
 
-// Test that in a sharded cluster writes are retried on a different mongos if one available
+/// retryable writes prose test #4
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_different_mongos() {
     let mut client_options = get_client_options().await.clone();
@@ -328,7 +333,7 @@ async fn retry_write_different_mongos() {
     drop(guards); // enforce lifetime
 }
 
-// Retryable Reads Are Retried on the Same mongos if No Others are Available
+/// retryable writes prose test #5
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_write_same_mongos() {
     if !topology_is_sharded().await {
@@ -384,4 +389,105 @@ async fn retry_write_same_mongos() {
     );
 
     drop(fp_guard); // enforce lifetime
+}
+
+/// retryable writes prose test #6
+#[tokio::test(flavor = "multi_thread")]
+async fn error_propagation_after_multiple_errors() {
+    if !topology_is_replica_set().await || server_version_lt(6, 0).await {
+        log_uncaptured(
+            "skipping error_propagation_after_multiple_errors: requires 6.0+ replica set",
+        );
+        return;
+    }
+
+    // case 1: no errors with NoWritesPerformed
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
+    let client = Client::for_test().await;
+    let guard = Mutex::new(None);
+    spawn(async move {
+        let client = client.clone();
+        while let Some(message) = rx.recv().await {
+            let (event, ack) = message.into_parts();
+            match event {
+                CommandEvent::Failed(failed)
+                    if event.command_name() == "insert" && failed.failure.code() == Some(91) =>
+                {
+                    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::AlwaysOn)
+                        .error_labels(vec![RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR])
+                        .error_code(10107);
+                    let mut guard = guard.lock().await;
+                    *guard = Some(client.enable_fail_point(fail_point).await.unwrap());
+                }
+                _ => {}
+            }
+            ack.acknowledge(());
+        }
+    });
+
+    let mut options = get_client_options().await.clone();
+    options.test_options_mut().async_event_listener = Some(tx);
+    let client2 = Client::for_test().options(options).monitor_events().await;
+
+    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
+        .error_labels(vec![RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR])
+        .error_code(91);
+    let _guard = client2.enable_fail_point(fail_point).await.unwrap();
+
+    let error = client2
+        .database("db")
+        .collection("error_propagation_after_multiple_errors")
+        .insert_one(doc! { "x": 1 })
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), Some(10107));
+
+    // case 2: all errors with NoWritesPerformed
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
+    let client = Client::for_test().await;
+    let guard = Mutex::new(None);
+    spawn(async move {
+        let client = client.clone();
+        while let Some(message) = rx.recv().await {
+            let (event, ack) = message.into_parts();
+            match event {
+                CommandEvent::Failed(failed)
+                    if event.command_name() == "insert" && failed.failure.code() == Some(91) =>
+                {
+                    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::AlwaysOn)
+                        .error_labels(vec![
+                            RETRYABLE_ERROR,
+                            SYSTEM_OVERLOADED_ERROR,
+                            NO_WRITES_PERFORMED,
+                        ])
+                        .error_code(10107);
+                    let mut guard = guard.lock().await;
+                    *guard = Some(client.enable_fail_point(fail_point).await.unwrap());
+                }
+                _ => {}
+            }
+            ack.acknowledge(());
+        }
+    });
+
+    let mut options = get_client_options().await.clone();
+    options.test_options_mut().async_event_listener = Some(tx);
+    let client = Client::for_test().options(options).await;
+
+    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
+        .error_labels(vec![
+            RETRYABLE_ERROR,
+            SYSTEM_OVERLOADED_ERROR,
+            NO_WRITES_PERFORMED,
+        ])
+        .error_code(91);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let error = client
+        .database("db")
+        .collection("error_propagation_after_multiple_errors")
+        .insert_one(doc! { "x": 1 })
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), Some(10107));
 }

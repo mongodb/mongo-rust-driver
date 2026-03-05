@@ -428,10 +428,10 @@ impl Client {
         loop {
             match retry {
                 Some(retry) if retry.max_retries_reached() => {
-                    return Err(retry.last_error);
+                    return Err(retry.last_error());
                 }
                 Some(retry) if retry.overloaded && !self.consume_from_token_bucket().await => {
-                    return Err(retry.last_error);
+                    return Err(retry.last_error());
                 }
                 Some(ref retry) => {
                     op.update_for_retry(Some(&retry));
