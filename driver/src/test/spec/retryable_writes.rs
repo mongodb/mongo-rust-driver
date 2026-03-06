@@ -391,9 +391,9 @@ async fn retry_write_same_mongos() {
     drop(fp_guard); // enforce lifetime
 }
 
-/// retryable writes prose test #6
+/// retryable writes prose test #6, case #1
 #[tokio::test(flavor = "multi_thread")]
-async fn error_propagation_after_multiple_errors() {
+async fn error_propagation_no_errors_with_no_writes_performed() {
     if !topology_is_replica_set().await || server_version_lt(6, 0).await {
         log_uncaptured(
             "skipping error_propagation_after_multiple_errors: requires 6.0+ replica set",
@@ -401,12 +401,11 @@ async fn error_propagation_after_multiple_errors() {
         return;
     }
 
-    // case 1: no errors with NoWritesPerformed
     let (tx, mut rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
     let client = Client::for_test().await;
-    let guard = Mutex::new(None);
+    let guard = Arc::new(Mutex::new(None));
+    let guard_clone = guard.clone();
     spawn(async move {
-        let client = client.clone();
         while let Some(message) = rx.recv().await {
             let (event, ack) = message.into_parts();
             match event {
@@ -416,17 +415,21 @@ async fn error_propagation_after_multiple_errors() {
                     let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::AlwaysOn)
                         .error_labels(vec![RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR])
                         .error_code(10107);
-                    let mut guard = guard.lock().await;
+                    let mut guard = guard_clone.lock().await;
                     *guard = Some(client.enable_fail_point(fail_point).await.unwrap());
+                    ack.acknowledge(());
+                    break;
                 }
-                _ => {}
+                _ => {
+                    ack.acknowledge(());
+                }
             }
-            ack.acknowledge(());
         }
     });
 
     let mut options = get_client_options().await.clone();
     options.test_options_mut().async_event_listener = Some(tx);
+    options.server_monitoring_mode = Some(crate::options::ServerMonitoringMode::Poll);
     let client2 = Client::for_test().options(options).monitor_events().await;
 
     let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
@@ -441,13 +444,22 @@ async fn error_propagation_after_multiple_errors() {
         .await
         .unwrap_err();
     assert_eq!(error.code(), Some(10107));
+}
 
-    // case 2: all errors with NoWritesPerformed
+#[tokio::test(flavor = "multi_thread")]
+async fn error_propagation_all_errors_with_no_writes_performed() {
+    if !topology_is_replica_set().await || server_version_lt(6, 0).await {
+        log_uncaptured(
+            "skipping error_propagation_after_multiple_errors: requires 6.0+ replica set",
+        );
+        return;
+    }
+
     let (tx, mut rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
     let client = Client::for_test().await;
-    let guard = Mutex::new(None);
+    let guard = Arc::new(Mutex::new(None));
+    let guard_clone = guard.clone();
     spawn(async move {
-        let client = client.clone();
         while let Some(message) = rx.recv().await {
             let (event, ack) = message.into_parts();
             match event {
@@ -461,17 +473,21 @@ async fn error_propagation_after_multiple_errors() {
                             NO_WRITES_PERFORMED,
                         ])
                         .error_code(10107);
-                    let mut guard = guard.lock().await;
+                    let mut guard = guard_clone.lock().await;
                     *guard = Some(client.enable_fail_point(fail_point).await.unwrap());
+                    ack.acknowledge(());
+                    break;
                 }
-                _ => {}
+                _ => {
+                    ack.acknowledge(());
+                }
             }
-            ack.acknowledge(());
         }
     });
 
     let mut options = get_client_options().await.clone();
     options.test_options_mut().async_event_listener = Some(tx);
+    options.server_monitoring_mode = Some(crate::options::ServerMonitoringMode::Poll);
     let client = Client::for_test().options(options).await;
 
     let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
@@ -490,4 +506,63 @@ async fn error_propagation_after_multiple_errors() {
         .await
         .unwrap_err();
     assert_eq!(error.code(), Some(10107));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn error_propagation_some_errors_with_no_writes_performed() {
+    if !topology_is_replica_set().await || server_version_lt(6, 0).await {
+        log_uncaptured(
+            "skipping error_propagation_after_multiple_errors: requires 6.0+ replica set",
+        );
+        return;
+    }
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
+    let client = Client::for_test().await;
+    let guard = Arc::new(Mutex::new(None));
+    let guard_clone = guard.clone();
+    spawn(async move {
+        while let Some(message) = rx.recv().await {
+            let (event, ack) = message.into_parts();
+            match event {
+                CommandEvent::Failed(failed)
+                    if event.command_name() == "insert" && failed.failure.code() == Some(91) =>
+                {
+                    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::AlwaysOn)
+                        .error_labels(vec![
+                            RETRYABLE_ERROR,
+                            SYSTEM_OVERLOADED_ERROR,
+                            NO_WRITES_PERFORMED,
+                        ])
+                        .error_code(91);
+                    let mut guard = guard_clone.lock().await;
+                    *guard = Some(client.enable_fail_point(fail_point).await.unwrap());
+                    ack.acknowledge(());
+                    break;
+                }
+                _ => {
+                    ack.acknowledge(());
+                }
+            }
+        }
+    });
+
+    let mut options = get_client_options().await.clone();
+    options.test_options_mut().async_event_listener = Some(tx);
+    options.server_monitoring_mode = Some(crate::options::ServerMonitoringMode::Poll);
+    let client = Client::for_test().options(options).await;
+
+    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
+        .error_labels(vec![RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR])
+        .error_code(91);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let error = client
+        .database("db")
+        .collection("error_propagation_after_multiple_errors")
+        .insert_one(doc! { "x": 1 })
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), Some(91));
+    assert!(!error.contains_label(NO_WRITES_PERFORMED));
 }
