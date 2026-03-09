@@ -120,12 +120,18 @@ impl RunOnRequirement {
     pub(crate) async fn can_run_on(&self) -> Result<(), String> {
         if let Some(ref min_version) = self.min_server_version {
             if !server_version_matches(&format!(">= {min_version}")).await {
-                return Err(format!("does not match min server version: {min_version}"));
+                return Err(format!(
+                    "does not match min server version: {min_version}, actual: {}",
+                    crate::test::get_test_client_metadata().await.server_version
+                ));
             }
         }
         if let Some(ref max_version) = self.max_server_version {
             if !server_version_matches(&format!("<= {max_version}")).await {
-                return Err(format!("does not match max server version: {max_version}"));
+                return Err(format!(
+                    "does not match max server version: {max_version}, actual: {}",
+                    crate::test::get_test_client_metadata().await.server_version
+                ));
             }
         }
         if let Some(ref topologies) = self.topologies {
