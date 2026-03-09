@@ -5,7 +5,6 @@
     {
       "minServerVersion": "8.2.0",
       "topologies": [
-        "replicaset",
         "sharded"
       ],
       "serverless": "forbid"
@@ -14,46 +13,121 @@
   "createEntities": [
     {
       "client": {
-        "id": "client0"
+        "id": "client0",
+        "useMultipleMongoses": true
       }
     },
     {
       "database": {
-        "id": "database0",
+        "id": "admin",
         "client": "client0",
-        "databaseName": "database0"
+        "databaseName": "admin"
+      }
+    },
+    {
+      "database": {
+        "id": "sharded_db",
+        "client": "client0",
+        "databaseName": "sharded_db"
       }
     },
     {
       "collection": {
         "id": "collection0",
-        "database": "database0",
+        "database": "sharded_db",
         "collectionName": "collection0"
       }
     },
     {
       "session": {
         "id": "session0",
-        "client": "client0"
+        "client": "client0",
+        "sessionOptions": {
+          "causalConsistency": false
+        }
       }
     }
   ],
   "tests": [
     {
-      "description": "when showExpandedEvents is true, commitTimestamp is included for operations in a transaction",
+      "description": "when showExpandedEvents is true, commitTimestamp is included for operations in a prepared transaction",
       "operations": [
         {
           "name": "dropCollection",
-          "object": "database0",
+          "object": "sharded_db",
           "arguments": {
             "collection": "collection0"
           }
         },
         {
           "name": "createCollection",
-          "object": "database0",
+          "object": "sharded_db",
           "arguments": {
             "collection": "collection0"
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "admin",
+          "arguments": {
+            "commandName": "enableSharding",
+            "command": {
+              "enableSharding": "sharded_db"
+            }
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "admin",
+          "arguments": {
+            "commandName": "shardCollection",
+            "command": {
+              "shardCollection": "sharded_db.collection0",
+              "key": {
+                "x": 1
+              }
+            }
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "admin",
+          "arguments": {
+            "commandName": "split",
+            "command": {
+              "split": "sharded_db.collection0",
+              "middle": {
+                "x": 0
+              }
+            }
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "admin",
+          "arguments": {
+            "commandName": "moveChunk",
+            "command": {
+              "moveChunk": "sharded_db.collection0",
+              "find": {
+                "x": -1
+              },
+              "to": "shard0"
+            }
+          }
+        },
+        {
+          "name": "runCommand",
+          "object": "admin",
+          "arguments": {
+            "commandName": "moveChunk",
+            "command": {
+              "moveChunk": "sharded_db.collection0",
+              "find": {
+                "x": 1
+              },
+              "to": "shard1"
+            }
           }
         },
         {
@@ -67,7 +141,22 @@
         },
         {
           "name": "startTransaction",
-          "object": "session0"
+          "object": "session0",
+          "arguments": {
+            "writeConcern": {
+              "w": "majority"
+            }
+          }
+        },
+        {
+          "name": "insertOne",
+          "object": "collection0",
+          "arguments": {
+            "document": {
+              "x": -1
+            },
+            "session": "session0"
+          }
         },
         {
           "name": "insertOne",
@@ -89,7 +178,7 @@
           "expectResult": {
             "operationType": "insert",
             "ns": {
-              "db": "database0",
+              "db": "sharded_db",
               "coll": "collection0"
             },
             "commitTimestamp": {
@@ -112,7 +201,7 @@
           "expectResult": {
             "operationType": "insert",
             "ns": {
-              "db": "database0",
+              "db": "sharded_db",
               "coll": "collection0"
             },
             "commitTimestamp": {
