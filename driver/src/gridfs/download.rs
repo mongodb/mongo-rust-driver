@@ -58,7 +58,7 @@ pub struct GridFsDownloadStream {
     file: FilesCollectionDocument,
 }
 
-type GetBytesFuture = BoxFuture<'static, Result<(Vec<u8>, Box<Cursor<Chunk<'static>>>)>>;
+type GetBytesFuture = BoxFuture<'static, Result<Idle>>;
 
 enum State {
     // Idle is stored as an option so that its fields can be moved into a GetBytesFuture
@@ -118,10 +118,10 @@ impl AsyncRead for GridFsDownloadStream {
 
         let result = match &mut stream.state {
             State::Idle(idle) => {
-                let Idle { buffer, cursor } = idle.take().unwrap();
+                let idle = idle.take().unwrap();
 
-                if !buffer.is_empty() {
-                    Ok((buffer, cursor))
+                if !idle.buffer.is_empty() {
+                    Ok(idle)
                 } else {
                     let chunks_in_buf = FilesCollectionDocument::n_from_vals(
                         buf.len() as u64,
@@ -136,8 +136,7 @@ impl AsyncRead for GridFsDownloadStream {
 
                     let new_future = stream.state.set_busy(
                         get_bytes(
-                            cursor,
-                            buffer,
+                            idle,
                             n_range,
                             stream.file.chunk_size_bytes,
                             stream.file.length,
@@ -160,12 +159,13 @@ impl AsyncRead for GridFsDownloadStream {
         };
 
         match result {
-            Ok((mut buffer, cursor)) => {
-                let bytes_to_write = std::cmp::min(buffer.len(), buf.len());
-                buf[..bytes_to_write].copy_from_slice(buffer.drain(0..bytes_to_write).as_slice());
+            Ok(mut idle) => {
+                let bytes_to_write = std::cmp::min(idle.buffer.len(), buf.len());
+                buf[..bytes_to_write]
+                    .copy_from_slice(idle.buffer.drain(0..bytes_to_write).as_slice());
 
-                stream.state = if !buffer.is_empty() || cursor.has_next() {
-                    State::Idle(Some(Idle { buffer, cursor }))
+                stream.state = if !idle.buffer.is_empty() || idle.cursor.has_next() {
+                    State::Idle(Some(idle))
                 } else {
                     State::Done
                 };
@@ -181,18 +181,17 @@ impl AsyncRead for GridFsDownloadStream {
 }
 
 async fn get_bytes(
-    mut cursor: Box<Cursor<Chunk<'static>>>,
-    mut buffer: Vec<u8>,
+    mut idle: Idle,
     n_range: Range<u32>,
     chunk_size_bytes: u32,
     file_len: u64,
-) -> Result<(Vec<u8>, Box<Cursor<Chunk<'static>>>)> {
+) -> Result<Idle> {
     for n in n_range {
-        if !cursor.advance().await? {
+        if !idle.cursor.advance().await? {
             return Err(ErrorKind::GridFs(GridFsErrorKind::MissingChunk { n }).into());
         }
 
-        let chunk = cursor.deserialize_current()?;
+        let chunk = idle.cursor.deserialize_current()?;
         let chunk_bytes = chunk.data.bytes;
 
         if chunk.n != n {
@@ -210,8 +209,8 @@ async fn get_bytes(
             .into());
         }
 
-        buffer.extend_from_slice(chunk_bytes);
+        idle.buffer.extend_from_slice(chunk_bytes);
     }
 
-    Ok((buffer, cursor))
+    Ok(idle)
 }
