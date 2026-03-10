@@ -15,7 +15,7 @@ mod score;
 use std::{collections::HashSet, convert::TryFrom, path::PathBuf};
 
 use anyhow::Result;
-use clap::{Arg, ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgMatches, Command};
 use futures::{Future, FutureExt};
 use mongodb::options::ClientOptions;
 
@@ -78,7 +78,7 @@ const SMALL_DOC_INSERT_BULK_WRITE_BENCH: &str = "Small doc insert-only bulkWrite
 const LARGE_DOC_INSERT_BULK_WRITE_BENCH: &str = "Large doc insert-only bulkWrite";
 const MIXED_BULK_WRITE_BENCH: &str = "Mixed bulkWrite";
 
-#[derive(Copy, Clone, num_enum::TryFromPrimitive, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, num_enum::TryFromPrimitive, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(u8)]
 enum BenchmarkId {
     RunCommand = 1,
@@ -595,14 +595,14 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         None => HashSet::new(),
     };
 
-    if matches.contains_id("single") {
+    if matches.get_flag("single") {
         ids.insert(BenchmarkId::RunCommand);
         ids.insert(BenchmarkId::RunCommandColdStart);
         ids.insert(BenchmarkId::FindOneById);
         ids.insert(BenchmarkId::SmallDocInsertOne);
         ids.insert(BenchmarkId::LargeDocInsertOne);
     }
-    if matches.contains_id("multi") {
+    if matches.get_flag("multi") {
         ids.insert(BenchmarkId::FindManyRawBson);
         ids.insert(BenchmarkId::SmallDocInsertMany);
         ids.insert(BenchmarkId::LargeDocInsertMany);
@@ -612,14 +612,14 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         ids.insert(BenchmarkId::LargeDocInsertBulkWrite);
         ids.insert(BenchmarkId::MixedBulkWrite);
     }
-    if matches.contains_id("parallel") {
+    if matches.get_flag("parallel") {
         ids.insert(BenchmarkId::LdJsonMultiFileImport);
         ids.insert(BenchmarkId::LdJsonMultiFileExport);
         ids.insert(BenchmarkId::GridFsMultiDownload);
         // TODO RUST-2010 Re-enable this benchmark
         //ids.insert(BenchmarkId::GridFsMultiUpload);
     }
-    if matches.contains_id("bson") {
+    if matches.get_flag("bson") {
         ids.insert(BenchmarkId::BsonFlatDocumentDecode);
         ids.insert(BenchmarkId::BsonFlatDocumentEncode);
         ids.insert(BenchmarkId::BsonDeepDocumentDecode);
@@ -627,7 +627,7 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         ids.insert(BenchmarkId::BsonFullDocumentDecode);
         ids.insert(BenchmarkId::BsonFullDocumentEncode);
     }
-    if matches.contains_id("driver") {
+    if matches.get_flag("driver") {
         ids.insert(BenchmarkId::RunCommand);
         ids.insert(BenchmarkId::RunCommandColdStart);
         ids.insert(BenchmarkId::FindOneById);
@@ -686,36 +686,42 @@ async fn main() {
             Arg::new("single")
                 .short('s')
                 .long("single")
+                .action(ArgAction::SetTrue)
                 .help("Run single document benchmarks"),
         )
         .arg(
             Arg::new("multi")
                 .short('m')
                 .long("multi")
+                .action(ArgAction::SetTrue)
                 .help("Run multi document benchmarks"),
         )
         .arg(
             Arg::new("parallel")
                 .short('p')
                 .long("parallel")
+                .action(ArgAction::SetTrue)
                 .help("Run parallel document benchmarks"),
         )
         .arg(
             Arg::new("bson")
                 .short('b')
                 .long("bson")
+                .action(ArgAction::SetTrue)
                 .help("Run BSON-only benchmarks"),
         )
         .arg(
             Arg::new("driver")
                 .short('d')
                 .long("driver")
+                .action(ArgAction::SetTrue)
                 .help("Run driver-only benchmarks"),
         )
         .arg(
             Arg::new("verbose")
                 .short('v')
                 .long("verbose")
+                .action(ArgAction::SetTrue)
                 .help("Print test information verbosely"),
         )
         .arg(
