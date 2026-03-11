@@ -1,5 +1,4 @@
 use std::{
-    ops::Range,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -7,14 +6,15 @@ use std::{
 use futures_util::{
     future::{BoxFuture, FutureExt},
     io::AsyncRead,
+    stream::StreamExt,
 };
 
 use super::{Chunk, FilesCollectionDocument};
 use crate::{
     bson::doc,
-    error::{ErrorKind, GridFsErrorKind, Result},
+    error::{Error, ErrorKind, GridFsErrorKind, Result},
+    raw_batch_cursor::RawBatchCursor,
     Collection,
-    Cursor,
 };
 
 /// A stream from which a file stored in a GridFS bucket can be downloaded.
@@ -54,7 +54,6 @@ use crate::{
 /// ```
 pub struct GridFsDownloadStream {
     state: State,
-    current_n: u32,
     file: FilesCollectionDocument,
 }
 
@@ -70,7 +69,8 @@ enum State {
 
 struct Idle {
     buffer: Vec<u8>,
-    cursor: Box<Cursor<Chunk<'static>>>,
+    cursor: RawBatchCursor,
+    current_n: u32,
 }
 
 impl State {
@@ -94,15 +94,16 @@ impl GridFsDownloadStream {
             let cursor = chunks
                 .find(doc! { "files_id": &file.id })
                 .sort(doc! { "n": 1 })
+                .batch()
                 .await?;
             State::Idle(Some(Idle {
                 buffer: Vec::new(),
-                cursor: Box::new(cursor),
+                cursor,
+                current_n: 0,
             }))
         };
         Ok(Self {
             state: initial_state,
-            current_n: 0,
             file,
         })
     }
@@ -123,23 +124,12 @@ impl AsyncRead for GridFsDownloadStream {
                 if !idle.buffer.is_empty() {
                     Ok(idle)
                 } else {
-                    let chunks_in_buf = FilesCollectionDocument::n_from_vals(
-                        buf.len() as u64,
-                        stream.file.chunk_size_bytes,
-                    );
-                    // We should read from current_n to chunks_in_buf + current_n, or, if that would
-                    // exceed the total number of chunks in the file, to the last chunk in the file.
-                    let final_n = std::cmp::min(chunks_in_buf + stream.current_n, stream.file.n());
-                    let n_range = stream.current_n..final_n;
-
-                    stream.current_n = final_n;
-
                     let new_future = stream.state.set_busy(
                         get_bytes(
                             idle,
-                            n_range,
                             stream.file.chunk_size_bytes,
                             stream.file.length,
+                            buf.len(),
                         )
                         .boxed(),
                     );
@@ -164,11 +154,17 @@ impl AsyncRead for GridFsDownloadStream {
                 buf[..bytes_to_write]
                     .copy_from_slice(idle.buffer.drain(0..bytes_to_write).as_slice());
 
-                stream.state = if !idle.buffer.is_empty() || idle.cursor.has_next() {
-                    State::Idle(Some(idle))
+                if !idle.buffer.is_empty() || idle.cursor.has_next() {
+                    stream.state = State::Idle(Some(idle));
                 } else {
-                    State::Done
-                };
+                    stream.state = State::Done;
+                    if idle.current_n != stream.file.n() {
+                        return Poll::Ready(Err(Error::from(ErrorKind::GridFs(
+                            GridFsErrorKind::MissingChunk { n: idle.current_n },
+                        ))
+                        .into_futures_io_error()));
+                    }
+                }
 
                 Poll::Ready(Ok(bytes_to_write))
             }
@@ -182,34 +178,54 @@ impl AsyncRead for GridFsDownloadStream {
 
 async fn get_bytes(
     mut idle: Idle,
-    n_range: Range<u32>,
     chunk_size_bytes: u32,
     file_len: u64,
+    buf_size: usize,
 ) -> Result<Idle> {
-    for n in n_range {
-        if !idle.cursor.advance().await? {
-            return Err(ErrorKind::GridFs(GridFsErrorKind::MissingChunk { n }).into());
+    while idle.buffer.len() < buf_size {
+        let batch = match idle.cursor.next().await.transpose()? {
+            Some(batch) => batch,
+            None => return Ok(idle),
+        };
+
+        for doc in batch.doc_slices()? {
+            let doc = doc?;
+            let doc = match doc.as_document() {
+                Some(doc) => doc,
+                None => {
+                    return Err(Error::invalid_response(format!(
+                        "invalid cursor batch value, expected document, got {:?}",
+                        doc.element_type(),
+                    )))
+                }
+            };
+
+            let chunk: Chunk<'_> = crate::bson_compat::deserialize_from_slice(doc.as_bytes())?;
+            let chunk_bytes = chunk.data.bytes;
+
+            if chunk.n != idle.current_n {
+                return Err(
+                    ErrorKind::GridFs(GridFsErrorKind::MissingChunk { n: idle.current_n }).into(),
+                );
+            }
+
+            let expected_len = FilesCollectionDocument::expected_chunk_length_from_vals(
+                file_len,
+                chunk_size_bytes,
+                idle.current_n,
+            );
+            if chunk_bytes.len() != (expected_len as usize) {
+                return Err(ErrorKind::GridFs(GridFsErrorKind::WrongSizeChunk {
+                    actual_size: chunk_bytes.len(),
+                    expected_size: expected_len,
+                    n: idle.current_n,
+                })
+                .into());
+            }
+
+            idle.buffer.extend_from_slice(chunk_bytes);
+            idle.current_n += 1;
         }
-
-        let chunk = idle.cursor.deserialize_current()?;
-        let chunk_bytes = chunk.data.bytes;
-
-        if chunk.n != n {
-            return Err(ErrorKind::GridFs(GridFsErrorKind::MissingChunk { n }).into());
-        }
-
-        let expected_len =
-            FilesCollectionDocument::expected_chunk_length_from_vals(file_len, chunk_size_bytes, n);
-        if chunk_bytes.len() != (expected_len as usize) {
-            return Err(ErrorKind::GridFs(GridFsErrorKind::WrongSizeChunk {
-                actual_size: chunk_bytes.len(),
-                expected_size: expected_len,
-                n,
-            })
-            .into());
-        }
-
-        idle.buffer.extend_from_slice(chunk_bytes);
     }
 
     Ok(idle)
