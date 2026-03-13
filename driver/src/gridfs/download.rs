@@ -1,7 +1,7 @@
 use std::{
     ops::Range,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use futures_util::{
@@ -145,17 +145,10 @@ impl AsyncRead for GridFsDownloadStream {
                         .boxed(),
                     );
 
-                    match new_future.poll_unpin(cx) {
-                        Poll::Ready(result) => result,
-                        Poll::Pending => return Poll::Pending,
-                    }
+                    ready!(new_future.poll_unpin(cx))
                 }
             }
-
-            State::Busy(future) => match future.poll_unpin(cx) {
-                Poll::Ready(result) => result,
-                Poll::Pending => return Poll::Pending,
-            },
+            State::Busy(future) => ready!(future.poll_unpin(cx)),
             State::Done => return Poll::Ready(Ok(0)),
         };
 
