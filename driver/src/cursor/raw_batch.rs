@@ -41,7 +41,7 @@
 
 use std::{
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use crate::{
@@ -227,44 +227,40 @@ impl Stream for RawBatchCursor {
         loop {
             // If a getMore is in flight, poll it and update state.
             if let Some(future) = self.state.provider.executing_future() {
-                match Pin::new(future).poll(cx) {
-                    Poll::Pending => return Poll::Pending,
-                    Poll::Ready(get_more_out) => {
-                        match get_more_out.result {
-                            Ok(out) => {
-                                self.state.initial_reply = Some(out.raw_reply);
-                                self.state.post_batch_resume_token = out.post_batch_resume_token;
-                                if out.exhausted {
-                                    self.mark_exhausted();
-                                }
-                                if out.id != 0 {
-                                    self.info.id = out.id;
-                                }
-                                self.info.ns = out.ns;
-                            }
-                            Err(e) => {
-                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                                {
-                                    self.mark_exhausted();
-                                }
-                                if e.is_network_error() {
-                                    // Flag the connection as invalid, preventing a killCursors
-                                    // command, but leave the connection pinned.
-                                    self.state.pinned_connection.invalidate();
-                                }
-                                let exhausted_now = self.state.exhausted;
-                                self.state
-                                    .provider
-                                    .clear_execution(get_more_out.session, exhausted_now);
-                                return Poll::Ready(Some(Err(e)));
-                            }
+                let get_more_out = ready!(Pin::new(future).poll(cx));
+                match get_more_out.result {
+                    Ok(out) => {
+                        self.state.initial_reply = Some(out.raw_reply);
+                        self.state.post_batch_resume_token = out.post_batch_resume_token;
+                        if out.exhausted {
+                            self.mark_exhausted();
+                        }
+                        if out.id != 0 {
+                            self.info.id = out.id;
+                        }
+                        self.info.ns = out.ns;
+                    }
+                    Err(e) => {
+                        if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
+                        {
+                            self.mark_exhausted();
+                        }
+                        if e.is_network_error() {
+                            // Flag the connection as invalid, preventing a killCursors
+                            // command, but leave the connection pinned.
+                            self.state.pinned_connection.invalidate();
                         }
                         let exhausted_now = self.state.exhausted;
                         self.state
                             .provider
                             .clear_execution(get_more_out.session, exhausted_now);
+                        return Poll::Ready(Some(Err(e)));
                     }
                 }
+                let exhausted_now = self.state.exhausted;
+                self.state
+                    .provider
+                    .clear_execution(get_more_out.session, exhausted_now);
             }
 
             // Yield any buffered reply.
@@ -435,43 +431,39 @@ impl Stream for SessionRawBatchCursorStream<'_, '_> {
         loop {
             // If a getMore is in flight, poll it and update state.
             if let Some(future) = self.provider.executing_future() {
-                match Pin::new(future).poll(cx) {
-                    Poll::Pending => return Poll::Pending,
-                    Poll::Ready(get_more_out) => {
-                        match get_more_out.result {
-                            Ok(out) => {
-                                if out.exhausted {
-                                    self.parent.mark_exhausted();
-                                }
-                                if out.id != 0 {
-                                    self.parent.info.id = out.id;
-                                }
-                                self.parent.info.ns = out.ns;
-                                self.parent.post_batch_resume_token = out.post_batch_resume_token;
-                                // Buffer next reply to yield on following polls.
-                                self.parent.buffered_reply = Some(out.raw_reply);
-                            }
-                            Err(e) => {
-                                if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                                {
-                                    self.parent.mark_exhausted();
-                                }
-                                if e.is_network_error() {
-                                    // Flag the connection as invalid, preventing a killCursors
-                                    // command, but leave the connection pinned.
-                                    self.parent.pinned_connection.invalidate();
-                                }
-                                let exhausted_now = self.parent.exhausted;
-                                self.provider
-                                    .clear_execution(get_more_out.session, exhausted_now);
-                                return Poll::Ready(Some(Err(e)));
-                            }
+                let get_more_out = ready!(Pin::new(future).poll(cx));
+                match get_more_out.result {
+                    Ok(out) => {
+                        if out.exhausted {
+                            self.parent.mark_exhausted();
+                        }
+                        if out.id != 0 {
+                            self.parent.info.id = out.id;
+                        }
+                        self.parent.info.ns = out.ns;
+                        self.parent.post_batch_resume_token = out.post_batch_resume_token;
+                        // Buffer next reply to yield on following polls.
+                        self.parent.buffered_reply = Some(out.raw_reply);
+                    }
+                    Err(e) => {
+                        if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
+                        {
+                            self.parent.mark_exhausted();
+                        }
+                        if e.is_network_error() {
+                            // Flag the connection as invalid, preventing a killCursors
+                            // command, but leave the connection pinned.
+                            self.parent.pinned_connection.invalidate();
                         }
                         let exhausted_now = self.parent.exhausted;
                         self.provider
                             .clear_execution(get_more_out.session, exhausted_now);
+                        return Poll::Ready(Some(Err(e)));
                     }
                 }
+                let exhausted_now = self.parent.exhausted;
+                self.provider
+                    .clear_execution(get_more_out.session, exhausted_now);
             }
 
             // Yield any buffered reply.

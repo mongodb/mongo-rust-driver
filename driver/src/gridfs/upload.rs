@@ -1,7 +1,7 @@
 use std::{
     pin::Pin,
     sync::atomic::Ordering,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use futures_util::{
@@ -303,12 +303,7 @@ impl AsyncWrite for GridFsUploadStream {
             State::Closing(_) | State::Closed => return Poll::Ready(Err(get_closed_error())),
         };
 
-        let result = match future.poll_unpin(cx) {
-            Poll::Ready(result) => result,
-            Poll::Pending => return Poll::Pending,
-        };
-
-        match result {
+        match ready!(future.poll_unpin(cx)) {
             Ok((chunks_written, buffer)) => {
                 stream.current_n += chunks_written;
                 stream.state = State::Idle(Some(buffer));
@@ -364,11 +359,7 @@ impl AsyncWrite for GridFsUploadStream {
             State::Closed => return Poll::Ready(Err(get_closed_error())),
         };
 
-        let result = match future.poll_unpin(cx) {
-            Poll::Ready(result) => result,
-            Poll::Pending => return Poll::Pending,
-        };
-
+        let result = ready!(future.poll_unpin(cx));
         stream.state = State::Closed;
         match result {
             Ok(()) => Poll::Ready(Ok(())),

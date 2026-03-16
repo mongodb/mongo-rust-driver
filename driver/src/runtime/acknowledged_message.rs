@@ -72,9 +72,8 @@ impl<R> Future for AcknowledgmentReceiver<R> {
     type Output = Option<R>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        match Pin::new(&mut self.get_mut().receiver).poll(cx) {
-            Poll::Ready(r) => Poll::Ready(r.ok()),
-            Poll::Pending => Poll::Pending,
-        }
+        Pin::new(&mut self.get_mut().receiver)
+            .poll(cx)
+            .map(Result::ok)
     }
 }
