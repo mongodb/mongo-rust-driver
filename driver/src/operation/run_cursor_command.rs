@@ -2,6 +2,7 @@ use futures_util::FutureExt;
 
 use crate::{
     bson_compat::{cstr, CStr},
+    client::Retry,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     concern::WriteConcern,
     cursor::common::CursorSpecification,
@@ -77,8 +78,8 @@ impl Operation for RunCursorCommand<'_> {
         self.run_command.is_backpressure_retryable(options)
     }
 
-    fn update_for_retry(&mut self, overloaded: bool) {
-        self.run_command.update_for_retry(overloaded)
+    fn update_for_retry(&mut self, retry: Option<&Retry>) {
+        self.run_command.update_for_retry(retry)
     }
 
     fn override_criteria(&self) -> super::OverrideCriteriaFn {

@@ -35,7 +35,7 @@ use crate::{
     bson::{self, Bson, Document},
     bson_compat::CStr,
     bson_util::{self, extend_raw_document_buf},
-    client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
+    client::{ClusterTime, Retry, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     cmap::{
         conn::{pooled::PooledConnection, PinnedConnectionHandle},
         Command,
@@ -179,7 +179,7 @@ pub(crate) trait Operation {
     fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool;
 
     /// Updates this operation as needed for a retry.
-    fn update_for_retry(&mut self, overloaded: bool);
+    fn update_for_retry(&mut self, retry: Option<&Retry>);
 
     /// Returns a function handle to potentially override selection criteria based on server
     /// topology.
@@ -387,7 +387,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     }
 
     /// Updates this operation as needed for a retry.
-    fn update_for_retry(&mut self, _overloaded: bool) {}
+    fn update_for_retry(&mut self, _retry: Option<&Retry>) {}
 
     /// Returns a function handle to potentially override selection criteria based on server
     /// topology.
@@ -451,8 +451,8 @@ where
     fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
         self.is_backpressure_retryable(options)
     }
-    fn update_for_retry(&mut self, overloaded: bool) {
-        self.update_for_retry(overloaded)
+    fn update_for_retry(&mut self, retry: Option<&Retry>) {
+        self.update_for_retry(retry)
     }
     fn override_criteria(&self) -> OverrideCriteriaFn {
         self.override_criteria()

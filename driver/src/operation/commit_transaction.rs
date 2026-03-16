@@ -1,13 +1,14 @@
 use std::time::Duration;
 
-use crate::{bson::rawdoc, options::ClientOptions, Client};
-
 use crate::{
+    bson::rawdoc,
     bson_compat::{cstr, CStr},
+    client::Retry,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options_to_raw_document, OperationWithDefaults, Retryability},
-    options::{Acknowledgment, TransactionOptions, WriteConcern},
+    options::{Acknowledgment, ClientOptions, TransactionOptions, WriteConcern},
+    Client,
 };
 
 use super::{ExecutionContext, WriteConcernOnlyBody};
@@ -65,8 +66,8 @@ impl OperationWithDefaults for CommitTransaction {
     // Updates the write concern to use w: majority and a w_timeout of 10000 if w_timeout is not
     // already set. The write concern on a commitTransaction command should be updated if a
     // commit is being retried internally or by the user.
-    fn update_for_retry(&mut self, overloaded: bool) {
-        if !overloaded {
+    fn update_for_retry(&mut self, retry: Option<&Retry>) {
+        if !retry.map(|retry| retry.overloaded).unwrap_or(false) {
             let options = self.options.get_or_insert_default();
             match &mut options.write_concern {
                 Some(write_concern) => {

@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Document, RawDocument},
+    client::Retry,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, Result},
     operation::{aggregate::Aggregate, Operation},
@@ -135,8 +136,8 @@ impl Operation for CountDocuments {
         self.aggregate.supports_sessions()
     }
 
-    fn update_for_retry(&mut self, overloaded: bool) {
-        self.aggregate.update_for_retry(overloaded);
+    fn update_for_retry(&mut self, retry: Option<&Retry>) {
+        self.aggregate.update_for_retry(retry);
     }
 
     fn override_criteria(&self) -> super::OverrideCriteriaFn {

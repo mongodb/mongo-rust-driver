@@ -2,6 +2,7 @@ use futures_util::FutureExt;
 
 use crate::{
     bson_compat::CStr,
+    client::Retry,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     options::{ClientOptions, SelectionCriteria},
@@ -67,8 +68,8 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         self.0.is_backpressure_retryable(options)
     }
 
-    fn update_for_retry(&mut self, overloaded: bool) {
-        self.0.update_for_retry(overloaded)
+    fn update_for_retry(&mut self, retry: Option<&Retry>) {
+        self.0.update_for_retry(retry)
     }
 
     fn override_criteria(&self) -> super::OverrideCriteriaFn {

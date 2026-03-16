@@ -462,7 +462,7 @@ impl<'a> Action for CommitTransaction<'a> {
                     &self.session.client(),
                     self.session.transaction.options.clone(),
                 );
-                commit_transaction.update_for_retry(false);
+                commit_transaction.update_for_retry(None);
                 self.session
                     .client
                     .clone()

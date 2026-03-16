@@ -4,6 +4,7 @@ use crate::{
         common::{ChangeStreamData, WatchArgs},
         event::ResumeToken,
     },
+    client::Retry,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
@@ -164,8 +165,8 @@ impl Operation for ChangeStreamAggregate {
         self.inner.supports_sessions()
     }
 
-    fn update_for_retry(&mut self, overloaded: bool) {
-        self.inner.update_for_retry(overloaded);
+    fn update_for_retry(&mut self, retry: Option<&Retry>) {
+        self.inner.update_for_retry(retry);
     }
 
     fn override_criteria(&self) -> crate::operation::OverrideCriteriaFn {

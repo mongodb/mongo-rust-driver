@@ -57,7 +57,7 @@ use crate::{
     TopologyType,
 };
 
-pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
+pub(crate) use executor::{retry::Retry, HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
 pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 
 use session::{ServerSession, ServerSessionPool};

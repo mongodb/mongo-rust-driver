@@ -1,31 +1,20 @@
-mod retry;
+pub(super) mod retry;
+
+use std::{
+    borrow::{BorrowMut, Cow},
+    collections::HashSet,
+    sync::{atomic::Ordering, Arc, LazyLock},
+    time::Instant,
+};
+
+#[cfg(feature = "in-use-encryption")]
+use futures_core::future::BoxFuture;
+use serde::de::DeserializeOwned;
 
 #[cfg(feature = "in-use-encryption")]
 use crate::bson::RawDocumentBuf;
 use crate::{
-    bson::{doc, RawBsonRef, RawDocument, Timestamp},
-    cursor::{
-        common::{CursorInformation, CursorSpecification},
-        NewCursor,
-    },
-    error::SYSTEM_OVERLOADED_ERROR,
-    operation::{is_commit_or_abort, Feature, OperationTarget},
-};
-#[cfg(feature = "in-use-encryption")]
-use futures_core::future::BoxFuture;
-use serde::de::DeserializeOwned;
-use std::{borrow::Cow, sync::LazyLock};
-
-use std::{
-    borrow::BorrowMut,
-    collections::HashSet,
-    sync::{atomic::Ordering, Arc},
-    time::Instant,
-};
-
-use super::{session::TransactionState, Client, ClientSession};
-use crate::{
-    bson::Document,
+    bson::{doc, Document, RawBsonRef, RawDocument, Timestamp},
     change_stream::{
         common::{ChangeStreamData, WatchArgs},
         event::ChangeStreamEvent,
@@ -42,12 +31,18 @@ use crate::{
         RawCommandResponse,
         StreamDescription,
     },
-    cursor::{session::SessionCursor, Cursor},
+    cursor::{
+        common::{CursorInformation, CursorSpecification},
+        session::SessionCursor,
+        Cursor,
+        NewCursor,
+    },
     error::{
         Error,
         ErrorKind,
         Result,
         RETRYABLE_WRITE_ERROR,
+        SYSTEM_OVERLOADED_ERROR,
         TRANSIENT_TRANSACTION_ERROR,
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
@@ -60,11 +55,14 @@ use crate::{
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
         aggregate::change_stream::ChangeStreamAggregate,
+        is_commit_or_abort,
         AbortTransaction,
         CommandErrorBody,
         CommitTransaction,
         ExecutionContext,
+        Feature,
         Operation,
+        OperationTarget,
         Retryability,
     },
     options::{ChangeStreamOptions, SelectionCriteria},
@@ -73,6 +71,9 @@ use crate::{
     tracking_arc::TrackingArc,
     ClusterTime,
 };
+
+use super::{session::TransactionState, Client, ClientSession};
+use retry::Retry;
 
 pub(crate) static REDACTED_COMMANDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     let mut hash_set = HashSet::new();
@@ -423,7 +424,7 @@ impl Client {
         selection_criteria: Option<SelectionCriteria>,
         session: &mut ExecutionSession<'_>,
     ) -> Result<ExecutionDetails<T>> {
-        let mut retry: Option<retry::Retry> = None;
+        let mut retry: Option<Retry> = None;
         loop {
             match retry {
                 Some(retry) if retry.max_retries_reached() => {
@@ -433,7 +434,7 @@ impl Client {
                     return Err(retry.last_error);
                 }
                 Some(ref retry) => {
-                    op.update_for_retry(retry.overloaded);
+                    op.update_for_retry(Some(&retry));
                     if retry.overloaded {
                         let backoff = retry.calculate_backoff(
                             #[cfg(test)]
@@ -481,7 +482,7 @@ impl Client {
                             session.as_ref_mut_option(),
                             None,
                         );
-                        retry = Some(retry::handle_connection_establishment_failure(
+                        retry = Some(Retry::for_connection_establishment_failure(
                             retry,
                             error,
                             op,
@@ -572,7 +573,7 @@ impl Client {
                     let server_address = server.address.clone();
                     drop(server);
 
-                    retry = Some(retry::handle_execution_failure(
+                    retry = Some(Retry::for_execution_failure(
                         retry,
                         error,
                         op,
