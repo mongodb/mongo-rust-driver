@@ -402,7 +402,7 @@ async fn error_propagation_no_errors_with_no_writes_performed() {
     }
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
-    let client = Client::for_test().await;
+    let fp_client = Client::for_test().await;
     let guard = Arc::new(Mutex::new(None));
     let guard_clone = guard.clone();
     spawn(async move {
@@ -416,7 +416,7 @@ async fn error_propagation_no_errors_with_no_writes_performed() {
                         .error_labels(vec![RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR])
                         .error_code(10107);
                     let mut guard = guard_clone.lock().await;
-                    *guard = Some(client.enable_fail_point(fail_point).await.unwrap());
+                    *guard = Some(fp_client.enable_fail_point(fail_point).await.unwrap());
                     ack.acknowledge(());
                     break;
                 }
@@ -430,14 +430,14 @@ async fn error_propagation_no_errors_with_no_writes_performed() {
     let mut options = get_client_options().await.clone();
     options.test_options_mut().async_event_listener = Some(tx);
     options.server_monitoring_mode = Some(crate::options::ServerMonitoringMode::Poll);
-    let client2 = Client::for_test().options(options).monitor_events().await;
+    let client = Client::for_test().options(options).await;
 
     let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
         .error_labels(vec![RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR])
         .error_code(91);
-    let _guard = client2.enable_fail_point(fail_point).await.unwrap();
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-    let error = client2
+    let error = client
         .database("db")
         .collection("error_propagation_after_multiple_errors")
         .insert_one(doc! { "x": 1 })
@@ -446,7 +446,7 @@ async fn error_propagation_no_errors_with_no_writes_performed() {
     assert_eq!(error.code(), Some(10107));
 }
 
-// retryable writes prose test #6, case #2
+/// retryable writes prose test #6, case #2
 #[tokio::test(flavor = "multi_thread")]
 async fn error_propagation_all_errors_with_no_writes_performed() {
     if !topology_is_replica_set().await || server_version_lt(6, 0).await {
@@ -457,7 +457,7 @@ async fn error_propagation_all_errors_with_no_writes_performed() {
     }
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
-    let client = Client::for_test().await;
+    let fp_client = Client::for_test().await;
     let guard = Arc::new(Mutex::new(None));
     let guard_clone = guard.clone();
     spawn(async move {
@@ -475,7 +475,7 @@ async fn error_propagation_all_errors_with_no_writes_performed() {
                         ])
                         .error_code(10107);
                     let mut guard = guard_clone.lock().await;
-                    *guard = Some(client.enable_fail_point(fail_point).await.unwrap());
+                    *guard = Some(fp_client.enable_fail_point(fail_point).await.unwrap());
                     ack.acknowledge(());
                     break;
                 }
@@ -509,7 +509,7 @@ async fn error_propagation_all_errors_with_no_writes_performed() {
     assert_eq!(error.code(), Some(10107));
 }
 
-// retryable writes prose test #6, case #3
+/// retryable writes prose test #6, case #3
 #[tokio::test(flavor = "multi_thread")]
 async fn error_propagation_some_errors_with_no_writes_performed() {
     if !topology_is_replica_set().await || server_version_lt(6, 0).await {
@@ -520,7 +520,7 @@ async fn error_propagation_some_errors_with_no_writes_performed() {
     }
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
-    let client = Client::for_test().await;
+    let fp_client = Client::for_test().await;
     let guard = Arc::new(Mutex::new(None));
     let guard_clone = guard.clone();
     spawn(async move {
@@ -538,7 +538,7 @@ async fn error_propagation_some_errors_with_no_writes_performed() {
                         ])
                         .error_code(91);
                     let mut guard = guard_clone.lock().await;
-                    *guard = Some(client.enable_fail_point(fail_point).await.unwrap());
+                    *guard = Some(fp_client.enable_fail_point(fail_point).await.unwrap());
                     ack.acknowledge(());
                     break;
                 }
