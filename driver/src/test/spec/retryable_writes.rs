@@ -446,6 +446,7 @@ async fn error_propagation_no_errors_with_no_writes_performed() {
     assert_eq!(error.code(), Some(10107));
 }
 
+// retryable writes prose test #6, case #2
 #[tokio::test(flavor = "multi_thread")]
 async fn error_propagation_all_errors_with_no_writes_performed() {
     if !topology_is_replica_set().await || server_version_lt(6, 0).await {
@@ -508,6 +509,7 @@ async fn error_propagation_all_errors_with_no_writes_performed() {
     assert_eq!(error.code(), Some(10107));
 }
 
+// retryable writes prose test #6, case #3
 #[tokio::test(flavor = "multi_thread")]
 async fn error_propagation_some_errors_with_no_writes_performed() {
     if !topology_is_replica_set().await || server_version_lt(6, 0).await {
