@@ -45,7 +45,7 @@ Drivers should test that retries do not occur immediately when a SystemOverloade
            const end = performance.now();
         ```
 
-    4. Configure the random number generator used for jitter to always return `1`.
+    4. Configure the random number generator used for jitter to always return a number as close as possible to `1`.
 
     5. Execute step 3 again.
 

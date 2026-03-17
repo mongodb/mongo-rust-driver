@@ -41,7 +41,7 @@ initialData:
       - { _id: 2, x: 22 }
 
 tests: {% for operation in operations %}
-  - description: '{{operation.object}}.{{operation.operation_name}} retries at most maxAttempts=5 times'
+  - description: '{{operation.object}}.{{operation.operation_name}}{{ " " + operation.operation_type + "" if operation.operation_name == "aggregate" else "" }} retries at most maxAttempts=5 times'
     {%- if ((operation.operation_name == 'clientBulkWrite')) %}
     runOnRequirements:
       - minServerVersion: '8.0' # client bulk write added to server in 8.0
