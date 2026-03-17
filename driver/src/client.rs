@@ -7,6 +7,7 @@ pub mod options;
 pub mod session;
 
 use std::{
+    collections::HashSet,
     sync::{
         atomic::{AtomicBool, Ordering},
         Mutex as SyncMutex,
@@ -19,6 +20,7 @@ pub use self::csfle::client_builder::*;
 use derive_where::derive_where;
 use futures_core::Future;
 use futures_util::FutureExt;
+use tokio::sync::Mutex;
 
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
@@ -52,9 +54,10 @@ use crate::{
     tracking_arc::TrackingArc,
     BoxFuture,
     ClientSession,
+    TopologyType,
 };
 
-pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
+pub(crate) use executor::{retry::Retry, HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
 pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 
 use session::{ServerSession, ServerSessionPool};
@@ -141,6 +144,7 @@ struct ClientInner {
     shutdown: Shutdown,
     dropped: AtomicBool,
     end_sessions_token: std::sync::Mutex<AsyncDropToken>,
+    token_bucket: Option<Mutex<u16>>,
     #[cfg(feature = "in-use-encryption")]
     csfle: tokio::sync::RwLock<Option<csfle::ClientState>>,
     #[cfg(feature = "opentelemetry")]
@@ -186,6 +190,11 @@ impl Client {
         #[cfg(feature = "opentelemetry")]
         let tracer = options.tracer();
 
+        let token_bucket = options
+            .adaptive_retries
+            .unwrap_or(false)
+            .then(|| Mutex::new(MAX_BUCKET_CAPACITY));
+
         let inner = TrackingArc::new(ClientInner {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
@@ -196,6 +205,7 @@ impl Client {
             },
             dropped: AtomicBool::new(false),
             end_sessions_token,
+            token_bucket,
             #[cfg(feature = "in-use-encryption")]
             csfle: Default::default(),
             #[cfg(feature = "opentelemetry")]
@@ -471,7 +481,7 @@ impl Client {
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
         let (server, _) = self
-            .select_server(criteria, &[], OpSelectionInfo::new("Test select server"))
+            .select_server(criteria, None, OpSelectionInfo::new("Test select server"))
             .await?;
         Ok(server.address.clone())
     }
@@ -481,7 +491,7 @@ impl Client {
     async fn select_server(
         &self,
         criteria: Option<&SelectionCriteria>,
-        deprioritized: &[&ServerAddress],
+        deprioritized: Option<&HashSet<ServerAddress>>,
         op_info: OpSelectionInfo<'_>,
     ) -> Result<(SelectedServer, SelectionCriteria)> {
         let criteria =
@@ -595,6 +605,10 @@ impl Client {
         self.inner.topology.latest().description.clone()
     }
 
+    pub(crate) fn is_sharded(&self) -> bool {
+        self.inner.topology.latest().description.topology_type == TopologyType::Sharded
+    }
+
     #[cfg(test)]
     pub(crate) fn topology(&self) -> &Topology {
         &self.inner.topology
@@ -659,7 +673,7 @@ impl Client {
                 &selection_criteria,
                 &state.description,
                 &state.servers(),
-                &[],
+                None,
             ) else {
                 // If a suitable server is not available, do not proceed with the operation to avoid
                 // spinning for server_selection_timeout.
@@ -758,5 +772,59 @@ impl<'a> OpSelectionInfo<'a> {
             name,
             override_criteria: |_, _| None,
         }
+    }
+}
+
+/// Retry token bucket functionality. Note that the values used are scaled by a factor of 10 from
+/// those defined in the spec to allow for the use of integers.
+const MAX_BUCKET_CAPACITY: u16 = 10_000;
+const RETRY_TOKEN_RETURN_RATE: u16 = 1;
+const RETRY_TOKEN_CONSUME_RATE: u16 = 10;
+impl Client {
+    pub(crate) async fn consume_from_token_bucket(&self) -> bool {
+        let Some(ref bucket) = self.inner.token_bucket else {
+            return true;
+        };
+        let mut tokens = bucket.lock().await;
+        if *tokens >= RETRY_TOKEN_CONSUME_RATE {
+            *tokens -= RETRY_TOKEN_CONSUME_RATE;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub(crate) async fn deposit_success_in_token_bucket(&self, is_retry: bool) {
+        let Some(ref bucket) = self.inner.token_bucket else {
+            return;
+        };
+        let mut deposit = RETRY_TOKEN_RETURN_RATE;
+        if is_retry {
+            deposit += 10;
+        }
+        let mut tokens = bucket.lock().await;
+        *tokens = std::cmp::min(*tokens + deposit, MAX_BUCKET_CAPACITY);
+    }
+
+    pub(crate) async fn deposit_retry_error_in_token_bucket(&self) {
+        let Some(ref bucket) = self.inner.token_bucket else {
+            return;
+        };
+        let mut tokens = bucket.lock().await;
+        *tokens = std::cmp::min(*tokens + RETRY_TOKEN_RETURN_RATE, MAX_BUCKET_CAPACITY);
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn get_num_tokens_in_bucket(&self) -> Option<u16> {
+        let bucket = self.inner.token_bucket.as_ref()?;
+        Some(*bucket.lock().await)
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn set_num_tokens_in_bucket(&self, tokens: u16) {
+        let Some(ref bucket) = self.inner.token_bucket else {
+            return;
+        };
+        *bucket.lock().await = tokens;
     }
 }

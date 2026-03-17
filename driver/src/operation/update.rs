@@ -9,7 +9,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{convert_insert_many_error, Result},
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
-    options::{UpdateModifications, UpdateOptions, WriteConcern},
+    options::{ClientOptions, UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
     Collection,
 };
@@ -197,12 +197,16 @@ impl OperationWithDefaults for Update {
             .into()
     }
 
-    fn retryability(&self) -> Retryability {
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
         if self.multi != Some(true) {
-            Retryability::Write
+            Retryability::write(options)
         } else {
             Retryability::None
         }
+    }
+
+    fn is_backpressure_retryable(&self, options: &crate::options::ClientOptions) -> bool {
+        options.retry_writes != Some(false)
     }
 
     fn target(&self) -> super::OperationTarget {

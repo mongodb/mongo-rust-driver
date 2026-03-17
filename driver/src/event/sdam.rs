@@ -38,17 +38,6 @@ pub struct ServerDescriptionChangedEvent {
     pub new_description: ServerDescription,
 }
 
-impl ServerDescriptionChangedEvent {
-    #[cfg(test)]
-    pub(crate) fn is_marked_unknown_event(&self) -> bool {
-        self.previous_description
-            .description
-            .server_type
-            .is_available()
-            && self.new_description.description.server_type == crate::ServerType::Unknown
-    }
-}
-
 /// Published when a server is initialized.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]

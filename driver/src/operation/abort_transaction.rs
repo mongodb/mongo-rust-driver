@@ -1,11 +1,11 @@
 use crate::{
     bson::rawdoc,
     bson_compat::{cstr, CStr},
-    client::session::TransactionPin,
+    client::{session::TransactionPin, Retry},
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::Retryability,
-    options::{SelectionCriteria, WriteConcern},
+    options::{ClientOptions, SelectionCriteria, WriteConcern},
     Client,
 };
 
@@ -71,11 +71,12 @@ impl OperationWithDefaults for AbortTransaction {
         self.write_concern.as_ref().into()
     }
 
-    fn retryability(&self) -> Retryability {
+    fn retryability(&self, _options: &ClientOptions) -> Retryability {
+        // abortTransaction is retryable regardless of the value of retryWrites
         Retryability::Write
     }
 
-    fn update_for_retry(&mut self) {
+    fn update_for_retry(&mut self, _retry: Option<&Retry>) {
         // The session must be "unpinned" before server selection for a retry.
         self.pinned = None;
     }

@@ -4,10 +4,11 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Document, RawDocument},
+    client::Retry,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, Result},
     operation::{aggregate::Aggregate, Operation},
-    options::{AggregateOptions, CountOptions, SelectionCriteria},
+    options::{AggregateOptions, ClientOptions, CountOptions, SelectionCriteria},
 };
 
 use super::{ExecutionContext, Retryability, SingleCursorResult};
@@ -107,8 +108,12 @@ impl Operation for CountDocuments {
         self.aggregate.selection_criteria()
     }
 
-    fn retryability(&self) -> Retryability {
-        Retryability::Read
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        Retryability::read(options)
+    }
+
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        options.retry_reads != Some(false)
     }
 
     fn target(&self) -> super::OperationTarget {
@@ -131,8 +136,8 @@ impl Operation for CountDocuments {
         self.aggregate.supports_sessions()
     }
 
-    fn update_for_retry(&mut self) {
-        self.aggregate.update_for_retry();
+    fn update_for_retry(&mut self, retry: Option<&Retry>) {
+        self.aggregate.update_for_retry(retry);
     }
 
     fn override_criteria(&self) -> super::OverrideCriteriaFn {

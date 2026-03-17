@@ -13,7 +13,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, InsertManyError, Result},
     operation::{OperationWithDefaults, Retryability, WriteResponseBody},
-    options::{InsertManyOptions, WriteConcern},
+    options::{ClientOptions, InsertManyOptions, WriteConcern},
     results::InsertManyResult,
     Collection,
 };
@@ -174,8 +174,8 @@ impl OperationWithDefaults for Insert<'_> {
         self.options.write_concern.as_ref().into()
     }
 
-    fn retryability(&self) -> Retryability {
-        Retryability::Write
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        Retryability::write(options)
     }
 
     fn target(&self) -> super::OperationTarget {

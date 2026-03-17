@@ -1,4 +1,8 @@
-use crate::{bson::rawdoc, options::SelectionCriteria, Collection};
+use crate::{
+    bson::rawdoc,
+    options::{ClientOptions, SelectionCriteria},
+    Collection,
+};
 use serde::Deserialize;
 
 use crate::{
@@ -72,8 +76,8 @@ impl OperationWithDefaults for Count {
             .into()
     }
 
-    fn retryability(&self) -> Retryability {
-        Retryability::Read
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        Retryability::read(options)
     }
 
     fn target(&self) -> super::OperationTarget {

@@ -104,6 +104,10 @@ impl OperationWithDefaults for GetMore<'_> {
         })
     }
 
+    fn is_backpressure_retryable(&self, options: &crate::options::ClientOptions) -> bool {
+        options.retry_reads != Some(false)
+    }
+
     fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
         super::Feature::Set(&self.selection_criteria)
     }

@@ -10,6 +10,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     bson_util::{self, RawDocumentCollection},
     checked::Checked,
+    client::session::TransactionState,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::{common::CursorSpecification, NewCursor},
     error::{BulkWriteError, Error, ErrorKind, Result},
@@ -19,7 +20,7 @@ use crate::{
         OperationWithDefaults,
         MAX_ENCRYPTED_WRITE_SIZE,
     },
-    options::{BulkWriteOptions, OperationType, WriteModel},
+    options::{BulkWriteOptions, ClientOptions, OperationType, WriteModel},
     results::{BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult},
     BoxFuture,
     Client,
@@ -118,7 +119,7 @@ where
             let txn_number = context
                 .session
                 .as_mut()
-                .and_then(|s| s.get_txn_number_for_operation(get_more.retryability()));
+                .and_then(|s| s.get_txn_number_for_operation(Retryability::None));
             let get_more_result = self
                 .client
                 .execute_operation_on_connection(
@@ -432,6 +433,14 @@ where
                 self.options.and_then(|options| options.comment.clone()),
             )?;
 
+            // The transaction state needs to be transitioned here to avoid adding
+            // startTransaction:true to getMore commands.
+            if let Some(ref mut session) = context.session {
+                if session.transaction.state == TransactionState::Starting {
+                    session.transaction.state = TransactionState::InProgress;
+                }
+            }
+
             let iteration_result = if self.client.is_load_balanced() {
                 // Using a cursor with a pinned connection is not feasible here; see RUST-2131 for
                 // more details.
@@ -492,12 +501,16 @@ where
         .boxed()
     }
 
-    fn retryability(&self) -> Retryability {
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
         if self.models.iter().any(|model| model.multi() == Some(true)) {
             Retryability::None
         } else {
-            Retryability::Write
+            Retryability::write(options)
         }
+    }
+
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        options.retry_writes != Some(false)
     }
 
     fn write_concern(&self) -> super::Feature<&crate::options::WriteConcern> {

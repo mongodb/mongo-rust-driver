@@ -3,42 +3,41 @@ use std::{
     collections::HashMap,
     future::IntoFuture,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
-use crate::bson::Document;
+use crate::{
+    bson::Document,
+    error::{RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
+    test::spec::unified_runner::run_unified_tests,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{doc, Bson},
-    error::{CommandError, Error, ErrorKind},
-    event::{cmap::CmapEvent, sdam::SdamEvent},
+    error::{CommandError, Error, ErrorKind, RETRYABLE_WRITE_ERROR},
+    event::cmap::CmapEvent,
     hello::LEGACY_HELLO_COMMAND_NAME,
-    options::{AuthMechanism, Credential, ServerAddress},
+    options::{AuthMechanism, Credential, ServerAddress, ServerMonitoringMode},
     runtime,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{
         auth_enabled,
         get_client_options,
         log_uncaptured,
+        server_version_lt,
         topology_is_replica_set,
         topology_is_sharded,
         topology_is_standalone,
         transactions_supported,
         util::{
-            event_buffer::{EventBuffer, EventStream},
+            event_buffer::EventStream,
             fail_point::{FailPoint, FailPointMode},
         },
         Event,
         SERVER_API,
     },
     Client,
-    ServerType,
-};
-
-use super::{
-    fail_command_appname_initial_handshake_supported,
-    streaming_monitor_protocol_supported,
 };
 
 #[derive(Debug, Deserialize)]
@@ -619,132 +618,69 @@ async fn x509_auth_skip_ci() {
         .unwrap();
 }
 
-/// Test verifies that retrying a commitTransaction operation after a checkOut
-/// failure works.
+/// Test that commitTransaction succeeds on retry after a checkout failure.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_commit_txn_check_out() {
-    if !topology_is_replica_set().await {
-        log_uncaptured("skipping retry_commit_txn_check_out due to non-replicaset topology");
-        return;
-    }
-    if !transactions_supported().await {
-        log_uncaptured("skipping retry_commit_txn_check_out due to lack of transaction support");
-        return;
-    }
-    if !fail_command_appname_initial_handshake_supported().await {
-        log_uncaptured(
-            "skipping retry_commit_txn_check_out due to insufficient failCommand support",
-        );
-        return;
-    }
-    if streaming_monitor_protocol_supported().await {
-        log_uncaptured("skipping retry_commit_txn_check_out due to streaming protocol support");
+    if !topology_is_replica_set().await || server_version_lt(4, 4).await {
+        log_uncaptured("skipping retry_commit_txn_check_out: requires 4.4+ replica set");
         return;
     }
 
-    let setup_client = Client::for_test().await;
-
-    // ensure namespace exists
-    setup_client
-        .database("retry_commit_txn_check_out")
-        .collection("retry_commit_txn_check_out")
-        .insert_one(doc! {})
-        .await
-        .unwrap();
+    let name = "retry_commit_txn_check_out";
+    let max_idle_time = Duration::from_millis(500);
 
     let mut options = get_client_options().await.clone();
-    let buffer = EventBuffer::new();
-    options.cmap_event_handler = Some(buffer.handler());
-    options.sdam_event_handler = Some(buffer.handler());
-    options.heartbeat_freq = Some(Duration::from_secs(120));
-    options.app_name = Some("retry_commit_txn_check_out".to_string());
-    let client = Client::with_options(options).unwrap();
+    options.server_monitoring_mode = Some(ServerMonitoringMode::Poll);
+    options.app_name = Some(name.to_string());
+    options.max_pool_size = Some(1);
+    options.max_idle_time = Some(max_idle_time);
+    // use a very high heartbeat frequency to ensure that the monitors do not encounter the hello
+    // failpoint
+    options.heartbeat_freq = Some(Duration::from_hours(1));
+    let client = Client::for_test().options(options).monitor_events().await;
+    let events = &client.events;
 
     let mut session = client.start_session().await.unwrap();
     session.start_transaction().await.unwrap();
-    // transition transaction to "in progress" so that the commit
-    // actually executes an operation.
+    // transition transaction to "in progress" so that the commit actually executes an operation
     client
-        .database("retry_commit_txn_check_out")
-        .collection("retry_commit_txn_check_out")
+        .database(name)
+        .collection(name)
         .insert_one(doc! {})
         .session(&mut session)
         .await
         .unwrap();
 
-    // Enable a fail point that clears the connection pools so that commitTransaction will create a
-    // new connection during checkout.
-    let fail_point = FailPoint::fail_command(&["ping"], FailPointMode::Times(1)).error_code(11600);
-    let _guard = setup_client.enable_fail_point(fail_point).await.unwrap();
-
-    let mut event_stream = buffer.stream();
-    client
-        .database("foo")
-        .run_command(doc! { "ping": 1 })
-        .await
-        .unwrap_err();
-
-    // failing with a state change error will request an immediate check
-    // wait for the mark unknown and subsequent succeeded heartbeat
-    let mut primary = None;
-    event_stream
-        .next_match(Duration::from_secs(1), |e| {
-            if let Event::Sdam(SdamEvent::ServerDescriptionChanged(event)) = e {
-                if event.is_marked_unknown_event() {
-                    primary = Some(event.address.clone());
-                    return true;
-                }
-            }
-            false
-        })
-        .await
-        .expect("should see marked unknown event");
-
-    // If this test were run when using the streaming protocol, this assertion would never succeed.
-    // This is because the monitors are waiting for the next heartbeat from the server for
-    // heartbeatFrequencyMS (which is 2 minutes) and ignore the immediate check requests from the
-    // ping command in the meantime due to already being in the middle of their checks.
-    event_stream
-        .next_match(Duration::from_secs(1), |e| {
-            if let Event::Sdam(SdamEvent::ServerDescriptionChanged(event)) = e {
-                if &event.address == primary.as_ref().unwrap()
-                    && event.previous_description.server_type() == ServerType::Unknown
-                {
-                    return true;
-                }
-            }
-            false
-        })
-        .await
-        .expect("should see mark available event");
-
+    let mut stream = events.stream();
     let fail_point = FailPoint::fail_command(
         &[LEGACY_HELLO_COMMAND_NAME, "hello"],
         FailPointMode::Times(1),
     )
+    // encountering this error code will cause an immediate check on the monitor to recover the server
     .error_code(11600)
-    .app_name("retry_commit_txn_check_out");
-    let _guard2 = setup_client.enable_fail_point(fail_point).await.unwrap();
+    .error_labels(vec![RETRYABLE_WRITE_ERROR])
+    .app_name(name);
+    let _hello_guard = client.enable_fail_point(fail_point).await.unwrap();
+    stream
+        .next_match(Duration::from_millis(500), |e| {
+            matches!(e, Event::Cmap(CmapEvent::ConnectionCheckedIn(..)))
+        })
+        .await
+        .unwrap();
 
-    // finally, attempt the commit.
-    // this should succeed due to retry
+    // sleep for max idle time so that the connection used to set the failpoint becomes stale: this
+    // will require commitTransaction to establish a new connection
+    tokio::time::sleep(max_idle_time).await;
+
+    // assert that checkout fails and commitTransaction succeeds after a retry
+    let mut stream = events.stream();
     session.commit_transaction().await.unwrap();
-
-    // ensure the first check out attempt fails
-    event_stream
-        .next_match(Duration::from_secs(1), |e| {
-            matches!(e, Event::Cmap(CmapEvent::ConnectionCheckoutFailed(_)))
+    stream
+        .next_match(Duration::from_millis(500), |e| {
+            matches!(e, Event::Cmap(CmapEvent::ConnectionCheckoutFailed(..)))
         })
         .await
-        .expect("should see check out failed event");
-
-    // ensure the second one succeeds
-    event_stream
-        .next_match(Duration::from_secs(1), |e| {
-            matches!(e, Event::Cmap(CmapEvent::ConnectionCheckedOut(_)))
-        })
-        .await
-        .expect("should see checked out event");
+        .unwrap();
 }
 
 /// Verifies that `Client::shutdown` succeeds.
@@ -1138,4 +1074,127 @@ async fn socks5_proxy_skip_ci() {
         .unwrap();
     let (started, _) = client.events.get_successful_command_execution("ping");
     assert_eq!(&started.connection.address.to_string(), mapped_host);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn backpressure_run_unified() {
+    run_unified_tests(&["client-backpressure"]).await;
+}
+
+// backpressure prose test #1
+#[tokio::test(flavor = "multi_thread")]
+async fn operation_retry_uses_exponential_backoff() {
+    if server_version_lt(4, 4).await {
+        log_uncaptured("skipping operation_retry_uses_exponential_backoff: requires 4.4+");
+        return;
+    }
+
+    let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
+    options.test_options_mut().jitter = Some(0f64);
+    let client = Client::for_test().options(options).await;
+    let coll = client.database("db").collection("coll");
+
+    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::AlwaysOn)
+        .error_code(2)
+        .error_labels(vec![SYSTEM_OVERLOADED_ERROR, RETRYABLE_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let start = Instant::now();
+    coll.insert_one(doc! { "a": 1 }).await.unwrap_err();
+    let duration_no_backoff = start.elapsed();
+
+    let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
+    options.test_options_mut().jitter = Some(1f64);
+    let client = Client::for_test().options(options).await;
+    let coll = client.database("db").collection("coll");
+
+    let start = Instant::now();
+    coll.insert_one(doc! { "a": 1 }).await.unwrap_err();
+    let duration_with_backoff = start.elapsed();
+
+    assert!(duration_with_backoff - duration_no_backoff >= Duration::from_millis(2100));
+}
+
+// backpressure prose test #2
+#[tokio::test]
+async fn token_bucket_capacity_enforced() {
+    const MAX_BUCKET_CAPACITY: u16 = 10_000;
+
+    let mut options = get_client_options().await.clone();
+    options.adaptive_retries = Some(true);
+    let client = Client::for_test().options(options).await;
+    let tokens = client.get_num_tokens_in_bucket().await.unwrap();
+    assert_eq!(tokens, MAX_BUCKET_CAPACITY);
+
+    client
+        .database("db")
+        .run_command(doc! { "ping": 1 })
+        .await
+        .unwrap();
+    let tokens = client.get_num_tokens_in_bucket().await.unwrap();
+    assert_eq!(tokens, MAX_BUCKET_CAPACITY);
+}
+
+// backpressure prose test #3
+#[tokio::test(flavor = "multi_thread")]
+async fn overload_errors_retried_max_retries_times() {
+    if server_version_lt(4, 4).await {
+        log_uncaptured("skipping overload_errors_retried_max_retries_times: requires 4.4+");
+        return;
+    }
+
+    let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
+    let client = Client::for_test().options(options).monitor_events().await;
+    let coll = client.database("db").collection::<Document>("coll");
+
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn)
+        .error_code(462)
+        .error_labels(vec![SYSTEM_OVERLOADED_ERROR, RETRYABLE_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let error = coll.find(doc! {}).await.unwrap_err();
+    assert!(error.contains_label(SYSTEM_OVERLOADED_ERROR));
+    assert!(error.contains_label(RETRYABLE_ERROR));
+
+    let events = client.events.get_command_started_events(&["find"]);
+    assert_eq!(events.len(), 6);
+}
+
+// backpressure prose test #4
+#[tokio::test(flavor = "multi_thread")]
+async fn adaptive_retries_limited_by_token_bucket_tokens() {
+    if server_version_lt(4, 4).await {
+        log_uncaptured("skipping adaptive_retries_limited_by_token_bucket_tokens: requires 4.4+");
+        return;
+    }
+
+    let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
+    options.adaptive_retries = Some(true);
+    let client = Client::for_test().options(options).monitor_events().await;
+    client.set_num_tokens_in_bucket(20).await;
+    let coll = client.database("db").collection::<Document>("coll");
+
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(3))
+        .error_code(462)
+        .error_labels(vec![SYSTEM_OVERLOADED_ERROR, RETRYABLE_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let error = coll.find(doc! {}).await.unwrap_err();
+    assert!(error.contains_label(SYSTEM_OVERLOADED_ERROR));
+    assert!(error.contains_label(RETRYABLE_ERROR));
+
+    let events = client.events.get_command_started_events(&["find"]);
+    assert_eq!(events.len(), 3);
 }
