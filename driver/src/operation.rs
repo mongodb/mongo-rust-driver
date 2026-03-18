@@ -380,8 +380,9 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     }
 
     /// Whether this operation is retryable when retrying system overloaded errors. For read/write
-    /// operations, the operation is retryable if retryReads/retryWrites was set to true. Operations
-    /// with special behavior defined in the backpressure specification should override this method.
+    /// operations, the operation is retryable if retryReads/retryWrites was not set to false.
+    /// Operations with special behavior defined in the backpressure specification should
+    /// override this method.
     fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
         self.retryability(options) != Retryability::None
     }
