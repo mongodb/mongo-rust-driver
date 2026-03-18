@@ -16,9 +16,30 @@ const MAX_RW_RETRIES: u8 = 1;
 pub(crate) struct Retry {
     attempt: u8,
     pub(super) deprioritized_servers: HashSet<ServerAddress>,
-    pub(super) last_error: Error,
+    last_failure: Failure,
     txn_number: Option<i64>,
     pub(crate) overloaded: bool,
+}
+
+struct Failure {
+    error: Error,
+    phase: FailurePhase,
+}
+
+#[derive(PartialEq)]
+enum FailurePhase {
+    ConnectionEstablishment,
+    Execution,
+}
+
+impl Failure {
+    fn indicates_writes_performed(&self) -> bool {
+        self.phase != FailurePhase::ConnectionEstablishment
+            && !self.error.contains_label(NO_WRITES_PERFORMED)
+            && (self.error.is_server_error()
+                || self.error.is_read_retryable()
+                || self.error.is_write_retryable())
+    }
 }
 
 impl Retry {
@@ -30,16 +51,11 @@ impl Retry {
         server: ServerAddress,
         is_transaction_op: bool,
     ) -> Result<Retry> {
-        Self::handle_failure(
-            retry,
+        let failure = Failure {
             error,
-            op,
-            client,
-            server,
-            is_transaction_op,
-            None,
-            true,
-        )
+            phase: FailurePhase::ConnectionEstablishment,
+        };
+        Self::handle_failure(retry, failure, op, client, server, is_transaction_op, None)
     }
 
     pub(super) fn for_execution_failure<T: Operation>(
@@ -51,32 +67,34 @@ impl Retry {
         is_transaction_op: bool,
         txn_number: Option<i64>,
     ) -> Result<Self> {
+        let failure = Failure {
+            error,
+            phase: FailurePhase::Execution,
+        };
         Self::handle_failure(
             retry,
-            error,
+            failure,
             op,
             client,
             server,
             is_transaction_op,
             txn_number,
-            false,
         )
     }
 
     /// Handles a failure by either creating a new `Retry` or updating the existing `Retry` with the
     /// new error. If the error cannot be retried, the appropriate error to return from the
     /// retry loop is returned and no further retries should be performed.
-    #[allow(clippy::too_many_arguments)]
     fn handle_failure<T: Operation>(
         retry: Option<Retry>,
-        error: Error,
+        failure: Failure,
         op: &T,
         client: &Client,
         server: ServerAddress,
         is_transaction_op: bool,
         txn_number: Option<i64>,
-        error_is_connection_establishment: bool,
     ) -> Result<Self> {
+        let error = &failure.error;
         let can_retry = if error.contains_label(SYSTEM_OVERLOADED_ERROR)
             && error.contains_label(RETRYABLE_ERROR)
             && op.is_backpressure_retryable(client.options())
@@ -97,24 +115,21 @@ impl Retry {
 
         match retry {
             Some(mut retry) => {
-                let better_error = if (error.is_server_error()
-                    || error.is_read_retryable()
-                    || error.is_write_retryable())
-                    && !error_is_connection_establishment
-                    && !error.contains_label(NO_WRITES_PERFORMED)
-                {
-                    error
-                } else {
-                    retry.last_error
+                let better_failure = match (
+                    retry.last_failure.indicates_writes_performed(),
+                    failure.indicates_writes_performed(),
+                ) {
+                    (true, false) => retry.last_failure,
+                    _ => failure,
                 };
                 if !can_retry {
-                    return Err(better_error);
+                    return Err(better_failure.error);
                 }
                 retry.attempt += 1;
                 if let Some(server) = deprioritized {
                     retry.deprioritized_servers.insert(server);
                 }
-                retry.last_error = better_error;
+                retry.last_failure = better_failure;
                 if txn_number.is_some() && retry.txn_number.is_none() {
                     retry.txn_number = txn_number;
                 }
@@ -123,19 +138,23 @@ impl Retry {
             }
             None => {
                 if !can_retry {
-                    return Err(error);
+                    return Err(failure.error);
                 }
                 Ok(Self {
                     attempt: 1,
                     deprioritized_servers: deprioritized
                         .map(|server| HashSet::from([server]))
                         .unwrap_or_default(),
-                    last_error: error,
+                    last_failure: failure,
                     txn_number,
                     overloaded,
                 })
             }
         }
+    }
+
+    pub(super) fn last_error(self) -> Error {
+        self.last_failure.error
     }
 
     pub(super) fn max_retries_reached(&self) -> bool {
@@ -165,7 +184,7 @@ impl Retry {
 
 pub(super) fn return_last_error(retry: &mut Option<Retry>) -> Result<()> {
     match retry.take() {
-        Some(retry) => Err(retry.last_error),
+        Some(retry) => Err(retry.last_failure.error),
         _ => Ok(()),
     }
 }
