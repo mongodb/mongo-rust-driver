@@ -19,7 +19,9 @@ fi
 
 for arg; do
   if [ $arg == "rust" ]; then
-    curl https://sh.rustup.rs -sSf | sh -s -- -y --no-modify-path $DEFAULT_HOST_OPTIONS
+    #RUSTUP_URL="https://sh.rustup.rs"
+    RUSTUP_URL="https://raw.githubusercontent.com/rust-lang/rustup/refs/heads/main/rustup-init.sh"
+    curl "${RUSTUP_URL}" -sSf | sh -s -- -y --no-modify-path $DEFAULT_HOST_OPTIONS
 
     # Cygwin has a bug with reporting symlink paths that breaks rustup; see 
     # https://github.com/rust-lang/rustup/issues/4239.  This works around it by replacing the
