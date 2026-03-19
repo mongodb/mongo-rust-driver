@@ -73,8 +73,10 @@ driver, use command monitoring instead.
         assert len(addresses) > 1
     ```
 
-3. Test that `PoolClearedError` has `TransientTransactionError` label. Since there is no simple way to trigger
-    `PoolClearedError`, this test should be implemented in a way that suites each driver the best.
+## PoolClearedError Prose Test
+
+Test that `PoolClearedError` has `TransientTransactionError` label. Since there is no simple way to trigger
+`PoolClearedError`, this test should be implemented in a way that suites each driver the best.
 
 ## Options Inside Transaction Prose Tests.
 
@@ -84,9 +86,11 @@ these tests do not run against a standalone server.
 ### 1.0 Write concern not inherited from collection object inside transaction.
 
 - Create a MongoClient running against a configured sharded/replica set/load balanced cluster.
+    - transactions require a 4.0+ server when non-sharded and 4.2+ when sharded
 - Start a new session on the client.
 - Start a transaction on the session.
 - Instantiate a collection object in the driver with a default write concern of `{ w: 0 }`.
+    - Create the collection or ensure it exists before the insert
 - Insert the document `{ n: 1 }` on the instantiated collection.
 - Commit the transaction.
 - End the session.
@@ -94,6 +98,8 @@ these tests do not run against a standalone server.
 
 ## Changelog
 
+- 2025-03-31: Move PoolClearedError tests to its own section.
+- 2025-03-27: Clarify server versions and collection creation for prose test
 - 2024-10-31: Add test for PoolClearedError.
 - 2024-02-15: Migrated from reStructuredText to Markdown.
 - 2024-02-07: Converted legacy transaction tests to unified format and moved the legacy test format docs to a separate

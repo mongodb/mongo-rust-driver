@@ -23,6 +23,7 @@ pub(crate) struct Aggregate {
     target: OperationTarget,
     pipeline: Vec<Document>,
     options: Option<AggregateOptions>,
+    is_out_or_merge: bool,
 }
 
 impl Aggregate {
@@ -31,10 +32,19 @@ impl Aggregate {
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<AggregateOptions>,
     ) -> Self {
+        let pipeline = pipeline.into_iter().collect::<Vec<_>>();
+        let is_out_or_merge = pipeline
+            .last()
+            .map(|stage| {
+                let stage = bson_util::first_key(stage);
+                stage == Some("$out") || stage == Some("$merge")
+            })
+            .unwrap_or(false);
         Self {
             target,
-            pipeline: pipeline.into_iter().collect(),
+            pipeline,
             options,
+            is_out_or_merge,
         }
     }
 }
@@ -57,7 +67,7 @@ impl OperationWithDefaults for Aggregate {
 
         append_options(&mut body, self.options.as_ref())?;
 
-        if self.is_out_or_merge() {
+        if self.is_out_or_merge {
             if let Ok(cursor_doc) = body.get_document_mut("cursor") {
                 cursor_doc.remove("batchSize");
             }
@@ -78,7 +88,7 @@ impl OperationWithDefaults for Aggregate {
         response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        if self.is_out_or_merge() {
+        if self.is_out_or_merge {
             let wc_error_info = response.body::<WriteConcernOnlyBody>()?;
             wc_error_info.validate()?;
         };
@@ -123,15 +133,23 @@ impl OperationWithDefaults for Aggregate {
     }
 
     fn retryability(&self, options: &ClientOptions) -> Retryability {
-        if self.is_out_or_merge() {
+        if self.is_out_or_merge {
             Retryability::None
         } else {
             Retryability::read(options)
         }
     }
 
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        if self.is_out_or_merge {
+            options.retry_writes != Some(false)
+        } else {
+            options.retry_reads != Some(false)
+        }
+    }
+
     fn override_criteria(&self) -> super::OverrideCriteriaFn {
-        if !self.is_out_or_merge() {
+        if !self.is_out_or_merge {
             return |_, _| None;
         }
         |criteria, topology| {
@@ -163,19 +181,6 @@ impl OperationWithDefaults for Aggregate {
 impl crate::otel::OtelInfoDefaults for Aggregate {
     fn output_cursor_id(output: &Self::O) -> Option<i64> {
         Some(output.id())
-    }
-}
-
-impl Aggregate {
-    /// Returns whether this is a $out or $merge aggregation operation.
-    fn is_out_or_merge(&self) -> bool {
-        self.pipeline
-            .last()
-            .map(|stage| {
-                let stage = bson_util::first_key(stage);
-                stage == Some("$out") || stage == Some("$merge")
-            })
-            .unwrap_or(false)
     }
 }
 

@@ -182,7 +182,6 @@ Then for each element in `tests`:
 7. When testing against a sharded cluster run a `distinct` command on the newly created collection on all mongoses. For
     an explanation see,
     [Why do tests that run distinct sometimes fail with StaleDbVersion?](#why-do-tests-that-run-distinct-sometimes-fail-with-staledbversion)
-    
 
 8. If `failPoint` is specified, its value is a configureFailPoint command. Run the command on the admin database to
     enable the fail point.
@@ -244,7 +243,7 @@ Then for each element in `tests`:
 
 13. If the test includes a list of command-started events in `expectations`, compare them to the actual command-started
     events using the same logic as the
-    `legacy Command Monitoring Spec Tests runner <https://github.com/mongodb/specifications/blob/09ee1ebc481f1502e3246971a9419e484d736207/source/command-monitoring/tests/README.rst#expectations>`_, plus the
+    [legacy Command Monitoring Spec Tests runner](../../command-logging-and-monitoring/tests/README.md), plus the
     rules in the Command-Started Events instructions below.
 
 14. If `failPoint` is specified, disable the fail point to avoid spurious failures in subsequent tests. The fail point
