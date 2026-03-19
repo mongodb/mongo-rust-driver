@@ -103,6 +103,7 @@ const URI_OPTIONS: &[&str] = &[
     "wtimeoutms",
     "zlibcompressionlevel",
     "srvservicename",
+    "adaptiveretries",
 ];
 
 /// Reserved characters as defined by [Section 2.2 of RFC-3986](https://tools.ietf.org/html/rfc3986#section-2.2).
@@ -812,6 +813,8 @@ impl Serialize for ClientOptions {
 
             srvservicename: &'a Option<String>,
 
+            adaptiveretries: &'a Option<bool>,
+
             #[cfg(feature = "socks5-proxy")]
             #[serde(flatten, serialize_with = "Socks5Proxy::serialize")]
             socks5proxy: &'a Option<Socks5Proxy>,
@@ -848,6 +851,7 @@ impl Serialize for ClientOptions {
                 .transpose()
                 .map_err(serde::ser::Error::custom)?,
             srvservicename: &self.srv_service_name,
+            adaptiveretries: &self.adaptive_retries,
             #[cfg(feature = "socks5-proxy")]
             socks5proxy: &self.socks5_proxy,
         };
@@ -2753,6 +2757,9 @@ impl ConnectionString {
                 }
 
                 parts.zlib_compression = Some(i);
+            }
+            "adaptiveretries" => {
+                self.adaptive_retries = Some(get_bool!(value, key));
             }
             #[cfg(feature = "socks5-proxy")]
             PROXY_HOST => parts.proxy_host = Some(value.to_string()),
