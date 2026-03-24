@@ -679,7 +679,7 @@ pub struct ClientOptions {
     pub socks5_proxy: Option<Socks5Proxy>,
 
     /// Enable a per-client token bucket to limit overload error retry attempts. Defaults to false.
-    pub adaptive_retries: Option<bool>,
+    pub(crate) adaptive_retries: Option<bool>,
 
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(setter(skip))]
@@ -1059,7 +1059,7 @@ pub struct ConnectionString {
     pub socks5_proxy: Option<Socks5Proxy>,
 
     /// Enable a per-client token bucket to limit overload error retry attempts. Defaults to false.
-    pub adaptive_retries: Option<bool>,
+    pub(crate) adaptive_retries: Option<bool>,
 
     #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
     wait_queue_timeout: Option<Duration>,
@@ -2758,9 +2758,9 @@ impl ConnectionString {
 
                 parts.zlib_compression = Some(i);
             }
-            "adaptiveretries" => {
-                self.adaptive_retries = Some(get_bool!(value, key));
-            }
+            // "adaptiveretries" => {
+            //     self.adaptive_retries = Some(get_bool!(value, key));
+            // }
             #[cfg(feature = "socks5-proxy")]
             PROXY_HOST => parts.proxy_host = Some(value.to_string()),
             #[cfg(feature = "socks5-proxy")]
