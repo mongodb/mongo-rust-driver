@@ -14,6 +14,11 @@ if [ "$RUST_VERSION" != "" ]; then
   # for this transient dependency.
   cargo add --package mongodb aws-sdk-sts@1.73
 
+  # unicode-segmentation 1.13 requires Rust 1.87+. This crate does not specify a rust-version in
+  # its Cargo.toml, so we need to pin to a compliant version manually. This can be removed when our
+  # MSRV is 1.87+.
+  cargo add --package mongodb unicode-segmentation@1.12
+
   CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo +nightly -Zmsrv-policy generate-lockfile
 fi
 
