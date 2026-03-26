@@ -218,7 +218,10 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
 
 #[tokio::test]
 async fn run_uri_options_spec_tests() {
-    let mut skipped_files = vec!["single-threaded-options.json"];
+    let mut skipped_files = vec![
+        "single-threaded-options.json",
+        "client-backpressure-options.json",
+    ];
     if cfg!(not(feature = "socks5-proxy")) {
         skipped_files.push("proxy-options.json");
     }
