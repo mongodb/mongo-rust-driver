@@ -45,7 +45,7 @@ use std::{
 };
 
 use crate::{
-    bson::{RawArray, RawBsonRef, RawDocument},
+    bson::{RawArray, RawDocument},
     cursor::common::CursorSpecification,
     operation::GetMore,
 };
@@ -65,6 +65,10 @@ use crate::{
 };
 
 use super::common::CursorInformation;
+
+const CURSOR: &str = "cursor";
+const FIRST_BATCH: &str = "firstBatch";
+const NEXT_BATCH: &str = "nextBatch";
 
 /// A raw batch response returned by the server for a cursor getMore/find.
 ///
@@ -87,17 +91,18 @@ impl RawBatch {
     pub fn doc_slices(&self) -> Result<&RawArray> {
         let root = self.reply.as_ref();
         let cursor = root
-            .get("cursor")?
-            .and_then(RawBsonRef::as_document)
-            .ok_or_else(|| Error::invalid_response("missing cursor subdocument"))?;
+            .get_document(CURSOR)
+            .map_err(|_| Error::invalid_response("missing cursor subdocument"))?;
 
         let docs = cursor
-            .get("firstBatch")?
-            .or_else(|| cursor.get("nextBatch").ok().flatten())
-            .ok_or_else(|| Error::invalid_response("missing firstBatch/nextBatch"))?;
+            .get(FIRST_BATCH)?
+            .or_else(|| cursor.get(NEXT_BATCH).ok().flatten())
+            .ok_or_else(|| {
+                Error::invalid_response(format!("missing {FIRST_BATCH}/{NEXT_BATCH}"))
+            })?;
 
         docs.as_array()
-            .ok_or_else(|| Error::invalid_response("invalid firstBatch/nextBatch"))
+            .ok_or_else(|| Error::invalid_response(format!("invalid {FIRST_BATCH}/{NEXT_BATCH}")))
     }
 
     /// Returns a reference to the full server response document.
@@ -133,7 +138,7 @@ struct RawBatchCursorState {
     pinned_connection: PinnedConnection,
     post_batch_resume_token: Option<ResumeToken>,
     provider: GetMoreRawProvider<'static, ImplicitClientSessionHandle>,
-    initial_reply: Option<RawDocumentBuf>,
+    buffered_reply: Option<RawDocumentBuf>,
 }
 
 impl crate::cursor::NewCursor for RawBatchCursor {
@@ -171,7 +176,7 @@ impl RawBatchCursor {
                 } else {
                     GetMoreRawProvider::Idle(Box::new(ImplicitClientSessionHandle(session)))
                 },
-                initial_reply: Some(spec.initial_reply),
+                buffered_reply: Some(spec.initial_reply),
             },
         }
     }
@@ -181,7 +186,24 @@ impl RawBatchCursor {
     }
 
     pub(crate) fn has_next(&self) -> bool {
-        self.state.initial_reply.is_some() || !self.is_exhausted()
+        if !self.is_exhausted() {
+            return true;
+        }
+        let Some(batch) = self
+            .state
+            .buffered_reply
+            .as_ref()
+            .and_then(|reply| reply.get_document(CURSOR).ok())
+            .and_then(|cursor| {
+                cursor
+                    .get_array(FIRST_BATCH)
+                    .or_else(|_| cursor.get_array(NEXT_BATCH))
+                    .ok()
+            })
+        else {
+            return false;
+        };
+        !batch.is_empty()
     }
 
     pub(crate) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
@@ -230,7 +252,7 @@ impl Stream for RawBatchCursor {
                 let get_more_out = ready!(Pin::new(future).poll(cx));
                 match get_more_out.result {
                     Ok(out) => {
-                        self.state.initial_reply = Some(out.raw_reply);
+                        self.state.buffered_reply = Some(out.raw_reply);
                         self.state.post_batch_resume_token = out.post_batch_resume_token;
                         if out.exhausted {
                             self.mark_exhausted();
@@ -264,7 +286,7 @@ impl Stream for RawBatchCursor {
             }
 
             // Yield any buffered reply.
-            if let Some(reply) = self.state.initial_reply.take() {
+            if let Some(reply) = self.state.buffered_reply.take() {
                 return Poll::Ready(Some(Ok(RawBatch::new(reply))));
             }
 

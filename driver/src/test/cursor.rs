@@ -267,25 +267,33 @@ async fn cursor_final_batch() {
 #[tokio::test]
 async fn cursor_has_next() {
     let client = Client::for_test().await;
-    let coll = client
-        .create_fresh_collection("test_cursor_has_next", "test", None)
-        .await;
-    coll.insert_many(vec![
-        doc! { "foo": 1 },
-        doc! { "foo": 2 },
-        doc! { "foo": 3 },
-        doc! { "foo": 4 },
-        doc! { "foo": 5 },
-    ])
-    .await
-    .unwrap();
+    let coll = client.database("db").collection("cursor_has_next");
+    coll.drop().await.unwrap();
 
-    let mut cursor = coll.find(doc! {}).batch_size(2).await.unwrap();
-    let mut found = 0;
-    while cursor.has_next() {
-        if cursor.advance().await.unwrap() {
-            found += 1;
-        }
-    }
-    assert_eq!(found, 5);
+    let cursor = coll.find(doc! {}).await.unwrap();
+    assert!(!cursor.has_next());
+
+    coll.insert_many(vec![doc! { "a": 1 }, doc! { "b": 2 }])
+        .await
+        .unwrap();
+
+    let mut cursor = coll.find(doc! {}).await.unwrap();
+    assert!(cursor.has_next()); // { "a": 1 }
+    cursor.advance().await.unwrap();
+    assert!(cursor.has_next()); // still { "a": 1 }, because the first call to advance points the
+                                // cursor to the first item
+    cursor.advance().await.unwrap();
+    assert!(cursor.has_next()); // { "b": 2 }
+    cursor.advance().await.unwrap();
+    assert!(!cursor.has_next());
+
+    let mut cursor = coll.find(doc! {}).batch_size(1).await.unwrap();
+    assert!(cursor.has_next()); // { "a": 1 }
+    cursor.advance().await.unwrap();
+    assert!(cursor.has_next()); // still { "a": 1 }, because the first call to advance points the
+                                // cursor to the first item
+    cursor.advance().await.unwrap();
+    assert!(cursor.has_next()); // { "b": 2 }
+    cursor.advance().await.unwrap();
+    assert!(!cursor.has_next());
 }
