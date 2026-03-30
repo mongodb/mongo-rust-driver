@@ -237,7 +237,7 @@ buildvariants:
     display_name: "AWS Authentication"
     patchable: false
     run_on:
-      - ubuntu2004-small
+      - ubuntu2404-small
     expansions:
       ORCHESTRATION_FILE: auth-aws.json
     tasks:
@@ -403,7 +403,7 @@ buildvariants:
     display_name: "AWS Lambda"
     patchable: false
     run_on:
-      - ubuntu2204-small
+      - rhel8-latest-small
     tasks:
       - name: test-aws-lambda-task-group
 
