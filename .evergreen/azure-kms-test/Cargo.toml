@@ -11,3 +11,5 @@ tokio = "1.28.1"
 [dependencies.mongodb]
 path = "../.."
 features = ["in-use-encryption", "azure-kms"]
+
+[workspace]
