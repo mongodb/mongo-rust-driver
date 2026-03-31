@@ -52,26 +52,15 @@ Drivers should test that retries do not occur immediately when a SystemOverloade
     6. Compare the two time between the two runs.
 
         ```python
-        assertTrue(with_backoff_time - no_backoff_time >= 2.1)
+        assertTrue(with_backoff_time - no_backoff_time >= 0.3)
         ```
 
-        The sum of 5 backoffs is 3.1 seconds. There is a 1-second window to account for potential variance between the two
-        runs.
-
-#### Test 2: Token Bucket Capacity is Enforced
-
-Drivers should test that retry token buckets are created at their maximum capacity and that that capacity is enforced.
-
-1. Let `client` be a `MongoClient` with `adaptiveRetries=True`.
-2. Assert that the client's retry token bucket is at full capacity and that the capacity is
-    `DEFAULT_RETRY_TOKEN_CAPACITY`.
-3. Using `client`, execute a successful `ping` command.
-4. Assert that the successful command did not increase the number of tokens in the bucket above
-    `DEFAULT_RETRY_TOKEN_CAPACITY`.
+        The sum of 2 backoffs is 0.3 seconds. There is a 0.3-second window to account for potential variance between the
+        two runs.
 
 #### Test 3: Overload Errors are Retried a Maximum of MAX_RETRIES times
 
-Drivers should test that without adaptive retries enabled, overload errors are retried a maximum of five times.
+Drivers should test that overload errors are retried a maximum of MAX_RETRIES times.
 
 1. Let `client` be a `MongoClient` with command event monitoring enabled.
 
@@ -95,24 +84,22 @@ Drivers should test that without adaptive retries enabled, overload errors are r
 
 5. Assert that the raised error contains both the `RetryableError` and `SystemOverloadedError` error labels.
 
-6. Assert that the total number of started commands is MAX_RETRIES + 1 (6).
+6. Assert that the total number of started commands is MAX_RETRIES + 1 (3).
 
-#### Test 4: Adaptive Retries are Limited by Token Bucket Tokens
+#### Test 4: Overload Errors are Retried a Maximum of maxAdaptiveRetries times when configured
 
-Drivers should test that when enabled, adaptive retries are limited by the number of tokens in the bucket.
+Drivers should test that overload errors are retried a maximum of `maxAdaptiveRetries` times, when configured.
 
-1. Let `client` be a `MongoClient` with `adaptiveRetries=True` and command event monitoring enabled.
+1. Let `client` be a `MongoClient` with `maxAdaptiveRetries=1` and command event monitoring enabled.
 
-2. Set `client`'s retry token bucket to have 2 tokens.
+2. Let `coll` be a collection.
 
-3. Let `coll` be a collection.
-
-4. Configure the following failpoint:
+3. Configure the following failpoint:
 
     ```javascript
         {
             configureFailPoint: 'failCommand',
-            mode: {times: 3},
+            mode: 'alwaysOn',
             data: {
                 failCommands: ['find'],
                 errorCode: 462,  // IngressRequestRateLimitExceeded
@@ -121,8 +108,8 @@ Drivers should test that when enabled, adaptive retries are limited by the numbe
         }
     ```
 
-5. Perform a find operation with `coll` that fails.
+4. Perform a find operation with `coll` that fails.
 
-6. Assert that the raised error contains both the `RetryableError` and `SystemOverloadedError` error labels.
+5. Assert that the raised error contains both the `RetryableError` and `SystemOverloadedError` error labels.
 
-7. Assert that the total number of started commands is 3: one for the initial attempt and two for the retries.
+6. Assert that the total number of started commands is `maxAdaptiveRetries` + 1 (2).
