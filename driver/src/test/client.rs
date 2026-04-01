@@ -1118,7 +1118,9 @@ async fn operation_retry_uses_exponential_backoff() {
     coll.insert_one(doc! { "a": 1 }).await.unwrap_err();
     let duration_with_backoff = start.elapsed();
 
-    assert!(duration_with_backoff - duration_no_backoff >= Duration::ZERO);
+    let difference =
+        duration_with_backoff.abs_diff(duration_no_backoff + Duration::from_millis(300));
+    assert!(difference < Duration::from_millis(300));
 }
 
 // backpressure prose test #2
