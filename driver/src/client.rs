@@ -9,8 +9,8 @@ pub mod session;
 use std::{
     collections::HashSet,
     sync::{
-        Mutex as SyncMutex,
         atomic::{AtomicBool, Ordering},
+        Mutex as SyncMutex,
     },
     time::{Duration, Instant},
 };
@@ -24,16 +24,13 @@ use tokio::sync::Mutex;
 
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
-    COMMAND_TRACING_EVENT_TARGET,
-    TracingOrLogLevel,
     command::CommandTracingEventEmitter,
     server_selection::ServerSelectionTracingEventEmitter,
     trace_or_log_enabled,
+    TracingOrLogLevel,
+    COMMAND_TRACING_EVENT_TARGET,
 };
 use crate::{
-    BoxFuture,
-    ClientSession,
-    TopologyType,
     bson::doc,
     concern::{ReadConcern, WriteConcern},
     db::Database,
@@ -50,14 +47,17 @@ use crate::{
         ServerAddress,
     },
     sdam::{
+        server_selection::{self, attempt_to_select_server},
         SelectedServer,
         Topology,
-        server_selection::{self, attempt_to_select_server},
     },
     tracking_arc::TrackingArc,
+    BoxFuture,
+    ClientSession,
+    TopologyType,
 };
 
-pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS, retry::Retry};
+pub(crate) use executor::{retry::Retry, HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
 pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 
 use session::{ServerSession, ServerSessionPool};

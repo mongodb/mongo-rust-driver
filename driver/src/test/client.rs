@@ -14,8 +14,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Client,
-    bson::{Bson, doc},
+    bson::{doc, Bson},
     error::{CommandError, Error, ErrorKind, RETRYABLE_WRITE_ERROR},
     event::cmap::CmapEvent,
     hello::LEGACY_HELLO_COMMAND_NAME,
@@ -23,8 +22,6 @@ use crate::{
     runtime,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{
-        Event,
-        SERVER_API,
         auth_enabled,
         get_client_options,
         log_uncaptured,
@@ -37,7 +34,10 @@ use crate::{
             event_buffer::EventStream,
             fail_point::{FailPoint, FailPointMode},
         },
+        Event,
+        SERVER_API,
     },
+    Client,
 };
 
 #[derive(Debug, Deserialize)]
@@ -732,17 +732,13 @@ async fn manual_shutdown_with_resources() {
     client.into_client().shutdown().await;
     if !is_sharded {
         // killCursors doesn't always execute on sharded clusters due to connection pinning
-        assert!(
-            !events
-                .get_command_started_events(&["killCursors"])
-                .is_empty()
-        );
+        assert!(!events
+            .get_command_started_events(&["killCursors"])
+            .is_empty());
     }
-    assert!(
-        !events
-            .get_command_started_events(&["abortTransaction"])
-            .is_empty()
-    );
+    assert!(!events
+        .get_command_started_events(&["abortTransaction"])
+        .is_empty());
     assert!(!events.get_command_started_events(&["delete"]).is_empty());
 }
 
@@ -784,16 +780,12 @@ async fn manual_shutdown_immediate_with_resources() {
     let events = client.events.clone();
     client.into_client().shutdown().immediate(true).await;
 
-    assert!(
-        events
-            .get_command_started_events(&["killCursors"])
-            .is_empty()
-    );
-    assert!(
-        events
-            .get_command_started_events(&["abortTransaction"])
-            .is_empty()
-    );
+    assert!(events
+        .get_command_started_events(&["killCursors"])
+        .is_empty());
+    assert!(events
+        .get_command_started_events(&["abortTransaction"])
+        .is_empty());
     assert!(events.get_command_started_events(&["delete"]).is_empty());
 }
 

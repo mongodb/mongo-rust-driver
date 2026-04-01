@@ -6,13 +6,13 @@ use serde::Deserialize;
 use std::sync::LazyLock;
 
 use crate::{
-    Client,
     bson::{Bson, Document},
     bson_util::get_int,
     client::options::{ClientOptions, ConnectionString, ServerAddress},
     error::ErrorKind,
     options::Tls,
     test::spec::deserialize_spec_tests,
+    Client,
 };
 
 static SKIPPED_TESTS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
@@ -455,12 +455,10 @@ async fn tls_insecure() {
 
     let uri = "mongodb://localhost:27017?tlsInsecure=true&tls=false";
     let error = ClientOptions::parse(uri).await.unwrap_err();
-    assert!(
-        error
-            .message()
-            .unwrap()
-            .contains("other TLS options are set")
-    );
+    assert!(error
+        .message()
+        .unwrap()
+        .contains("other TLS options are set"));
 
     let uri = "mongodb://localhost:27017?tlsInsecure=true&tlsAllowInvalidCertificates=true";
     let error = ClientOptions::parse(uri).await.unwrap_err();

@@ -1,5 +1,5 @@
 use crate::{
-    action::{ParseConnectionString, action_impl},
+    action::{action_impl, ParseConnectionString},
     error::{Error, Result},
     srv::OriginalSrvInfo,
 };

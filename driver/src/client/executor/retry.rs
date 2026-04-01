@@ -1,11 +1,11 @@
 use std::{collections::HashSet, time::Duration};
 
 use crate::{
-    Client,
     bson_util::round_clamp,
-    error::{Error, NO_WRITES_PERFORMED, RETRYABLE_ERROR, Result, SYSTEM_OVERLOADED_ERROR},
+    error::{Error, Result, NO_WRITES_PERFORMED, RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
     operation::{Operation, Retryability},
     options::ServerAddress,
+    Client,
 };
 
 /// The default maximum number of retries that can be performed when the system is overloaded.

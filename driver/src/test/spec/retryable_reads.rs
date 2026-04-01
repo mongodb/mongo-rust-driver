@@ -3,9 +3,8 @@ use std::{future::IntoFuture, sync::Arc, time::Duration};
 use crate::bson::doc;
 
 use crate::{
-    Client,
     bson::Document,
-    error::{RETRYABLE_ERROR, Result, SYSTEM_OVERLOADED_ERROR},
+    error::{Result, RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
     event::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
@@ -13,7 +12,6 @@ use crate::{
     options::{ReadPreference, SelectionCriteria},
     runtime::{self, AsyncJoinHandle},
     test::{
-        Event,
         get_client_options,
         log_uncaptured,
         server_version_lt,
@@ -25,7 +23,9 @@ use crate::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
         },
+        Event,
     },
+    Client,
 };
 
 #[tokio::test(flavor = "multi_thread")]

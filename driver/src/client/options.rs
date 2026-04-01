@@ -19,7 +19,7 @@ use std::{
 
 use derive_where::derive_where;
 use macro_magic::export_tokens;
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Unexpected};
+use serde::{de::Unexpected, Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use std::sync::LazyLock;
 use strsim::jaro_winkler;
@@ -34,13 +34,13 @@ use crate::options::Compressor;
 #[cfg(test)]
 use crate::srv::LookupHosts;
 use crate::{
-    bson::{Bson, Document, Timestamp, UuidRepresentation, doc},
+    bson::{doc, Bson, Document, Timestamp, UuidRepresentation},
     client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{Error, ErrorKind, Result},
     event::EventHandler,
     options::ReadConcernLevel,
-    sdam::{DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY, verify_max_staleness},
+    sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     serde_util,
     srv::{OriginalSrvInfo, SrvResolver},
@@ -1642,12 +1642,10 @@ impl ConnectionString {
         } else {
             match &hosts[..] {
                 [ServerAddress::Tcp { host, port: None }] => HostInfo::DnsRecord(host.clone()),
-                [
-                    ServerAddress::Tcp {
-                        host: _,
-                        port: Some(_),
-                    },
-                ] => {
+                [ServerAddress::Tcp {
+                    host: _,
+                    port: Some(_),
+                }] => {
                     return Err(Error::invalid_argument(
                         "a port cannot be specified with 'mongodb+srv'",
                     ));
@@ -2965,11 +2963,9 @@ mod tests {
 
     #[tokio::test]
     async fn fails_with_invalid_scheme() {
-        assert!(
-            ClientOptions::parse("mangodb://localhost:27017")
-                .await
-                .is_err()
-        );
+        assert!(ClientOptions::parse("mangodb://localhost:27017")
+            .await
+            .is_err());
     }
 
     #[tokio::test]
@@ -3069,11 +3065,9 @@ mod tests {
 
     #[tokio::test]
     async fn with_w_negative_int() {
-        assert!(
-            ClientOptions::parse("mongodb://localhost:27017/?w=-1")
-                .await
-                .is_err()
-        );
+        assert!(ClientOptions::parse("mongodb://localhost:27017/?w=-1")
+            .await
+            .is_err());
     }
 
     #[tokio::test]
