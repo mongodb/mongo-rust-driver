@@ -1,5 +1,5 @@
 use crate::{
-    action::{action_impl, ParseConnectionString},
+    action::{ParseConnectionString, action_impl},
     error::{Error, Result},
     srv::OriginalSrvInfo,
 };
@@ -172,6 +172,8 @@ impl ClientOptions {
             #[cfg(feature = "socks5-proxy")]
             socks5_proxy: conn_str.socks5_proxy,
             adaptive_retries: conn_str.adaptive_retries,
+            max_adaptive_retries: conn_str.max_adaptive_retries,
+            enable_overload_retargeting: conn_str.enable_overload_retargeting,
         }
     }
 }

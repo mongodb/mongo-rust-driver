@@ -3,7 +3,7 @@ pub(super) mod retry;
 use std::{
     borrow::{BorrowMut, Cow},
     collections::HashSet,
-    sync::{atomic::Ordering, Arc, LazyLock},
+    sync::{Arc, LazyLock, atomic::Ordering},
     time::Instant,
 };
 
@@ -14,34 +14,35 @@ use serde::de::DeserializeOwned;
 #[cfg(feature = "in-use-encryption")]
 use crate::bson::RawDocumentBuf;
 use crate::{
-    bson::{doc, Document, RawBsonRef, RawDocument, Timestamp},
+    ClusterTime,
+    bson::{Document, RawBsonRef, RawDocument, Timestamp, doc},
     change_stream::{
+        ChangeStream,
         common::{ChangeStreamData, WatchArgs},
         event::ChangeStreamEvent,
         session::SessionChangeStream,
-        ChangeStream,
     },
     cmap::{
-        conn::{
-            pooled::PooledConnection,
-            wire::{next_request_id, Message},
-            PinnedConnectionHandle,
-        },
         ConnectionPool,
         RawCommandResponse,
         StreamDescription,
+        conn::{
+            PinnedConnectionHandle,
+            pooled::PooledConnection,
+            wire::{Message, next_request_id},
+        },
     },
     cursor::{
-        common::{CursorInformation, CursorSpecification},
-        session::SessionCursor,
         Cursor,
         NewCursor,
+        common::{CursorInformation, CursorSpecification},
+        session::SessionCursor,
     },
     error::{
         Error,
         ErrorKind,
-        Result,
         RETRYABLE_WRITE_ERROR,
+        Result,
         SYSTEM_OVERLOADED_ERROR,
         TRANSIENT_TRANSACTION_ERROR,
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
@@ -54,8 +55,6 @@ use crate::{
     },
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
-        aggregate::change_stream::ChangeStreamAggregate,
-        is_commit_or_abort,
         AbortTransaction,
         CommandErrorBody,
         CommitTransaction,
@@ -64,15 +63,16 @@ use crate::{
         Operation,
         OperationTarget,
         Retryability,
+        aggregate::change_stream::ChangeStreamAggregate,
+        is_commit_or_abort,
     },
     options::{ChangeStreamOptions, SelectionCriteria},
     sdam::{HandshakePhase, ServerType, TopologyType, TransactionSupportStatus},
     selection_criteria::ReadPreference,
     tracking_arc::TrackingArc,
-    ClusterTime,
 };
 
-use super::{session::TransactionState, Client, ClientSession};
+use super::{Client, ClientSession, session::TransactionState};
 use retry::Retry;
 
 pub(crate) static REDACTED_COMMANDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
@@ -984,7 +984,7 @@ impl Client {
                 return Err(ErrorKind::InvalidResponse {
                     message: "missing 'ok' value in response".to_string(),
                 }
-                .into())
+                .into());
             }
         };
 

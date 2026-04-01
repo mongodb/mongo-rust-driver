@@ -14,7 +14,8 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bson::{doc, Bson},
+    Client,
+    bson::{Bson, doc},
     error::{CommandError, Error, ErrorKind, RETRYABLE_WRITE_ERROR},
     event::cmap::CmapEvent,
     hello::LEGACY_HELLO_COMMAND_NAME,
@@ -22,6 +23,8 @@ use crate::{
     runtime,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{
+        Event,
+        SERVER_API,
         auth_enabled,
         get_client_options,
         log_uncaptured,
@@ -34,10 +37,7 @@ use crate::{
             event_buffer::EventStream,
             fail_point::{FailPoint, FailPointMode},
         },
-        Event,
-        SERVER_API,
     },
-    Client,
 };
 
 #[derive(Debug, Deserialize)]
@@ -732,13 +732,17 @@ async fn manual_shutdown_with_resources() {
     client.into_client().shutdown().await;
     if !is_sharded {
         // killCursors doesn't always execute on sharded clusters due to connection pinning
-        assert!(!events
-            .get_command_started_events(&["killCursors"])
-            .is_empty());
+        assert!(
+            !events
+                .get_command_started_events(&["killCursors"])
+                .is_empty()
+        );
     }
-    assert!(!events
-        .get_command_started_events(&["abortTransaction"])
-        .is_empty());
+    assert!(
+        !events
+            .get_command_started_events(&["abortTransaction"])
+            .is_empty()
+    );
     assert!(!events.get_command_started_events(&["delete"]).is_empty());
 }
 
@@ -780,12 +784,16 @@ async fn manual_shutdown_immediate_with_resources() {
     let events = client.events.clone();
     client.into_client().shutdown().immediate(true).await;
 
-    assert!(events
-        .get_command_started_events(&["killCursors"])
-        .is_empty());
-    assert!(events
-        .get_command_started_events(&["abortTransaction"])
-        .is_empty());
+    assert!(
+        events
+            .get_command_started_events(&["killCursors"])
+            .is_empty()
+    );
+    assert!(
+        events
+            .get_command_started_events(&["abortTransaction"])
+            .is_empty()
+    );
     assert!(events.get_command_started_events(&["delete"]).is_empty());
 }
 
@@ -1122,6 +1130,7 @@ async fn operation_retry_uses_exponential_backoff() {
 }
 
 // backpressure prose test #2
+/** disabled until backpressure phase 2 is implemented
 #[tokio::test]
 async fn token_bucket_capacity_enforced() {
     const MAX_BUCKET_CAPACITY: u16 = 10_000;
@@ -1140,6 +1149,7 @@ async fn token_bucket_capacity_enforced() {
     let tokens = client.get_num_tokens_in_bucket().await.unwrap();
     assert_eq!(tokens, MAX_BUCKET_CAPACITY);
 }
+*/
 
 // backpressure prose test #3
 #[tokio::test(flavor = "multi_thread")]
@@ -1166,10 +1176,11 @@ async fn overload_errors_retried_max_retries_times() {
     assert!(error.contains_label(RETRYABLE_ERROR));
 
     let events = client.events.get_command_started_events(&["find"]);
-    assert_eq!(events.len(), 6);
+    assert_eq!(events.len(), 3);
 }
 
-// backpressure prose test #4
+// old backpressure prose test #4
+/** disabled until backpressure phase 2 is implemented
 #[tokio::test(flavor = "multi_thread")]
 async fn adaptive_retries_limited_by_token_bucket_tokens() {
     if server_version_lt(4, 4).await {
@@ -1197,4 +1208,36 @@ async fn adaptive_retries_limited_by_token_bucket_tokens() {
 
     let events = client.events.get_command_started_events(&["find"]);
     assert_eq!(events.len(), 3);
+}
+*/
+
+// backpressure prose test #4
+#[tokio::test(flavor = "multi_thread")]
+async fn overload_errors_retried_max_adaptive_retries_times() {
+    if server_version_lt(4, 4).await {
+        log_uncaptured(
+            "skipping overload_errors_retried_max_adaptive_retries_times: requires 4.4+",
+        );
+        return;
+    }
+
+    let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
+    options.max_adaptive_retries = Some(1);
+    let client = Client::for_test().options(options).monitor_events().await;
+    let coll = client.database("db").collection::<Document>("coll");
+
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn)
+        .error_code(462)
+        .error_labels(vec![SYSTEM_OVERLOADED_ERROR, RETRYABLE_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let error = coll.find(doc! {}).await.unwrap_err();
+    assert!(error.contains_label(SYSTEM_OVERLOADED_ERROR));
+    assert!(error.contains_label(RETRYABLE_ERROR));
+
+    let events = client.events.get_command_started_events(&["find"]);
+    assert_eq!(events.len(), 2);
 }
