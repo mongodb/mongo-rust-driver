@@ -352,9 +352,12 @@ impl TopologyWorker {
                 .as_ref()
                 .and_then(|to| to.topology_worker_shutdown_delay)
             {
-                // Sleep longer than heartbeat_freq (maxAwaitTimeMS) to ensure the
-                // monitor completes a hello and calls topology_updater.update() during
-                // this window. Without the fix above, this would deadlock.
+                // In tests, sleep briefly to give any in-flight monitor hello responses a chance to
+                // complete and call topology_updater.update(). This widens the race window to
+                // verify the deadlock fix (dropping update_receiver before closing monitors). Sleep
+                // longer than heartbeat_freq (maxAwaitTimeMS) to ensure the monitor completes a
+                // hello and calls topology_updater.update() during this window. Without the fix
+                // above, this would deadlock.
                 tokio::time::sleep(dur).await;
             }
 
