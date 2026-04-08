@@ -730,6 +730,8 @@ pub(crate) struct TestOptions {
     pub(crate) hello_cb: Option<EventHandler<crate::cmap::Command>>,
 
     pub(crate) jitter: Option<f64>,
+
+    pub(crate) topology_worker_shutdown_delay: Option<Duration>,
 }
 
 pub(crate) type TestEventSender = tokio::sync::mpsc::Sender<
