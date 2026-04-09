@@ -129,6 +129,7 @@ pub struct ChangeStreamEvent<T> {
 }
 
 /// Describes which fields have been updated or removed from a document.
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
