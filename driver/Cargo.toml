@@ -29,7 +29,8 @@ compat-3-3-0 = []
 bson-2 = ["dep:bson2", "mongocrypt?/bson-2"]
 bson-3 = ["dep:bson3", "mongocrypt?/bson-3"]
 sync = []
-rustls-tls = ["dep:rustls", "dep:tokio-rustls", "dep:webpki-roots"]
+rustls-tls = ["dep:rustls", "rustls/ring", "dep:tokio-rustls", "tokio-rustls/ring", "dep:webpki-roots"]
+rustls-tls-aws-lc = ["dep:rustls", "rustls/aws_lc_rs", "dep:tokio-rustls", "tokio-rustls/aws_lc_rs", "dep:webpki-roots"]
 openssl-tls = ["dep:openssl", "dep:openssl-probe", "dep:tokio-openssl"]
 dns-resolver = ["dep:hickory-resolver", "dep:hickory-proto"]
 cert-key-password = ["dep:pem", "dep:pkcs8"]
@@ -186,7 +187,7 @@ features = ["json", "rustls-tls"]
 version = "0.23.20"
 optional = true
 default-features = false
-features = ["logging", "ring", "std", "tls12"]
+features = ["logging", "std", "tls12"]
 
 [dependencies.serde]
 version = "1.0.125"
@@ -203,7 +204,7 @@ features = ["io-util", "sync", "macros", "net", "process", "rt", "time", "fs"]
 version = "0.26"
 optional = true
 default-features = false
-features = ["logging", "ring", "tls12"]
+features = ["logging", "tls12"]
 
 [dependencies.uuid]
 version = "1.1.2"
