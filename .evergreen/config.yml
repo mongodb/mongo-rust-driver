@@ -62,9 +62,9 @@ buildvariants:
   - name: lint
     display_name: "Lint"
     run_on:
-      - rhel8-latest-small
+      - ubuntu2404-small
     expansions:
-      LIBMONGOCRYPT_OS: rhel-80-64-bit
+      LIBMONGOCRYPT_OS: ubuntu2204-64
     tasks:
       - name: .lint
 
