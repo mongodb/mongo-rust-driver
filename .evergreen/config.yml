@@ -64,7 +64,7 @@ buildvariants:
     run_on:
       - ubuntu2404-small
     expansions:
-      LIBMONGOCRYPT_OS: ubuntu2404-64
+      LIBMONGOCRYPT_OS: ubuntu2204-64
     tasks:
       - name: .lint
 
