@@ -56,7 +56,7 @@ Each YAML file has the following keys:
 The definition of MATCH or MATCHES in the Spec Test Runner is as follows:
 
 - MATCH takes two values, `expected` and `actual`
-- Notation is "Assert \[actual\] MATCHES \[expected\]
+- Notation is "Assert [actual] MATCHES [expected]
 - Assertion passes if `expected` is a subset of `actual`, with the value `42` acting as placeholders for "any value"
 
 Pseudocode implementation of `actual` MATCHES `expected`:
@@ -167,7 +167,7 @@ and sharded clusters unless otherwise specified:
 
 1. `ChangeStream` must continuously track the last seen `resumeToken`
 
-2. `ChangeStream` will throw an exception if the server response is missing the resume token (if wire version is \< 8,
+2. `ChangeStream` will throw an exception if the server response is missing the resume token (if wire version is < 8,
     this is a driver-side error; for 8+, this is a server-side error)
 
 3. After receiving a `resumeToken`, `ChangeStream` will automatically resume one time on a resumable error with the
@@ -194,23 +194,13 @@ and sharded clusters unless otherwise specified:
 
 11. For a `ChangeStream` under these conditions:
 
-    - Running against a server `>=4.0.7`.
     - The batch is empty or has been iterated to the last document.
 
     Expected result:
 
     - `getResumeToken` must return the `postBatchResumeToken` from the current command response.
 
-12. For a `ChangeStream` under these conditions:
-
-    - Running against a server `<4.0.7`.
-    - The batch is empty or has been iterated to the last document.
-
-    Expected result:
-
-    - `getResumeToken` must return the `_id` of the last document returned if one exists.
-    - `getResumeToken` must return `resumeAfter` from the initial aggregate if the option was specified.
-    - If `resumeAfter` was not specified, the `getResumeToken` result must be empty.
+12. **Removed**
 
 13. For a `ChangeStream` under these conditions:
 
