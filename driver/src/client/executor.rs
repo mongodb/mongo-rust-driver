@@ -984,7 +984,7 @@ impl Client {
                 return Err(ErrorKind::InvalidResponse {
                     message: "missing 'ok' value in response".to_string(),
                 }
-                .into())
+                .into());
             }
         };
 

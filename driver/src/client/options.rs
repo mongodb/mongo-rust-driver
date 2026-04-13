@@ -104,6 +104,7 @@ const URI_OPTIONS: &[&str] = &[
     "zlibcompressionlevel",
     "srvservicename",
     "adaptiveretries",
+    "maxadaptiveretries",
 ];
 
 /// Reserved characters as defined by [Section 2.2 of RFC-3986](https://tools.ietf.org/html/rfc3986#section-2.2).
@@ -311,7 +312,7 @@ impl ServerAddress {
                              between 1 and 65535, got {port}"
                         ),
                     }
-                    .into())
+                    .into());
                 }
                 Ok(port) => Some(port),
             }
@@ -681,6 +682,15 @@ pub struct ClientOptions {
     /// Enable a per-client token bucket to limit overload error retry attempts. Defaults to false.
     pub(crate) adaptive_retries: Option<bool>,
 
+    /// The maximum number of retries to perform when overload errors are encountered. Defaults to
+    /// 2.
+    pub max_adaptive_retries: Option<u32>,
+
+    /// Whether to enable overload retargeting when overload errors are encountered. When overload
+    /// retargeting is enabled, the server on which an overload error occurs is deprioritized
+    /// when selecting a server for a retry attempt. Defaults to false.
+    pub enable_overload_retargeting: Option<bool>,
+
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(setter(skip))]
     #[serde(skip)]
@@ -815,6 +825,10 @@ impl Serialize for ClientOptions {
 
             adaptiveretries: &'a Option<bool>,
 
+            maxadaptiveretries: &'a Option<u32>,
+
+            enableoverloadretargeting: &'a Option<bool>,
+
             #[cfg(feature = "socks5-proxy")]
             #[serde(flatten, serialize_with = "Socks5Proxy::serialize")]
             socks5proxy: &'a Option<Socks5Proxy>,
@@ -852,6 +866,8 @@ impl Serialize for ClientOptions {
                 .map_err(serde::ser::Error::custom)?,
             srvservicename: &self.srv_service_name,
             adaptiveretries: &self.adaptive_retries,
+            maxadaptiveretries: &self.max_adaptive_retries,
+            enableoverloadretargeting: &self.enable_overload_retargeting,
             #[cfg(feature = "socks5-proxy")]
             socks5proxy: &self.socks5_proxy,
         };
@@ -1060,6 +1076,15 @@ pub struct ConnectionString {
 
     /// Enable a per-client token bucket to limit overload error retry attempts. Defaults to false.
     pub(crate) adaptive_retries: Option<bool>,
+
+    /// The maximum number of retries to perform when overload errors are encountered. Defaults to
+    /// 2.
+    pub max_adaptive_retries: Option<u32>,
+
+    /// Whether to enable overload retargeting when overload errors are encountered. When overload
+    /// retargeting is enabled, the server on which an overload error occurs is deprioritized
+    /// when selecting a server for a retry attempt. Defaults to false.
+    pub enable_overload_retargeting: Option<bool>,
 
     #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
     wait_queue_timeout: Option<Duration>,
@@ -1575,12 +1600,12 @@ impl ConnectionString {
                 return Err(Error::invalid_argument(
                     "mongodb+srv connection strings cannot be used when the 'dns-resolver' \
                      feature is disabled",
-                ))
+                ));
             }
             other => {
                 return Err(Error::invalid_argument(format!(
                     "unsupported connection string scheme: {other}"
-                )))
+                )));
             }
         };
 
@@ -1634,7 +1659,7 @@ impl ConnectionString {
                 _ => {
                     return Err(Error::invalid_argument(
                         "exactly one host must be specified with 'mongodb+srv'",
-                    ))
+                    ));
                 }
             }
         };
@@ -1861,6 +1886,8 @@ impl ConnectionString {
             #[cfg(feature = "socks5-proxy")]
             socks5_proxy,
             adaptive_retries,
+            max_adaptive_retries,
+            enable_overload_retargeting,
             #[cfg(test)]
                 original_uri: _,
         } = self;
@@ -2179,6 +2206,16 @@ impl ConnectionString {
             opts.push_str(&format!("&adaptiveRetries={adaptive_retries}"));
         }
 
+        if let Some(max_adaptive_retries) = max_adaptive_retries {
+            opts.push_str(&format!("&maxAdaptiveRetries={max_adaptive_retries}"));
+        }
+
+        if let Some(enable_overload_retargeting) = enable_overload_retargeting {
+            opts.push_str(&format!(
+                "&enableOverloadRetargeting={enable_overload_retargeting}"
+            ));
+        }
+
         if !opts.is_empty() {
             opts.replace_range(0..1, "?"); // mark start of options
             res.push_str(&opts);
@@ -2219,7 +2256,7 @@ impl ConnectionString {
                 None => {
                     return Err(Error::invalid_argument(format!(
                         "connection string option is not a 'key=value' pair: {option_pair}"
-                    )))
+                    )));
                 }
             };
 
@@ -2261,7 +2298,7 @@ impl ConnectionString {
                                   preference mode"
                             .to_string(),
                     }
-                    .into())
+                    .into());
                 }
             };
         }
@@ -2275,7 +2312,7 @@ impl ConnectionString {
                                   mode"
                             .to_string(),
                     }
-                    .into())
+                    .into());
                 }
             };
         }
@@ -2505,7 +2542,7 @@ impl ConnectionString {
                         return Err(ErrorKind::InvalidArgument {
                             message: format!("'{other}' is not a valid read preference"),
                         }
-                        .into())
+                        .into());
                     }
                 });
             }
@@ -2580,12 +2617,12 @@ impl ConnectionString {
                     Some(Tls::Enabled(_)) if !tls => {
                         return Err(Error::invalid_argument(
                             "cannot set {key}={tls} if other TLS options are set",
-                        ))
+                        ));
                     }
                     Some(Tls::Disabled) if tls => {
                         return Err(Error::invalid_argument(
                             "cannot set {key}={tls} if TLS is disabled",
-                        ))
+                        ));
                     }
                     None => {
                         if tls {
@@ -2632,7 +2669,7 @@ impl ConnectionString {
                     Tls::Disabled => {
                         return Err(Error::invalid_argument(format!(
                             "cannot set {key} when TLS is disabled"
-                        )))
+                        )));
                     }
                 }
             }
@@ -2710,7 +2747,7 @@ impl ConnectionString {
                              `{value}`"
                         ),
                     }
-                    .into())
+                    .into());
                 }
             },
             "w" => {
@@ -2725,7 +2762,7 @@ impl ConnectionString {
                                           integer"
                                     .to_string(),
                             }
-                            .into())
+                            .into());
                         }
                     },
                     Err(_) => {
@@ -2761,6 +2798,12 @@ impl ConnectionString {
             // "adaptiveretries" => {
             //     self.adaptive_retries = Some(get_bool!(value, key));
             // }
+            "maxadaptiveretries" => {
+                self.max_adaptive_retries = Some(get_u32!(value, key));
+            }
+            "enableoverloadretargeting" => {
+                self.enable_overload_retargeting = Some(get_bool!(value, key));
+            }
             #[cfg(feature = "socks5-proxy")]
             PROXY_HOST => parts.proxy_host = Some(value.to_string()),
             #[cfg(feature = "socks5-proxy")]

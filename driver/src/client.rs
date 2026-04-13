@@ -815,12 +815,14 @@ impl Client {
     }
 
     #[cfg(test)]
+    #[expect(dead_code)]
     pub(crate) async fn get_num_tokens_in_bucket(&self) -> Option<u16> {
         let bucket = self.inner.token_bucket.as_ref()?;
         Some(*bucket.lock().await)
     }
 
     #[cfg(test)]
+    #[expect(dead_code)]
     pub(crate) async fn set_num_tokens_in_bucket(&self, tokens: u16) {
         let Some(ref bucket) = self.inner.token_bucket else {
             return;

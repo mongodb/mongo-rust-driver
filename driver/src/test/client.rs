@@ -1118,10 +1118,13 @@ async fn operation_retry_uses_exponential_backoff() {
     coll.insert_one(doc! { "a": 1 }).await.unwrap_err();
     let duration_with_backoff = start.elapsed();
 
-    assert!(duration_with_backoff - duration_no_backoff >= Duration::from_millis(2100));
+    let difference =
+        duration_with_backoff.abs_diff(duration_no_backoff + Duration::from_millis(300));
+    assert!(difference < Duration::from_millis(300));
 }
 
 // backpressure prose test #2
+/** disabled until backpressure phase 2 is implemented
 #[tokio::test]
 async fn token_bucket_capacity_enforced() {
     const MAX_BUCKET_CAPACITY: u16 = 10_000;
@@ -1140,6 +1143,7 @@ async fn token_bucket_capacity_enforced() {
     let tokens = client.get_num_tokens_in_bucket().await.unwrap();
     assert_eq!(tokens, MAX_BUCKET_CAPACITY);
 }
+*/
 
 // backpressure prose test #3
 #[tokio::test(flavor = "multi_thread")]
@@ -1166,10 +1170,11 @@ async fn overload_errors_retried_max_retries_times() {
     assert!(error.contains_label(RETRYABLE_ERROR));
 
     let events = client.events.get_command_started_events(&["find"]);
-    assert_eq!(events.len(), 6);
+    assert_eq!(events.len(), 3);
 }
 
-// backpressure prose test #4
+// old backpressure prose test #4
+/** disabled until backpressure phase 2 is implemented
 #[tokio::test(flavor = "multi_thread")]
 async fn adaptive_retries_limited_by_token_bucket_tokens() {
     if server_version_lt(4, 4).await {
@@ -1197,4 +1202,36 @@ async fn adaptive_retries_limited_by_token_bucket_tokens() {
 
     let events = client.events.get_command_started_events(&["find"]);
     assert_eq!(events.len(), 3);
+}
+*/
+
+// backpressure prose test #4
+#[tokio::test(flavor = "multi_thread")]
+async fn overload_errors_retried_max_adaptive_retries_times() {
+    if server_version_lt(4, 4).await {
+        log_uncaptured(
+            "skipping overload_errors_retried_max_adaptive_retries_times: requires 4.4+",
+        );
+        return;
+    }
+
+    let mut options = get_client_options().await.clone();
+    if topology_is_sharded().await {
+        options.hosts.drain(1..);
+    }
+    options.max_adaptive_retries = Some(1);
+    let client = Client::for_test().options(options).monitor_events().await;
+    let coll = client.database("db").collection::<Document>("coll");
+
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn)
+        .error_code(462)
+        .error_labels(vec![SYSTEM_OVERLOADED_ERROR, RETRYABLE_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let error = coll.find(doc! {}).await.unwrap_err();
+    assert!(error.contains_label(SYSTEM_OVERLOADED_ERROR));
+    assert!(error.contains_label(RETRYABLE_ERROR));
+
+    let events = client.events.get_command_started_events(&["find"]);
+    assert_eq!(events.len(), 2);
 }

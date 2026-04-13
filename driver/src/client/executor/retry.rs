@@ -8,17 +8,18 @@ use crate::{
     Client,
 };
 
-/// The maximum number of retries that can be performed when the system is overloaded.
-const MAX_OVERLOADED_RETRIES: u8 = 5;
+/// The default maximum number of retries that can be performed when the system is overloaded.
+const DEFAULT_MAX_ADAPTIVE_RETRIES: u32 = 2;
 /// The maximum number of retries that can be performed for retryable reads/writes.
-const MAX_RW_RETRIES: u8 = 1;
+const MAX_RW_RETRIES: u32 = 1;
 
 pub(crate) struct Retry {
-    attempt: u8,
+    attempt: u32,
     pub(super) deprioritized_servers: HashSet<ServerAddress>,
     last_failure: Failure,
     txn_number: Option<i64>,
     pub(crate) overloaded: bool,
+    max_adaptive_retries: u32,
 }
 
 struct Failure {
@@ -107,7 +108,12 @@ impl Retry {
                 || retryability.can_retry_error(&error) && !is_transaction_op
         };
         let overloaded = error.contains_label(SYSTEM_OVERLOADED_ERROR);
-        let deprioritized = if client.is_sharded() || overloaded {
+
+        let enable_overload_retargeting = client
+            .options()
+            .enable_overload_retargeting
+            .unwrap_or(false);
+        let deprioritized = if client.is_sharded() || overloaded && enable_overload_retargeting {
             Some(server)
         } else {
             None
@@ -148,6 +154,10 @@ impl Retry {
                     last_failure: failure,
                     txn_number,
                     overloaded,
+                    max_adaptive_retries: client
+                        .options()
+                        .max_adaptive_retries
+                        .unwrap_or(DEFAULT_MAX_ADAPTIVE_RETRIES),
                 })
             }
         }
@@ -159,7 +169,7 @@ impl Retry {
 
     pub(super) fn max_retries_reached(&self) -> bool {
         if self.overloaded {
-            self.attempt > MAX_OVERLOADED_RETRIES
+            self.attempt > self.max_adaptive_retries
         } else {
             self.attempt > MAX_RW_RETRIES
         }
