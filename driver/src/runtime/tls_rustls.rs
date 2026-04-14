@@ -11,7 +11,7 @@ use rustls::{
     Error as TlsError,
     RootCertStore,
 };
-#[cfg(feature = "rustls-tls")]
+#[cfg(all(feature = "rustls-tls", not(feature = "rustls-tls-aws-lc")))]
 use rustls::crypto::ring as provider;
 #[cfg(feature = "rustls-tls-aws-lc")]
 use rustls::crypto::aws_lc_rs as provider;

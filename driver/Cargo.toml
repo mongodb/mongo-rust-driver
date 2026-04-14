@@ -29,6 +29,7 @@ compat-3-3-0 = []
 bson-2 = ["dep:bson2", "mongocrypt?/bson-2"]
 bson-3 = ["dep:bson3", "mongocrypt?/bson-3"]
 sync = []
+
 rustls-tls = ["dep:rustls", "rustls/ring", "dep:tokio-rustls", "tokio-rustls/ring", "dep:webpki-roots"]
 rustls-tls-aws-lc = ["dep:rustls", "rustls/aws_lc_rs", "dep:tokio-rustls", "tokio-rustls/aws_lc_rs", "dep:webpki-roots"]
 openssl-tls = ["dep:openssl", "dep:openssl-probe", "dep:tokio-openssl"]
