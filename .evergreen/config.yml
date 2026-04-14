@@ -237,11 +237,21 @@ buildvariants:
     display_name: "AWS Authentication"
     patchable: false
     run_on:
+      - rhel8-latest-small
+    expansions:
+      ORCHESTRATION_FILE: auth-aws.json
+    tasks:
+      - .aws-auth !test-aws-auth-ecs
+
+  - name: aws-auth-ecs
+    display_name: "AWS Authentication (ECS)"
+    patchable: false
+    run_on:
       - ubuntu2404-small
     expansions:
       ORCHESTRATION_FILE: auth-aws.json
     tasks:
-      - .aws-auth
+      - test-aws-auth-ecs
 
   - name: azure-kms
     display_name: "Azure KMS"
