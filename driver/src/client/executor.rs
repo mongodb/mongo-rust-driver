@@ -1167,7 +1167,7 @@ impl Error {
     /// On a pre-4.4 connection, a RetryableWriteError label should be added to any write-retryable
     /// error. On a 4.4+ connection, a label should only be added to network errors. Regardless of
     /// server version, a label should only be added if the `retry_writes` client option is not set
-    /// to `false`, the operation during which the error occured is write-retryable, and a
+    /// to `false`, the operation during which the error occurred is write-retryable, and a
     /// TransientTransactionError label has not already been added.
     ///
     /// If the TransientTransactionError or UnknownTransactionCommitResult labels are added, the
