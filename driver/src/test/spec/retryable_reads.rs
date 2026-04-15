@@ -1,16 +1,20 @@
-use std::{future::IntoFuture, sync::Arc, time::Duration};
+use std::{
+    future::IntoFuture,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
-use crate::bson::doc;
+use tokio::sync::Mutex;
 
 use crate::{
-    bson::Document,
+    bson::{doc, Document},
     error::{Result, RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
     event::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
-    options::{ReadPreference, SelectionCriteria},
-    runtime::{self, AsyncJoinHandle},
+    options::{ReadPreference, SelectionCriteria, ServerMonitoringMode},
+    runtime::{self, AcknowledgedMessage, AsyncJoinHandle},
     test::{
         get_client_options,
         log_uncaptured,
@@ -396,4 +400,71 @@ async fn overload_error_retried_on_same_server_retargeting_disabled() {
     let succeeded_server = &succeeded.connection.address;
 
     assert_eq!(failed_server, succeeded_server);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn mix_of_overload_and_non_overload_errors() {
+    if server_version_lt(4, 4).await || !topology_is_replica_set().await {
+        log_uncaptured(
+            "skipping max_retries_when_overload_error_encountered: requires 4.4+ replica set",
+        );
+        return;
+    }
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
+    let fp_client = Client::for_test().await;
+    let guard = Arc::new(Mutex::new(None));
+    let guard_clone = guard.clone();
+    tokio::spawn(async move {
+        while let Some(message) = rx.recv().await {
+            let (event, ack) = message.into_parts();
+            match event {
+                CommandEvent::Failed(failed)
+                    if event.command_name() == "find" && failed.failure.code() == Some(91) =>
+                {
+                    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn)
+                        .error_code(91)
+                        .error_labels(vec![RETRYABLE_ERROR]);
+                    let mut guard = guard_clone.lock().await;
+                    *guard = Some(fp_client.enable_fail_point(fail_point).await.unwrap());
+                    ack.acknowledge(());
+                    break;
+                }
+                _ => {
+                    ack.acknowledge(());
+                }
+            }
+        }
+    });
+
+    let backoff = Duration::from_secs(2);
+
+    let mut options = get_client_options().await.clone();
+    options.test_options_mut().async_event_listener = Some(tx);
+    options.test_options_mut().backoff = Some(backoff);
+    options.server_monitoring_mode = Some(ServerMonitoringMode::Poll);
+    let client = Client::for_test().options(options).monitor_events().await;
+
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::Times(1))
+        .error_code(91)
+        .error_labels(vec![RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let start = Instant::now();
+    let error = client
+        .database("db")
+        .collection::<Document>("mix_of_overload_and_non_overload_errors")
+        .find(doc! {})
+        .await
+        .unwrap_err();
+    let elapsed = start.elapsed();
+    assert!(error.is_server_error());
+
+    // prose test 4 assertion
+    let events = client.events.get_command_started_events(&["find"]);
+    assert_eq!(events.len(), 3); // MAX_RETRIES + 1
+
+    // prose test 5 assertion
+    assert!(elapsed > backoff);
+    assert!(elapsed < backoff * 2);
 }

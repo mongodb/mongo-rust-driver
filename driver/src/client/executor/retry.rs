@@ -1,5 +1,7 @@
 use std::{collections::HashSet, time::Duration};
 
+#[cfg(test)]
+use crate::options::TestOptions;
 use crate::{
     bson_util::round_clamp,
     error::{Error, Result, NO_WRITES_PERFORMED, RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
@@ -19,7 +21,7 @@ pub(crate) struct Retry {
     last_failure: Failure,
     txn_number: Option<i64>,
     pub(crate) overloaded: bool,
-    max_adaptive_retries: u32,
+    max_retries: u32,
 }
 
 struct Failure {
@@ -109,6 +111,13 @@ impl Retry {
         };
         let overloaded = error.contains_label(SYSTEM_OVERLOADED_ERROR);
 
+        let max_adaptive_retries = overloaded.then_some(
+            client
+                .options()
+                .max_adaptive_retries
+                .unwrap_or(DEFAULT_MAX_ADAPTIVE_RETRIES),
+        );
+
         let enable_overload_retargeting = client
             .options()
             .enable_overload_retargeting
@@ -140,6 +149,12 @@ impl Retry {
                     retry.txn_number = txn_number;
                 }
                 retry.overloaded = overloaded;
+                // If we've encountered an overload error, reset the max retries value to max
+                // adaptive retries. This should persist for the duration of the retry loop,
+                // regardless of whether or not future errors are overload errors.
+                if let Some(max_adaptive_retries) = max_adaptive_retries {
+                    retry.max_retries = max_adaptive_retries;
+                }
                 Ok(retry)
             }
             None => {
@@ -154,10 +169,7 @@ impl Retry {
                     last_failure: failure,
                     txn_number,
                     overloaded,
-                    max_adaptive_retries: client
-                        .options()
-                        .max_adaptive_retries
-                        .unwrap_or(DEFAULT_MAX_ADAPTIVE_RETRIES),
+                    max_retries: max_adaptive_retries.unwrap_or(MAX_RW_RETRIES),
                 })
             }
         }
@@ -168,21 +180,25 @@ impl Retry {
     }
 
     pub(super) fn max_retries_reached(&self) -> bool {
-        if self.overloaded {
-            self.attempt > self.max_adaptive_retries
-        } else {
-            self.attempt > MAX_RW_RETRIES
-        }
+        self.attempt > self.max_retries
     }
 
-    pub(super) fn calculate_backoff(&self, #[cfg(test)] test_jitter: Option<f64>) -> Duration {
+    pub(super) fn calculate_backoff(
+        &self,
+        #[cfg(test)] test_options: Option<&TestOptions>,
+    ) -> Duration {
+        #[cfg(test)]
+        if let Some(backoff) = test_options.and_then(|o| o.backoff) {
+            return backoff;
+        }
+
         const BACKOFF_INITIAL_MS: f64 = 100f64;
         const BACKOFF_MAX_MS: f64 = 10_000f64;
         const RETRY_BASE: f64 = 2f64;
 
         let jitter = rand::random_range(0f64..1f64);
         #[cfg(test)]
-        let jitter = test_jitter.unwrap_or(jitter);
+        let jitter = test_options.and_then(|o| o.jitter).unwrap_or(jitter);
 
         let computed_backoff =
             jitter * BACKOFF_INITIAL_MS * RETRY_BASE.powf(f64::from(self.attempt - 1));
