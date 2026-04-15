@@ -339,6 +339,28 @@ impl TopologyWorker {
             // indicate to the topology watchers that the topology is no longer alive
             drop(self.publisher);
 
+            // Drop the update receiver so monitors' topology_updater.update() calls fail
+            // immediately instead of waiting for acknowledgment from this (now-exited) loop.
+            // Without this, close_monitor().await deadlocks: we wait for the monitor to exit, but
+            // the monitor waits for us to acknowledge its update.
+            drop(self.update_receiver);
+
+            #[cfg(test)]
+            if let Some(dur) = self
+                .options
+                .test_options
+                .as_ref()
+                .and_then(|to| to.topology_worker_shutdown_delay)
+            {
+                // In tests, sleep briefly to give any in-flight monitor hello responses a chance to
+                // complete and call topology_updater.update(). This widens the race window to
+                // verify the deadlock fix (dropping update_receiver before closing monitors). Sleep
+                // longer than heartbeat_freq (maxAwaitTimeMS) to ensure the monitor completes a
+                // hello and calls topology_updater.update() during this window. Without the fix
+                // above, this would deadlock.
+                tokio::time::sleep(dur).await;
+            }
+
             // Close all the monitors.
             let mut close_futures = FuturesUnordered::new();
             for (address, server) in self.servers.into_iter() {
