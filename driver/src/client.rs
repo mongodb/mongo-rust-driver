@@ -9,8 +9,8 @@ pub mod session;
 use std::{
     collections::HashSet,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Mutex as SyncMutex,
+        atomic::{AtomicBool, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -24,13 +24,16 @@ use tokio::sync::Mutex;
 
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
+    COMMAND_TRACING_EVENT_TARGET,
+    TracingOrLogLevel,
     command::CommandTracingEventEmitter,
     server_selection::ServerSelectionTracingEventEmitter,
     trace_or_log_enabled,
-    TracingOrLogLevel,
-    COMMAND_TRACING_EVENT_TARGET,
 };
 use crate::{
+    BoxFuture,
+    ClientSession,
+    TopologyType,
     bson::doc,
     concern::{ReadConcern, WriteConcern},
     db::Database,
@@ -47,17 +50,14 @@ use crate::{
         ServerAddress,
     },
     sdam::{
-        server_selection::{self, attempt_to_select_server},
         SelectedServer,
         Topology,
+        server_selection::{self, attempt_to_select_server},
     },
     tracking_arc::TrackingArc,
-    BoxFuture,
-    ClientSession,
-    TopologyType,
 };
 
-pub(crate) use executor::{retry::Retry, HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
+pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS, retry::Retry};
 pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 
 use session::{ServerSession, ServerSessionPool};
@@ -121,6 +121,22 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// _all_ outstanding resource handles to be dropped, so they must either have been dropped before
 /// calling `shutdown` or in a concurrent task; see the documentation of `shutdown` for more
 /// details.
+///
+/// ## Overload Retry Behavior
+/// All operations executed by a `Client` may retry if the selected server is overloaded. For
+/// details on server load-shedding, see the documentation for
+/// [Intelligent Workload Management](https://www.mongodb.com/docs/atlas/intelligent-workload-management/)
+/// and [Overload Errors](https://www.mongodb.com/docs/atlas/overload-errors).
+///
+/// The following options can be configured to customize this behavior:
+/// - Set [`ClientOptions::retry_reads`] to false to disable retrying all reads. Note that this will
+///   also disable non-overload retries.
+/// - Set [`ClientOptions::retry_writes`] to false to disable retrying all writes. Note that this
+///   will also disable non-overload retries.
+/// - Set [`ClientOptions::max_adaptive_retries`] to adjust the number of retries to perform when
+///   overload errors are encountered.
+/// - Set [`ClientOptions::enable_overload_retargeting`] to deprioritize servers on which an
+///   overload error has occurred.
 #[derive(Debug, Clone)]
 pub struct Client {
     inner: TrackingArc<ClientInner>,
