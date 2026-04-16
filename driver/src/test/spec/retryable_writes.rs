@@ -1,4 +1,7 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use tokio::sync::Mutex;
 
@@ -15,7 +18,7 @@ use crate::{
         cmap::{CmapEvent, ConnectionCheckoutFailedReason},
         command::CommandEvent,
     },
-    options::SelectionCriteria,
+    options::{SelectionCriteria, ServerMonitoringMode},
     runtime::{self, spawn, AcknowledgedMessage, AsyncJoinHandle},
     test::{
         get_client_options,
@@ -429,7 +432,7 @@ async fn error_propagation_no_errors_with_no_writes_performed() {
 
     let mut options = get_client_options().await.clone();
     options.test_options_mut().async_event_listener = Some(tx);
-    options.server_monitoring_mode = Some(crate::options::ServerMonitoringMode::Poll);
+    options.server_monitoring_mode = Some(ServerMonitoringMode::Poll);
     let client = Client::for_test().options(options).await;
 
     let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
@@ -488,7 +491,7 @@ async fn error_propagation_all_errors_with_no_writes_performed() {
 
     let mut options = get_client_options().await.clone();
     options.test_options_mut().async_event_listener = Some(tx);
-    options.server_monitoring_mode = Some(crate::options::ServerMonitoringMode::Poll);
+    options.server_monitoring_mode = Some(ServerMonitoringMode::Poll);
     let client = Client::for_test().options(options).await;
 
     let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
@@ -551,7 +554,7 @@ async fn error_propagation_some_errors_with_no_writes_performed() {
 
     let mut options = get_client_options().await.clone();
     options.test_options_mut().async_event_listener = Some(tx);
-    options.server_monitoring_mode = Some(crate::options::ServerMonitoringMode::Poll);
+    options.server_monitoring_mode = Some(ServerMonitoringMode::Poll);
     let client = Client::for_test().options(options).await;
 
     let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
@@ -567,4 +570,72 @@ async fn error_propagation_some_errors_with_no_writes_performed() {
         .unwrap_err();
     assert_eq!(error.code(), Some(91));
     assert!(!error.contains_label(NO_WRITES_PERFORMED));
+}
+
+// retryable writes prose test #6, cases #4 and #5
+#[tokio::test(flavor = "multi_thread")]
+async fn mix_of_overload_and_non_overload_errors() {
+    if server_version_lt(4, 4).await || !topology_is_replica_set().await {
+        log_uncaptured(
+            "skipping max_retries_when_overload_error_encountered: requires 4.4+ replica set",
+        );
+        return;
+    }
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<AcknowledgedMessage<CommandEvent>>(1);
+    let fp_client = Client::for_test().await;
+    let guard = Arc::new(Mutex::new(None));
+    let guard_clone = guard.clone();
+    tokio::spawn(async move {
+        while let Some(message) = rx.recv().await {
+            let (event, ack) = message.into_parts();
+            match event {
+                CommandEvent::Failed(failed)
+                    if event.command_name() == "insert" && failed.failure.code() == Some(91) =>
+                {
+                    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::AlwaysOn)
+                        .error_code(91)
+                        .error_labels(vec![RETRYABLE_ERROR, RETRYABLE_WRITE_ERROR]);
+                    let mut guard = guard_clone.lock().await;
+                    *guard = Some(fp_client.enable_fail_point(fail_point).await.unwrap());
+                    ack.acknowledge(());
+                    break;
+                }
+                _ => {
+                    ack.acknowledge(());
+                }
+            }
+        }
+    });
+
+    let backoff = Duration::from_secs(2);
+
+    let mut options = get_client_options().await.clone();
+    options.test_options_mut().async_event_listener = Some(tx);
+    options.test_options_mut().backoff = Some(backoff);
+    options.server_monitoring_mode = Some(ServerMonitoringMode::Poll);
+    let client = Client::for_test().options(options).monitor_events().await;
+
+    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::Times(1))
+        .error_code(91)
+        .error_labels(vec![RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let start = Instant::now();
+    let error = client
+        .database("db")
+        .collection("mix_of_overload_and_non_overload_errors")
+        .insert_one(doc! { "x": 1 })
+        .await
+        .unwrap_err();
+    let elapsed = start.elapsed();
+    assert!(error.is_server_error());
+
+    // case 4
+    let events = client.events.get_command_started_events(&["insert"]);
+    assert_eq!(events.len(), 3); // MAX_RETRIES + 1
+
+    // case 5
+    assert!(elapsed > backoff);
+    assert!(elapsed < backoff * 2);
 }

@@ -438,7 +438,7 @@ impl Client {
                     if retry.overloaded {
                         let backoff = retry.calculate_backoff(
                             #[cfg(test)]
-                            self.options().test_options.as_ref().and_then(|o| o.jitter),
+                            self.options().test_options.as_ref(),
                         );
                         tokio::time::sleep(backoff).await;
                     }

@@ -739,7 +739,12 @@ pub(crate) struct TestOptions {
     /// Callback to receive hello commands.
     pub(crate) hello_cb: Option<EventHandler<crate::cmap::Command>>,
 
+    /// The value to use for jitter when calculating retry backoff.
     pub(crate) jitter: Option<f64>,
+
+    /// The amount of time to use for all retry backoffs. Set to a large number to detect the
+    /// absence/presence of backoff.
+    pub(crate) backoff: Option<Duration>,
 
     pub(crate) topology_worker_shutdown_delay: Option<Duration>,
 }
