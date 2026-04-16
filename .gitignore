@@ -15,4 +15,4 @@ mongocryptd.pid
 semgrep/
 sarif.json
 .secrets
-.zed/
+.zed
