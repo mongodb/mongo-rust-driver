@@ -14,4 +14,4 @@ authors = [
 license = "Apache-2.0"
 edition = "2021"
 repository = "https://github.com/mongodb/mongo-rust-driver"
-rust-version = "1.83"
+rust-version = "1.85"
