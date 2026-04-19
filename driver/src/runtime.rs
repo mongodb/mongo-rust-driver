@@ -43,15 +43,26 @@ use crate::{error::Result, options::ServerAddress};
 pub(crate) use http::HttpClient;
 #[cfg(feature = "openssl-tls")]
 use tls_openssl as tls;
-#[cfg(all(any(feature = "rustls-tls", feature = "rustls-tls-aws-lc"), not(feature = "openssl-tls")))]
+#[cfg(all(
+    any(feature = "rustls-tls", feature = "rustls-tls-aws-lc"),
+    not(feature = "openssl-tls")
+))]
 use tls_rustls as tls;
-#[cfg(not(any(feature = "rustls-tls", feature = "rustls-tls-aws-lc", feature = "openssl-tls")))]
-compile_error!("At least one of the features 'rustls-tls', 'rustls-tls-aws-lc' or 'openssl-tls' must be enabled.");
+#[cfg(not(any(
+    feature = "rustls-tls",
+    feature = "rustls-tls-aws-lc",
+    feature = "openssl-tls"
+)))]
+compile_error!(
+    "At least one of the features 'rustls-tls', 'rustls-tls-aws-lc' or 'openssl-tls' must be \
+     enabled."
+);
 #[cfg(all(feature = "rustls-tls", feature = "rustls-tls-aws-lc"))]
 #[allow(dead_code)]
 fn emit_double_rustls_warning() {
     #[warn(dead_code)]
-    let w = "Warning: Only one of the features 'rustls-tls' or 'rustls-tls-aws-lc' should be enabled as 'rustls-tls' is ignored while adding extra dependencies";
+    let w = "Warning: Only one of the features 'rustls-tls' or 'rustls-tls-aws-lc' should be \
+             enabled as 'rustls-tls' is ignored while adding extra dependencies";
 }
 
 pub(crate) use tls::TlsConfig;
