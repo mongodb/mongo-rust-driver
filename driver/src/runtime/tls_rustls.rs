@@ -5,13 +5,17 @@ use std::{
     sync::Arc,
 };
 
+#[cfg(feature = "rustls-tls-aws-lc")]
+use rustls::crypto::aws_lc_rs as provider;
+#[cfg(all(feature = "rustls-tls", not(feature = "rustls-tls-aws-lc")))]
+use rustls::crypto::ring as provider;
 use rustls::{
     client::ClientConfig,
-    crypto::ring as provider,
     pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer, ServerName},
     Error as TlsError,
     RootCertStore,
 };
+
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::TlsConnector;
 use webpki_roots::TLS_SERVER_ROOTS;
