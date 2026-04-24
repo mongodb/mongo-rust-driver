@@ -114,7 +114,6 @@ pub(crate) struct RuntimeEnvironment {
     pub(crate) timeout_sec: Option<i32>,
     pub(crate) memory_mb: Option<i32>,
     pub(crate) region: Option<String>,
-    pub(crate) url: Option<String>,
     pub(crate) container: Option<RawDocumentBuf>,
 }
 
@@ -186,7 +185,6 @@ impl From<&RuntimeEnvironment> for RawBson {
             timeout_sec,
             memory_mb,
             region,
-            url,
             container,
         } = env;
         let mut out = rawdoc! {};
@@ -205,9 +203,6 @@ impl From<&RuntimeEnvironment> for RawBson {
         if let Some(r) = region {
             out.append(cstr!("region"), r.as_str());
         }
-        if let Some(u) = url {
-            out.append(cstr!("url"), u.as_str());
-        }
         if let Some(c) = container {
             out.append(cstr!("container"), c.clone());
         }
@@ -222,7 +217,6 @@ impl RuntimeEnvironment {
         timeout_sec: None,
         memory_mb: None,
         region: None,
-        url: None,
         container: None,
     };
 
