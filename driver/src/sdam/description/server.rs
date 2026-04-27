@@ -15,7 +15,7 @@ use crate::{
 
 const DRIVER_MIN_DB_VERSION: &str = "4.2";
 const DRIVER_MIN_WIRE_VERSION: i32 = 8;
-const DRIVER_MAX_WIRE_VERSION: i32 = 25;
+const DRIVER_MAX_WIRE_VERSION: i32 = 29;
 
 /// Enum representing the possible types of servers that the driver can connect to.
 #[derive(Debug, Deserialize, Clone, Copy, Eq, PartialEq, Serialize, Default)]
