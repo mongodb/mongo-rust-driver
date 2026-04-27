@@ -57,7 +57,7 @@ for arg; do
     fi
   elif [ $arg == "cargo-lambda" ]; then
     source ${CARGO_HOME}/env
-    cargo install cargo-binstall
+    cargo install cargo-binstall --locked
     cargo binstall cargo-lambda -y
   else
     echo Missing/unknown install option: "$arg"
