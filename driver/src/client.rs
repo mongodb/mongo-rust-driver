@@ -154,8 +154,7 @@ struct ClientInner {
     topology: Topology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
-    shutdown: TaskTracker,
-    shutdown_done: AtomicBool,
+    shutdown: Shutdown,
     dropped: AtomicBool,
     end_sessions_token: std::sync::Mutex<AsyncDropToken>,
     token_bucket: Option<Mutex<u16>>,
@@ -165,6 +164,12 @@ struct ClientInner {
     tracer: opentelemetry::global::BoxedTracer,
     #[cfg(test)]
     disable_command_events: AtomicBool,
+}
+
+#[derive(Debug)]
+struct Shutdown {
+    pending_drops: TaskTracker,
+    executed: AtomicBool,
 }
 
 impl Client {
@@ -207,8 +212,10 @@ impl Client {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
             options,
-            shutdown: TaskTracker::new(),
-            shutdown_done: AtomicBool::new(false),
+            shutdown: Shutdown {
+                pending_drops: TaskTracker::new(),
+                executed: AtomicBool::new(false),
+            },
             dropped: AtomicBool::new(false),
             end_sessions_token,
             token_bucket,
@@ -422,12 +429,12 @@ impl Client {
 
     pub(crate) fn register_async_drop(&self) -> AsyncDropToken {
         let (cleanup_tx, cleanup_rx) = tokio::sync::oneshot::channel::<BoxFuture<'static, ()>>();
-        self.inner.shutdown.spawn(async move {
+        crate::runtime::spawn(self.inner.shutdown.pending_drops.track_future(async move {
             // If the cleanup channel is closed, that task was dropped.
             if let Ok(cleanup) = cleanup_rx.await {
                 cleanup.await;
             }
-        });
+        }));
         AsyncDropToken {
             tx: Some(cleanup_tx),
         }
@@ -711,7 +718,7 @@ impl AsyncDropToken {
 
 impl Drop for Client {
     fn drop(&mut self) {
-        if !self.inner.shutdown.is_closed()
+        if !self.inner.shutdown.executed.load(Ordering::SeqCst)
             && !self.inner.dropped.load(Ordering::SeqCst)
             && TrackingArc::strong_count(&self.inner) == 1
         {
