@@ -16,7 +16,7 @@ impl Action for crate::action::Shutdown {
         if !self.client.inner.shutdown.executed.load(Ordering::SeqCst) {
             self.client.end_all_sessions().await;
         }
-        self.client.inner.topology.updater().shutdown().await;
+        self.client.inner.topology.shutdown().await;
         // This has to happen last to allow pending cleanup to execute commands.
         self.client
             .inner

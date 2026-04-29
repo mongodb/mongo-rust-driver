@@ -18,6 +18,7 @@ use tokio::sync::{
     mpsc::{self, UnboundedReceiver, UnboundedSender},
     watch::{self, Ref},
 };
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 use crate::{
     client::options::{ClientOptions, ServerAddress},
@@ -67,7 +68,23 @@ pub(crate) struct Topology {
     watcher: TopologyWatcher,
     updater: TopologyUpdater,
     pub(crate) metadata: Arc<std::sync::RwLock<ClientMetadata>>,
+    shutdown: Shutdown,
     _worker_handle: WorkerHandle,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Shutdown {
+    pub(crate) token: CancellationToken,
+    pub(crate) tasks: TaskTracker,
+}
+
+impl Shutdown {
+    pub(crate) fn new() -> Self {
+        Self {
+            token: CancellationToken::new(),
+            tasks: TaskTracker::new(),
+        }
+    }
 }
 
 impl Topology {
@@ -115,6 +132,8 @@ impl Topology {
         let spec = TopologySpec::try_from(options)?;
         let connection_establisher = ConnectionEstablisher::new(EstablisherOptions::from(&spec))?;
 
+        let shutdown = Shutdown::new();
+
         let worker = TopologyWorker {
             id,
             topology_description: description,
@@ -127,6 +146,7 @@ impl Topology {
             handle_listener,
             event_emitter,
             connection_establisher,
+            shutdown: shutdown.clone(),
         };
 
         worker.start();
@@ -137,6 +157,7 @@ impl Topology {
             watcher,
             updater,
             metadata: spec.metadata,
+            shutdown,
             _worker_handle: worker_handle,
         })
     }
@@ -151,6 +172,12 @@ impl Topology {
 
     pub(crate) fn latest(&self) -> Ref<'_, TopologyState> {
         self.watcher.peek_latest()
+    }
+
+    pub(crate) async fn shutdown(&self) {
+        self.shutdown.token.cancel();
+        self.shutdown.tasks.close();
+        self.shutdown.tasks.wait().await;
     }
 }
 
@@ -206,7 +233,6 @@ pub(crate) enum UpdateMessage {
 
 #[derive(Debug, Clone)]
 pub(crate) enum BroadcastMessage {
-    Shutdown,
     FillPool,
     #[cfg(test)]
     SyncWorkers,
@@ -242,6 +268,7 @@ struct TopologyWorker {
     // the following fields stored here for creating new server monitors
     topology_watcher: TopologyWatcher,
     topology_updater: TopologyUpdater,
+    shutdown: Shutdown,
 }
 
 impl TopologyWorker {
@@ -284,15 +311,15 @@ impl TopologyWorker {
     }
 
     fn start(mut self) {
-        runtime::spawn(async move {
+        runtime::spawn(self.shutdown.tasks.clone().track_future(async move {
             self.initialize().await;
-            let mut shutdown_ack = None;
 
             loop {
                 tokio::select! {
+                    _ = self.shutdown.token.cancelled() => break,
                     Some(update) = self.update_receiver.recv() => {
                         let (update, ack) = update.into_parts();
-                        let mut ack = Some(ack);
+                        let ack = Some(ack);
                         let changed = match update {
                             UpdateMessage::AdvanceClusterTime(to) => {
                                 self.advance_cluster_time(to);
@@ -319,10 +346,6 @@ impl TopologyWorker {
                                     .map(|v| v.pool.broadcast(msg.clone()))
                                     .collect();
                                 let _: Vec<_> = rxen.collect().await;
-                                if matches!(msg, BroadcastMessage::Shutdown) {
-                                    shutdown_ack = ack.take();
-                                    break
-                                }
                                 false
                             }
                         };
@@ -401,11 +424,7 @@ impl TopologyWorker {
                     }))
                     .await;
             }
-
-            if let Some(ack) = shutdown_ack {
-                ack.acknowledge(true);
-            }
-        });
+        }));
     }
 
     /// Publish the current TopologyDescription and map of Servers.
@@ -556,6 +575,7 @@ impl TopologyWorker {
                     self.options.clone(),
                     self.connection_establisher.clone(),
                     self.topology_updater.clone(),
+                    self.shutdown.clone(),
                     #[cfg(feature = "tracing-unstable")]
                     self.id,
                 );
@@ -822,11 +842,6 @@ impl TopologyUpdater {
     /// This will start server monitors for the newly added servers.
     pub(crate) async fn sync_hosts(&self, hosts: HashSet<ServerAddress>) {
         self.send_message(UpdateMessage::SyncHosts(hosts)).await;
-    }
-
-    pub(crate) async fn shutdown(&self) {
-        self.send_message(UpdateMessage::Broadcast(BroadcastMessage::Shutdown))
-            .await;
     }
 
     pub(crate) async fn fill_pool(&self) {

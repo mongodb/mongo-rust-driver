@@ -38,7 +38,7 @@ use crate::{
     },
     options::ServerAddress,
     runtime::AcknowledgmentReceiver,
-    sdam::{BroadcastMessage, TopologyUpdater},
+    sdam::{topology::Shutdown, BroadcastMessage, TopologyUpdater},
 };
 use connection_requester::ConnectionRequester;
 use manager::PoolManager;
@@ -70,6 +70,7 @@ impl ConnectionPool {
         connection_establisher: ConnectionEstablisher,
         server_updater: TopologyUpdater,
         options: Option<ConnectionPoolOptions>,
+        shutdown: Shutdown,
         #[cfg(feature = "tracing-unstable")] topology_id: ObjectId,
     ) -> Self {
         let event_handler = options
@@ -93,6 +94,7 @@ impl ConnectionPool {
             server_updater,
             event_emitter.clone(),
             options.clone(),
+            shutdown,
         );
 
         event_emitter.emit_event(|| {

@@ -1,4 +1,4 @@
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, sdam::topology::Shutdown};
 use serde::Deserialize;
 
 use super::EVENT_TIMEOUT;
@@ -50,6 +50,7 @@ async fn acquire_connection_and_send_command() {
         ConnectionEstablisher::new(EstablisherOptions::from(&client_options)).unwrap(),
         TopologyUpdater::channel().0,
         Some(pool_options),
+        Shutdown::new(),
         #[cfg(feature = "tracing-unstable")]
         crate::bson::oid::ObjectId::new(),
     );
@@ -118,6 +119,7 @@ async fn concurrent_connections() {
         ConnectionEstablisher::new(EstablisherOptions::from(&client_options)).unwrap(),
         TopologyUpdater::channel().0,
         Some(options),
+        Shutdown::new(),
         #[cfg(feature = "tracing-unstable")]
         crate::bson::oid::ObjectId::new(),
     );
@@ -194,6 +196,7 @@ async fn connection_error_during_establishment() {
         ConnectionEstablisher::new(EstablisherOptions::from(&client_options)).unwrap(),
         TopologyUpdater::channel().0,
         Some(options),
+        Shutdown::new(),
         #[cfg(feature = "tracing-unstable")]
         crate::bson::oid::ObjectId::new(),
     );

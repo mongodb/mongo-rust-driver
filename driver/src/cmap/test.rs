@@ -23,7 +23,7 @@ use crate::{
     },
     options::TlsOptions,
     runtime::{self, AsyncJoinHandle},
-    sdam::{TopologyUpdater, UpdateMessage},
+    sdam::{topology::Shutdown, TopologyUpdater, UpdateMessage},
     test::{
         assert_matches,
         eq_matches,
@@ -166,6 +166,7 @@ impl Executor {
                 .unwrap(),
             updater,
             Some(self.pool_options),
+            Shutdown::new(),
             #[cfg(feature = "tracing-unstable")]
             crate::bson::oid::ObjectId::new(),
         );
