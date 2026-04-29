@@ -8,10 +8,7 @@ pub mod session;
 
 use std::{
     collections::HashSet,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Mutex as SyncMutex,
-    },
+    sync::atomic::{AtomicBool, Ordering},
     time::{Duration, Instant},
 };
 
@@ -21,6 +18,7 @@ use derive_where::derive_where;
 use futures_core::Future;
 use futures_util::FutureExt;
 use tokio::sync::Mutex;
+use tokio_util::task::TaskTracker;
 
 #[cfg(feature = "tracing-unstable")]
 use crate::trace::{
@@ -36,7 +34,6 @@ use crate::{
     db::Database,
     error::{Error, ErrorKind, Result},
     event::command::CommandEvent,
-    id_set::IdSet,
     operation::OverrideCriteriaFn,
     options::{
         ClientOptions,
@@ -157,7 +154,8 @@ struct ClientInner {
     topology: Topology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
-    shutdown: Shutdown,
+    shutdown: TaskTracker,
+    shutdown_done: AtomicBool,
     dropped: AtomicBool,
     end_sessions_token: std::sync::Mutex<AsyncDropToken>,
     token_bucket: Option<Mutex<u16>>,
@@ -167,12 +165,6 @@ struct ClientInner {
     tracer: opentelemetry::global::BoxedTracer,
     #[cfg(test)]
     disable_command_events: AtomicBool,
-}
-
-#[derive(Debug)]
-struct Shutdown {
-    pending_drops: SyncMutex<IdSet<crate::runtime::AsyncJoinHandle<()>>>,
-    executed: AtomicBool,
 }
 
 impl Client {
@@ -215,10 +207,8 @@ impl Client {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
             options,
-            shutdown: Shutdown {
-                pending_drops: SyncMutex::new(IdSet::new()),
-                executed: AtomicBool::new(false),
-            },
+            shutdown: TaskTracker::new(),
+            shutdown_done: AtomicBool::new(false),
             dropped: AtomicBool::new(false),
             end_sessions_token,
             token_bucket,
@@ -432,34 +422,12 @@ impl Client {
 
     pub(crate) fn register_async_drop(&self) -> AsyncDropToken {
         let (cleanup_tx, cleanup_rx) = tokio::sync::oneshot::channel::<BoxFuture<'static, ()>>();
-        let (id_tx, id_rx) = tokio::sync::oneshot::channel::<crate::id_set::Id>();
-        let weak = self.weak();
-        let handle = crate::runtime::spawn(async move {
-            // Unwrap safety: the id is sent immediately after task creation, with no
-            // await points in between.
-            let id = id_rx.await.unwrap();
+        self.inner.shutdown.spawn(async move {
             // If the cleanup channel is closed, that task was dropped.
             if let Ok(cleanup) = cleanup_rx.await {
                 cleanup.await;
             }
-            if let Some(client) = weak.upgrade() {
-                client
-                    .inner
-                    .shutdown
-                    .pending_drops
-                    .lock()
-                    .unwrap()
-                    .remove(&id);
-            }
         });
-        let id = self
-            .inner
-            .shutdown
-            .pending_drops
-            .lock()
-            .unwrap()
-            .insert(handle);
-        let _ = id_tx.send(id);
         AsyncDropToken {
             tx: Some(cleanup_tx),
         }
@@ -743,7 +711,7 @@ impl AsyncDropToken {
 
 impl Drop for Client {
     fn drop(&mut self) {
-        if !self.inner.shutdown.executed.load(Ordering::SeqCst)
+        if !self.inner.shutdown.is_closed()
             && !self.inner.dropped.load(Ordering::SeqCst)
             && TrackingArc::strong_count(&self.inner) == 1
         {

@@ -332,7 +332,7 @@ impl Client {
     ) -> Result<ExecutionDetails<T>> {
         // Validate inputs that can be checked before server selection and connection
         // checkout.
-        if self.inner.shutdown.executed.load(Ordering::SeqCst) {
+        if self.inner.shutdown_done.load(Ordering::SeqCst) {
             return Err(ErrorKind::Shutdown.into());
         }
 
