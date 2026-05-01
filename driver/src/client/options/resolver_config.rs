@@ -25,12 +25,12 @@ impl PartialEq for ResolverConfig {
         }
 
         for (a, b) in std::iter::zip(left.name_servers(), right.name_servers()) {
-            if !(a.socket_addr == b.socket_addr
-                && a.protocol == b.protocol
-                && a.tls_dns_name == b.tls_dns_name
-                && a.http_endpoint == b.http_endpoint
+            if !(a.ip == b.ip
                 && a.trust_negative_responses == b.trust_negative_responses
-                && a.bind_addr == b.bind_addr)
+                && a.connections.len() == b.connections.len()
+                && std::iter::zip(&a.connections, &b.connections).all(|(ca, cb)| {
+                    ca.port == cb.port && ca.protocol == cb.protocol && ca.bind_addr == cb.bind_addr
+                }))
             {
                 return false;
             }
@@ -48,7 +48,7 @@ impl ResolverConfig {
     /// Please see: <https://www.cloudflare.com/dns/>
     pub fn cloudflare() -> Self {
         ResolverConfig {
-            inner: HickoryResolverConfig::cloudflare(),
+            inner: HickoryResolverConfig::udp_and_tcp(&hickory_resolver::config::CLOUDFLARE),
         }
     }
 
@@ -59,7 +59,7 @@ impl ResolverConfig {
     /// ISP’s track similar information in DNS.
     pub fn google() -> Self {
         ResolverConfig {
-            inner: HickoryResolverConfig::google(),
+            inner: HickoryResolverConfig::udp_and_tcp(&hickory_resolver::config::GOOGLE),
         }
     }
 
@@ -69,7 +69,7 @@ impl ResolverConfig {
     /// Please see: <https://www.quad9.net/faq/>
     pub fn quad9() -> Self {
         ResolverConfig {
-            inner: HickoryResolverConfig::quad9(),
+            inner: HickoryResolverConfig::udp_and_tcp(&hickory_resolver::config::QUAD9),
         }
     }
 }

@@ -338,7 +338,7 @@ impl Error {
     }
 
     #[cfg(feature = "dns-resolver")]
-    pub(crate) fn from_resolve_error(error: hickory_resolver::ResolveError) -> Self {
+    pub(crate) fn from_resolve_error(error: hickory_net::NetError) -> Self {
         ErrorKind::DnsResolve {
             message: error.to_string(),
         }
