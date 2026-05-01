@@ -33,7 +33,7 @@ sync = []
 rustls-tls = ["dep:rustls", "rustls/ring", "dep:tokio-rustls", "tokio-rustls/ring", "dep:webpki-roots"]
 rustls-tls-aws-lc = ["dep:rustls", "rustls/aws_lc_rs", "dep:tokio-rustls", "tokio-rustls/aws_lc_rs", "dep:webpki-roots"]
 openssl-tls = ["dep:openssl", "dep:openssl-probe", "dep:tokio-openssl"]
-dns-resolver = ["dep:hickory-resolver", "dep:hickory-proto"]
+dns-resolver = ["dep:hickory-net", "dep:hickory-resolver", "dep:hickory-proto"]
 cert-key-password = ["dep:pem", "dep:pkcs8"]
 socks5-proxy = ["dep:fast-socks5"]
 
@@ -96,8 +96,9 @@ futures-io = "0.3.21"
 futures-core = "0.3.14"
 futures-util = { version = "0.3.14", features = ["io"] }
 hex = "0.4.0"
-hickory-proto = { version = "0.25", optional = true }
-hickory-resolver = { version = "0.25", optional = true }
+hickory-net = { version = "0.26", optional = true }
+hickory-proto = { version = "0.26", optional = true }
+hickory-resolver = { version = "0.26", optional = true }
 hmac = "0.12.1"
 log = { version = "0.4.17", optional = true }
 md-5 = "0.10.1"
