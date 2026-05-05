@@ -2984,13 +2984,15 @@ async fn text_indexes_explicit_encryption_setup() -> (Client, ClientEncryption, 
         .await
         .unwrap();
 
-    encrypted_client
-        .database("db")
-        .collection("prefix-suffix")
-        .insert_one(doc! { "_id": 0, "encryptedText": encrypted_foobarbaz })
-        .write_concern(WriteConcern::majority())
-        .await
-        .unwrap();
+    if server_version_lt(9, 0).await {
+        encrypted_client
+            .database("db")
+            .collection("prefix-suffix")
+            .insert_one(doc! { "_id": 0, "encryptedText": encrypted_foobarbaz })
+            .write_concern(WriteConcern::majority())
+            .await
+            .unwrap();
+    }
 
     let text_options = TextOptions::builder()
         .case_sensitive(true)
