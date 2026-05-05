@@ -124,7 +124,7 @@ tokio-openssl = { version = "0.6.3", optional = true }
 tracing = { version = "0.1.36", optional = true }
 typed-builder = "0.22.0"
 webpki-roots = { version = "1", optional = true }
-zstd = { version = "0.11.2", optional = true }
+zstd = { version = "0.13.3", optional = true }
 macro_magic = "0.5.1"
 rustversion = "1.0.20"
 tokio-util = { version = "0.7.0", features = ["compat"] }
