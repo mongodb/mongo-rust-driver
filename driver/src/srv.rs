@@ -2,6 +2,8 @@ use std::time::Duration;
 
 #[cfg(feature = "dns-resolver")]
 use crate::error::ErrorKind;
+#[cfg(feature = "dns-resolver")]
+use hickory_proto::rr::RData;
 use crate::{client::options::ResolverConfig, error::Result, options::ServerAddress};
 
 #[derive(Debug)]
@@ -127,23 +129,21 @@ impl SrvResolver {
     }
 
     async fn get_srv_hosts_unvalidated(&self, lookup_hostname: &str) -> Result<LookupHosts> {
-        use hickory_proto::rr::RData;
-
         let srv_lookup = self.resolver.srv_lookup(lookup_hostname).await?;
         let mut hosts = vec![];
         let mut min_ttl = u32::MAX;
-        for record in srv_lookup.as_lookup().record_iter() {
-            let RData::SRV(srv) = record.data() else {
+        for record in srv_lookup.answers() {
+            let RData::SRV(srv) = &record.data else {
                 continue;
             };
-            let mut host = srv.target().to_utf8();
+            let mut host = srv.target.to_utf8();
             // Remove the trailing '.'
             if host.ends_with('.') {
                 host.pop();
             }
-            let port = Some(srv.port());
+            let port = Some(srv.port);
             hosts.push(ServerAddress::Tcp { host, port });
-            min_ttl = std::cmp::min(min_ttl, record.ttl());
+            min_ttl = std::cmp::min(min_ttl, record.ttl);
         }
         Ok(LookupHosts {
             hosts,
@@ -175,7 +175,13 @@ impl SrvResolver {
             Some(response) => response,
             None => return Ok(()),
         };
-        let mut txt_records = txt_records_response.iter();
+        let mut txt_records = txt_records_response
+            .answers()
+            .iter()
+            .filter_map(|record| match &record.data {
+                RData::TXT(txt) => Some(txt),
+                _ => None,
+            });
 
         let txt_record = match txt_records.next() {
             Some(record) => record,
@@ -193,7 +199,7 @@ impl SrvResolver {
         }
 
         let txt_data: Vec<_> = txt_record
-            .txt_data()
+            .txt_data
             .iter()
             .map(|bytes| String::from_utf8_lossy(bytes.as_ref()).into_owned())
             .collect();
