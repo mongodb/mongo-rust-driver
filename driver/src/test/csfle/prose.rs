@@ -2754,82 +2754,90 @@ async fn text_indexes_explicit_encryption() {
     let projection = doc! { "__safeContent__": 0 };
 
     // Case 1: can find a document by prefix
-    let (encrypted_client, client_encryption, key1_id) =
-        text_indexes_explicit_encryption_setup().await;
+    if server_version_lt(9, 0).await {
+        let (encrypted_client, client_encryption, key1_id) =
+            text_indexes_explicit_encryption_setup().await;
 
-    let prefix = client_encryption
-        .encrypt("foo", key1_id, Algorithm::TextPreview)
-        .query_type(prefix_query_type)
-        .contention_factor(0)
-        .text_options(text_prefix_options.clone())
-        .await
-        .unwrap();
+        let prefix = client_encryption
+            .encrypt("foo", key1_id, Algorithm::TextPreview)
+            .query_type(prefix_query_type)
+            .contention_factor(0)
+            .text_options(text_prefix_options.clone())
+            .await
+            .unwrap();
 
-    let actual = prefix_suffix_coll(&encrypted_client)
-        .find_one(prefix_filter(prefix))
-        .projection(projection.clone())
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(actual, expected);
+        let actual = prefix_suffix_coll(&encrypted_client)
+            .find_one(prefix_filter(prefix))
+            .projection(projection.clone())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(actual, expected);
+    }
 
     // Case 2: can find a document by suffix
-    let (encrypted_client, client_encryption, key1_id) =
-        text_indexes_explicit_encryption_setup().await;
+    if server_version_lt(9, 0).await {
+        let (encrypted_client, client_encryption, key1_id) =
+            text_indexes_explicit_encryption_setup().await;
 
-    let suffix = client_encryption
-        .encrypt("baz", key1_id, Algorithm::TextPreview)
-        .query_type(suffix_query_type)
-        .contention_factor(0)
-        .text_options(text_suffix_options.clone())
-        .await
-        .unwrap();
+        let suffix = client_encryption
+            .encrypt("baz", key1_id, Algorithm::TextPreview)
+            .query_type(suffix_query_type)
+            .contention_factor(0)
+            .text_options(text_suffix_options.clone())
+            .await
+            .unwrap();
 
-    let actual = prefix_suffix_coll(&encrypted_client)
-        .find_one(suffix_filter(suffix))
-        .projection(projection.clone())
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(actual, expected);
+        let actual = prefix_suffix_coll(&encrypted_client)
+            .find_one(suffix_filter(suffix))
+            .projection(projection.clone())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(actual, expected);
+    }
 
     // Case 3: assert no document found by prefix
-    let (encrypted_client, client_encryption, key1_id) =
-        text_indexes_explicit_encryption_setup().await;
+    if server_version_lt(9, 0).await {
+        let (encrypted_client, client_encryption, key1_id) =
+            text_indexes_explicit_encryption_setup().await;
 
-    let prefix = client_encryption
-        .encrypt("baz", key1_id, Algorithm::TextPreview)
-        .query_type(prefix_query_type)
-        .contention_factor(0)
-        .text_options(text_prefix_options.clone())
-        .await
-        .unwrap();
+        let prefix = client_encryption
+            .encrypt("baz", key1_id, Algorithm::TextPreview)
+            .query_type(prefix_query_type)
+            .contention_factor(0)
+            .text_options(text_prefix_options.clone())
+            .await
+            .unwrap();
 
-    let actual = prefix_suffix_coll(&encrypted_client)
-        .find_one(prefix_filter(prefix))
-        .projection(projection.clone())
-        .await
-        .unwrap();
-    assert!(actual.is_none(), "{actual:?}");
+        let actual = prefix_suffix_coll(&encrypted_client)
+            .find_one(prefix_filter(prefix))
+            .projection(projection.clone())
+            .await
+            .unwrap();
+        assert!(actual.is_none(), "{actual:?}");
+    }
 
     // Case 4: assert no document found by suffix
-    let (encrypted_client, client_encryption, key1_id) =
-        text_indexes_explicit_encryption_setup().await;
+    if server_version_lt(9, 0).await {
+        let (encrypted_client, client_encryption, key1_id) =
+            text_indexes_explicit_encryption_setup().await;
 
-    let suffix = client_encryption
-        .encrypt("foo", key1_id, Algorithm::TextPreview)
-        .query_type(suffix_query_type)
-        .contention_factor(0)
-        .text_options(text_suffix_options)
-        .await
-        .unwrap();
+        let suffix = client_encryption
+            .encrypt("foo", key1_id, Algorithm::TextPreview)
+            .query_type(suffix_query_type)
+            .contention_factor(0)
+            .text_options(text_suffix_options)
+            .await
+            .unwrap();
 
-    let actual = prefix_suffix_coll(&encrypted_client)
-        .find_one(suffix_filter(suffix))
-        .projection(projection.clone())
-        .await
-        .unwrap();
-    assert!(actual.is_none(), "{actual:?}");
+        let actual = prefix_suffix_coll(&encrypted_client)
+            .find_one(suffix_filter(suffix))
+            .projection(projection.clone())
+            .await
+            .unwrap();
+        assert!(actual.is_none(), "{actual:?}");
+    }
 
     // Case 5: can find a document by substring
     let (encrypted_client, client_encryption, key1_id) =
@@ -2871,15 +2879,17 @@ async fn text_indexes_explicit_encryption() {
     assert!(actual.is_none(), "{actual:?}");
 
     // Case 7: assert contentionFactor is required
-    let (_, client_encryption, key1_id) = text_indexes_explicit_encryption_setup().await;
-    let error = client_encryption
-        .encrypt("foo", key1_id, Algorithm::TextPreview)
-        .query_type(prefix_query_type)
-        .text_options(text_prefix_options)
-        .await
-        .unwrap_err();
-    let message = error.message().unwrap();
-    assert!(message.contains("contention factor is required for textPreview algorithm"));
+    if server_version_lt(9, 0).await {
+        let (_, client_encryption, key1_id) = text_indexes_explicit_encryption_setup().await;
+        let error = client_encryption
+            .encrypt("foo", key1_id, Algorithm::TextPreview)
+            .query_type(prefix_query_type)
+            .text_options(text_prefix_options)
+            .await
+            .unwrap_err();
+        let message = error.message().unwrap();
+        assert!(message.contains("contention factor is required for textPreview algorithm"));
+    }
 }
 
 #[cfg(feature = "text-indexes-unstable")]
@@ -2889,17 +2899,19 @@ async fn text_indexes_explicit_encryption_setup() -> (Client, ClientEncryption, 
     let util_client = Client::for_test().await;
     let db = util_client.database("db");
 
-    let ps_encrypted_fields = load_testdata("data/encryptedFields-prefix-suffix.json").unwrap();
-    db.collection::<Document>("prefix-suffix")
-        .drop()
-        .encrypted_fields(ps_encrypted_fields.clone())
-        .await
-        .unwrap();
-    db.create_collection("prefix-suffix")
-        .encrypted_fields(ps_encrypted_fields)
-        .write_concern(WriteConcern::majority())
-        .await
-        .unwrap();
+    if server_version_lt(9, 0).await {
+        let ps_encrypted_fields = load_testdata("data/encryptedFields-prefix-suffix.json").unwrap();
+        db.collection::<Document>("prefix-suffix")
+            .drop()
+            .encrypted_fields(ps_encrypted_fields.clone())
+            .await
+            .unwrap();
+        db.create_collection("prefix-suffix")
+            .encrypted_fields(ps_encrypted_fields)
+            .write_concern(WriteConcern::majority())
+            .await
+            .unwrap();
+    }
 
     let substring_encrypted_fields = load_testdata("data/encryptedFields-substring.json").unwrap();
     db.collection::<Document>("substring")
@@ -2972,13 +2984,15 @@ async fn text_indexes_explicit_encryption_setup() -> (Client, ClientEncryption, 
         .await
         .unwrap();
 
-    encrypted_client
-        .database("db")
-        .collection("prefix-suffix")
-        .insert_one(doc! { "_id": 0, "encryptedText": encrypted_foobarbaz })
-        .write_concern(WriteConcern::majority())
-        .await
-        .unwrap();
+    if server_version_lt(9, 0).await {
+        encrypted_client
+            .database("db")
+            .collection("prefix-suffix")
+            .insert_one(doc! { "_id": 0, "encryptedText": encrypted_foobarbaz })
+            .write_concern(WriteConcern::majority())
+            .await
+            .unwrap();
+    }
 
     let text_options = TextOptions::builder()
         .case_sensitive(true)
