@@ -3457,6 +3457,7 @@ Use `encryptedClient` to drop and create the following collections:
 - `db.qe2` with options: `{ "encryptedFields": "<schema-qe2.json>"}`.
 - `db.no_schema` with no options.
 - `db.no_schema2` with no options.
+- `db.non_csfle_schema` with options: `{ "validator": { "$jsonSchema": "<schema-non-csfle.json>"}}`
 
 Create an unencrypted MongoClient named `unencryptedClient`.
 
@@ -3472,6 +3473,7 @@ Insert documents with `encryptedClient`:
     - Use `unencryptedClient` to retrieve it. Assert the `qe2` field is BSON binary.
 - `{"no_schema": "no_schema"}` into `db.no_schema`
 - `{"no_schema2": "no_schema2"}` into `db.no_schema2`
+- `{"non_csfle_schema": "non_csfle_schema"}` into `db.non_csfle_schema`
 
 #### Case 1: `db.csfle` joins `db.no_schema`
 
@@ -3652,7 +3654,7 @@ Expect one document to be returned matching:
 
 #### Case 8: `db.csfle` joins `db.qe`
 
-Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+.
+Test requires server 8.1+ and mongocryptd/crypt_shared 8.1+
 
 Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
 impacting the test).
@@ -3673,7 +3675,12 @@ Run an aggregate operation on `db.csfle` with the following pipeline:
 ]
 ```
 
-Expect an exception to be thrown with a message containing the substring `not supported`.
+Expect an exception to be thrown with a message containing one of the following substrings depending on the
+mongocryptd/crypt_shared and libmongocrypt versions:
+
+- mongocryptd/crypt_shared \<8.2 **or** libmongocrypt \<1.17.0: `not supported`.
+- mongocryptd/crypt_shared 8.2+ **and** libmongocrypt 1.17.0+:
+    `Cannot specify both encryptionInformation and csfleEncryptionSchemas unless csfleEncryptionSchemas only contains non-encryption JSON schema validators`.
 
 #### Case 9: test error with \<8.1
 
@@ -3699,6 +3706,31 @@ Run an aggregate operation on `db.csfle` with the following pipeline:
 ```
 
 Expect an exception to be thrown with a message containing the substring `Upgrade`.
+
+#### Case 10: `db.qe` joins `db.non_csfle_schema`
+
+Test requires server 8.2+, mongocryptd/crypt_shared 8.2+, and libmongocrypt 1.17.0+.
+
+Recreate `encryptedClient` with the same `AutoEncryptionOpts` as the setup. (Recreating prevents schema caching from
+impacting the test).
+
+Run an aggregate operation on `db.qe` with the following pipeline:
+
+```json
+[
+    {"$match" : {"qe" : "qe"}},
+    {
+        "$lookup" : {
+            "from" : "non_csfle_schema",
+            "as" : "matched",
+            "pipeline" : [ {"$match" : {"non_csfle_schema" : "non_csfle_schema"}}, {"$project" : {"_id" : 0, "__safeContent__" : 0}} ]
+        }
+    },
+    {"$project" : {"_id" : 0, "__safeContent__" : 0}}
+]
+```
+
+Expect one document to be returned matching: `{"qe" : "qe", "matched" : [ {"non_csfle_schema" : "non_csfle_schema"} ]}`.
 
 ### 26. Custom AWS Credentials
 
@@ -3852,7 +3884,8 @@ Using [QE CreateCollection() and Collection.Drop()](../client-side-encryption.md
 create the following collections with majority write concern:
 
 - `db.prefix-suffix` using the `encryptedFields` option set to the contents of
-    [encryptedFields-prefix-suffix.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/encryptedFields-prefix-suffix.json)
+    [encryptedFields-prefix-suffix.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/encryptedFields-prefix-suffix.json).
+    Skip this step if testing server 9.0.0+.
 - `db.substring` using the `encryptedFields` option set to the contents of
     [encryptedFields-substring.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/encryptedFields-substring.json)
 
@@ -3943,6 +3976,8 @@ Use `encryptedClient` to insert the following document into `db.substring` with 
 
 #### Case 1: can find a document by prefix
 
+Skip this test case if testing MongoDB server 9.0.0+.
+
 Use `clientEncryption.encrypt()` to encrypt the string `"foo"` with the following `EncryptOpts`:
 
 ```typescript
@@ -3975,6 +4010,8 @@ Assert the following document is returned:
 ```
 
 #### Case 2: can find a document by suffix
+
+Skip this test case if testing MongoDB server 9.0.0+.
 
 Use `clientEncryption.encrypt()` to encrypt the string `"baz"` with the following `EncryptOpts`:
 
@@ -4009,6 +4046,8 @@ Assert the following document is returned:
 
 #### Case 3: assert no document found by prefix
 
+Skip this test case if testing MongoDB server 9.0.0+.
+
 Use `clientEncryption.encrypt()` to encrypt the string `"baz"` with the following `EncryptOpts`:
 
 ```typescript
@@ -4037,6 +4076,8 @@ Use `encryptedClient` to run a "find" operation on the `db.prefix-suffix` collec
 Assert that no documents are returned.
 
 #### Case 4: assert no document found by suffix
+
+Skip this test case if testing MongoDB server 9.0.0+.
 
 Use `clientEncryption.encrypt()` to encrypt the string `"foo"` with the following `EncryptOpts`:
 
@@ -4130,6 +4171,8 @@ Use `encryptedClient` to run a "find" operation on the `db.substring` collection
 Assert that no documents are returned.
 
 #### Case 7: assert `contentionFactor` is required
+
+Skip this test case if testing MongoDB server 9.0.0+.
 
 Use `clientEncryption.encrypt()` to encrypt the string `"foo"` with the following `EncryptOpts`:
 
