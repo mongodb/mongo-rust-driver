@@ -34,7 +34,7 @@ use crate::{
     },
     options::ServerAddress,
     runtime::{self, WorkerHandleListener},
-    sdam::{BroadcastMessage, TopologyUpdater},
+    sdam::{topology::TopologyShutdown, BroadcastMessage, TopologyUpdater},
 };
 
 use std::{
@@ -141,6 +141,9 @@ pub(crate) struct ConnectionPoolWorker {
 
     /// Sender used to broadcast cancellation notices to checked-out connections.
     cancellation_sender: Option<broadcast::Sender<()>>,
+
+    /// Client shutdown handling.
+    shutdown: TopologyShutdown,
 }
 
 impl ConnectionPoolWorker {
@@ -153,6 +156,7 @@ impl ConnectionPoolWorker {
         server_updater: TopologyUpdater,
         event_emitter: CmapEventEmitter,
         options: Option<ConnectionPoolOptions>,
+        shutdown: TopologyShutdown,
     ) -> (PoolManager, ConnectionRequester, PoolGenerationSubscriber) {
         // The CMAP spec indicates that a max idle time of zero means that connections should not be
         // closed due to idleness.
@@ -256,11 +260,12 @@ impl ConnectionPoolWorker {
             server_updater,
             max_connecting,
             cancellation_sender,
+            shutdown,
         };
 
-        runtime::spawn(async move {
+        runtime::spawn(worker.shutdown.tasks.clone().track_future(async move {
             worker.execute().await;
-        });
+        }));
 
         (manager, connection_requester, generation_subscriber)
     }
@@ -270,7 +275,6 @@ impl ConnectionPoolWorker {
     /// emit a pool closed event.
     async fn execute(mut self) {
         let mut maintenance_interval = tokio::time::interval(self.maintenance_frequency);
-        let mut shutdown_ack = None;
 
         loop {
             let task = tokio::select! {
@@ -337,10 +341,6 @@ impl ConnectionPoolWorker {
                     PoolManagementRequest::Broadcast(msg) => {
                         let (msg, ack) = msg.into_parts();
                         match msg {
-                            BroadcastMessage::Shutdown => {
-                                shutdown_ack = Some(ack);
-                                break;
-                            }
                             BroadcastMessage::FillPool => {
                                 crate::runtime::spawn(fill_pool(self.weak_requester.clone(), ack));
                             }
@@ -373,9 +373,6 @@ impl ConnectionPoolWorker {
             }
             .into()
         });
-        if let Some(tx) = shutdown_ack {
-            tx.acknowledge(());
-        }
     }
 
     fn below_max_connections(&self) -> bool {

@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::bson::doc;
+use crate::{bson::doc, sdam::topology::TopologyShutdown};
 use tokio::sync::watch;
 
 use super::{
@@ -66,6 +66,8 @@ pub(crate) struct Monitor {
     /// been removed from the topology and no longer needs to be monitored and to receive
     /// cancellation requests.
     request_receiver: MonitorRequestReceiver,
+
+    shutdown: TopologyShutdown,
 }
 
 impl Monitor {
@@ -77,6 +79,7 @@ impl Monitor {
         manager_receiver: MonitorRequestReceiver,
         client_options: ClientOptions,
         connection_establisher: ConnectionEstablisher,
+        shutdown: TopologyShutdown,
     ) {
         let (rtt_monitor, rtt_monitor_handle) = RttMonitor::new(
             address.clone(),
@@ -106,9 +109,10 @@ impl Monitor {
             connection: None,
             allow_streaming,
             topology_version: None,
+            shutdown: shutdown.clone(),
         };
 
-        runtime::spawn(monitor.execute());
+        runtime::spawn(shutdown.tasks.track_future(monitor.execute()));
     }
 
     async fn execute(mut self) {
@@ -119,7 +123,12 @@ impl Monitor {
 
             if self.topology_version.is_some() && self.allow_streaming {
                 if let Some(rtt_monitor) = self.pending_rtt_monitor.take() {
-                    runtime::spawn(rtt_monitor.execute());
+                    runtime::spawn(
+                        self.shutdown
+                            .tasks
+                            .clone()
+                            .track_future(rtt_monitor.execute()),
+                    );
                 }
             }
 
