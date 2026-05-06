@@ -13,6 +13,7 @@ use crate::{
     error::{Error, Result},
     options::ClientOptions,
     runtime,
+    sdam::topology::TopologyShutdown,
     srv::{LookupHosts, SrvResolver},
 };
 
@@ -52,9 +53,10 @@ impl SrvPollingMonitor {
         topology: TopologyUpdater,
         topology_watcher: TopologyWatcher,
         client_options: ClientOptions,
+        shutdown: TopologyShutdown,
     ) {
         if let Some(monitor) = Self::new(topology, topology_watcher, client_options) {
-            runtime::spawn(monitor.execute());
+            runtime::spawn(shutdown.tasks.track_future(monitor.execute()));
         }
     }
 

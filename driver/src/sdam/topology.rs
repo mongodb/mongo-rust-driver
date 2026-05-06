@@ -68,17 +68,17 @@ pub(crate) struct Topology {
     watcher: TopologyWatcher,
     updater: TopologyUpdater,
     pub(crate) metadata: Arc<std::sync::RwLock<ClientMetadata>>,
-    shutdown: Shutdown,
+    shutdown: TopologyShutdown,
     _worker_handle: WorkerHandle,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Shutdown {
+pub(crate) struct TopologyShutdown {
     pub(crate) token: CancellationToken,
     pub(crate) tasks: TaskTracker,
 }
 
-impl Shutdown {
+impl TopologyShutdown {
     pub(crate) fn new() -> Self {
         Self {
             token: CancellationToken::new(),
@@ -132,7 +132,7 @@ impl Topology {
         let spec = TopologySpec::try_from(options)?;
         let connection_establisher = ConnectionEstablisher::new(EstablisherOptions::from(&spec))?;
 
-        let shutdown = Shutdown::new();
+        let shutdown = TopologyShutdown::new();
 
         let worker = TopologyWorker {
             id,
@@ -268,7 +268,7 @@ struct TopologyWorker {
     // the following fields stored here for creating new server monitors
     topology_watcher: TopologyWatcher,
     topology_updater: TopologyUpdater,
-    shutdown: Shutdown,
+    shutdown: TopologyShutdown,
 }
 
 impl TopologyWorker {
@@ -303,6 +303,7 @@ impl TopologyWorker {
                 self.topology_updater.clone(),
                 self.topology_watcher.clone(),
                 self.options.clone(),
+                self.shutdown.clone(),
             );
         }
 
@@ -597,6 +598,7 @@ impl TopologyWorker {
                         monitor_request_receiver,
                         self.options.clone(),
                         self.connection_establisher.clone(),
+                        self.shutdown.clone(),
                     );
                 }
 

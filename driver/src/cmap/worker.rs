@@ -34,7 +34,7 @@ use crate::{
     },
     options::ServerAddress,
     runtime::{self, WorkerHandleListener},
-    sdam::{topology::Shutdown, BroadcastMessage, TopologyUpdater},
+    sdam::{topology::TopologyShutdown, BroadcastMessage, TopologyUpdater},
 };
 
 use std::{
@@ -143,7 +143,7 @@ pub(crate) struct ConnectionPoolWorker {
     cancellation_sender: Option<broadcast::Sender<()>>,
 
     /// Client shutdown handling.
-    shutdown: Shutdown,
+    shutdown: TopologyShutdown,
 }
 
 impl ConnectionPoolWorker {
@@ -156,7 +156,7 @@ impl ConnectionPoolWorker {
         server_updater: TopologyUpdater,
         event_emitter: CmapEventEmitter,
         options: Option<ConnectionPoolOptions>,
-        shutdown: Shutdown,
+        shutdown: TopologyShutdown,
     ) -> (PoolManager, ConnectionRequester, PoolGenerationSubscriber) {
         // The CMAP spec indicates that a max idle time of zero means that connections should not be
         // closed due to idleness.
@@ -283,8 +283,6 @@ impl ConnectionPoolWorker {
                 // and ready always have priority over checkout requests. The pool
                 // exiting also has priority.
                 biased;
-
-                _ = self.shutdown.token.cancelled() => break,
 
                 Some(request) = self.management_receiver.recv() => request.into(),
                 _ = self.handle_listener.wait_for_all_handle_drops() => {

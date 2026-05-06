@@ -154,7 +154,7 @@ struct ClientInner {
     topology: Topology,
     options: ClientOptions,
     session_pool: ServerSessionPool,
-    shutdown: Shutdown,
+    shutdown: ClientShutdown,
     dropped: AtomicBool,
     end_sessions_token: std::sync::Mutex<AsyncDropToken>,
     token_bucket: Option<Mutex<u16>>,
@@ -167,7 +167,7 @@ struct ClientInner {
 }
 
 #[derive(Debug)]
-struct Shutdown {
+struct ClientShutdown {
     pending_drops: TaskTracker,
     executed: AtomicBool,
 }
@@ -212,7 +212,7 @@ impl Client {
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
             options,
-            shutdown: Shutdown {
+            shutdown: ClientShutdown {
                 pending_drops: TaskTracker::new(),
                 executed: AtomicBool::new(false),
             },

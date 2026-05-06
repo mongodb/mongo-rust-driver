@@ -6,7 +6,7 @@ use std::sync::{
 use crate::{
     cmap::{establish::ConnectionEstablisher, options::ConnectionPoolOptions, ConnectionPool},
     options::{ClientOptions, ServerAddress},
-    sdam::{topology::Shutdown, TopologyUpdater},
+    sdam::{topology::TopologyShutdown, TopologyUpdater},
 };
 
 /// Contains the state for a given server in the topology.
@@ -37,7 +37,7 @@ impl Server {
         options: ClientOptions,
         connection_establisher: ConnectionEstablisher,
         topology_updater: TopologyUpdater,
-        shutdown: Shutdown,
+        shutdown: TopologyShutdown,
         #[cfg(feature = "tracing-unstable")] topology_id: crate::bson::oid::ObjectId,
     ) -> Arc<Server> {
         Arc::new(Self {
