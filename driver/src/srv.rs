@@ -2,9 +2,9 @@ use std::time::Duration;
 
 #[cfg(feature = "dns-resolver")]
 use crate::error::ErrorKind;
+use crate::{client::options::ResolverConfig, error::Result, options::ServerAddress};
 #[cfg(feature = "dns-resolver")]
 use hickory_proto::rr::RData;
-use crate::{client::options::ResolverConfig, error::Result, options::ServerAddress};
 
 #[derive(Debug)]
 pub(crate) struct ResolvedConfig {
@@ -175,13 +175,14 @@ impl SrvResolver {
             Some(response) => response,
             None => return Ok(()),
         };
-        let mut txt_records = txt_records_response
-            .answers()
-            .iter()
-            .filter_map(|record| match &record.data {
-                RData::TXT(txt) => Some(txt),
-                _ => None,
-            });
+        let mut txt_records =
+            txt_records_response
+                .answers()
+                .iter()
+                .filter_map(|record| match &record.data {
+                    RData::TXT(txt) => Some(txt),
+                    _ => None,
+                });
 
         let txt_record = match txt_records.next() {
             Some(record) => record,

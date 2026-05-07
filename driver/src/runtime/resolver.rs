@@ -1,15 +1,8 @@
 use crate::error::{Error, Result};
-use hickory_resolver::{
-    config::ResolverConfig,
-    lookup::Lookup,
-    proto::rr::Name,
-};
+use hickory_resolver::{config::ResolverConfig, lookup::Lookup, proto::rr::Name};
 
 #[cfg(feature = "gssapi-auth")]
-use hickory_resolver::{
-    lookup_ip::LookupIp,
-    proto::rr::RecordType,
-};
+use hickory_resolver::{lookup_ip::LookupIp, proto::rr::RecordType};
 #[cfg(feature = "gssapi-auth")]
 use std::net::IpAddr;
 
