@@ -4,6 +4,8 @@ mod windows;
 #[cfg(not(target_os = "windows"))]
 mod nix;
 
+use hickory_proto::rr::RData;
+
 use crate::{
     bson::Bson,
     client::{
@@ -240,7 +242,7 @@ async fn canonicalize_hostname(
         CanonicalizeHostName::Forward => {
             let lookup_records = resolver.cname_lookup(hostname).await?;
 
-            if !lookup_records.records().is_empty() {
+            if !lookup_records.answers().is_empty() {
                 // As long as there is a record, we can return the original hostname.
                 // Although the spec says to return the canonical name, this is not
                 // done by any drivers in practice since the majority of them use
@@ -264,7 +266,12 @@ async fn canonicalize_hostname(
                 // reverse lookup
                 match resolver.reverse_lookup(first_address).await {
                     Ok(reverse_lookup) => {
-                        if let Some(name) = reverse_lookup.iter().next() {
+                        if let Some(name) =
+                            reverse_lookup.answers().iter().find_map(|r| match &r.data {
+                                RData::PTR(ptr) => Some(ptr),
+                                _ => None,
+                            })
+                        {
                             name.to_lowercase().to_string()
                         } else {
                             hostname.to_lowercase()
