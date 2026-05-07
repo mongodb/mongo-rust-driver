@@ -320,8 +320,7 @@ impl StartTransaction<&mut ClientSession> {
     /// callback, it MUST return them after doing so.
     ///
     /// This version of the method uses an async closure, which means it's both more convenient and
-    /// avoids the lifetime issues of `and_run`, but is only available in Rust versions 1.85 and
-    /// above.
+    /// avoids the lifetime issues of `and_run`.
     ///
     /// In some circumstances, using this method can trigger a
     /// [compiler bug](https://github.com/rust-lang/rust/issues/96865) that results in
@@ -357,7 +356,6 @@ impl StartTransaction<&mut ClientSession> {
     /// # Ok(())
     /// # }
     /// ```
-    #[rustversion::since(1.85)]
     pub async fn and_run2<R, F>(self, mut callback: F) -> Result<R>
     where
         F: for<'b> AsyncFnMut(&'b mut ClientSession) -> Result<R>,
