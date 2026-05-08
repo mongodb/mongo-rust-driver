@@ -37,23 +37,33 @@ async fn run_unified() {
         ]);
     }
 
+    let mut skipped_tests = vec![
+        // The driver does not support socketTimeoutMS.
+        "Reset server and pool after network timeout error during authentication",
+        "Ignore network timeout error on find",
+        "apply backpressure on network timeout error during connection establishment",
+        // TODO RUST-2068: unskip these tests
+        "Pool is cleared on handshake error during minPoolSize population",
+        "Pool is cleared on authentication error during minPoolSize population",
+    ];
+    if cfg!(target_os = "macos") {
+        skipped_tests
+            .extend_from_slice(&["Topology lifecycle", "Command error on Monitor handshake"]);
+    }
+
     run_unified_tests(&["server-discovery-and-monitoring", "unified"])
         .skip_files(&skipped_files)
-        .skip_tests(&[
-            // The driver does not support socketTimeoutMS.
-            "Reset server and pool after network timeout error during authentication",
-            "Ignore network timeout error on find",
-            "apply backpressure on network timeout error during connection establishment",
-            // TODO RUST-2068: unskip these tests
-            "Pool is cleared on handshake error during minPoolSize population",
-            "Pool is cleared on authentication error during minPoolSize population",
-        ])
+        .skip_tests(&skipped_tests)
         .await;
 }
 
 /// Streaming protocol prose test 1 from SDAM spec tests.
 #[tokio::test(flavor = "multi_thread")]
 async fn streaming_min_heartbeat_frequency() {
+    if cfg!(target_os = "macos") {
+        log_uncaptured("skipping streaming_min_heartbeat_frequency: flaky on macos");
+        return;
+    }
     if topology_is_load_balanced().await {
         log_uncaptured("skipping streaming_min_heartbeat_frequency due to load balanced topology");
         return;

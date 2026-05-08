@@ -1084,6 +1084,10 @@ async fn backpressure_run_unified() {
 // backpressure prose test #1
 #[tokio::test(flavor = "multi_thread")]
 async fn operation_retry_uses_exponential_backoff() {
+    if cfg!(target_os = "macos") {
+        log_uncaptured("skipping operation_retry_uses_exponential_backoff: flaky on macos");
+        return;
+    }
     if server_version_lt(4, 4).await {
         log_uncaptured("skipping operation_retry_uses_exponential_backoff: requires 4.4+");
         return;

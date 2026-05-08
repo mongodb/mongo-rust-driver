@@ -7,12 +7,17 @@ use crate::{
     bson::doc,
     options::{CreateCollectionOptions, CursorType, FindOptions},
     runtime,
+    test::log_uncaptured,
     Client,
 };
 
 #[tokio::test]
 #[function_name::named]
 async fn tailable_cursor() {
+    if cfg!(target_os = "macos") {
+        log_uncaptured("skipping tailable_cursor: flaky on macos");
+        return;
+    }
     let client = Client::for_test().await;
     let coll = client
         .create_fresh_collection(

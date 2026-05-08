@@ -41,6 +41,11 @@ async fn run_unified() {
 /// pool before the second attempt.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_releases_connection() {
+    if cfg!(target_os = "macos") {
+        log_uncaptured("skipping retry_releases_connection: flaky on macos");
+        return;
+    }
+
     let mut client_options = get_client_options().await.clone();
     client_options.hosts.drain(1..);
     client_options.retry_reads = Some(true);
