@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:0b411c71-3ae4-4f86-b418-c0d628e39501",
+  "serialNumber": "urn:uuid:1ed1728e-ed5d-4f64-8241-a49fd292b95d",
   "metadata": {
-    "timestamp": "2026-05-05T14:57:48.213804151Z",
+    "timestamp": "2026-05-11T09:04:43.679270527Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -6339,6 +6339,7 @@
         "registry+https://github.com/rust-lang/crates.io-index#futures-core@0.3.32",
         "registry+https://github.com/rust-lang/crates.io-index#futures-io@0.3.32",
         "registry+https://github.com/rust-lang/crates.io-index#futures-sink@0.3.32",
+        "registry+https://github.com/rust-lang/crates.io-index#futures-util@0.3.32",
         "registry+https://github.com/rust-lang/crates.io-index#pin-project-lite@0.2.17",
         "registry+https://github.com/rust-lang/crates.io-index#tokio@1.52.1"
       ]
