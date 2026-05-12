@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:46f3b13c-f226-4c02-b913-dc3aede9d071",
+  "serialNumber": "urn:uuid:b324cd38-4c69-419e-9106-9caf4bff2df0",
   "metadata": {
-    "timestamp": "2026-05-11T18:17:23.166822509Z",
+    "timestamp": "2026-05-12T12:38:02.823666949Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -3263,37 +3263,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#rustversion@1.0.22",
-      "author": "David Tolnay <dtolnay@gmail.com>",
-      "name": "rustversion",
-      "version": "1.0.22",
-      "description": "Conditional compilation according to rustc compiler version",
-      "scope": "required",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
-        }
-      ],
-      "licenses": [
-        {
-          "expression": "MIT OR Apache-2.0"
-        }
-      ],
-      "purl": "pkg:cargo/rustversion@1.0.22",
-      "externalReferences": [
-        {
-          "type": "documentation",
-          "url": "https://docs.rs/rustversion"
-        },
-        {
-          "type": "vcs",
-          "url": "https://github.com/dtolnay/rustversion"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#scopeguard@1.2.0",
       "author": "bluss",
       "name": "scopeguard",
@@ -5437,7 +5406,6 @@
         "registry+https://github.com/rust-lang/crates.io-index#rand@0.9.4",
         "registry+https://github.com/rust-lang/crates.io-index#rustc_version_runtime@0.3.0",
         "registry+https://github.com/rust-lang/crates.io-index#rustls@0.23.40",
-        "registry+https://github.com/rust-lang/crates.io-index#rustversion@1.0.22",
         "registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228",
         "registry+https://github.com/rust-lang/crates.io-index#serde_bytes@0.11.19",
         "registry+https://github.com/rust-lang/crates.io-index#serde_with@3.20.0",
@@ -6119,9 +6087,6 @@
         "registry+https://github.com/rust-lang/crates.io-index#subtle@2.6.1",
         "registry+https://github.com/rust-lang/crates.io-index#zeroize@1.8.2"
       ]
-    },
-    {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#rustversion@1.0.22"
     },
     {
       "ref": "registry+https://github.com/rust-lang/crates.io-index#scopeguard@1.2.0"
