@@ -46,8 +46,7 @@ impl OperationWithDefaults for GetStreamProcessor {
             doc = inner;
         }
 
-        let info: StreamProcessorInfo =
-            crate::bson::from_document(doc).map_err(crate::error::Error::custom)?;
+        let info: StreamProcessorInfo = crate::bson_compat::deserialize_from_document(doc)?;
         Ok(info)
     }
 
