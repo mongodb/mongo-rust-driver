@@ -4,9 +4,9 @@
 //!
 //! Requirements:
 //!
-//!   - An Atlas Stream Processing workspace with a hostname matching the
-//!     pattern `atlas-stream-<workspaceId>-<suffix>.<region>.a.query.mongodb.net`
-//!     (or `.mongodb-<env>.net` for staging).
+//!   - An Atlas Stream Processing workspace with a hostname matching the pattern
+//!     `atlas-stream-<workspaceId>-<suffix>.<region>.a.query.mongodb.net` (or `.mongodb-<env>.net`
+//!     for staging).
 //!   - A user with the `atlasAdmin` role.
 //!   - Two connections registered in the workspace:
 //!       - `sample_stream_solar`  (built-in sample source)
@@ -28,7 +28,11 @@ use std::{
 use mongodb::{
     bson::{doc, oid::ObjectId},
     error::Result,
-    stream_processing::{GetStreamProcessorSamplesOptions, StreamProcessingClient, StreamProcessors},
+    stream_processing::{
+        GetStreamProcessorSamplesOptions,
+        StreamProcessingClient,
+        StreamProcessors,
+    },
 };
 
 #[tokio::main]
@@ -36,12 +40,8 @@ async fn main() -> ExitCode {
     let uri = match std::env::var("MONGODB_STREAM_PROCESSING_URI") {
         Ok(uri) if !uri.is_empty() => uri,
         _ => {
-            eprintln!(
-                "This example requires an Atlas Stream Processing workspace endpoint."
-            );
-            eprintln!(
-                "Set MONGODB_STREAM_PROCESSING_URI to the workspace connection string."
-            );
+            eprintln!("This example requires an Atlas Stream Processing workspace endpoint.");
+            eprintln!("Set MONGODB_STREAM_PROCESSING_URI to the workspace connection string.");
             return ExitCode::from(1);
         }
     };
@@ -49,8 +49,8 @@ async fn main() -> ExitCode {
     if !StreamProcessingClient::is_workspace_uri(&uri) {
         eprintln!("MONGODB_STREAM_PROCESSING_URI does not look like a workspace endpoint.");
         eprintln!(
-            "Expected hostname pattern: atlas-stream-*.<region>.a.query.mongodb.net \
-             (or .mongodb-stage.net for Atlas staging)"
+            "Expected hostname pattern: atlas-stream-*.<region>.a.query.mongodb.net (or \
+             .mongodb-stage.net for Atlas staging)"
         );
         return ExitCode::from(1);
     }
