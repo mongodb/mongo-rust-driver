@@ -27,8 +27,8 @@ fn is_subset(subset: &[i32], superset: &[i32]) -> bool {
 fn shutting_down_codes_subset_of_recovering_codes() {
     assert!(
         is_subset(&SHUTTING_DOWN_CODES, &RECOVERING_CODES),
-        "SHUTTING_DOWN_CODES must be a subset of RECOVERING_CODES; \
-         update both arrays together when adding new codes"
+        "SHUTTING_DOWN_CODES must be a subset of RECOVERING_CODES; update both arrays together \
+         when adding new codes"
     );
 }
 
@@ -50,7 +50,7 @@ fn retryable_read_codes_differ_from_write_codes_by_exactly_134() {
     assert_eq!(
         read_only,
         vec![134],
-        "RETRYABLE_READ_CODES should differ from RETRYABLE_WRITE_CODES \
-         only by code 134 (ReadConcernMajorityNotAvailableYet)"
+        "RETRYABLE_READ_CODES should differ from RETRYABLE_WRITE_CODES only by code 134 \
+         (ReadConcernMajorityNotAvailableYet)"
     );
 }
