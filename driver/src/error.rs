@@ -25,7 +25,7 @@ pub use bulk_write::{BulkWriteError, PartialBulkWriteResult};
 /// SHUTTING_DOWN_CODES is a strict subset of these.
 pub(crate) const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
 /// Codes indicating the node is not a writable primary (per the SDAM spec).
-const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
+pub(crate) const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
 /// Codes indicating the node is shutting down. Strict subset of RECOVERING_CODES;
 /// both sets must be updated together if new codes are added.
 pub(crate) const SHUTTING_DOWN_CODES: [i32; 2] = [11600, 91];

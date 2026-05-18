@@ -1,5 +1,6 @@
 use crate::error::{
     Error,
+    NOTWRITABLEPRIMARY_CODES,
     RECOVERING_CODES,
     RETRYABLE_READ_CODES,
     RETRYABLE_WRITE_CODES,
@@ -30,6 +31,16 @@ fn shutting_down_codes_subset_of_recovering_codes() {
         "SHUTTING_DOWN_CODES must be a subset of RECOVERING_CODES; update both arrays together \
          when adding new codes"
     );
+}
+
+#[test]
+fn not_writeable_primary_codes_disjoint_from_recovering_codes() {
+    assert!(
+        NOTWRITABLEPRIMARY_CODES
+            .iter()
+            .all(|c| !RECOVERING_CODES.contains(c)),
+        "NOTWRITABLEPRIMARY_CODES must be disjoint from RECOVERING_CODES",
+    )
 }
 
 #[test]
