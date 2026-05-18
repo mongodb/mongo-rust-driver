@@ -21,17 +21,34 @@ use crate::{
 
 pub use bulk_write::{BulkWriteError, PartialBulkWriteResult};
 
-const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
-const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
-const SHUTTING_DOWN_CODES: [i32; 2] = [11600, 91];
-const RETRYABLE_READ_CODES: [i32; 13] = [
+/// Codes indicating the node is in a recovering state (per the SDAM spec).
+/// SHUTTING_DOWN_CODES is a strict subset of these.
+pub(crate) const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
+/// Codes indicating the node is not a writable primary (per the SDAM spec).
+pub(crate) const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
+/// Codes indicating the node is shutting down. Strict subset of RECOVERING_CODES;
+/// both sets must be updated together if new codes are added.
+pub(crate) const SHUTTING_DOWN_CODES: [i32; 2] = [11600, 91];
+/// Codes that make a read operation retryable (wire version <= 8).
+/// Superset of RETRYABLE_WRITE_CODES — includes code 134 (ReadConcernMajorityNotAvailableYet).
+pub(crate) const RETRYABLE_READ_CODES: [i32; 13] = [
     11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 134, 262,
 ];
-const RETRYABLE_WRITE_CODES: [i32; 12] = [
+/// Codes that make a write operation retryable (wire version <= 8).
+/// Subset of RETRYABLE_READ_CODES.
+pub(crate) const RETRYABLE_WRITE_CODES: [i32; 12] = [
     11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 262,
 ];
 const UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL_CODES: [i32; 3] = [50, 64, 91];
 const REAUTHENTICATION_REQUIRED_CODE: i32 = 391;
+/// Code 43 is CursorNotFound, which is always resumable regardless of wire version.
+const CURSOR_NOT_FOUND_CODE: i32 = 43;
+/// Error codes indicating a change stream is resumable on servers with wire version < 9
+/// (MongoDB < 4.4). On wire version >= 9, the server instead sets the
+/// "ResumableChangeStreamError" label directly.
+const RESUMABLE_CHANGE_STREAM_CODES: [i32; 17] = [
+    6, 7, 89, 91, 189, 262, 9001, 10107, 11600, 11602, 13435, 13436, 63, 150, 13388, 234, 133,
+];
 
 /// Retryable write error label. This label will be added to an error when the error is
 /// write-retryable.
@@ -498,7 +515,7 @@ impl Error {
             return true;
         }
         let code = self.sdam_code();
-        if code == Some(43) {
+        if code == Some(CURSOR_NOT_FOUND_CODE) {
             return true;
         }
         if matches!(self.wire_version, Some(v) if v >= 9)
@@ -507,12 +524,7 @@ impl Error {
             return true;
         }
         if let (Some(code), true) = (code, matches!(self.wire_version, Some(v) if v < 9)) {
-            if [
-                6, 7, 89, 91, 189, 262, 9001, 10107, 11600, 11602, 13435, 13436, 63, 150, 13388,
-                234, 133,
-            ]
-            .contains(&code)
-            {
+            if RESUMABLE_CHANGE_STREAM_CODES.contains(&code) {
                 return true;
             }
         }
