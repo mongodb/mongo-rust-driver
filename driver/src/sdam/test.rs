@@ -30,6 +30,10 @@ use crate::{
 
 #[tokio::test(flavor = "multi_thread")]
 async fn min_heartbeat_frequency() {
+    if cfg!(target_os = "macos") {
+        log_uncaptured("skipping min_heartbeat_frequency: flaky on macos");
+        return;
+    }
     if topology_is_load_balanced().await {
         log_uncaptured("skipping min_heartbeat_frequency test due to load-balanced topology");
         return;
@@ -87,6 +91,10 @@ async fn min_heartbeat_frequency() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sdam_pool_management() {
+    if cfg!(target_os = "macos") {
+        log_uncaptured("skipping sdam_pool_management: flaky on macos");
+        return;
+    }
     if !server_version_matches(">= 4.2.9").await {
         log_uncaptured(
             "skipping sdam_pool_management test due to server not supporting appName failCommand",

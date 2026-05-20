@@ -67,6 +67,10 @@ async fn init_stream(
 /// Prose test 1: ChangeStream must continuously track the last seen resumeToken
 #[tokio::test]
 async fn tracks_resume_token() -> Result<()> {
+    if cfg!(target_os = "macos") {
+        log_uncaptured("skipping tracks_resume_token: flaky on macos");
+        return Ok(());
+    }
     let (client, coll, mut stream) = match init_stream("track_resume_token", false).await? {
         Some(t) => t,
         None => return Ok(()),

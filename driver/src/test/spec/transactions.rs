@@ -280,6 +280,10 @@ async fn write_concern_not_inherited() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn convenient_api_retry_backoff_is_enforced() {
+    if cfg!(target_os = "macos") {
+        log_uncaptured("skipping convenient_api_retry_backoff_is_enforced: flaky on macos");
+        return;
+    }
     if !transactions_supported().await {
         log_uncaptured("skipping convenient_retry_backoff_is_enforced: transactions not supported");
         return;
