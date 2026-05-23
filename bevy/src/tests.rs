@@ -62,6 +62,34 @@ fn load_image_document() {
 }
 
 #[test]
+fn load_image_document_nested() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let plugin = rt.block_on(async {
+        let client = mongodb::Client::with_uri_str(&*MONGODB_URI).await.unwrap();
+        let db = client.database("bevy_test");
+
+        let doc = rawdoc! {
+            "name": "textures/player/pixel.pbm",
+            "data": mongodb::bson::Binary {
+                subtype: BinarySubtype::Generic,
+                bytes: PNM_IMAGE_DATA.to_owned(),
+            },
+        };
+        let coll = db.collection::<RawDocumentBuf>("doc_images_nested");
+        coll.drop().await.unwrap();
+        coll.insert_one(doc.clone()).await.unwrap();
+
+        let meta_coll = db.collection::<RawDocumentBuf>("doc_images_nested.meta");
+        meta_coll.drop().await.unwrap();
+
+        MongodbAssetPlugin::new(&client).await
+    });
+
+    let result = test_load_image(plugin, "mongodb://document/bevy_test/doc_images_nested/textures/player/pixel.pbm");
+    assert!(result.is_ok(), "{:?}", result);
+}
+
+#[test]
 fn load_image_document_with_meta() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let plugin = rt.block_on(async {

@@ -221,7 +221,6 @@ enum AssetPath {
         name: String,
     },
 }
-
 impl AssetPath {
     fn parse(path: &Path) -> std::io::Result<Self> {
         let Some(parts) = path.iter().map(|p| p.to_str()).collect::<Option<Vec<_>>>() else {
@@ -230,28 +229,34 @@ impl AssetPath {
                 "non-utf8 path",
             ));
         };
-        return match parts.as_slice() {
-            ["document", db, coll, name] => Ok(Self::Document {
-                namespace: mongodb::Namespace::new(*db, *coll),
-                name: name.to_string(),
-            }),
-            ["gridfs", db, bucket, name] => Ok(Self::GridFs {
-                db: db.to_string(),
-                bucket: bucket.to_string(),
-                name: name.to_string(),
-            }),
-            _ => Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidFilename,
-                format!(
-                    "expected \"document/<database>/<collection>/<asset>\" or \
-                     \"gridfs/<database>/<bucket>/<asset>\", got {:?}",
-                    path
-                ),
-            )),
-        };
+        if parts.len() >= 4 {
+            let prefix = parts[0];
+            let db = parts[1].to_string();
+            let secondary = parts[2].to_string();
+            let name = parts[3..].join("/");
+            if prefix == "document" {
+                return Ok(Self::Document {
+                    namespace: mongodb::Namespace::new(db, secondary),
+                    name,
+                });
+            } else if prefix == "gridfs" {
+                return Ok(Self::GridFs {
+                    db,
+                    bucket: secondary,
+                    name,
+                });
+            }
+        }
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidFilename,
+            format!(
+                "expected \"document/<database>/<collection>/<asset>\" or \
+                 \"gridfs/<database>/<bucket>/<asset>\", got {:?}",
+                path
+            ),
+        ))
     }
 }
-
 impl std::fmt::Display for AssetPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

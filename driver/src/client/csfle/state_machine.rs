@@ -531,10 +531,14 @@ pub(crate) mod azure {
                     &format!("invalid `expires_in` response field: {e}"),
                 )
             })?;
+            let expires_in = Duration::from_secs(expires_in_secs);
+            let expire_time = now.checked_add(expires_in).ok_or_else(|| {
+                Error::authentication_error("azure imds", "expires_in response is too large")
+            })?;
             #[allow(clippy::redundant_clone)]
             Ok(CachedAccessToken {
                 token_doc: rawdoc! { "accessToken": server_response.access_token.clone() },
-                expire_time: now + Duration::from_secs(expires_in_secs),
+                expire_time,
                 #[cfg(test)]
                 server_response,
             })
