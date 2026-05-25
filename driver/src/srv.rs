@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 #[cfg(feature = "dns-resolver")]
-use crate::error::ErrorKind;
+use crate::error::{ErrorKind, Redact};
 use crate::{client::options::ResolverConfig, error::Result, options::ServerAddress};
 #[cfg(feature = "dns-resolver")]
 use hickory_proto::rr::RData;
@@ -69,7 +69,10 @@ impl LookupHosts {
 
         if self.hosts.is_empty() {
             return Err(ErrorKind::DnsResolve {
-                message: format!("SRV lookup for {original_hostname} returned no records"),
+                message: format!(
+                    "SRV lookup for {} returned no records",
+                    Redact(original_hostname)
+                ),
             }
             .into());
         }
@@ -192,8 +195,9 @@ impl SrvResolver {
         if txt_records.next().is_some() {
             return Err(ErrorKind::DnsResolve {
                 message: format!(
-                    "TXT lookup for {original_hostname} returned more than one record, but more \
-                     than one are not allowed with 'mongodb+srv'",
+                    "TXT lookup for {} returned more than one record, but more than one are not \
+                     allowed with 'mongodb+srv'",
+                    Redact(original_hostname),
                 ),
             }
             .into());

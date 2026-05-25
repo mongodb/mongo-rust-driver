@@ -37,7 +37,7 @@ use crate::{
     bson::{doc, Bson, Document, Timestamp, UuidRepresentation},
     client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
-    error::{Error, ErrorKind, Result},
+    error::{Error, ErrorKind, Redact, Result},
     event::EventHandler,
     options::ReadConcernLevel,
     sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
@@ -252,8 +252,8 @@ impl ServerAddress {
             let Some((hostname, port)) = ip_literal.split_once("]") else {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
-                        "invalid server address {address}: missing closing ']' in IP literal \
-                         hostname"
+                        "invalid server address {}: missing closing ']' in IP literal hostname",
+                        Redact(address),
                     ),
                 }
                 .into());
@@ -261,7 +261,7 @@ impl ServerAddress {
 
             if let Err(parse_error) = Ipv6Addr::from_str(hostname) {
                 return Err(ErrorKind::InvalidArgument {
-                    message: format!("invalid server address {address}: {parse_error}"),
+                    message: format!("invalid server address {}: {parse_error}", Redact(address)),
                 }
                 .into());
             }
@@ -273,8 +273,9 @@ impl ServerAddress {
             } else {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
-                        "invalid server address {address}: the hostname can only be followed by a \
-                         port prefixed with ':', got {port}"
+                        "invalid server address {}: the hostname can only be followed by a port \
+                         prefixed with ':', got {port}",
+                        Redact(address)
                     ),
                 }
                 .into());
@@ -290,7 +291,10 @@ impl ServerAddress {
 
         if hostname.is_empty() {
             return Err(ErrorKind::InvalidArgument {
-                message: format!("invalid server address {address}: the hostname cannot be empty"),
+                message: format!(
+                    "invalid server address {}: the hostname cannot be empty",
+                    Redact(address)
+                ),
             }
             .into());
         }
@@ -308,8 +312,9 @@ impl ServerAddress {
                 Ok(0) | Err(_) => {
                     return Err(ErrorKind::InvalidArgument {
                         message: format!(
-                            "invalid server address {address}: the port must be an integer \
-                             between 1 and 65535, got {port}"
+                            "invalid server address {}: the port must be an integer between 1 and \
+                             65535, got {port}",
+                            Redact(address)
                         ),
                     }
                     .into());
