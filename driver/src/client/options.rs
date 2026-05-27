@@ -709,9 +709,6 @@ pub struct ClientOptions {
 
     /// Configuration of the DNS resolver used for SRV and TXT lookups.
     /// By default, the host system's resolver configuration will be used.
-    ///
-    /// On Windows, there is a known performance issue in [hickory_resolver] with using the default
-    /// system configuration, so a custom configuration is recommended.
     #[builder(setter(skip))]
     #[serde(skip)]
     #[derive_where(skip(Debug))]
