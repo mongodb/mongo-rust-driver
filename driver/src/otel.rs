@@ -224,7 +224,7 @@ impl Client {
             .tracer()
             .span_builder("transaction")
             .with_kind(SpanKind::Client)
-            .with_attributes([KeyValue::new("db.system", "mongodb")])
+            .with_attributes([KeyValue::new("db.system", "mongodb"), KeyValue::new("db.system.name", "mongodb")])
             .start(self.tracer());
         TxnSpan(Context::current_with_span(span))
     }
@@ -307,6 +307,7 @@ fn common_attrs(op: &impl OtelInfo) -> Vec<KeyValue> {
     let name = target.name();
     let mut attrs = vec![
         KeyValue::new("db.system", "mongodb"),
+        KeyValue::new("db.system.name", "mongodb"),
         KeyValue::new("db.namespace", name.database.to_owned()),
     ];
     if let Some(coll) = name.collection {
