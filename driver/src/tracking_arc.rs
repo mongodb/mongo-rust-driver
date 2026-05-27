@@ -51,6 +51,7 @@ impl<T> TrackingArc<T> {
         }
     }
 
+    #[cfg(feature = "in-use-encryption")]
     pub(crate) fn downgrade(tracked: &Self) -> Weak<T> {
         Weak {
             inner: Arc::downgrade(&tracked.inner),
@@ -114,11 +115,13 @@ impl<T> std::ops::Deref for TrackingArc<T> {
     }
 }
 
+#[cfg(feature = "in-use-encryption")]
 #[derive(Debug)]
 pub(crate) struct Weak<T> {
     inner: std::sync::Weak<Inner<T>>,
 }
 
+#[cfg(feature = "in-use-encryption")]
 impl<T> Clone for Weak<T> {
     fn clone(&self) -> Self {
         Self {
@@ -127,6 +130,7 @@ impl<T> Clone for Weak<T> {
     }
 }
 
+#[cfg(feature = "in-use-encryption")]
 impl<T> Weak<T> {
     pub(crate) fn upgrade(&self) -> Option<TrackingArc<T>> {
         self.inner.upgrade().map(|inner| {

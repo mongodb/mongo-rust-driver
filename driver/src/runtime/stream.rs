@@ -115,7 +115,10 @@ impl AsyncStream {
                 let resolved: Vec<_> = runtime::resolve_address(&address).await?.collect();
                 if resolved.is_empty() {
                     return Err(ErrorKind::DnsResolve {
-                        message: format!("No DNS results for domain {address}"),
+                        message: format!(
+                            "No DNS results for domain {}",
+                            crate::error::Redact(address)
+                        ),
                     }
                     .into());
                 }

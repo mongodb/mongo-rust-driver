@@ -145,8 +145,8 @@ impl Error {
     pub(crate) fn pool_cleared_error(address: &ServerAddress, cause: &Error) -> Self {
         ErrorKind::ConnectionPoolCleared {
             message: format!(
-                "Connection pool for {address} cleared because another operation failed with: \
-                 {cause}"
+                "Connection pool for {} cleared because another operation failed with: {cause}",
+                Redact(address)
             ),
         }
         .into()
@@ -1187,3 +1187,25 @@ macro_rules! load_balanced_mode_mismatch {
 }
 
 pub(crate) use load_balanced_mode_mismatch;
+
+pub(crate) struct Redact<T>(pub T);
+
+impl<T: std::fmt::Display> std::fmt::Display for Redact<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if cfg!(feature = "redact-errors") {
+            write!(f, "<redacted>")
+        } else {
+            write!(f, "{}", self.0)
+        }
+    }
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for Redact<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if cfg!(feature = "redact-errors") {
+            write!(f, "<redacted>")
+        } else {
+            write!(f, "{:?}", self.0)
+        }
+    }
+}

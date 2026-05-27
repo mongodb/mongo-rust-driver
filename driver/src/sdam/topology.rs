@@ -5,11 +5,6 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    bson::oid::ObjectId,
-    cmap::establish::handshake::ClientMetadata,
-    error::SYSTEM_OVERLOADED_ERROR,
-};
 use futures_util::{
     stream::{FuturesUnordered, StreamExt},
     FutureExt,
@@ -21,14 +16,15 @@ use tokio::sync::{
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 use crate::{
+    bson::oid::ObjectId,
     client::options::{ClientOptions, ServerAddress},
     cmap::{
         conn::{pooled::PooledConnection, ConnectionGeneration},
-        establish::{ConnectionEstablisher, EstablisherOptions},
+        establish::{handshake::ClientMetadata, ConnectionEstablisher, EstablisherOptions},
         Command,
         PoolGeneration,
     },
-    error::{load_balanced_mode_mismatch, Error, Result},
+    error::{load_balanced_mode_mismatch, Error, Redact, Result, SYSTEM_OVERLOADED_ERROR},
     event::sdam::{
         SdamEvent,
         ServerClosedEvent,
@@ -520,7 +516,8 @@ impl TopologyWorker {
                 let removed_server = self.servers.remove(address);
                 debug_assert!(
                     removed_server.is_some(),
-                    "tried to remove non-existent address from topology: {address}"
+                    "tried to remove non-existent address from topology: {}",
+                    Redact(address)
                 );
 
                 self.emit_event(|| {
@@ -557,7 +554,8 @@ impl TopologyWorker {
                 if self.servers.contains_key(address) {
                     debug_assert!(
                         false,
-                        "adding address that already exists in topology: {address}"
+                        "adding address that already exists in topology: {}",
+                        Redact(address)
                     );
                     continue;
                 }

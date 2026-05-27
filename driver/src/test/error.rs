@@ -1,5 +1,6 @@
 use crate::error::{
     Error,
+    Redact,
     NOTWRITABLEPRIMARY_CODES,
     RECOVERING_CODES,
     RETRYABLE_READ_CODES,
@@ -64,4 +65,38 @@ fn retryable_read_codes_differ_from_write_codes_by_exactly_134() {
         "RETRYABLE_READ_CODES should differ from RETRYABLE_WRITE_CODES only by code 134 \
          (ReadConcernMajorityNotAvailableYet)"
     );
+}
+
+#[test]
+fn redacted_display() {
+    let value = "test";
+    let actual = format!("{}", Redact(value));
+    if cfg!(feature = "redact-errors") {
+        assert!(
+            !actual.contains(value),
+            "value: {value:?} actual: {actual:?}"
+        );
+    } else {
+        assert!(
+            actual.contains(value),
+            "value: {value:?} actual: {actual:?}"
+        );
+    }
+}
+
+#[test]
+fn redacted_debug() {
+    let value = "test";
+    let actual = format!("{:?}", Redact(value));
+    if cfg!(feature = "redact-errors") {
+        assert!(
+            !actual.contains(value),
+            "value: {value:?} actual: {actual:?}"
+        );
+    } else {
+        assert!(
+            actual.contains(value),
+            "value: {value:?} actual: {actual:?}"
+        );
+    }
 }

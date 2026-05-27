@@ -17,7 +17,7 @@ use crate::{
         options::ServerApi,
     },
     cmap::Connection,
-    error::{Error, Result},
+    error::{Error, Redact, Result},
     options::ResolverConfig,
 };
 
@@ -254,7 +254,7 @@ async fn canonicalize_hostname(
             } else {
                 return Err(Error::authentication_error(
                     GSSAPI_STR,
-                    &format!("No addresses found for hostname: {hostname}"),
+                    &format!("No addresses found for hostname: {}", Redact(hostname)),
                 ));
             }
         }
@@ -282,7 +282,7 @@ async fn canonicalize_hostname(
             } else {
                 return Err(Error::authentication_error(
                     GSSAPI_STR,
-                    &format!("No addresses found for hostname: {hostname}"),
+                    &format!("No addresses found for hostname: {}", Redact(hostname)),
                 ));
             }
         }

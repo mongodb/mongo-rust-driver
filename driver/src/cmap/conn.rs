@@ -21,7 +21,7 @@ use super::{conn::pooled::PooledConnection, manager::PoolManager};
 use crate::{
     bson::oid::ObjectId,
     cmap::PoolGeneration,
-    error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
+    error::{load_balanced_mode_mismatch, Error, ErrorKind, Redact, Result},
     event::cmap::{CmapEventEmitter, ConnectionCreatedEvent},
     options::ServerAddress,
     runtime::AsyncStream,
@@ -192,7 +192,7 @@ impl Connection {
                 let error: Error = ErrorKind::ConnectionPoolCleared {
                     message: format!(
                         "Connection to {} interrupted due to server monitor timeout",
-                        self.address,
+                        Redact(&self.address),
                     )
                 }.into();
                 self.error = Some(error.clone());
@@ -216,7 +216,7 @@ impl Connection {
         if self.more_to_come {
             return Err(Error::internal(format!(
                 "attempted to send a new message to {} but moreToCome bit was set",
-                self.address()
+                Redact(self.address())
             )));
         }
 
@@ -276,7 +276,7 @@ impl Connection {
         if !self.more_to_come {
             return Err(Error::internal(format!(
                 "attempted to stream response from connection to {} but moreToCome bit was not set",
-                self.address()
+                Redact(self.address())
             )));
         }
 

@@ -628,6 +628,7 @@ impl Client {
         }
     }
 
+    #[cfg(feature = "in-use-encryption")]
     pub(crate) fn weak(&self) -> WeakClient {
         WeakClient {
             inner: TrackingArc::downgrade(&self.inner),
@@ -688,11 +689,13 @@ impl Client {
     }
 }
 
+#[cfg(feature = "in-use-encryption")]
 #[derive(Clone, Debug)]
 pub(crate) struct WeakClient {
     inner: crate::tracking_arc::Weak<ClientInner>,
 }
 
+#[cfg(feature = "in-use-encryption")]
 impl WeakClient {
     pub(crate) fn upgrade(&self) -> Option<Client> {
         self.inner.upgrade().map(|inner| Client { inner })

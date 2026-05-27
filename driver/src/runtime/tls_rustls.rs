@@ -53,7 +53,7 @@ pub(super) async fn tls_connect<T: AsyncRead + AsyncWrite + Unpin>(
 ) -> Result<TlsStream<T>> {
     let name = ServerName::try_from(host)
         .map_err(|e| ErrorKind::DnsResolve {
-            message: format!("could not resolve {host:?}: {e}"),
+            message: format!("could not resolve {:?}: {e}", crate::error::Redact(host)),
         })?
         .to_owned();
 
