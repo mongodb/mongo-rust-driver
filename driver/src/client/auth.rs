@@ -202,13 +202,25 @@ impl AuthMechanism {
             }
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => {
-                if credential.username.is_some() && credential.password.is_none() {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "Username cannot be provided without password for MONGODB-AWS \
-                                  authentication"
-                            .to_string(),
-                    }
-                    .into());
+                if credential.username.is_some() {
+                    return Err(Error::invalid_argument(
+                        "Username cannot be provided for MONGODB-AWS authentication",
+                    ));
+                }
+                if credential.password.is_some() {
+                    return Err(Error::invalid_argument(
+                        "Password cannot be provided for MONGODB-AWS authentication",
+                    ));
+                }
+                if credential
+                    .mechanism_properties
+                    .as_ref()
+                    .map_or(false, |mp| mp.contains_key("AWS_SESSION_TOKEN"))
+                {
+                    return Err(Error::invalid_argument(
+                        "AWS_SESSION_TOKEN mechanism property cannot be provided for MONGODB-AWS \
+                         authentication",
+                    ));
                 }
 
                 Ok(())

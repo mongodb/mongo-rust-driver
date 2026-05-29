@@ -18,17 +18,25 @@ ______________________________________________________________________
 
 ## Machine Authentication Flow Prose Tests
 
-Drivers MUST run the machine prose tests when `OIDC_TOKEN_DIR` is set. Drivers can either set the `ENVIRONMENT:test`
-auth mechanism property, or use a custom callback that also reads the file.
+Drivers MUST run these tests in all supported OIDC environments:
 
-Drivers can also choose to run the machine prose tests on GCP or Azure VMs, or on the Kubernetes clusters.
+- A callback that reads the token file for `ENVIRONMENT:test`. A callback enables testing additional behaviors. Tests
+    and assertions limited to a callback are noted with `[callback-only]`.
+- `ENVIRONMENT:test`
+- `ENVIRONMENT:gcp`
+- `ENVIRONMENT:azure`
+- `ENVIRONMENT:k8s`
+
+The token file `ENVIRONMENT:test` is located in `OIDC_TOKEN_DIR` set by
+[drivers-evergreen-tools](https://github.com/mongodb-labs/drivers-evergreen-tools/blob/master/.evergreen/auth_oidc/README.md)
+scripts.
 
 Drivers MUST implement all prose tests in this section. Unless otherwise noted, all `MongoClient` instances MUST be
 configured with `retryReads=false`.
 
 > [!NOTE]
-> For test cases that create fail points, drivers MUST either use a unique `appName` or explicitly remove the fail point
-> callback to prevent interaction between test cases.
+> For test cases that create fail points, drivers MUST use a unique `appName` to prevent interaction with other
+> environment processes, and explicitly remove the fail point to prevent interaction between test runs.
 
 After setting up your OIDC
 [environment](https://github.com/mongodb-labs/drivers-evergreen-tools/blob/master/.evergreen/auth_oidc/README.md),
@@ -40,17 +48,17 @@ source the `secrets-export.sh` file and use the associated env variables in your
 
 - Create an OIDC configured client.
 - Perform a `find` operation that succeeds.
-- Assert that the callback was called 1 time.
+- `[callback-only]` Assert that the callback was called 1 time.
 - Close the client.
 
 **1.2 Callback is called once for multiple connections**
 
 - Create an OIDC configured client.
 - Start 10 threads and run 100 `find` operations in each thread that all succeed.
-- Assert that the callback was called 1 time.
+- `[callback-only]` Assert that the callback was called 1 time.
 - Close the client.
 
-### (2) OIDC Callback Validation
+### (2) `[callback-only]` OIDC Callback Validation
 
 **2.1 Valid Callback Inputs**
 
@@ -91,10 +99,10 @@ source the `secrets-export.sh` file and use the associated env variables in your
 - Create an OIDC configured client.
 - Poison the *Client Cache* with an invalid access token.
 - Perform a `find` operation that succeeds.
-- Assert that the callback was called 1 time.
+- `[callback-only]` Assert that the callback was called 1 time.
 - Close the client.
 
-**3.2 Authentication failures without cached tokens return an error**
+**3.2 `[callback-only]` Authentication failures without cached tokens return an error**
 
 - Create an OIDC configured client with an OIDC callback that always returns invalid access tokens.
 - Perform a `find` operation that fails.
@@ -103,7 +111,7 @@ source the `secrets-export.sh` file and use the associated env variables in your
 
 **3.3 Unexpected error code does not clear the cache**
 
-- Create a `MongoClient` with an OIDC callback that returns a valid token.
+- Create an OIDC configured client.
 - Set a fail point for `saslStart` commands of the form:
 
 ```javascript
@@ -122,9 +130,9 @@ source the `secrets-export.sh` file and use the associated env variables in your
 ```
 
 - Perform a `find` operation that fails.
-- Assert that the callback has been called once.
+- `[callback-only]` Assert that the callback has been called once.
 - Perform a `find` operation that succeeds.
-- Assert that the callback has been called once.
+- `[callback-only]` Assert that the callback has been called once.
 - Close the client.
 
 ### (4) Reauthentication
@@ -150,10 +158,11 @@ source the `secrets-export.sh` file and use the associated env variables in your
 ```
 
 - Perform a `find` operation that succeeds.
-- Assert that the callback was called 2 times (once during the connection handshake, and again during reauthentication).
+- `[callback-only]` Assert that the callback was called 2 times (once during the connection handshake, and again during
+    reauthentication).
 - Close the client.
 
-#### 4.2 Read Commands Fail If Reauthentication Fails
+#### `[callback-only]` 4.2 Read Commands Fail If Reauthentication Fails
 
 - Create a `MongoClient` whose OIDC callback returns one good token and then bad tokens after the first call.
 - Perform a `find` operation that succeeds.
@@ -178,7 +187,7 @@ source the `secrets-export.sh` file and use the associated env variables in your
 - Assert that the callback was called 2 times.
 - Close the client.
 
-#### 4.3 Write Commands Fail If Reauthentication Fails
+#### `[callback-only]` 4.3 Write Commands Fail If Reauthentication Fails
 
 - Create a `MongoClient` whose OIDC callback returns one good token and then bad tokens after the first call.
 - Perform an `insert` operation that succeeds.
@@ -199,7 +208,7 @@ source the `secrets-export.sh` file and use the associated env variables in your
 }
 ```
 
-- Perform a `find` operation that fails.
+- Perform a `insert` operation that fails.
 - Assert that the callback was called 2 times.
 - Close the client.
 
@@ -207,9 +216,10 @@ source the `secrets-export.sh` file and use the associated env variables in your
 
 - Create an OIDC configured client.
 - Populate the *Client Cache* with a valid access token to enforce Speculative Authentication.
+    - This may be done by authenticating a temporary OIDC configured client and copying the cached token.
 - Perform an `insert` operation that succeeds.
 - Assert that the callback was not called.
-- Assert there were no `SaslStart` commands executed.
+- Assert there were no `saslStart` commands executed.
 - Set a fail point for `insert` commands of the form:
 
 ```javascript
@@ -228,8 +238,8 @@ source the `secrets-export.sh` file and use the associated env variables in your
 ```
 
 - Perform an `insert` operation that succeeds.
-- Assert that the callback was called once.
-- Assert there were `SaslStart` commands executed.
+- `[callback-only]` Assert that the callback was called once.
+- Assert there were `saslStart` commands executed.
 - Close the client.
 
 #### 4.5 Reauthentication Succeeds when a Session is involved
@@ -254,7 +264,8 @@ source the `secrets-export.sh` file and use the associated env variables in your
 
 - Start a new session.
 - In the started session perform a `find` operation that succeeds.
-- Assert that the callback was called 2 times (once during the connection handshake, and again during reauthentication).
+- `[callback-only]` Assert that the callback was called 2 times (once during the connection handshake, and again during
+    reauthentication).
 - Close the session and the client.
 
 ## (5) Azure Tests
