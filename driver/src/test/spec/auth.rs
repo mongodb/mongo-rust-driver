@@ -58,6 +58,14 @@ async fn run_auth_test(test_file: TestFile) {
             #[cfg(not(feature = "aws-auth"))]
             "MONGODB-AWS",
         ];
+        let skipped_tests = [
+            // Lack of callback can't be validated from just URI parsing, as it's set in code
+            "should throw an exception if neither environment nor callbacks specified",
+            // TODO RUST-2248 enable these for 4.0
+            "should throw an exception if username provided (MONGODB-AWS)",
+            "should throw an exception if username and password provided (MONGODB-AWS)",
+            "should throw an exception if AWS_SESSION_TOKEN provided (MONGODB-AWS)",
+        ];
 
         if skipped_mechanisms
             .iter()
@@ -65,18 +73,18 @@ async fn run_auth_test(test_file: TestFile) {
         {
             continue;
         }
+        if skipped_tests
+            .iter()
+            .any(|desc| test_case.description.contains(desc))
+        {
+            continue;
+        }
+
         #[cfg(not(feature = "gssapi-auth"))]
         // This one's GSSAPI but doesn't include it in the description
         if test_case
             .description
             .contains("must raise an error when the hostname canonicalization is invalid")
-        {
-            continue;
-        }
-        // Lack of callback can't be validated from just URI parsing, as it's set in code
-        if test_case
-            .description
-            .contains("should throw an exception if neither environment nor callbacks specified")
         {
             continue;
         }
