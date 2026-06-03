@@ -758,7 +758,7 @@ async fn manual_shutdown_immediate_with_resources() {
     }
 
     let client = Client::for_test().monitor_events().await;
-    let db = client.database("shutdown_test");
+    let db = client.database("shutdown_immediate_test");
     db.drop().await.unwrap();
     let coll = db.collection::<Document>("test");
     coll.insert_many([doc! {}, doc! {}]).await.unwrap();
