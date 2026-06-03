@@ -109,9 +109,6 @@ pub(super) const AWS_SESSION_TOKEN: &'static str = "AWS_SESSION_TOKEN";
 // Find credentials using MongoDB URI or AWS SDK
 pub(crate) async fn get_aws_credentials(credential: &Credential) -> Result<Credentials> {
     if let (Some(access_key), Some(secret_key)) = (&credential.username, &credential.password) {
-        crate::log_warning!(
-            "URI credentials for MONGODB-AWS are deprecated and will be removed in 4.0."
-        );
         // Look for credentials in the MongoDB URI
         Ok(Credentials::new(
             access_key.clone(),

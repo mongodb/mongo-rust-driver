@@ -215,7 +215,7 @@ impl AuthMechanism {
                 {
                     crate::log_warning!(
                         "Auth mechanism {:?} for MONGODB-AWS is deprecated and will be removed in \
-                         4.0",
+                         4.0.",
                         aws::AWS_SESSION_TOKEN
                     );
                 }
