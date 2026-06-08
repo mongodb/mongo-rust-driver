@@ -2711,19 +2711,15 @@ mod text_indexes_explicit_encryption {
     }
 
     const PREFIX_QUERY_TYPE: &str = "prefixPreview";
+    const SUFFIX_QUERY_TYPE: &str = "suffixPreview";
+    const SUBSTRING_QUERY_TYPE: &str = "substringPreview";
 
     fn prefix_filter(prefix: Binary) -> Document {
         doc! { "$expr": { "$encStrStartsWith": { "input": "$encryptedText", "prefix": prefix } } }
     }
-
-    const SUFFIX_QUERY_TYPE: &str = "suffixPreview";
-
     fn suffix_filter(suffix: Binary) -> Document {
         doc! { "$expr": { "$encStrEndsWith": { "input": "$encryptedText", "suffix": suffix } } }
     }
-
-    const SUBSTRING_QUERY_TYPE: &str = "substringPreview";
-
     fn substring_filter(substring: Binary) -> Document {
         doc! { "$expr": { "$encStrContains": { "input": "$encryptedText", "substring": substring } } }
     }
@@ -2902,7 +2898,7 @@ mod text_indexes_explicit_encryption {
     async fn find_prefix_suffix() {
         server_check!("find by prefix/suffix", skip_on_9);
 
-        enum QueryType {
+        enum QueryKind {
             Prefix,
             Suffix,
         }
@@ -2928,25 +2924,25 @@ mod text_indexes_explicit_encryption {
             )
             .build();
 
-        for (query, query_type, expected) in [
+        for (query, query_kind, expected) in [
             // Case 1: can find a document by prefix
-            ("foo", QueryType::Prefix, Some("foobarbaz")),
+            ("foo", QueryKind::Prefix, Some("foobarbaz")),
             // Case 2: can find a document by suffix
-            ("baz", QueryType::Suffix, Some("foobarbaz")),
+            ("baz", QueryKind::Suffix, Some("foobarbaz")),
             // Case 3: assert no document found by prefix
-            ("baz", QueryType::Prefix, None),
+            ("baz", QueryKind::Prefix, None),
             // Case 4: assert no document found by suffix
-            ("foo", QueryType::Suffix, None),
+            ("foo", QueryKind::Suffix, None),
         ] {
             let expected = expected.map(|s| doc! { "_id": 0, "encryptedText": s });
             let (query_type, text_options, filter): (_, _, fn(Binary) -> Document) =
-                match query_type {
-                    QueryType::Prefix => (
+                match query_kind {
+                    QueryKind::Prefix => (
                         PREFIX_QUERY_TYPE,
                         text_prefix_options.clone(),
                         prefix_filter,
                     ),
-                    QueryType::Suffix => (
+                    QueryKind::Suffix => (
                         SUFFIX_QUERY_TYPE,
                         text_suffix_options.clone(),
                         suffix_filter,
@@ -2960,18 +2956,18 @@ mod text_indexes_explicit_encryption {
                 ..
             } = Setup::new().await;
 
-            let prefix = client_encryption
+            let encrypted_query = client_encryption
                 .encrypt(query, key1_id, Algorithm::TextPreview)
                 .query_type(query_type)
                 .contention_factor(0)
-                .text_options(text_options)
+                .text_options(text_options.clone())
                 .await
                 .unwrap();
 
             let actual = explicit_encrypted_client
                 .database("db")
                 .collection::<Document>("prefix-suffix")
-                .find_one(filter(prefix))
+                .find_one(filter(encrypted_query))
                 .projection(doc! { "__safeContent__": 0 })
                 .await
                 .unwrap();
