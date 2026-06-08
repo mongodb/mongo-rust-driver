@@ -98,6 +98,8 @@ compile_error!(
      versions of this crate."
 );
 
+#[allow(unused)]
+#[cfg(not(feature = "log"))]
 macro_rules! log_warning {
     ($($arg:tt)+) => {
         #[cfg(debug_assertions)]
@@ -107,4 +109,13 @@ macro_rules! log_warning {
         }
     }
 }
+
+#[allow(unused)]
+#[cfg(feature = "log")]
+macro_rules! log_warning {
+    ($($arg:tt)+) => {
+        log::warn!($($arg)+);
+    }
+}
+
 use log_warning;
