@@ -8,6 +8,7 @@ use std::{
 
 use crate::{bson::doc, sdam::topology::TopologyShutdown};
 use tokio::sync::watch;
+use tokio_util::sync::CancellationToken;
 
 use super::{
     description::server::{ServerDescription, TopologyVersion},
@@ -86,6 +87,7 @@ impl Monitor {
             topology_watcher.clone(),
             connection_establisher.clone(),
             client_options.clone(),
+            shutdown.clone(),
         );
         let allow_streaming = match client_options
             .server_monitoring_mode
@@ -143,6 +145,7 @@ impl Monitor {
                     .wait_for_check_request(
                         self.client_options.min_heartbeat_frequency(),
                         heartbeat_frequency,
+                        self.shutdown.token.clone(),
                     )
                     .await;
             }
@@ -394,6 +397,7 @@ struct RttMonitor {
     address: ServerAddress,
     client_options: ClientOptions,
     connection_establisher: ConnectionEstablisher,
+    shutdown: TopologyShutdown,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -422,6 +426,7 @@ impl RttMonitor {
         topology: TopologyWatcher,
         connection_establisher: ConnectionEstablisher,
         client_options: ClientOptions,
+        shutdown: TopologyShutdown,
     ) -> (Self, RttMonitorHandle) {
         let (sender, rtt_receiver) = watch::channel(RttInfo { average: None });
         let sender = Arc::new(sender);
@@ -433,6 +438,7 @@ impl RttMonitor {
             client_options,
             connection_establisher,
             sender: sender.clone(),
+            shutdown,
         };
 
         let handle = RttMonitorHandle {
@@ -497,12 +503,15 @@ impl RttMonitor {
                 // responsible for resetting the average RTT."
             }
 
-            tokio::time::sleep(
+            let sleep = tokio::time::sleep(
                 self.client_options
                     .heartbeat_freq
                     .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY),
-            )
-            .await;
+            );
+            tokio::select! {
+                _ = self.shutdown.token.cancelled() => (),
+                _ = sleep => (),
+            }
         }
     }
 }
@@ -655,7 +664,12 @@ impl MonitorRequestReceiver {
     ///
     /// The `delay` parameter indicates how long this method should wait before listening to
     /// requests. The time spent in the delay counts toward the provided timeout.
-    async fn wait_for_check_request(&mut self, delay: Duration, timeout: Duration) {
+    async fn wait_for_check_request(
+        &mut self,
+        delay: Duration,
+        timeout: Duration,
+        cancel: CancellationToken,
+    ) {
         let _ = runtime::timeout(timeout, async {
             let wait_for_check_request = async {
                 tokio::time::sleep(delay).await;
@@ -666,6 +680,7 @@ impl MonitorRequestReceiver {
             tokio::pin!(wait_for_check_request);
 
             tokio::select! {
+                _ = cancel.cancelled() => (),
                 _ = self.individual_check_request_receiver.changed() => (),
                 _ = &mut wait_for_check_request => (),
                 // Don't continue waiting after server has been removed from the topology.
