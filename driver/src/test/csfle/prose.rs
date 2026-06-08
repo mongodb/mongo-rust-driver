@@ -2695,63 +2695,21 @@ async fn text_indexes_explicit_encryption() {
 
     // Prefix test utils
     let prefix_query_type = "prefixPreview";
-    let text_prefix_options = TextOptions::builder()
-        .case_sensitive(true)
-        .diacritic_sensitive(true)
-        .prefix(
-            PrefixOptions::builder()
-                .max_query_length(10)
-                .min_query_length(2)
-                .build(),
-        )
-        .build();
     fn prefix_filter(prefix: Binary) -> Document {
         doc! { "$expr": { "$encStrStartsWith": { "input": "$encryptedText", "prefix": prefix } } }
     }
 
     // Suffix test utils
     let suffix_query_type = "suffixPreview";
-    let text_suffix_options = TextOptions::builder()
-        .case_sensitive(true)
-        .diacritic_sensitive(true)
-        .suffix(
-            SuffixOptions::builder()
-                .max_query_length(10)
-                .min_query_length(2)
-                .build(),
-        )
-        .build();
     fn suffix_filter(suffix: Binary) -> Document {
         doc! { "$expr": { "$encStrEndsWith": { "input": "$encryptedText", "suffix": suffix } } }
     }
 
     // Substring test utils
     let substring_query_type = "substringPreview";
-    let text_substring_options = TextOptions::builder()
-        .case_sensitive(true)
-        .diacritic_sensitive(true)
-        .substring(
-            SubstringOptions::builder()
-                .max_string_length(10)
-                .max_query_length(10)
-                .min_query_length(2)
-                .build(),
-        )
-        .build();
     fn substring_filter(substring: Binary) -> Document {
         doc! { "$expr": { "$encStrContains": { "input": "$encryptedText", "substring": substring } } }
     }
-    let substring_coll =
-        |client: &Client| client.database("db").collection::<Document>("substring");
-
-    // General utils
-    let prefix_suffix_coll = |client: &Client| {
-        client
-            .database("db")
-            .collection::<Document>("prefix-suffix")
-    };
-    let expected = doc! { "_id": 0, "encryptedText": "foobarbaz" };
-    let projection = doc! { "__safeContent__": 0 };
 
     // Client setup
     type Setup = TextIndexesExplicitEncryptionSetup;
@@ -2767,110 +2725,103 @@ async fn text_indexes_explicit_encryption() {
         out
     }
 
-    // Case 1: can find a document by prefix
-    if skip_on_9("can find a document by prefix").await {
-        let Setup {
-            explicit_encrypted_client,
-            client_encryption,
-            key1_id,
-            ..
-        } = Setup::new().await;
-
-        let prefix = client_encryption
-            .encrypt("foo", key1_id, Algorithm::TextPreview)
-            .query_type(prefix_query_type)
-            .contention_factor(0)
-            .text_options(text_prefix_options.clone())
-            .await
-            .unwrap();
-
-        let actual = prefix_suffix_coll(&explicit_encrypted_client)
-            .find_one(prefix_filter(prefix))
-            .projection(projection.clone())
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(actual, expected);
+    enum QueryType {
+        Prefix,
+        Suffix,
     }
 
-    // Case 2: can find a document by suffix
-    if skip_on_9("can find a document by suffix").await {
-        let Setup {
-            explicit_encrypted_client,
-            client_encryption,
-            key1_id,
-            ..
-        } = Setup::new().await;
+    let text_prefix_options = TextOptions::builder()
+        .case_sensitive(true)
+        .diacritic_sensitive(true)
+        .prefix(
+            PrefixOptions::builder()
+                .max_query_length(10)
+                .min_query_length(2)
+                .build(),
+        )
+        .build();
+    let text_suffix_options = TextOptions::builder()
+        .case_sensitive(true)
+        .diacritic_sensitive(true)
+        .suffix(
+            SuffixOptions::builder()
+                .max_query_length(10)
+                .min_query_length(2)
+                .build(),
+        )
+        .build();
 
-        let suffix = client_encryption
-            .encrypt("baz", key1_id, Algorithm::TextPreview)
-            .query_type(suffix_query_type)
-            .contention_factor(0)
-            .text_options(text_suffix_options.clone())
-            .await
-            .unwrap();
+    if skip_on_9("find by prefix/suffix").await {
+        for (query, query_type, expected) in [
+            // Case 1: can find a document by prefix
+            ("foo", QueryType::Prefix, Some("foobarbaz")),
+            // Case 2: can find a document by suffix
+            ("baz", QueryType::Suffix, Some("foobarbaz")),
+            // Case 3: assert no document found by prefix
+            ("baz", QueryType::Prefix, None),
+            // Case 4: assert no document found by suffix
+            ("foo", QueryType::Suffix, None),
+        ] {
+            let expected = expected.map(|s| doc! { "_id": 0, "encryptedText": s });
+            let (query_type, text_options, filter): (_, _, fn(Binary) -> Document) =
+                match query_type {
+                    QueryType::Prefix => (
+                        prefix_query_type,
+                        text_prefix_options.clone(),
+                        prefix_filter,
+                    ),
+                    QueryType::Suffix => (
+                        suffix_query_type,
+                        text_suffix_options.clone(),
+                        suffix_filter,
+                    ),
+                };
 
-        let actual = prefix_suffix_coll(&explicit_encrypted_client)
-            .find_one(suffix_filter(suffix))
-            .projection(projection.clone())
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(actual, expected);
+            let Setup {
+                explicit_encrypted_client,
+                client_encryption,
+                key1_id,
+                ..
+            } = Setup::new().await;
+
+            let prefix = client_encryption
+                .encrypt(query, key1_id, Algorithm::TextPreview)
+                .query_type(query_type)
+                .contention_factor(0)
+                .text_options(text_options)
+                .await
+                .unwrap();
+
+            let actual = explicit_encrypted_client
+                .database("db")
+                .collection::<Document>("prefix-suffix")
+                .find_one(filter(prefix))
+                .projection(doc! { "__safeContent__": 0 })
+                .await
+                .unwrap();
+            assert_eq!(actual, expected);
+        }
     }
 
-    // Case 3: assert no document found by prefix
-    if skip_on_9("assert no document found by prefix").await {
-        let Setup {
-            explicit_encrypted_client,
-            client_encryption,
-            key1_id,
-            ..
-        } = Setup::new().await;
+    let text_substring_options = TextOptions::builder()
+        .case_sensitive(true)
+        .diacritic_sensitive(true)
+        .substring(
+            SubstringOptions::builder()
+                .max_string_length(10)
+                .max_query_length(10)
+                .min_query_length(2)
+                .build(),
+        )
+        .build();
 
-        let prefix = client_encryption
-            .encrypt("baz", key1_id, Algorithm::TextPreview)
-            .query_type(prefix_query_type)
-            .contention_factor(0)
-            .text_options(text_prefix_options.clone())
-            .await
-            .unwrap();
-
-        let actual = prefix_suffix_coll(&explicit_encrypted_client)
-            .find_one(prefix_filter(prefix))
-            .projection(projection.clone())
-            .await
-            .unwrap();
-        assert!(actual.is_none(), "{actual:?}");
-    }
-
-    // Case 4: assert no document found by suffix
-    if skip_on_9("assert no document found by suffix").await {
-        let Setup {
-            explicit_encrypted_client,
-            client_encryption,
-            key1_id,
-            ..
-        } = Setup::new().await;
-
-        let suffix = client_encryption
-            .encrypt("foo", key1_id, Algorithm::TextPreview)
-            .query_type(suffix_query_type)
-            .contention_factor(0)
-            .text_options(text_suffix_options)
-            .await
-            .unwrap();
-
-        let actual = prefix_suffix_coll(&explicit_encrypted_client)
-            .find_one(suffix_filter(suffix))
-            .projection(projection.clone())
-            .await
-            .unwrap();
-        assert!(actual.is_none(), "{actual:?}");
-    }
-
-    // Case 5: can find a document by substring
-    {
+    for (query, expected) in [
+        // Case 5: can find a document by substring
+        ("bar", Some("foobarbaz")),
+        // Case 6: assert no document found by substring
+        ("qux", None),
+    ] {
+        let expected = expected.map(|s| doc! { "_id": 0, "encryptedText": s });
         let Setup {
             explicit_encrypted_client,
             client_encryption,
@@ -2879,45 +2830,21 @@ async fn text_indexes_explicit_encryption() {
         } = Setup::new().await;
 
         let substring = client_encryption
-            .encrypt("bar", key1_id, Algorithm::TextPreview)
+            .encrypt(query, key1_id, Algorithm::TextPreview)
             .query_type(substring_query_type)
             .contention_factor(0)
             .text_options(text_substring_options.clone())
             .await
             .unwrap();
 
-        let actual = substring_coll(&explicit_encrypted_client)
+        let actual = explicit_encrypted_client
+            .database("db")
+            .collection::<Document>("substring")
             .find_one(substring_filter(substring))
-            .projection(projection.clone())
+            .projection(doc! { "__safeContent__": 0 })
             .await
-            .unwrap()
             .unwrap();
         assert_eq!(actual, expected);
-    }
-
-    // Case 6: assert no document found by substring
-    {
-        let Setup {
-            explicit_encrypted_client,
-            client_encryption,
-            key1_id,
-            ..
-        } = Setup::new().await;
-
-        let substring = client_encryption
-            .encrypt("qux", key1_id, Algorithm::TextPreview)
-            .query_type(substring_query_type)
-            .contention_factor(0)
-            .text_options(text_substring_options)
-            .await
-            .unwrap();
-
-        let actual = substring_coll(&explicit_encrypted_client)
-            .find_one(substring_filter(substring))
-            .projection(projection)
-            .await
-            .unwrap();
-        assert!(actual.is_none(), "{actual:?}");
     }
 
     // Case 7: assert contentionFactor is required
