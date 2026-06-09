@@ -1711,7 +1711,8 @@ functions:
       params:
         binary: sh
         args:
-          - ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
+          - ${DRIVERS_TOOLS}/.evergreen/run-mongodb.sh
+          - start
         include_expansions_in_env:
           - AUTH
           - SSL
