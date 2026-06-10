@@ -68,7 +68,7 @@ in-use-encryption-unstable = ["in-use-encryption"]
 # Enables support for emitting tracing events.
 # The tracing API is unstable and may have backwards-incompatible changes in minor version updates.
 # TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.
-tracing-unstable = ["dep:tracing", "dep:log", "bson3?/serde_json-1"]
+tracing-unstable = ["dep:tracing", "log", "bson3?/serde_json-1"]
 
 # Enables support for text indexes in explicit encryption. This feature is in preview and should be
 # used for experimental workloads only. This feature is unstable and its security is not guaranteed
@@ -81,6 +81,9 @@ opentelemetry = ["dep:opentelemetry"]
 
 # Capture backtraces in errors.  This can be slow, memory intensive, and very verbose.
 error-backtrace = []
+
+# Enable logging.
+log = ["dep:log"]
 
 [dependencies]
 base64 = "0.22"

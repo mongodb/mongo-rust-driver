@@ -97,3 +97,25 @@ compile_error!(
     "The feature 'compat-3-3-0' must be enabled to ensure forward compatibility with future \
      versions of this crate."
 );
+
+#[allow(unused)]
+#[cfg(not(feature = "log"))]
+macro_rules! log_warning {
+    ($($arg:tt)+) => {
+        #[cfg(debug_assertions)]
+        {
+            eprint!("WARNING: ");
+            eprintln!($($arg)+);
+        }
+    }
+}
+
+#[allow(unused)]
+#[cfg(feature = "log")]
+macro_rules! log_warning {
+    ($($arg:tt)+) => {
+        log::warn!($($arg)+);
+    }
+}
+
+use log_warning;

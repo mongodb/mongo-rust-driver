@@ -2,7 +2,7 @@
 
 Drivers MUST test the following scenarios:
 
-1. `Regular Credentials`: Auth via an `ACCESS_KEY_ID` and `SECRET_ACCESS_KEY` pair
+1. `Regular Credentials`: Auth via an `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` pair
 2. `EC2 Credentials`: Auth from an EC2 instance via temporary credentials assigned to the machine
 3. `ECS Credentials`: Auth from an ECS instance via temporary credentials assigned to the task
 4. `Assume Role`: Auth via temporary credentials obtained from an STS AssumeRole request
@@ -12,8 +12,7 @@ Drivers MUST test the following scenarios:
 7. Caching of AWS credentials fetched by the driver.
 
 For brevity, this section gives the values `<AccessKeyId>`, `<SecretAccessKey>` and `<Token>` in place of a valid access
-key ID, secret access key and session token (also known as a security token). Note that if these values are passed into
-the URI they MUST be URL encoded. Sample values are below.
+key ID, secret access key and session token (also known as a security token). Sample values are below.
 
 ```text
 AccessKeyId=AKIAI44QH8DHBEXAMPLE
@@ -21,13 +20,42 @@ SecretAccessKey=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 Token=AQoDYXdzEJr...<remainder of security token>
 ```
 
+## Testing custom credential providers
+
+If the driver supports custom AWS credential providers, the driver MUST test the following:
+
+### 1. Custom Credential Provider Authenticates
+
+Scenarios 1-6 from the previous section with a user provided `AWS_CREDENTIAL_PROVIDER` auth mechanism property. This
+credentials MAY be obtained from the default credential provider from the AWS SDK. If the default provider does not
+cover all scenarios above, those not covered MAY be skipped. In these tests the driver MUST also assert that the user
+provided credential provider was called in each test. This may be via a custom function or object that wraps the calls
+to the custom provider and asserts that it was called at least once. For test scenarios where the drivers tools scripts
+put the credentials in the MONGODB_URI, drivers MAY extract the credentials from the URI and return the AWS credentials
+directly from the custom provider instead of using the AWS SDK default provider.
+
+### 2. Custom Credential Provider Authentication Precedence
+
+#### Case 1: Credentials in URI Take Precedence *Removed*
+
+#### Case 2: Custom Provider Takes Precedence Over Environment Variables
+
+Run this test in an environment with AWS credentials configured as environment variables (e.g. `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN`)
+
+Create a `MongoClient` configured to use AWS auth. Example: `mongodb://localhost:27017/?authMechanism=MONGODB-AWS`.
+
+Configure a custom credential provider to pass valid AWS credentials. The provider must track if it was called.
+
+Expect authentication to succeed and the custom credential provider was called.
+
 ## Regular credentials
 
-Drivers MUST be able to authenticate by providing a valid access key id and secret access key pair as the username and
-password, respectively, in the MongoDB URI. An example of a valid URI would be:
+Drivers MUST be able to authenticate when a valid access key id and secret access key pair are present in the
+environment. Drivers MUST provide the --nouri option to aws_tester.py in drivers-evergreen-tools for this test.
 
 ```text
-mongodb://<AccessKeyId>:<SecretAccessKey>@localhost/?authMechanism=MONGODB-AWS
+mongodb://localhost/?authMechanism=MONGODB-AWS
 ```
 
 ## EC2 Credentials
@@ -59,11 +87,11 @@ mongodb://localhost/?authMechanism=MONGODB-AWS
 ## AssumeRole
 
 Drivers MUST be able to authenticate using temporary credentials returned from an assume role request. These temporary
-credentials consist of an access key ID, a secret access key, and a security token passed into the URI. A sample URI
-would be:
+credentials consist of an access key ID, a secret access key, and a security token present in the environment. Drivers
+MUST provide the --nouri option to aws_tester.py in drivers-evergreen-tools for this test. A sample URI would be:
 
 ```text
-mongodb://<AccessKeyId>:<SecretAccessKey>@localhost/?authMechanism=MONGODB-AWS&authMechanismProperties=AWS_SESSION_TOKEN:<Token>
+mongodb://localhost/?authMechanism=MONGODB-AWS
 ```
 
 ## Assume Role with Web Identity

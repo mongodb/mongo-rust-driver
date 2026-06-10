@@ -202,6 +202,23 @@ impl AuthMechanism {
             }
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => {
+                if credential.username.is_some() || credential.password.is_some() {
+                    crate::log_warning!(
+                        "URI credentials for MONGODB-AWS are deprecated and will be removed in \
+                         4.0."
+                    );
+                }
+                if credential
+                    .mechanism_properties
+                    .as_ref()
+                    .map_or(false, |mp| mp.contains_key(aws::AWS_SESSION_TOKEN))
+                {
+                    crate::log_warning!(
+                        "Auth mechanism {:?} for MONGODB-AWS is deprecated and will be removed in \
+                         4.0.",
+                        aws::AWS_SESSION_TOKEN
+                    );
+                }
                 if credential.username.is_some() && credential.password.is_none() {
                     return Err(ErrorKind::InvalidArgument {
                         message: "Username cannot be provided without password for MONGODB-AWS \
