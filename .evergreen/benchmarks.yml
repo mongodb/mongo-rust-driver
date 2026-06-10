@@ -134,7 +134,7 @@ functions:
             REQUIRE_API_VERSION=${REQUIRE_API_VERSION} \
             SKIP_LEGACY_SHELL=1 \
             sh ${DRIVERS_TOOLS}/.evergreen/run-mongodb.sh start
-    # run-orchestration generates expansion file with the MONGODB_URI for the cluster
+    # run-mongodb generates expansion file with the MONGODB_URI for the cluster
     - command: expansions.update
       params:
         file: mo-expansion.yml
@@ -241,16 +241,7 @@ functions:
       params:
         script: |
           ${PREPARE_SHELL}
-
-          cd "$MONGO_ORCHESTRATION_HOME"
-          # source the mongo-orchestration virtualenv if it exists
-          if [ -f venv/bin/activate ]; then
-            . venv/bin/activate
-          elif [ -f venv/Scripts/activate ]; then
-            . venv/Scripts/activate
-          fi
-          mongo-orchestration stop
-
+          sh ${DRIVERS_TOOLS}/.evergreen/run-mongodb.sh stop
 
   "cleanup":
     - command: shell.exec

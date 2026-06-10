@@ -1975,19 +1975,12 @@ functions:
         display_name: "mongodb-logs.tar.gz"
 
   "stop mongo orchestration":
-    - command: shell.exec
+    - command: subprocess.exec
       params:
-        script: |
-          ${PREPARE_SHELL}
-
-          cd ${MONGO_ORCHESTRATION_HOME}
-          # source the mongo-orchestration virtualenv if it exists
-          if [ -f venv/bin/activate ]; then
-            . venv/bin/activate
-          elif [ -f venv/Scripts/activate ]; then
-            . venv/Scripts/activate
-          fi
-          mongo-orchestration stop
+        binary: sh
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/run-mongodb.sh
+          - stop
 
   "cleanup":
     - command: shell.exec
