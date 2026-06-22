@@ -16,7 +16,7 @@ pub(crate) fn decrypt_private_key(pem_data: &[u8], password: &[u8]) -> Result<Ve
             .into())
         }
     };
-    let encrypted_key = pkcs8::EncryptedPrivateKeyInfo::<Vec<u8>>::try_from(
+    let encrypted_key = pkcs8::EncryptedPrivateKeyInfo::<pkcs8::der::asn1::OctetString>::try_from(
         encrypted_bytes.as_slice(),
     )
     .map_err(|error| ErrorKind::InvalidTlsConfig {
