@@ -2645,9 +2645,8 @@ async fn encrypt_expression_with_options() {
 }
 
 // Prose test 27. Text explicit encryption
-#[cfg(feature = "text-indexes-unstable")]
 mod text_indexes_explicit_encryption {
-    use crate::client_encryption::{PrefixOptions, SubstringOptions, SuffixOptions, TextOptions};
+    use crate::client_encryption::{PrefixOptions, StringOptions, SubstringOptions, SuffixOptions};
 
     use super::*;
 
@@ -2703,9 +2702,9 @@ mod text_indexes_explicit_encryption {
         async fn new() -> Self {
             use crate::client_encryption::{
                 PrefixOptions,
+                StringOptions,
                 SubstringOptions,
                 SuffixOptions,
-                TextOptions,
             };
 
             let util_client = Client::for_test().await;
@@ -2794,7 +2793,7 @@ mod text_indexes_explicit_encryption {
             .await
             .unwrap();
 
-            let text_options = TextOptions::builder()
+            let string_options = StringOptions::builder()
                 .case_sensitive(true)
                 .diacritic_sensitive(true)
                 .prefix(
@@ -2813,7 +2812,7 @@ mod text_indexes_explicit_encryption {
             let encrypted_foobarbaz = client_encryption
                 .encrypt("foobarbaz", key1_id.clone(), Algorithm::TextPreview)
                 .contention_factor(0)
-                .text_options(text_options)
+                .string_options(string_options)
                 .await
                 .unwrap();
 
@@ -2827,7 +2826,7 @@ mod text_indexes_explicit_encryption {
                     .unwrap();
             }
 
-            let text_options = TextOptions::builder()
+            let string_options = StringOptions::builder()
                 .case_sensitive(true)
                 .diacritic_sensitive(true)
                 .substring(
@@ -2841,7 +2840,7 @@ mod text_indexes_explicit_encryption {
             let encrypted_foobarbaz = client_encryption
                 .encrypt("foobarbaz", key1_id.clone(), Algorithm::TextPreview)
                 .contention_factor(0)
-                .text_options(text_options)
+                .string_options(string_options)
                 .await
                 .unwrap();
 
@@ -2871,7 +2870,7 @@ mod text_indexes_explicit_encryption {
             Suffix,
         }
 
-        let text_prefix_options = TextOptions::builder()
+        let string_prefix_options = StringOptions::builder()
             .case_sensitive(true)
             .diacritic_sensitive(true)
             .prefix(
@@ -2881,7 +2880,7 @@ mod text_indexes_explicit_encryption {
                     .build(),
             )
             .build();
-        let text_suffix_options = TextOptions::builder()
+        let string_suffix_options = StringOptions::builder()
             .case_sensitive(true)
             .diacritic_sensitive(true)
             .suffix(
@@ -2903,16 +2902,16 @@ mod text_indexes_explicit_encryption {
             ("foo", QueryKind::Suffix, None),
         ] {
             let expected = expected.map(|s| doc! { "_id": 0, "encryptedText": s });
-            let (query_type, text_options, filter): (_, _, fn(Binary) -> Document) =
+            let (query_type, string_options, filter): (_, _, fn(Binary) -> Document) =
                 match query_kind {
                     QueryKind::Prefix => (
                         PREFIX_QUERY_TYPE,
-                        text_prefix_options.clone(),
+                        string_prefix_options.clone(),
                         prefix_filter,
                     ),
                     QueryKind::Suffix => (
                         SUFFIX_QUERY_TYPE,
-                        text_suffix_options.clone(),
+                        string_suffix_options.clone(),
                         suffix_filter,
                     ),
                 };
@@ -2928,7 +2927,7 @@ mod text_indexes_explicit_encryption {
                 .encrypt(query, key1_id, Algorithm::TextPreview)
                 .query_type(query_type)
                 .contention_factor(0)
-                .text_options(text_options.clone())
+                .string_options(string_options.clone())
                 .await
                 .unwrap();
 
@@ -2947,7 +2946,7 @@ mod text_indexes_explicit_encryption {
     async fn find_substring() {
         server_check!("find by substring");
 
-        let text_substring_options = TextOptions::builder()
+        let string_substring_options = StringOptions::builder()
             .case_sensitive(true)
             .diacritic_sensitive(true)
             .substring(
@@ -2977,7 +2976,7 @@ mod text_indexes_explicit_encryption {
                 .encrypt(query, key1_id, Algorithm::TextPreview)
                 .query_type(SUBSTRING_QUERY_TYPE)
                 .contention_factor(0)
-                .text_options(text_substring_options.clone())
+                .string_options(string_substring_options.clone())
                 .await
                 .unwrap();
 
@@ -3005,8 +3004,8 @@ mod text_indexes_explicit_encryption {
         let error = client_encryption
             .encrypt("foo", key1_id, Algorithm::TextPreview)
             .query_type(PREFIX_QUERY_TYPE)
-            .text_options(
-                TextOptions::builder()
+            .string_options(
+                StringOptions::builder()
                     .case_sensitive(true)
                     .diacritic_sensitive(true)
                     .prefix(
@@ -3027,7 +3026,7 @@ mod text_indexes_explicit_encryption {
     async fn insensitive_prefix_suffix() {
         server_check!("insensitive prefix/suffix", skip_on_9);
 
-        let insensitive_prefix_options = TextOptions::builder()
+        let insensitive_prefix_options = StringOptions::builder()
             .case_sensitive(false)
             .diacritic_sensitive(false)
             .prefix(
@@ -3037,7 +3036,7 @@ mod text_indexes_explicit_encryption {
                     .build(),
             )
             .build();
-        let insensitive_suffix_options = TextOptions::builder()
+        let insensitive_suffix_options = StringOptions::builder()
             .case_sensitive(false)
             .diacritic_sensitive(false)
             .suffix(
@@ -3076,7 +3075,7 @@ mod text_indexes_explicit_encryption {
                 .encrypt(prefix, key1_id.clone(), Algorithm::TextPreview)
                 .query_type(PREFIX_QUERY_TYPE)
                 .contention_factor(0)
-                .text_options(insensitive_prefix_options.clone())
+                .string_options(insensitive_prefix_options.clone())
                 .await
                 .unwrap();
 
@@ -3098,7 +3097,7 @@ mod text_indexes_explicit_encryption {
                 .encrypt(suffix, key1_id.clone(), Algorithm::TextPreview)
                 .query_type(SUFFIX_QUERY_TYPE)
                 .contention_factor(0)
-                .text_options(insensitive_suffix_options.clone())
+                .string_options(insensitive_suffix_options.clone())
                 .await
                 .unwrap();
 
@@ -3115,7 +3114,7 @@ mod text_indexes_explicit_encryption {
     async fn insensitive_substring() {
         server_check!("insensitive substring");
 
-        let insensitive_substring_options = TextOptions::builder()
+        let insensitive_substring_options = StringOptions::builder()
             .case_sensitive(false)
             .diacritic_sensitive(false)
             .substring(
@@ -3155,7 +3154,7 @@ mod text_indexes_explicit_encryption {
                 .encrypt(substring, key1_id.clone(), Algorithm::TextPreview)
                 .query_type(SUBSTRING_QUERY_TYPE)
                 .contention_factor(0)
-                .text_options(insensitive_substring_options.clone())
+                .string_options(insensitive_substring_options.clone())
                 .await
                 .unwrap();
 
