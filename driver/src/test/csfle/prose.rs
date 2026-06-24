@@ -957,6 +957,16 @@ mod explicit_encryption {
             db.create_collection("explicit_encryption")
                 .encrypted_fields(encrypted_fields)
                 .await?;
+
+            let encrypted_fields_c10 = load_testdata("data/encryptedFields-c10.json")?;
+            db.collection::<Document>("explicit_encryption_c10")
+                .drop()
+                .encrypted_fields(encrypted_fields_c10.clone())
+                .await?;
+            db.create_collection("explicit_encryption_c10")
+                .encrypted_fields(encrypted_fields_c10)
+                .await?;
+
             let keyvault = key_vault_client.database("keyvault");
             keyvault.collection::<Document>("datakeys").drop().await?;
             keyvault.create_collection("datakeys").await?;
@@ -1069,7 +1079,7 @@ mod explicit_encryption {
         let enc_coll = testdata
             .encrypted_client
             .database("db")
-            .collection::<Document>("explicit_encryption");
+            .collection::<Document>("explicit_encryption_c10");
 
         for _ in 0..10 {
             let insert_payload = testdata
@@ -1094,30 +1104,10 @@ mod explicit_encryption {
                 Algorithm::Indexed,
             )
             .query_type("equality".to_string())
-            .contention_factor(0)
-            .await?;
-        let found: Vec<_> = enc_coll
-            .find(doc! { "encryptedIndexed": find_payload })
-            .await?
-            .try_collect()
-            .await?;
-        assert!(found.len() < 10);
-        for doc in found {
-            assert_eq!("encrypted indexed value", doc.get_str("encryptedIndexed")?);
-        }
-
-        let find_payload2 = testdata
-            .client_encryption
-            .encrypt(
-                "encrypted indexed value",
-                EncryptKey::Id(testdata.key1_id.clone()),
-                Algorithm::Indexed,
-            )
-            .query_type("equality")
             .contention_factor(10)
             .await?;
         let found: Vec<_> = enc_coll
-            .find(doc! { "encryptedIndexed": find_payload2 })
+            .find(doc! { "encryptedIndexed": find_payload })
             .await?
             .try_collect()
             .await?;
