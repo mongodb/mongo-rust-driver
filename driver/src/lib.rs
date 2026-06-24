@@ -53,6 +53,7 @@ mod search_index;
 mod selection_criteria;
 mod serde_util;
 mod srv;
+pub mod stream_processing;
 #[cfg(feature = "sync")]
 pub mod sync;
 #[cfg(test)]
