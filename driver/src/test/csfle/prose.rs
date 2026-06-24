@@ -932,82 +932,92 @@ mod deadlock {
 mod explicit_encryption {
     use super::*;
 
-    struct ExplicitEncryptionTestData {
+    struct TestData {
         key1_id: Binary,
         client_encryption: ClientEncryption,
         encrypted_client: Client,
     }
 
-    async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData>> {
-        if server_version_lt(6, 0).await {
-            log_uncaptured("skipping explicit encryption test: server below 6.0");
-            return Ok(None);
+    impl TestData {
+        async fn new() -> Result<Self> {
+            let key_vault_client = Client::for_test().await;
+
+            let encrypted_fields = load_testdata("data/encryptedFields.json")?;
+            let key1_document = load_testdata("data/keys/key1-document.json")?;
+            let key1_id = match key1_document.get("_id").unwrap() {
+                Bson::Binary(b) => b.clone(),
+                v => return Err(failure!("expected binary _id, got {:?}", v)),
+            };
+
+            let db = key_vault_client.database("db");
+            db.collection::<Document>("explicit_encryption")
+                .drop()
+                .encrypted_fields(encrypted_fields.clone())
+                .await?;
+            db.create_collection("explicit_encryption")
+                .encrypted_fields(encrypted_fields)
+                .await?;
+            let keyvault = key_vault_client.database("keyvault");
+            keyvault.collection::<Document>("datakeys").drop().await?;
+            keyvault.create_collection("datakeys").await?;
+            keyvault
+                .collection::<Document>("datakeys")
+                .insert_one(key1_document)
+                .write_concern(WriteConcern::majority())
+                .await?;
+
+            let client_encryption = ClientEncryption::new(
+                key_vault_client.into_client(),
+                KV_NAMESPACE.clone(),
+                vec![LOCAL_KMS.clone()],
+            )?;
+            let encrypted_client = Client::encrypted_builder(
+                get_client_options().await.clone(),
+                KV_NAMESPACE.clone(),
+                vec![LOCAL_KMS.clone()],
+            )?
+            .bypass_query_analysis(true)
+            .extra_options(EXTRA_OPTIONS.clone())
+            .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+            .build()
+            .await?;
+
+            Ok(TestData {
+                key1_id,
+                client_encryption,
+                encrypted_client,
+            })
         }
-        if topology_is_standalone().await {
-            log_uncaptured("skipping explicit encryption test: cannot run on standalone");
-            return Ok(None);
-        }
+    }
 
-        let key_vault_client = Client::for_test().await;
-
-        let encrypted_fields = load_testdata("data/encryptedFields.json")?;
-        let key1_document = load_testdata("data/keys/key1-document.json")?;
-        let key1_id = match key1_document.get("_id").unwrap() {
-            Bson::Binary(b) => b.clone(),
-            v => return Err(failure!("expected binary _id, got {:?}", v)),
-        };
-
-        let db = key_vault_client.database("db");
-        db.collection::<Document>("explicit_encryption")
-            .drop()
-            .encrypted_fields(encrypted_fields.clone())
-            .await?;
-        db.create_collection("explicit_encryption")
-            .encrypted_fields(encrypted_fields)
-            .await?;
-        let keyvault = key_vault_client.database("keyvault");
-        keyvault.collection::<Document>("datakeys").drop().await?;
-        keyvault.create_collection("datakeys").await?;
-        keyvault
-            .collection::<Document>("datakeys")
-            .insert_one(key1_document)
-            .write_concern(WriteConcern::majority())
-            .await?;
-
-        let client_encryption = ClientEncryption::new(
-            key_vault_client.into_client(),
-            KV_NAMESPACE.clone(),
-            vec![LOCAL_KMS.clone()],
-        )?;
-        let encrypted_client = Client::encrypted_builder(
-            get_client_options().await.clone(),
-            KV_NAMESPACE.clone(),
-            vec![LOCAL_KMS.clone()],
-        )?
-        .bypass_query_analysis(true)
-        .extra_options(EXTRA_OPTIONS.clone())
-        .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
-        .build()
-        .await?;
-
-        Ok(Some(ExplicitEncryptionTestData {
-            key1_id,
-            client_encryption,
-            encrypted_client,
-        }))
+    macro_rules! server_check {
+        ($name:expr) => {{
+            if !fle2v2_ok($name).await {
+                return Ok(());
+            }
+            if server_version_lt(6, 0).await {
+                log_uncaptured(format!(
+                    "skipping explicit encryption test [{}]: server below 6.0",
+                    $name
+                ));
+                return Ok(());
+            }
+            if topology_is_standalone().await {
+                log_uncaptured(format!(
+                    "skipping explicit encryption test [{}]: cannot run on standalone",
+                    $name
+                ));
+                return Ok(());
+            }
+        }};
     }
 
     // can insert encrypted indexed and find
     #[tokio::test]
     async fn case_1() -> Result<()> {
-        if !fle2v2_ok("explicit_encryption_case_1").await {
-            return Ok(());
-        }
+        server_check!("explicit_encryption_case_1");
 
-        let testdata = match explicit_encryption_setup().await? {
-            Some(t) => t,
-            None => return Ok(()),
-        };
+        let testdata = TestData::new().await?;
         let enc_coll = testdata
             .encrypted_client
             .database("db")
@@ -1053,14 +1063,9 @@ mod explicit_encryption {
     // can insert encrypted indexed and find with non-zero contention
     #[tokio::test]
     async fn case_2() -> Result<()> {
-        if !fle2v2_ok("explicit_encryption_case_2").await {
-            return Ok(());
-        }
+        server_check!("explicit_encryption_case_2");
 
-        let testdata = match explicit_encryption_setup().await? {
-            Some(t) => t,
-            None => return Ok(()),
-        };
+        let testdata = TestData::new().await?;
         let enc_coll = testdata
             .encrypted_client
             .database("db")
@@ -1127,14 +1132,9 @@ mod explicit_encryption {
     // can insert encrypted unindexed
     #[tokio::test]
     async fn case_3() -> Result<()> {
-        if !fle2v2_ok("explicit_encryption_case_3").await {
-            return Ok(());
-        }
+        server_check!("explicit_encryption_case_3");
 
-        let testdata = match explicit_encryption_setup().await? {
-            Some(t) => t,
-            None => return Ok(()),
-        };
+        let testdata = TestData::new().await?;
         let enc_coll = testdata
             .encrypted_client
             .database("db")
@@ -1169,14 +1169,9 @@ mod explicit_encryption {
     // can roundtrip encrypted indexed
     #[tokio::test]
     async fn case_4() -> Result<()> {
-        if !fle2v2_ok("explicit_encryption_case_4").await {
-            return Ok(());
-        }
+        server_check!("explicit_encryption_case_4");
 
-        let testdata = match explicit_encryption_setup().await? {
-            Some(t) => t,
-            None => return Ok(()),
-        };
+        let testdata = TestData::new().await?;
 
         let raw_value = RawBson::String("encrypted indexed value".to_string());
         let payload = testdata
@@ -1200,14 +1195,9 @@ mod explicit_encryption {
     //can roundtrip encrypted unindexed)
     #[tokio::test]
     async fn case_5() -> Result<()> {
-        if !fle2v2_ok("explicit_encryption_case_5").await {
-            return Ok(());
-        }
+        server_check!("explicit_encryption_case_5");
 
-        let testdata = match explicit_encryption_setup().await? {
-            Some(t) => t,
-            None => return Ok(()),
-        };
+        let testdata = TestData::new().await?;
 
         let raw_value = RawBson::String("encrypted unindexed value".to_string());
         let payload = testdata
