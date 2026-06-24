@@ -2697,11 +2697,11 @@ mod text_indexes_explicit_encryption {
             }
         }};
 
-        ($name:expr, skip_on_9) => {{
+        ($name:expr, requires_9) => {{
             server_check!($name);
-            if server_version_gte(9, 0).await {
+            if server_version_lt(9, 0).await {
                 log_uncaptured(format!(
-                    "skipping text_indexes_explicit_encryption [{}]: requires server < 9.0",
+                    "skipping text_indexes_explicit_encryption [{}]: requires server >= 9.0",
                     $name
                 ));
                 return;
@@ -2709,8 +2709,10 @@ mod text_indexes_explicit_encryption {
         }};
     }
 
-    const PREFIX_QUERY_TYPE: &str = "prefixPreview";
-    const SUFFIX_QUERY_TYPE: &str = "suffixPreview";
+    const PREFIX_QUERY_TYPE: &str = "prefix";
+    const PREFIX_PREVIEW_QUERY_TYPE: &str = "prefixPreview";
+    const SUFFIX_QUERY_TYPE: &str = "suffix";
+    const SUFFIX_PREVIEW_QUERY_TYPE: &str = "suffixPreview";
     const SUBSTRING_QUERY_TYPE: &str = "substringPreview";
 
     fn prefix_filter(prefix: Binary) -> Document {
@@ -2743,26 +2745,26 @@ mod text_indexes_explicit_encryption {
             let db = util_client.database("db");
 
             let server_is_9 = server_version_gte(9, 0).await;
-            for (path, coll, skip_on_9) in [
-                (
-                    "data/encryptedFields-prefix-suffix.json",
-                    "prefix-suffix",
-                    true,
-                ),
+            for (path, coll) in [
+                ("data/encryptedFields-prefix-suffix.json", "prefix-suffix"),
                 (
                     "data/encryptedFields-prefix-suffix-ci-di.json",
                     "prefix-suffix-ci-di",
-                    true,
                 ),
-                ("data/encryptedFields-substring.json", "substring", false),
+                (
+                    "data/encryptedFields-prefix-suffix-preview.json",
+                    "prefix-suffix-preview",
+                ),
+                ("data/encryptedFields-substring.json", "substring"),
                 (
                     "data/encryptedFields-substring-ci-di.json",
                     "substring-ci-di",
-                    false,
                 ),
             ] {
-                if server_is_9 && skip_on_9 {
-                    continue;
+                match coll {
+                    "prefix-suffix" | "prefix-suffix-ci-di" if !server_is_9 => continue,
+                    "prefix-suffix-preview" if server_is_9 => continue,
+                    _ => (),
                 }
                 let enc_fields = load_testdata(path).unwrap();
                 db.collection::<Document>(coll)
@@ -2848,15 +2850,18 @@ mod text_indexes_explicit_encryption {
                 .await
                 .unwrap();
 
-            if server_version_lt(9, 0).await {
-                explicit_encrypted_client
-                    .database("db")
-                    .collection("prefix-suffix")
-                    .insert_one(doc! { "_id": 0, "encryptedText": encrypted_foobarbaz })
-                    .write_concern(WriteConcern::majority())
-                    .await
-                    .unwrap();
-            }
+            let prefix_suffix_coll_name = if server_version_lt(9, 0).await {
+                "prefix-suffix-preview"
+            } else {
+                "prefix-suffix"
+            };
+            explicit_encrypted_client
+                .database("db")
+                .collection(prefix_suffix_coll_name)
+                .insert_one(doc! { "_id": 0, "encryptedText": encrypted_foobarbaz })
+                .write_concern(WriteConcern::majority())
+                .await
+                .unwrap();
 
             let string_options = StringOptions::builder()
                 .case_sensitive(true)
@@ -2895,7 +2900,8 @@ mod text_indexes_explicit_encryption {
 
     #[tokio::test]
     async fn find_prefix_suffix() {
-        server_check!("find by prefix/suffix", skip_on_9);
+        server_check!("find by prefix/suffix");
+        let server_is_9 = server_version_gte(9, 0).await;
 
         enum QueryKind {
             Prefix,
@@ -2937,12 +2943,20 @@ mod text_indexes_explicit_encryption {
             let (query_type, string_options, filter): (_, _, fn(Binary) -> Document) =
                 match query_kind {
                     QueryKind::Prefix => (
-                        PREFIX_QUERY_TYPE,
+                        if server_is_9 {
+                            PREFIX_QUERY_TYPE
+                        } else {
+                            PREFIX_PREVIEW_QUERY_TYPE
+                        },
                         string_prefix_options.clone(),
                         prefix_filter,
                     ),
                     QueryKind::Suffix => (
-                        SUFFIX_QUERY_TYPE,
+                        if server_is_9 {
+                            SUFFIX_QUERY_TYPE
+                        } else {
+                            SUFFIX_PREVIEW_QUERY_TYPE
+                        },
                         string_suffix_options.clone(),
                         suffix_filter,
                     ),
@@ -2963,9 +2977,14 @@ mod text_indexes_explicit_encryption {
                 .await
                 .unwrap();
 
+            let coll_name = if server_is_9 {
+                "prefix-suffix"
+            } else {
+                "prefix-suffix-preview"
+            };
             let actual = explicit_encrypted_client
                 .database("db")
-                .collection::<Document>("prefix-suffix")
+                .collection::<Document>(coll_name)
                 .find_one(filter(encrypted_query))
                 .projection(doc! { "__safeContent__": 0 })
                 .await
@@ -3026,7 +3045,7 @@ mod text_indexes_explicit_encryption {
     // Case 7: assert contentionFactor is required
     #[tokio::test]
     async fn contention_factor_required() {
-        server_check!("assert contentionFactor is required", skip_on_9);
+        server_check!("assert contentionFactor is required", requires_9);
 
         let Setup {
             client_encryption,
@@ -3056,7 +3075,7 @@ mod text_indexes_explicit_encryption {
 
     #[tokio::test]
     async fn insensitive_prefix_suffix() {
-        server_check!("insensitive prefix/suffix", skip_on_9);
+        server_check!("insensitive prefix/suffix", requires_9);
 
         let insensitive_prefix_options = StringOptions::builder()
             .case_sensitive(false)
