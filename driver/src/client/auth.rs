@@ -663,7 +663,7 @@ fn mac<M: Mac + KeyInit>(
     input: &[u8],
     auth_mechanism: &str,
 ) -> Result<impl AsRef<[u8]>> {
-    let mut mac = <M as Mac>::new_from_slice(key)
+    let mut mac = <M as KeyInit>::new_from_slice(key)
         .map_err(|_| Error::unknown_authentication_error(auth_mechanism))?;
     mac.update(input);
     Ok(mac.finalize().into_bytes())

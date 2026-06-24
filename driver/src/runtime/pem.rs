@@ -16,10 +16,12 @@ pub(crate) fn decrypt_private_key(pem_data: &[u8], password: &[u8]) -> Result<Ve
             .into())
         }
     };
-    let encrypted_key = pkcs8::EncryptedPrivateKeyInfo::try_from(encrypted_bytes.as_slice())
-        .map_err(|error| ErrorKind::InvalidTlsConfig {
-            message: format!("Invalid encrypted private key: {error}"),
-        })?;
+    let encrypted_key = pkcs8::EncryptedPrivateKeyInfo::<pkcs8::der::asn1::OctetString>::try_from(
+        encrypted_bytes.as_slice(),
+    )
+    .map_err(|error| ErrorKind::InvalidTlsConfig {
+        message: format!("Invalid encrypted private key: {error}"),
+    })?;
     let decrypted_key =
         encrypted_key
             .decrypt(password)
