@@ -2812,7 +2812,7 @@ mod text_indexes_explicit_encryption {
                 )
                 .build();
             let encrypted_foobarbaz = client_encryption
-                .encrypt("foobarbaz", key1_id.clone(), Algorithm::TextPreview)
+                .encrypt("foobarbaz", key1_id.clone(), Algorithm::String)
                 .contention_factor(0)
                 .string_options(string_options)
                 .await
@@ -2843,7 +2843,7 @@ mod text_indexes_explicit_encryption {
                 )
                 .build();
             let encrypted_foobarbaz = client_encryption
-                .encrypt("foobarbaz", key1_id.clone(), Algorithm::TextPreview)
+                .encrypt("foobarbaz", key1_id.clone(), Algorithm::String)
                 .contention_factor(0)
                 .string_options(string_options)
                 .await
@@ -2938,7 +2938,7 @@ mod text_indexes_explicit_encryption {
             } = Setup::new().await;
 
             let encrypted_query = client_encryption
-                .encrypt(query, key1_id, Algorithm::TextPreview)
+                .encrypt(query, key1_id, Algorithm::String)
                 .query_type(query_type)
                 .contention_factor(0)
                 .string_options(string_options.clone())
@@ -2992,7 +2992,7 @@ mod text_indexes_explicit_encryption {
             } = Setup::new().await;
 
             let substring = client_encryption
-                .encrypt(query, key1_id, Algorithm::TextPreview)
+                .encrypt(query, key1_id, Algorithm::String)
                 .query_type(SUBSTRING_QUERY_TYPE)
                 .contention_factor(0)
                 .string_options(string_substring_options.clone())
@@ -3021,7 +3021,7 @@ mod text_indexes_explicit_encryption {
             ..
         } = Setup::new().await;
         let error = client_encryption
-            .encrypt("foo", key1_id, Algorithm::TextPreview)
+            .encrypt("foo", key1_id, Algorithm::String)
             .query_type(PREFIX_QUERY_TYPE)
             .string_options(
                 StringOptions::builder()
@@ -3091,7 +3091,7 @@ mod text_indexes_explicit_encryption {
                 .inserted_id;
 
             let encrypted_pre = client_encryption
-                .encrypt(prefix, key1_id.clone(), Algorithm::TextPreview)
+                .encrypt(prefix, key1_id.clone(), Algorithm::String)
                 .query_type(PREFIX_QUERY_TYPE)
                 .contention_factor(0)
                 .string_options(insensitive_prefix_options.clone())
@@ -3113,7 +3113,7 @@ mod text_indexes_explicit_encryption {
             );
 
             let encrypted_suf = client_encryption
-                .encrypt(suffix, key1_id.clone(), Algorithm::TextPreview)
+                .encrypt(suffix, key1_id.clone(), Algorithm::String)
                 .query_type(SUFFIX_QUERY_TYPE)
                 .contention_factor(0)
                 .string_options(insensitive_suffix_options.clone())
@@ -3170,7 +3170,7 @@ mod text_indexes_explicit_encryption {
                 .inserted_id;
 
             let encrypted_sub = client_encryption
-                .encrypt(substring, key1_id.clone(), Algorithm::TextPreview)
+                .encrypt(substring, key1_id.clone(), Algorithm::String)
                 .query_type(SUBSTRING_QUERY_TYPE)
                 .contention_factor(0)
                 .string_options(insensitive_substring_options.clone())
