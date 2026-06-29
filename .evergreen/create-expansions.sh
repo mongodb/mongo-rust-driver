@@ -19,7 +19,12 @@ MONGO_ORCHESTRATION_HOME="${DRIVERS_TOOLS}/.evergreen/orchestration"
 MONGODB_BINARIES="${DRIVERS_TOOLS}/mongodb/bin"
 UPLOAD_BUCKET="${project}"
 PROJECT_DIRECTORY="$(pwd)"
-MONGOCRYPT_LIB_DIR="${PROJECT_DIRECTORY}/libmongocrypt/install/libmongocrypt/lib64"
+if [[ -f /etc/redhat-release ]] || [[ -f /etc/centos-release ]]; then
+  LIBMONGOCRYPT_SUFFIX_DIR="lib64"
+else
+  LIBMONGOCRYPT_SUFFIX_DIR="lib"
+fi
+MONGOCRYPT_LIB_DIR="${PROJECT_DIRECTORY}/libmongocrypt/install/libmongocrypt/${LIBMONGOCRYPT_SUFFIX_DIR}"
 LD_LIBRARY_PATH="${MONGOCRYPT_LIB_DIR}:${LD_LIBRARY_PATH}"
 
 TMPDIR="${MONGO_ORCHESTRATION_HOME}/db"
