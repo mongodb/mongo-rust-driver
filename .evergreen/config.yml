@@ -64,7 +64,7 @@ buildvariants:
     run_on:
       - ubuntu2404-small
     expansions:
-      LIBMONGOCRYPT_OS: ubuntu2204-64
+      LIBMONGOCRYPT: true
     tasks:
       - name: .lint
 
@@ -260,7 +260,7 @@ buildvariants:
       # The Azure CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
     expansions:
-      LIBMONGOCRYPT_OS: "debian11"
+      LIBMONGOCRYPT: true
     tasks:
       - name: azure-kms-task-group
     # Limit the test to only schedule every 14 days to reduce external resource usage.
@@ -273,7 +273,7 @@ buildvariants:
       # The GCP CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
     expansions:
-      LIBMONGOCRYPT_OS: "debian11"
+      LIBMONGOCRYPT: true
     tasks:
       - name: gcp-kms-task-group
     # Limit the test to only schedule every 14 days to reduce external resource usage.
@@ -359,7 +359,7 @@ buildvariants:
     run_on:
       - rhel8-latest-small
     expansions:
-      LIBMONGOCRYPT_OS: rhel-80-64-bit
+      LIBMONGOCRYPT: true
       AUTH: auth
       SSL: ssl
     tasks:
@@ -372,7 +372,7 @@ buildvariants:
     run_on:
       - rhel8-latest-small
     expansions:
-      LIBMONGOCRYPT_OS: rhel-80-64-bit
+      LIBMONGOCRYPT: true
       AUTH: auth
       SSL: ssl
       DISABLE_CRYPT_SHARED: true
@@ -385,7 +385,7 @@ buildvariants:
     run_on:
       - rhel8-latest-small
     expansions:
-      LIBMONGOCRYPT_OS: rhel-80-64-bit
+      LIBMONGOCRYPT: true
       AUTH: auth
       SSL: ssl
       OPENSSL: true
@@ -1426,7 +1426,7 @@ tasks:
           - SNAPPY
           - MONGOCRYPT_LIB_DIR
           - LD_LIBRARY_PATH
-          - LIBMONGOCRYPT_OS
+          - LIBMONGOCRYPT
     - command: s3.put
       type: setup
       params:
@@ -1476,7 +1476,6 @@ functions:
           - is_patch
           - version_id
           - project
-          - LIBMONGOCRYPT_OS
     - command: expansions.update
       params:
         file: src/expansion.yml
