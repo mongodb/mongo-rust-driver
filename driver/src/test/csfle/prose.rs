@@ -1000,32 +1000,12 @@ mod explicit_encryption {
         }
     }
 
-    macro_rules! server_check {
-        ($name:expr) => {{
-            if !fle2v2_ok($name).await {
-                return Ok(());
-            }
-            if server_version_lt(6, 0).await {
-                log_uncaptured(format!(
-                    "skipping explicit encryption test [{}]: server below 6.0",
-                    $name
-                ));
-                return Ok(());
-            }
-            if topology_is_standalone().await {
-                log_uncaptured(format!(
-                    "skipping explicit encryption test [{}]: cannot run on standalone",
-                    $name
-                ));
-                return Ok(());
-            }
-        }};
-    }
-
     // can insert encrypted indexed and find
     #[tokio::test]
     async fn case_1() -> Result<()> {
-        server_check!("explicit_encryption_case_1");
+        if !fle2v2_ok("explicit_encryption_case_1").await {
+            return Ok(());
+        }
 
         let testdata = TestData::new().await?;
         let enc_coll = testdata
@@ -1073,7 +1053,9 @@ mod explicit_encryption {
     // can insert encrypted indexed and find with non-zero contention
     #[tokio::test]
     async fn case_2() -> Result<()> {
-        server_check!("explicit_encryption_case_2");
+        if !fle2v2_ok("explicit_encryption_case_2").await {
+            return Ok(());
+        }
 
         let testdata = TestData::new().await?;
         let enc_coll = testdata
@@ -1122,7 +1104,9 @@ mod explicit_encryption {
     // can insert encrypted unindexed
     #[tokio::test]
     async fn case_3() -> Result<()> {
-        server_check!("explicit_encryption_case_3");
+        if !fle2v2_ok("explicit_encryption_case_3").await {
+            return Ok(());
+        }
 
         let testdata = TestData::new().await?;
         let enc_coll = testdata
@@ -1159,7 +1143,9 @@ mod explicit_encryption {
     // can roundtrip encrypted indexed
     #[tokio::test]
     async fn case_4() -> Result<()> {
-        server_check!("explicit_encryption_case_4");
+        if !fle2v2_ok("explicit_encryption_case_4").await {
+            return Ok(());
+        }
 
         let testdata = TestData::new().await?;
 
@@ -1185,7 +1171,9 @@ mod explicit_encryption {
     //can roundtrip encrypted unindexed)
     #[tokio::test]
     async fn case_5() -> Result<()> {
-        server_check!("explicit_encryption_case_5");
+        if !fle2v2_ok("explicit_encryption_case_5").await {
+            return Ok(());
+        }
 
         let testdata = TestData::new().await?;
 
