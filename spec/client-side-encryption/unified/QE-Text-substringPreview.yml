@@ -2,6 +2,7 @@ description: QE-Text-substringPreview
 schemaVersion: "1.25"
 runOnRequirements:
   - minServerVersion: "8.2.0" # Server 8.2.0 adds preview support for QE text queries.
+    maxServerVersion: "8.99.99" # Server 9.0.0 will remove support for "substringPreview": SERVER-129158
     topologies: ["replicaset", "sharded", "load-balanced"] # QE does not support standalone.
     csfle:
       minLibmongocryptVersion: 1.15.0 # For SPM-4158.

@@ -27,13 +27,13 @@ use crate::{
 use super::{options::KmsProviders, state_machine::CryptExecutor};
 
 pub use super::client_builder::EncryptedClientBuilder;
-pub use crate::action::csfle::encrypt::{EncryptKey, RangeOptions};
-#[cfg(feature = "text-indexes-unstable")]
 pub use crate::action::csfle::encrypt::{
+    EncryptKey,
     PrefixOptions,
+    RangeOptions,
+    StringOptions,
     SubstringOptions,
     SuffixOptions,
-    TextOptions,
 };
 
 /// A handle to the key vault.  Used to create data encryption keys, and to explicitly encrypt and
