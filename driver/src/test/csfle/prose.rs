@@ -2665,6 +2665,17 @@ mod text_indexes_explicit_encryption {
             }
         }};
 
+        ($name:expr, skip_on_9) => {{
+            server_check!($name);
+            if server_version_gte(9, 0).await {
+                log_uncaptured(format!(
+                    "skipping text_indexes_explicit_encryption [{}]: requires server < 9.0",
+                    $name
+                ));
+                return;
+            }
+        }};
+
         ($name:expr, requires_9) => {{
             server_check!($name);
             if server_version_lt(9, 0).await {
@@ -2731,7 +2742,9 @@ mod text_indexes_explicit_encryption {
             ] {
                 match coll {
                     "prefix-suffix" | "prefix-suffix-ci-di" if !server_is_9 => continue,
-                    "prefix-suffix-preview" if server_is_9 => continue,
+                    "prefix-suffix-preview" | "substring" | "substring-ci-di" if server_is_9 => {
+                        continue
+                    }
                     _ => (),
                 }
                 let enc_fields = load_testdata(path).unwrap();
@@ -2849,13 +2862,15 @@ mod text_indexes_explicit_encryption {
                 .await
                 .unwrap();
 
-            explicit_encrypted_client
-                .database("db")
-                .collection("substring")
-                .insert_one(doc! { "_id": 0 , "encryptedText": encrypted_foobarbaz })
-                .write_concern(WriteConcern::majority())
-                .await
-                .unwrap();
+            if !server_is_9 {
+                explicit_encrypted_client
+                    .database("db")
+                    .collection("substring")
+                    .insert_one(doc! { "_id": 0 , "encryptedText": encrypted_foobarbaz })
+                    .write_concern(WriteConcern::majority())
+                    .await
+                    .unwrap();
+            }
 
             Self {
                 explicit_encrypted_client,
@@ -2963,7 +2978,7 @@ mod text_indexes_explicit_encryption {
 
     #[tokio::test]
     async fn find_substring() {
-        server_check!("find by substring");
+        server_check!("find by substring", skip_on_9);
 
         let string_substring_options = StringOptions::builder()
             .case_sensitive(true)
@@ -3038,7 +3053,11 @@ mod text_indexes_explicit_encryption {
             .await
             .unwrap_err();
         let message = error.message().unwrap();
-        assert!(message.contains("contention factor is required for textPreview algorithm"));
+        assert!(
+            message.contains("contention factor is required for string algorithm"),
+            "{:?}",
+            message
+        );
     }
 
     #[tokio::test]
@@ -3131,7 +3150,7 @@ mod text_indexes_explicit_encryption {
 
     #[tokio::test]
     async fn insensitive_substring() {
-        server_check!("insensitive substring");
+        server_check!("insensitive substring", skip_on_9);
 
         let insensitive_substring_options = StringOptions::builder()
             .case_sensitive(false)
