@@ -28,6 +28,7 @@ mod happy_eyeballs_skip_ci; // requires happy eyeballs server
 mod index_management;
 mod lambda_examples;
 pub(crate) mod spec;
+mod stream_processing;
 mod timeseries;
 pub(crate) mod util;
 
