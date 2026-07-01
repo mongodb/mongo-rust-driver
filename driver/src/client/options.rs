@@ -689,11 +689,15 @@ pub struct ClientOptions {
 
     /// The maximum number of retries to perform when overload errors are encountered. Defaults to
     /// 2.
+    ///
+    /// This option only has an effect with MongoDB server version 9.0 and above.
     pub max_adaptive_retries: Option<u32>,
 
     /// Whether to enable overload retargeting when overload errors are encountered. When overload
     /// retargeting is enabled, the server on which an overload error occurs is deprioritized
     /// when selecting a server for a retry attempt. Defaults to false.
+    ///
+    /// This option only has an effect with MongoDB server version 9.0 and above.
     pub enable_overload_retargeting: Option<bool>,
 
     /// Information from the SRV URI that generated these client options, if applicable.
@@ -1088,11 +1092,15 @@ pub struct ConnectionString {
 
     /// The maximum number of retries to perform when overload errors are encountered. Defaults to
     /// 2.
+    ///
+    /// This option only has an effect with MongoDB server version 9.0 and above.
     pub max_adaptive_retries: Option<u32>,
 
     /// Whether to enable overload retargeting when overload errors are encountered. When overload
     /// retargeting is enabled, the server on which an overload error occurs is deprioritized
     /// when selecting a server for a retry attempt. Defaults to false.
+    ///
+    /// This option only has an effect with MongoDB server version 9.0 and above.
     pub enable_overload_retargeting: Option<bool>,
 
     #[serde(serialize_with = "serde_util::serialize_duration_option_as_int_millis")]
