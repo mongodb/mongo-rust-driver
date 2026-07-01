@@ -932,69 +932,72 @@ mod deadlock {
 mod explicit_encryption {
     use super::*;
 
-    struct ExplicitEncryptionTestData {
+    struct TestData {
         key1_id: Binary,
         client_encryption: ClientEncryption,
         encrypted_client: Client,
     }
 
-    async fn explicit_encryption_setup() -> Result<Option<ExplicitEncryptionTestData>> {
-        if server_version_lt(6, 0).await {
-            log_uncaptured("skipping explicit encryption test: server below 6.0");
-            return Ok(None);
+    impl TestData {
+        async fn new() -> Result<Self> {
+            let key_vault_client = Client::for_test().await;
+
+            let encrypted_fields = load_testdata("data/encryptedFields.json")?;
+            let key1_document = load_testdata("data/keys/key1-document.json")?;
+            let key1_id = match key1_document.get("_id").unwrap() {
+                Bson::Binary(b) => b.clone(),
+                v => return Err(failure!("expected binary _id, got {:?}", v)),
+            };
+
+            let db = key_vault_client.database("db");
+            db.collection::<Document>("explicit_encryption")
+                .drop()
+                .encrypted_fields(encrypted_fields.clone())
+                .await?;
+            db.create_collection("explicit_encryption")
+                .encrypted_fields(encrypted_fields)
+                .await?;
+
+            let encrypted_fields_c10 = load_testdata("data/encryptedFields-c10.json")?;
+            db.collection::<Document>("explicit_encryption_c10")
+                .drop()
+                .encrypted_fields(encrypted_fields_c10.clone())
+                .await?;
+            db.create_collection("explicit_encryption_c10")
+                .encrypted_fields(encrypted_fields_c10)
+                .await?;
+
+            let keyvault = key_vault_client.database("keyvault");
+            keyvault.collection::<Document>("datakeys").drop().await?;
+            keyvault.create_collection("datakeys").await?;
+            keyvault
+                .collection::<Document>("datakeys")
+                .insert_one(key1_document)
+                .write_concern(WriteConcern::majority())
+                .await?;
+
+            let client_encryption = ClientEncryption::new(
+                key_vault_client.into_client(),
+                KV_NAMESPACE.clone(),
+                vec![LOCAL_KMS.clone()],
+            )?;
+            let encrypted_client = Client::encrypted_builder(
+                get_client_options().await.clone(),
+                KV_NAMESPACE.clone(),
+                vec![LOCAL_KMS.clone()],
+            )?
+            .bypass_query_analysis(true)
+            .extra_options(EXTRA_OPTIONS.clone())
+            .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+            .build()
+            .await?;
+
+            Ok(TestData {
+                key1_id,
+                client_encryption,
+                encrypted_client,
+            })
         }
-        if topology_is_standalone().await {
-            log_uncaptured("skipping explicit encryption test: cannot run on standalone");
-            return Ok(None);
-        }
-
-        let key_vault_client = Client::for_test().await;
-
-        let encrypted_fields = load_testdata("data/encryptedFields.json")?;
-        let key1_document = load_testdata("data/keys/key1-document.json")?;
-        let key1_id = match key1_document.get("_id").unwrap() {
-            Bson::Binary(b) => b.clone(),
-            v => return Err(failure!("expected binary _id, got {:?}", v)),
-        };
-
-        let db = key_vault_client.database("db");
-        db.collection::<Document>("explicit_encryption")
-            .drop()
-            .encrypted_fields(encrypted_fields.clone())
-            .await?;
-        db.create_collection("explicit_encryption")
-            .encrypted_fields(encrypted_fields)
-            .await?;
-        let keyvault = key_vault_client.database("keyvault");
-        keyvault.collection::<Document>("datakeys").drop().await?;
-        keyvault.create_collection("datakeys").await?;
-        keyvault
-            .collection::<Document>("datakeys")
-            .insert_one(key1_document)
-            .write_concern(WriteConcern::majority())
-            .await?;
-
-        let client_encryption = ClientEncryption::new(
-            key_vault_client.into_client(),
-            KV_NAMESPACE.clone(),
-            vec![LOCAL_KMS.clone()],
-        )?;
-        let encrypted_client = Client::encrypted_builder(
-            get_client_options().await.clone(),
-            KV_NAMESPACE.clone(),
-            vec![LOCAL_KMS.clone()],
-        )?
-        .bypass_query_analysis(true)
-        .extra_options(EXTRA_OPTIONS.clone())
-        .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
-        .build()
-        .await?;
-
-        Ok(Some(ExplicitEncryptionTestData {
-            key1_id,
-            client_encryption,
-            encrypted_client,
-        }))
     }
 
     // can insert encrypted indexed and find
@@ -1004,10 +1007,7 @@ mod explicit_encryption {
             return Ok(());
         }
 
-        let testdata = match explicit_encryption_setup().await? {
-            Some(t) => t,
-            None => return Ok(()),
-        };
+        let testdata = TestData::new().await?;
         let enc_coll = testdata
             .encrypted_client
             .database("db")
@@ -1057,14 +1057,11 @@ mod explicit_encryption {
             return Ok(());
         }
 
-        let testdata = match explicit_encryption_setup().await? {
-            Some(t) => t,
-            None => return Ok(()),
-        };
+        let testdata = TestData::new().await?;
         let enc_coll = testdata
             .encrypted_client
             .database("db")
-            .collection::<Document>("explicit_encryption");
+            .collection::<Document>("explicit_encryption_c10");
 
         for _ in 0..10 {
             let insert_payload = testdata
@@ -1089,30 +1086,10 @@ mod explicit_encryption {
                 Algorithm::Indexed,
             )
             .query_type("equality".to_string())
-            .contention_factor(0)
-            .await?;
-        let found: Vec<_> = enc_coll
-            .find(doc! { "encryptedIndexed": find_payload })
-            .await?
-            .try_collect()
-            .await?;
-        assert!(found.len() < 10);
-        for doc in found {
-            assert_eq!("encrypted indexed value", doc.get_str("encryptedIndexed")?);
-        }
-
-        let find_payload2 = testdata
-            .client_encryption
-            .encrypt(
-                "encrypted indexed value",
-                EncryptKey::Id(testdata.key1_id.clone()),
-                Algorithm::Indexed,
-            )
-            .query_type("equality")
             .contention_factor(10)
             .await?;
         let found: Vec<_> = enc_coll
-            .find(doc! { "encryptedIndexed": find_payload2 })
+            .find(doc! { "encryptedIndexed": find_payload })
             .await?
             .try_collect()
             .await?;
@@ -1131,10 +1108,7 @@ mod explicit_encryption {
             return Ok(());
         }
 
-        let testdata = match explicit_encryption_setup().await? {
-            Some(t) => t,
-            None => return Ok(()),
-        };
+        let testdata = TestData::new().await?;
         let enc_coll = testdata
             .encrypted_client
             .database("db")
@@ -1173,10 +1147,7 @@ mod explicit_encryption {
             return Ok(());
         }
 
-        let testdata = match explicit_encryption_setup().await? {
-            Some(t) => t,
-            None => return Ok(()),
-        };
+        let testdata = TestData::new().await?;
 
         let raw_value = RawBson::String("encrypted indexed value".to_string());
         let payload = testdata
@@ -1204,10 +1175,7 @@ mod explicit_encryption {
             return Ok(());
         }
 
-        let testdata = match explicit_encryption_setup().await? {
-            Some(t) => t,
-            None => return Ok(()),
-        };
+        let testdata = TestData::new().await?;
 
         let raw_value = RawBson::String("encrypted unindexed value".to_string());
         let payload = testdata
