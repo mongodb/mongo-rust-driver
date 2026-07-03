@@ -162,7 +162,6 @@ pub struct RangeOptions {
 #[non_exhaustive]
 pub struct StringOptions {
     /// Options for substring queries.
-    /// NOTE: substring is currently unstable API and subject to backwards breaking changes.
     pub substring: Option<SubstringOptions>,
 
     /// Options for prefix queries.
@@ -179,9 +178,6 @@ pub struct StringOptions {
 }
 
 /// Options for substring queries.
-///
-/// NOTE: These options are unstable and subject to backwards-breaking changes. They should only be
-/// used in experimental workloads.
 #[derive(Clone, Default, Debug, Serialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]

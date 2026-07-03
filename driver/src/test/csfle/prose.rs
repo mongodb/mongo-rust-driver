@@ -2692,7 +2692,8 @@ mod text_indexes_explicit_encryption {
     const PREFIX_PREVIEW_QUERY_TYPE: &str = "prefixPreview";
     const SUFFIX_QUERY_TYPE: &str = "suffix";
     const SUFFIX_PREVIEW_QUERY_TYPE: &str = "suffixPreview";
-    const SUBSTRING_QUERY_TYPE: &str = "substringPreview";
+    const SUBSTRING_QUERY_TYPE: &str = "substring";
+    const SUBSTRING_PREVIEW_QUERY_TYPE: &str = "substring";
 
     fn prefix_filter(prefix: Binary) -> Document {
         doc! { "$expr": { "$encStrStartsWith": { "input": "$encryptedText", "prefix": prefix } } }
@@ -2739,12 +2740,18 @@ mod text_indexes_explicit_encryption {
                     "data/encryptedFields-substring-ci-di.json",
                     "substring-ci-di",
                 ),
+                (
+                    "data/encryptedFields-substring-preview.json",
+                    "substring-preview",
+                ),
             ] {
                 match coll {
-                    "prefix-suffix" | "prefix-suffix-ci-di" if !server_is_9 => continue,
-                    "prefix-suffix-preview" | "substring" | "substring-ci-di" if server_is_9 => {
+                    "prefix-suffix" | "prefix-suffix-ci-di" | "substring" | "substring-ci-di"
+                        if !server_is_9 =>
+                    {
                         continue
                     }
+                    "prefix-suffix-preview" | "substring-preview" if server_is_9 => continue,
                     _ => (),
                 }
                 let enc_fields = load_testdata(path).unwrap();
@@ -2831,10 +2838,10 @@ mod text_indexes_explicit_encryption {
                 .await
                 .unwrap();
 
-            let prefix_suffix_coll_name = if server_version_lt(9, 0).await {
-                "prefix-suffix-preview"
-            } else {
+            let prefix_suffix_coll_name = if server_is_9 {
                 "prefix-suffix"
+            } else {
+                "prefix-suffix-preview"
             };
             explicit_encrypted_client
                 .database("db")
@@ -2862,15 +2869,18 @@ mod text_indexes_explicit_encryption {
                 .await
                 .unwrap();
 
-            if !server_is_9 {
-                explicit_encrypted_client
-                    .database("db")
-                    .collection("substring")
-                    .insert_one(doc! { "_id": 0 , "encryptedText": encrypted_foobarbaz })
-                    .write_concern(WriteConcern::majority())
-                    .await
-                    .unwrap();
-            }
+            let substring_coll_name = if server_is_9 {
+                "substring"
+            } else {
+                "substring-preview"
+            };
+            explicit_encrypted_client
+                .database("db")
+                .collection(substring_coll_name)
+                .insert_one(doc! { "_id": 0 , "encryptedText": encrypted_foobarbaz })
+                .write_concern(WriteConcern::majority())
+                .await
+                .unwrap();
 
             Self {
                 explicit_encrypted_client,
@@ -2978,7 +2988,12 @@ mod text_indexes_explicit_encryption {
 
     #[tokio::test]
     async fn find_substring() {
-        server_check!("find by substring", skip_on_9);
+        server_check!("find by substring");
+        let (query_type, collection) = if server_version_gte(9, 0).await {
+            (SUBSTRING_QUERY_TYPE, "substring")
+        } else {
+            (SUBSTRING_PREVIEW_QUERY_TYPE, "substring-preview")
+        };
 
         let string_substring_options = StringOptions::builder()
             .case_sensitive(true)
@@ -3008,7 +3023,7 @@ mod text_indexes_explicit_encryption {
 
             let substring = client_encryption
                 .encrypt(query, key1_id, Algorithm::String)
-                .query_type(SUBSTRING_QUERY_TYPE)
+                .query_type(query_type)
                 .contention_factor(0)
                 .string_options(string_substring_options.clone())
                 .await
@@ -3016,7 +3031,7 @@ mod text_indexes_explicit_encryption {
 
             let actual = explicit_encrypted_client
                 .database("db")
-                .collection::<Document>("substring")
+                .collection::<Document>(collection)
                 .find_one(substring_filter(substring))
                 .projection(doc! { "__safeContent__": 0 })
                 .await
@@ -3150,7 +3165,7 @@ mod text_indexes_explicit_encryption {
 
     #[tokio::test]
     async fn insensitive_substring() {
-        server_check!("insensitive substring", skip_on_9);
+        server_check!("insensitive substring", requires_9);
 
         let insensitive_substring_options = StringOptions::builder()
             .case_sensitive(false)
@@ -3158,7 +3173,7 @@ mod text_indexes_explicit_encryption {
             .substring(
                 SubstringOptions::builder()
                     .max_string_length(10)
-                    .max_query_length(10)
+                    .max_query_length(6)
                     .min_query_length(2)
                     .build(),
             )
