@@ -2303,8 +2303,8 @@ dependencies = [
 
 [[package]]
 name = "mongocrypt"
-version = "0.3.3"
-source = "git+https://github.com/abr-egn/libmongocrypt-rust.git?branch=RUST-2402%2Fqe-prefix-suffix-redux#74e9fdd71bf4d52aaa5cc0b37bcf3c71939fc34c"
+version = "0.4.0"
+source = "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#025292bb68e7d702497ac7564b79ca78403edca3"
 dependencies = [
  "bson 2.15.0",
  "bson 3.1.0",
@@ -2316,7 +2316,7 @@ dependencies = [
 [[package]]
 name = "mongocrypt-sys"
 version = "0.1.6+1.18.2"
-source = "git+https://github.com/abr-egn/libmongocrypt-rust.git?branch=RUST-2402%2Fqe-prefix-suffix-redux#74e9fdd71bf4d52aaa5cc0b37bcf3c71939fc34c"
+source = "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#025292bb68e7d702497ac7564b79ca78403edca3"
 
 [[package]]
 name = "mongodb"

@@ -15,6 +15,3 @@ license = "Apache-2.0"
 edition = "2021"
 repository = "https://github.com/mongodb/mongo-rust-driver"
 rust-version = "1.88"
-
-[patch."https://github.com/mongodb/libmongocrypt-rust.git"]
-mongocrypt = { git = "https://github.com/abr-egn/libmongocrypt-rust.git", branch = "RUST-2402/qe-prefix-suffix-redux" }
