@@ -2693,7 +2693,7 @@ mod text_indexes_explicit_encryption {
     const SUFFIX_QUERY_TYPE: &str = "suffix";
     const SUFFIX_PREVIEW_QUERY_TYPE: &str = "suffixPreview";
     const SUBSTRING_QUERY_TYPE: &str = "substring";
-    const SUBSTRING_PREVIEW_QUERY_TYPE: &str = "substring";
+    const SUBSTRING_PREVIEW_QUERY_TYPE: &str = "substringPreview";
 
     fn prefix_filter(prefix: Binary) -> Document {
         doc! { "$expr": { "$encStrStartsWith": { "input": "$encryptedText", "prefix": prefix } } }
