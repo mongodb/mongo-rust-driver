@@ -1499,6 +1499,14 @@ impl ClientOptions {
             None
         }
     }
+
+    pub(crate) fn connect_timeout(&self) -> Duration {
+        match self.connect_timeout {
+            Some(d) if d.is_zero() => Duration::MAX,
+            Some(d) => d,
+            None => crate::runtime::stream::DEFAULT_CONNECT_TIMEOUT,
+        }
+    }
 }
 
 /// Splits the string once on the first instance of the given delimiter. If the delimiter is not

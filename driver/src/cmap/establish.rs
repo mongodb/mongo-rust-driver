@@ -13,7 +13,7 @@ use crate::{
     hello::HelloReply,
     options::Socks5Proxy,
     runtime,
-    runtime::{stream::DEFAULT_CONNECT_TIMEOUT, AsyncStream, TlsConfig},
+    runtime::{AsyncStream, TlsConfig},
     sdam::{topology::TopologySpec, HandshakePhase},
 };
 
@@ -51,7 +51,7 @@ pub(crate) struct ConnectionEstablisher {
 pub(crate) struct EstablisherOptions {
     handshake_options: HandshakerOptions,
     tls_options: Option<TlsOptions>,
-    connect_timeout: Option<Duration>,
+    connect_timeout: Duration,
     #[allow(unused)]
     proxy: Option<Socks5Proxy>,
     #[cfg(test)]
@@ -63,7 +63,7 @@ impl From<&TopologySpec> for EstablisherOptions {
         Self {
             handshake_options: HandshakerOptions::from(spec),
             tls_options: spec.options.tls_options(),
-            connect_timeout: spec.options.connect_timeout,
+            connect_timeout: spec.options.connect_timeout(),
             #[cfg(test)]
             test_patch_reply: None,
             #[cfg(feature = "socks5-proxy")]
@@ -92,16 +92,10 @@ impl ConnectionEstablisher {
             None
         };
 
-        let connect_timeout = match options.connect_timeout {
-            Some(d) if d.is_zero() => Duration::MAX,
-            Some(d) => d,
-            None => DEFAULT_CONNECT_TIMEOUT,
-        };
-
         Ok(Self {
             handshaker,
             tls_config,
-            connect_timeout,
+            connect_timeout: options.connect_timeout,
             #[cfg(test)]
             test_patch_reply: options.test_patch_reply,
             #[cfg(feature = "socks5-proxy")]
