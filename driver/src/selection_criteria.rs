@@ -280,6 +280,43 @@ pub struct HedgedReadOptions {
 }
 
 impl ReadPreference {
+    /// Creates a `ReadPreference::Primary`. Reads will only be routed to the primary.
+    pub fn primary() -> Self {
+        Self::Primary
+    }
+
+    /// Creates a `ReadPreference::Secondary` with the given options. Reads will only be routed to a
+    /// secondary.
+    pub fn secondary(options: impl Into<Option<ReadPreferenceOptions>>) -> Self {
+        Self::Secondary {
+            options: options.into(),
+        }
+    }
+
+    /// Creates a `ReadPreference::PrimaryPreferred` with the given options. Reads will be routed to
+    /// the primary if it's available, and fall back to the secondaries if not.
+    pub fn primary_preferred(options: impl Into<Option<ReadPreferenceOptions>>) -> Self {
+        Self::PrimaryPreferred {
+            options: options.into(),
+        }
+    }
+
+    /// Creates a `ReadPreference::SecondaryPreferred` with the given options. Reads will be routed
+    /// to a secondary if one is available, and fall back to the primary if not.
+    pub fn secondary_preferred(options: impl Into<Option<ReadPreferenceOptions>>) -> Self {
+        Self::SecondaryPreferred {
+            options: options.into(),
+        }
+    }
+
+    /// Creates a `ReadPreference::Nearest` with the given options. Reads will be routed to the node
+    /// with the least network latency regardless of whether it's the primary or a secondary.
+    pub fn nearest(options: impl Into<Option<ReadPreferenceOptions>>) -> Self {
+        Self::Nearest {
+            options: options.into(),
+        }
+    }
+
     pub(crate) fn mode(&self) -> &'static str {
         match self {
             Self::Primary => "primary",
@@ -356,6 +393,8 @@ pub type TagSet = HashMap<String, String>;
 
 #[cfg(test)]
 mod test {
+    use std::time::Duration;
+
     use super::{HedgedReadOptions, ReadPreference, ReadPreferenceOptions};
     use crate::bson::doc;
 
@@ -374,6 +413,38 @@ mod test {
         assert_eq!(
             doc,
             doc! { "mode": "secondary", "hedge": { "enabled": true } }
+        );
+    }
+
+    #[test]
+    fn constructors() {
+        assert_eq!(ReadPreference::primary(), ReadPreference::Primary);
+
+        assert_eq!(
+            ReadPreference::secondary(None),
+            ReadPreference::Secondary { options: None }
+        );
+        assert_eq!(
+            ReadPreference::primary_preferred(None),
+            ReadPreference::PrimaryPreferred { options: None }
+        );
+        assert_eq!(
+            ReadPreference::secondary_preferred(None),
+            ReadPreference::SecondaryPreferred { options: None }
+        );
+        assert_eq!(
+            ReadPreference::nearest(None),
+            ReadPreference::Nearest { options: None }
+        );
+
+        let options = ReadPreferenceOptions::builder()
+            .max_staleness(Duration::from_secs(120))
+            .build();
+        assert_eq!(
+            ReadPreference::nearest(options.clone()),
+            ReadPreference::Nearest {
+                options: Some(options)
+            }
         );
     }
 }
