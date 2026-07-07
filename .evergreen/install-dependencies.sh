@@ -48,7 +48,7 @@ for arg; do
     # Install tool for merging different junit reports into a single one
     cargo install merge-junit
   elif [ $arg == "libmongocrypt" ]; then
-    LIBMONGOCRYPT_TAG="1.19.2"
+    LIBMONGOCRYPT_TAG="1.20.0"
     mkdir ${PROJECT_DIRECTORY}/libmongocrypt
     cd ${PROJECT_DIRECTORY}/libmongocrypt
     git clone https://github.com/mongodb/libmongocrypt --depth=1 --branch $LIBMONGOCRYPT_TAG

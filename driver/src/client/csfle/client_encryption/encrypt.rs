@@ -86,9 +86,8 @@ impl ClientEncryption {
             let options_doc = crate::bson_compat::serialize_to_document(range_options)?;
             builder = builder.algorithm_range(options_doc)?;
         }
-        #[cfg(feature = "text-indexes-unstable")]
-        if let Some(text_options) = &opts.text_options {
-            let options_doc = crate::bson_compat::serialize_to_document(text_options)?;
+        if let Some(string_options) = &opts.string_options {
+            let options_doc = crate::bson_compat::serialize_to_document(string_options)?;
             builder = builder.algorithm_text(options_doc)?;
         }
         Ok(builder)

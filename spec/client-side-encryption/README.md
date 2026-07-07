@@ -1940,6 +1940,13 @@ Read the `"_id"` field of `key1Document` as `key1ID`.
 Drop and create the collection `db.explicit_encryption` using `encryptedFields` as an option. See
 [FLE 2 CreateCollection() and Collection.Drop()](../client-side-encryption.md#create-collection-helper).
 
+Load the file
+[encryptedFields-c10.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/encryptedFields-c10.json)
+as `encryptedFields_c10`.
+
+Drop and create the collection `db.explicit_encryption_c10` using `encryptedFields_c10` as an option. See
+[FLE 2 CreateCollection() and Collection.Drop()](../client-side-encryption.md#create-collection-helper).
+
 Drop and create the collection `keyvault.datakeys`.
 
 Insert `key1Document` in `keyvault.datakeys` with majority write concern.
@@ -2014,28 +2021,10 @@ class EncryptOpts {
 
 Store the result in `insertPayload`.
 
-Use `encryptedClient` to insert the document `{ "encryptedIndexed": <insertPayload> }` into `db.explicit_encryption`.
+Use `encryptedClient` to insert the document `{ "encryptedIndexed": <insertPayload> }` into
+`db.explicit_encryption_c10`.
 
 Repeat the above steps 10 times to insert 10 total documents. The `insertPayload` must be regenerated each iteration.
-
-Use `clientEncryption` to encrypt the value "encrypted indexed value" with these `EncryptOpts`:
-
-```typescript
-class EncryptOpts {
-   keyId : <key1ID>,
-   algorithm: "Indexed",
-   queryType: "equality",
-   contentionFactor: 0,
-}
-```
-
-Store the result in `findPayload`.
-
-Use `encryptedClient` to run a "find" operation on the `db.explicit_encryption` collection with the filter
-`{ "encryptedIndexed": <findPayload> }`.
-
-Assert less than 10 documents are returned. 0 documents may be returned. Assert each returned document contains the
-field `{ "encryptedIndexed": "encrypted indexed value" }`.
 
 Use `clientEncryption` to encrypt the value "encrypted indexed value" with these `EncryptOpts`:
 
@@ -2048,10 +2037,10 @@ class EncryptOpts {
 }
 ```
 
-Store the result in `findPayload2`.
+Store the result in `findPayload`.
 
-Use `encryptedClient` to run a "find" operation on the `db.explicit_encryption` collection with the filter
-`{ "encryptedIndexed": <findPayload2> }`.
+Use `encryptedClient` to run a "find" operation on the `db.explicit_encryption_c10` collection with the filter
+`{ "encryptedIndexed": <findPayload> }`.
 
 Assert 10 documents are returned. Assert each returned document contains the field
 `{ "encryptedIndexed": "encrypted indexed value" }`.
@@ -3871,10 +3860,10 @@ expect(dk).to.be.a(Binary);
 expect(calledCount).to.be.greaterThan(0);
 ```
 
-### 27. Text Explicit Encryption
+### 27. String Explicit Encryption
 
-The Text Explicit Encryption tests utilize Queryable Encryption (QE) range protocol V2 and require MongoDB server 8.2.0+
-and libmongocrypt 1.15.1+. The tests must not run against a standalone.
+The String Explicit Encryption tests utilize Queryable Encryption (QE) and require MongoDB server 8.2.0+ and
+libmongocrypt 1.18.1+. The tests must not run against a standalone.
 
 Before running each of the following test cases, perform the following Test Setup.
 
@@ -3885,9 +3874,22 @@ create the following collections with majority write concern:
 
 - `db.prefix-suffix` using the `encryptedFields` option set to the contents of
     [encryptedFields-prefix-suffix.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/encryptedFields-prefix-suffix.json).
-    Skip this step if testing server 9.0.0+.
+    This step requires server 9.0.0+.
+- `db.prefix-suffix-ci-di` using the `encryptedFields` option set to the contents of
+    [encryptedFields-prefix-suffix-ci-di.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/encryptedFields-prefix-suffix-ci-di.json).
+    This step requires server 9.0.0+.
+- `db.prefix-suffix-preview` using the `encryptedFields` option set to the contents of
+    [encryptedFields-prefix-suffix-preview.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/encryptedFields-prefix-suffix-preview.json).
+    This step requires server pre-9.0.0.
 - `db.substring` using the `encryptedFields` option set to the contents of
     [encryptedFields-substring.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/encryptedFields-substring.json)
+    This step requires server 9.0.0+.
+- `db.substring-ci-di` using the `encryptedFields` option set to the contents of
+    [encryptedFields-substring-ci-di.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/encryptedFields-substring-ci-di.json)
+    This step requires server 9.0.0+.
+- `db.substring-preview` using the `encryptedFields` option set to the contents of
+    [encryptedFields-substring-preview.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/encryptedFields-substring-preview.json)
+    This step requires server pre-9.0.0.
 
 Load the file
 [key1-document.json](https://github.com/mongodb/specifications/tree/master/source/client-side-encryption/etc/data/keys/key1-document.json)
@@ -3911,7 +3913,7 @@ class ClientEncryptionOpts {
 }
 ```
 
-Create a MongoClient named `encryptedClient` with these `AutoEncryptionOpts`:
+Create a MongoClient named `explicitEncryptedClient` with these `AutoEncryptionOpts`:
 
 ```typescript
 class AutoEncryptionOpts {
@@ -3921,14 +3923,24 @@ class AutoEncryptionOpts {
 }
 ```
 
+Create a MongoClient with auto-encryption enabled (without `bypassQueryAnalysis`) named `autoEncryptedClient` using
+these `AutoEncryptionOpts`:
+
+```typescript
+class AutoEncryptionOpts {
+   keyVaultNamespace: "keyvault.datakeys",
+   kmsProviders: { "local": { "key": <base64 decoding of LOCAL_MASTERKEY> } },
+}
+```
+
 Use `clientEncryption` to encrypt the string `"foobarbaz"` with the following `EncryptOpts`:
 
 ```typescript
 class EncryptOpts {
    keyId : <key1ID>,
-   algorithm: "TextPreview",
+   algorithm: "String",
    contentionFactor: 0,
-   textOpts: TextOpts {
+   stringOpts: StringOpts {
       caseSensitive: true,
       diacriticSensitive: true,
       prefix: PrefixOpts {
@@ -3943,7 +3955,8 @@ class EncryptOpts {
 }
 ```
 
-Use `encryptedClient` to insert the following document into `db.prefix-suffix` with majority write concern:
+Use `explicitEncryptedClient` to insert the following document into `db.prefix-suffix` (if created) and
+`db.prefix-suffix-preview` (if created) with majority write concern:
 
 ```javascript
 { "_id": 0, "encryptedText": <encrypted 'foobarbaz'> }
@@ -3954,21 +3967,22 @@ Use `clientEncryption` to encrypt the string `"foobarbaz"` with the following `E
 ```typescript
 class EncryptOpts {
    keyId : <key1ID>,
-   algorithm: "TextPreview",
+   algorithm: "String",
    contentionFactor: 0,
-   textOpts: TextOpts {
+   stringOpts: StringOpts {
       caseSensitive: true,
       diacriticSensitive: true,
       substring: SubstringOpts {
        strMaxLength: 10,
-       strMaxQueryLength: 10,
+       strMaxQueryLength: 6,
        strMinQueryLength: 2,
       }
    },
 }
 ```
 
-Use `encryptedClient` to insert the following document into `db.substring` with majority write concern:
+Use `explicitEncryptedClient` to insert the following document into `db.substring` (if created) and
+`db.substring-preview` (if created) with majority write concern:
 
 ```javascript
 { "_id": 0, "encryptedText": <encrypted 'foobarbaz'> }
@@ -3976,17 +3990,22 @@ Use `encryptedClient` to insert the following document into `db.substring` with 
 
 #### Case 1: can find a document by prefix
 
-Skip this test case if testing MongoDB server 9.0.0+.
+Run this case multiple times with the following sets of parameters:
+
+- `queryType=prefix` and `collection=prefix-suffix`
+    - Require server 9.0.0+ and libmongocrypt 1.19.0+.
+- `queryType=prefixPreview` and `collection=prefix-suffix-preview`
+    - Require server pre-9.0.0 and libmongocrypt 1.19.1+.
 
 Use `clientEncryption.encrypt()` to encrypt the string `"foo"` with the following `EncryptOpts`:
 
 ```typescript
 class EncryptOpts {
    keyId : <key1ID>,
-   algorithm: "TextPreview",
-   queryType: "prefixPreview",
+   algorithm: "String",
+   queryType: "<queryType>",
    contentionFactor: 0,
-   textOpts: TextOpts {
+   stringOpts: StringOpts {
       caseSensitive: true,
       diacriticSensitive: true,
       prefix: PrefixOpts {
@@ -3997,7 +4016,7 @@ class EncryptOpts {
 }
 ```
 
-Use `encryptedClient` to run a "find" operation on the `db.prefix-suffix` collection with the following filter:
+Use `explicitEncryptedClient` to run a "find" operation on the `db.<collection>` collection with the following filter:
 
 ```javascript
 { $expr: { $encStrStartsWith: {input: '$encryptedText', prefix: <encrypted 'foo'>} } }
@@ -4011,17 +4030,22 @@ Assert the following document is returned:
 
 #### Case 2: can find a document by suffix
 
-Skip this test case if testing MongoDB server 9.0.0+.
+Run this case multiple times with the following sets of parameters:
+
+- `queryType=suffix` and `collection=prefix-suffix`
+    - Require server 9.0.0+ and libmongocrypt 1.19.0+.
+- `queryType=suffixPreview` and `collection=prefix-suffix-preview`
+    - Require server pre-9.0.0 and libmongocrypt 1.19.1+.
 
 Use `clientEncryption.encrypt()` to encrypt the string `"baz"` with the following `EncryptOpts`:
 
 ```typescript
 class EncryptOpts {
    keyId : <key1ID>,
-   algorithm: "TextPreview",
-   queryType: "suffixPreview",
+   algorithm: "String",
+   queryType: "<queryType>",
    contentionFactor: 0,
-   textOpts: TextOpts {
+   stringOpts: StringOpts {
       caseSensitive: true,
       diacriticSensitive: true,
       suffix: SuffixOpts {
@@ -4032,7 +4056,7 @@ class EncryptOpts {
 }
 ```
 
-Use `encryptedClient` to run a "find" operation on the `db.prefix-suffix` collection with the following filter:
+Use `explicitEncryptedClient` to run a "find" operation on the `db.<collection>` collection with the following filter:
 
 ```javascript
 { $expr: { $encStrEndsWith: {input: '$encryptedText', suffix: <encrypted 'baz'>} } }
@@ -4046,17 +4070,22 @@ Assert the following document is returned:
 
 #### Case 3: assert no document found by prefix
 
-Skip this test case if testing MongoDB server 9.0.0+.
+Run this case multiple times with the following sets of parameters:
+
+- `queryType=prefix` and `collection=prefix-suffix`
+    - Require server 9.0.0+ and libmongocrypt 1.19.0+.
+- `queryType=prefixPreview` and `collection=prefix-suffix-preview`
+    - Require server pre-9.0.0 and libmongocrypt 1.19.1+.
 
 Use `clientEncryption.encrypt()` to encrypt the string `"baz"` with the following `EncryptOpts`:
 
 ```typescript
 class EncryptOpts {
    keyId : <key1ID>,
-   algorithm: "TextPreview",
-   queryType: "prefixPreview",
+   algorithm: "String",
+   queryType: "<queryType>",
    contentionFactor: 0,
-   textOpts: TextOpts {
+   stringOpts: StringOpts {
       caseSensitive: true,
       diacriticSensitive: true,
       prefix: PrefixOpts {
@@ -4067,7 +4096,7 @@ class EncryptOpts {
 }
 ```
 
-Use `encryptedClient` to run a "find" operation on the `db.prefix-suffix` collection with the following filter:
+Use `explicitEncryptedClient` to run a "find" operation on the `db.<collection>` collection with the following filter:
 
 ```javascript
 { $expr: { $encStrStartsWith: {input: '$encryptedText', prefix: <encrypted 'baz'>} } }
@@ -4077,17 +4106,22 @@ Assert that no documents are returned.
 
 #### Case 4: assert no document found by suffix
 
-Skip this test case if testing MongoDB server 9.0.0+.
+Run this case multiple times with the following sets of parameters:
+
+- `queryType=suffix` and `collection=prefix-suffix`
+    - Require server 9.0.0+ and libmongocrypt 1.19.0+.
+- `queryType=suffixPreview` and `collection=prefix-suffix-preview`
+    - Require server pre-9.0.0 and libmongocrypt 1.19.1+.
 
 Use `clientEncryption.encrypt()` to encrypt the string `"foo"` with the following `EncryptOpts`:
 
 ```typescript
 class EncryptOpts {
    keyId : <key1ID>,
-   algorithm: "TextPreview",
-   queryType: "suffixPreview",
+   algorithm: "String",
+   queryType: "<queryType>",
    contentionFactor: 0,
-   textOpts: TextOpts {
+   stringOpts: StringOpts {
       caseSensitive: true,
       diacriticSensitive: true,
       suffix: SuffixOpts {
@@ -4098,7 +4132,7 @@ class EncryptOpts {
 }
 ```
 
-Use `encryptedClient` to run a "find" operation on the `db.prefix-suffix` collection with the following filter:
+Use `explicitEncryptedClient` to run a "find" operation on the `db.<collection>` collection with the following filter:
 
 ```javascript
 { $expr: { $encStrEndsWith: {input: '$encryptedText', suffix: <encrypted 'foo'>} } }
@@ -4108,27 +4142,34 @@ Assert that no documents are returned.
 
 #### Case 5: can find a document by substring
 
+Run this case multiple times with the following sets of parameters:
+
+- `queryType=substring` and `collection=substring`
+    - Require server 9.0.0+ and libmongocrypt 1.20.0+.
+- `queryType=substringPreview` and `collection=substring-preview`
+    - Require server pre-9.0.0 and libmongocrypt 1.18.1+.
+
 Use `clientEncryption.encrypt()` to encrypt the string `"bar"` with the following `EncryptOpts`:
 
 ```typescript
 class EncryptOpts {
    keyId : <key1ID>,
-   algorithm: "TextPreview",
-   queryType: "substringPreview",
+   algorithm: "String",
+   queryType: "<queryType>",
    contentionFactor: 0,
-   textOpts: TextOpts {
+   stringOpts: StringOpts {
       caseSensitive: true,
       diacriticSensitive: true,
       substring: SubstringOpts {
        strMaxLength: 10,
-       strMaxQueryLength: 10,
+       strMaxQueryLength: 6,
        strMinQueryLength: 2,
       }
    },
 }
 ```
 
-Use `encryptedClient` to run a "find" operation on the `db.substring` collection with the following filter:
+Use `explicitEncryptedClient` to run a "find" operation on the `db.<collection>` collection with the following filter:
 
 ```javascript
 { $expr: { $encStrContains: {input: '$encryptedText', substring: <encrypted 'bar'>} } }
@@ -4142,27 +4183,34 @@ Assert the following document is returned:
 
 #### Case 6: assert no document found by substring
 
+Run this case multiple times with the following sets of parameters:
+
+- `queryType=substring` and `collection=substring`
+    - Require server 9.0.0+ and libmongocrypt 1.20.0+.
+- `queryType=substringPreview` and `collection=substring-preview`
+    - Require server pre-9.0.0 and libmongocrypt 1.18.1+.
+
 Use `clientEncryption.encrypt()` to encrypt the string `"qux"` with the following `EncryptOpts`:
 
 ```typescript
 class EncryptOpts {
    keyId : <key1ID>,
-   algorithm: "TextPreview",
-   queryType: "substringPreview",
+   algorithm: "String",
+   queryType: "<queryType>",
    contentionFactor: 0,
-   textOpts: TextOpts {
+   stringOpts: StringOpts {
       caseSensitive: true,
       diacriticSensitive: true,
       substring: SubstringOpts {
        strMaxLength: 10,
-       strMaxQueryLength: 10,
+       strMaxQueryLength: 6,
        strMinQueryLength: 2,
       }
    },
 }
 ```
 
-Use `encryptedClient` to run a "find" operation on the `db.substring` collection with the following filter:
+Use `explicitEncryptedClient` to run a "find" operation on the `db.<collection>` collection with the following filter:
 
 ```javascript
 { $expr: { $encStrContains: {input: '$encryptedText', substring: <encrypted 'qux'>} } }
@@ -4172,16 +4220,16 @@ Assert that no documents are returned.
 
 #### Case 7: assert `contentionFactor` is required
 
-Skip this test case if testing MongoDB server 9.0.0+.
+This test case requires MongoDB server 9.0.0+ and libmongocrypt 1.19.0+.
 
 Use `clientEncryption.encrypt()` to encrypt the string `"foo"` with the following `EncryptOpts`:
 
 ```typescript
 class EncryptOpts {
    keyId : <key1ID>,
-   algorithm: "TextPreview",
-   queryType: "prefixPreview",
-   textOpts: TextOpts {
+   algorithm: "String",
+   queryType: "prefix",
+   stringOpts: StringOpts {
       caseSensitive: true,
       diacriticSensitive: true,
       prefix: PrefixOpts {
@@ -4192,5 +4240,247 @@ class EncryptOpts {
 }
 ```
 
-Expect an error from libmongocrypt with a message containing the string: "contention factor is required for textPreview
+Expect an error from libmongocrypt with a message containing the string: "contention factor is required for string
 algorithm".
+
+#### Case 8: can find an auto-encrypted case-insensitively indexed document by prefix and suffix
+
+This is a regression test for [DRIVERS-3470](https://jira.mongodb.org/browse/DRIVERS-3470). This test case requires
+MongoDB server 9.0.0+ and libmongocrypt 1.19.0+.
+
+Use `autoEncryptedClient` to insert the following document into `db.prefix-suffix-ci-di` with majority write concern.
+
+```javascript
+{ "encryptedText": "BingQiLin" }
+```
+
+Use `clientEncryption.encrypt()` to encrypt the string `"bing"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "String",
+   queryType: "prefix",
+   contentionFactor: 0,
+   stringOpts: StringOpts {
+      caseSensitive: false,
+      diacriticSensitive: false,
+      prefix: PrefixOpts {
+        strMaxQueryLength: 10,
+        strMinQueryLength: 2,
+     }
+   },
+}
+```
+
+Use `explicitEncryptedClient` to run a "find" operation on the `db.prefix-suffix-ci-di` collection with the following
+filter:
+
+```javascript
+{ $expr: { $encStrStartsWith: {input: '$encryptedText', prefix: <encrypted 'bing'>} } }
+```
+
+Assert the following document is returned:
+
+```javascript
+{ "encryptedText": "BingQiLin" }
+```
+
+Use `clientEncryption.encrypt()` to encrypt the string `"lin"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "String",
+   queryType: "suffix",
+   contentionFactor: 0,
+   stringOpts: StringOpts {
+      caseSensitive: false,
+      diacriticSensitive: false,
+      suffix: SuffixOpts {
+        strMaxQueryLength: 10,
+        strMinQueryLength: 2,
+     }
+   },
+}
+```
+
+Use `explicitEncryptedClient` to run a "find" operation on the `db.prefix-suffix-ci-di` collection with the following
+filter:
+
+```javascript
+{ $expr: { $encStrEndsWith: {input: '$encryptedText', suffix: <encrypted 'lin'>} } }
+```
+
+Assert the following document is returned:
+
+```javascript
+{ "encryptedText": "BingQiLin" }
+```
+
+#### Case 9: can find an auto-encrypted diacritic-insensitively indexed document by prefix and suffix
+
+This is a regression test for [DRIVERS-3470](https://jira.mongodb.org/browse/DRIVERS-3470). This test case requires
+MongoDB server 9.0.0+ and libmongocrypt 1.19.0+.
+
+Use `autoEncryptedClient` to insert the following document into `db.prefix-suffix-ci-di` with majority write concern:
+
+```javascript
+{ "encryptedText": "cafébarbäz" }
+```
+
+Use `clientEncryption.encrypt()` to encrypt the string `"cafe"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "String",
+   queryType: "prefix",
+   contentionFactor: 0,
+   stringOpts: StringOpts {
+      caseSensitive: false,
+      diacriticSensitive: false,
+      prefix: PrefixOpts {
+        strMaxQueryLength: 10,
+        strMinQueryLength: 2,
+     }
+   },
+}
+```
+
+Use `explicitEncryptedClient` to run a "find" operation on the `db.prefix-suffix-ci-di` collection with the following
+filter:
+
+```javascript
+{ $expr: { $encStrStartsWith: {input: '$encryptedText', prefix: <encrypted 'cafe'>} } }
+```
+
+Assert the following document is returned:
+
+```javascript
+{ "encryptedText": "cafébarbäz" }
+```
+
+Use `clientEncryption.encrypt()` to encrypt the string `"baz"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "String",
+   queryType: "suffix",
+   contentionFactor: 0,
+   stringOpts: StringOpts {
+      caseSensitive: false,
+      diacriticSensitive: false,
+      suffix: SuffixOpts {
+        strMaxQueryLength: 10,
+        strMinQueryLength: 2,
+     }
+   },
+}
+```
+
+Use `explicitEncryptedClient` to run a "find" operation on the `db.prefix-suffix-ci-di` collection with the following
+filter:
+
+```javascript
+{ $expr: { $encStrEndsWith: {input: '$encryptedText', suffix: <encrypted 'baz'>} } }
+```
+
+Assert the following document is returned:
+
+```javascript
+{ "encryptedText": "cafébarbäz" }
+```
+
+#### Case 10: can find an auto-encrypted case-insensitively indexed document by substring
+
+Skip this test on server 9.0.0+.
+
+This is a regression test for [DRIVERS-3470](https://jira.mongodb.org/browse/DRIVERS-3470). This test requires
+libmongocrypt 1.18.1+.
+
+Use `autoEncryptedClient` to insert the following document into `db.substring-ci-di` with majority write concern:
+
+```javascript
+{ "encryptedText": "FooBarBaz" }
+```
+
+Use `clientEncryption.encrypt()` to encrypt the string `"bar"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "String",
+   queryType: "substring",
+   contentionFactor: 0,
+   stringOpts: StringOpts {
+      caseSensitive: false,
+      diacriticSensitive: false,
+      substring: SubstringOpts {
+        strMaxLength: 10,
+        strMaxQueryLength: 6,
+        strMinQueryLength: 2,
+      }
+   },
+}
+```
+
+Use `explicitEncryptedClient` to run a "find" operation on the `db.substring-ci-di` collection with the following
+filter:
+
+```javascript
+{ $expr: { $encStrContains: {input: '$encryptedText', substring: <encrypted 'bar'>} } }
+```
+
+Assert the following document is returned:
+
+```javascript
+{ "encryptedText": "FooBarBaz" }
+```
+
+#### Case 11: can find an auto-encrypted diacritic-insensitively indexed document by substring
+
+Skip this test on server 9.0.0+.
+
+This is a regression test for [DRIVERS-3470](https://jira.mongodb.org/browse/DRIVERS-3470). This test requires
+libmongocrypt 1.18.1+.
+
+Use `autoEncryptedClient` to insert the following document into `db.substring-ci-di` with majority write concern:
+
+```javascript
+{ "encryptedText": "foocafébaz" }
+```
+
+Use `clientEncryption.encrypt()` to encrypt the string `"cafe"` with the following `EncryptOpts`:
+
+```typescript
+class EncryptOpts {
+   keyId : <key1ID>,
+   algorithm: "String",
+   queryType: "substring",
+   contentionFactor: 0,
+   stringOpts: StringOpts {
+      caseSensitive: false,
+      diacriticSensitive: false,
+      substring: SubstringOpts {
+        strMaxLength: 10,
+        strMaxQueryLength: 6,
+        strMinQueryLength: 2,
+      }
+   },
+}
+```
+
+Use `explicitEncryptedClient` to run a "find" operation on the `db.substring-ci-di` collection with the following
+filter:
+
+```javascript
+{ $expr: { $encStrContains: {input: '$encryptedText', substring: <encrypted 'cafe'>} } }
+```
+
+Assert the following document is returned:
+
+```javascript
+{ "encryptedText": "foocafébaz" }
+```
