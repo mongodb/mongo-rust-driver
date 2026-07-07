@@ -4395,10 +4395,8 @@ Assert the following document is returned:
 
 #### Case 10: can find an auto-encrypted case-insensitively indexed document by substring
 
-Skip this test on server 9.0.0+.
-
-This is a regression test for [DRIVERS-3470](https://jira.mongodb.org/browse/DRIVERS-3470). This test requires
-libmongocrypt 1.18.1+.
+This is a regression test for [DRIVERS-3470](https://jira.mongodb.org/browse/DRIVERS-3470). This test case requires
+MongoDB server 9.0.0+ and libmongocrypt 1.20.0+.
 
 Use `autoEncryptedClient` to insert the following document into `db.substring-ci-di` with majority write concern:
 
@@ -4441,10 +4439,8 @@ Assert the following document is returned:
 
 #### Case 11: can find an auto-encrypted diacritic-insensitively indexed document by substring
 
-Skip this test on server 9.0.0+.
-
-This is a regression test for [DRIVERS-3470](https://jira.mongodb.org/browse/DRIVERS-3470). This test requires
-libmongocrypt 1.18.1+.
+This is a regression test for [DRIVERS-3470](https://jira.mongodb.org/browse/DRIVERS-3470). This test case requires
+MongoDB server 9.0.0+ and libmongocrypt 1.20.0+.
 
 Use `autoEncryptedClient` to insert the following document into `db.substring-ci-di` with majority write concern:
 
