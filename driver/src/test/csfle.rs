@@ -55,8 +55,12 @@ static FLE_AZURE_TENANTID: LazyLock<String> = LazyLock::new(|| get_env_var("FLE_
 static FLE_AZURE_CLIENTID: LazyLock<String> = LazyLock::new(|| get_env_var("FLE_AZURE_CLIENTID"));
 static FLE_AZURE_CLIENTSECRET: LazyLock<String> =
     LazyLock::new(|| get_env_var("FLE_AZURE_CLIENTSECRET"));
+static FLE_AZURE_ACCESSTOKEN: LazyLock<String> =
+    LazyLock::new(|| get_env_var("CSFLE_AZURE_ACCESS_TOKEN"));
 static FLE_GCP_EMAIL: LazyLock<String> = LazyLock::new(|| get_env_var("FLE_GCP_EMAIL"));
 static FLE_GCP_PRIVATEKEY: LazyLock<String> = LazyLock::new(|| get_env_var("FLE_GCP_PRIVATEKEY"));
+static FLE_GCP_ACCESSTOKEN: LazyLock<String> =
+    LazyLock::new(|| get_env_var("CSFLE_GCP_ACCESS_TOKEN"));
 
 // Additional environment variables. These values should be set to the relevant local paths/ports.
 #[cfg(feature = "azure-kms")]
@@ -353,6 +357,17 @@ pub(crate) fn fill_kms_placeholders(
 
         for (key, value) in config.iter_mut() {
             if value.as_document() == Some(&placeholder) {
+                if key.to_ascii_lowercase() == "accesstoken" {
+                    let token = if provider == KmsProvider::azure() {
+                        &*FLE_AZURE_ACCESSTOKEN
+                    } else if provider == KmsProvider::gcp() {
+                        &*FLE_GCP_ACCESSTOKEN
+                    } else {
+                        panic!("no test access token for {provider:?}");
+                    };
+                    *value = crate::bson::Bson::String(token.clone());
+                    continue;
+                }
                 let test_kms_provider =
                     test_kms_provider.unwrap_or_else(|| panic!("missing config for {provider:?}"));
                 let placeholder_value = test_kms_provider
