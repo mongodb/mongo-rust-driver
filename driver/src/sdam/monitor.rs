@@ -28,7 +28,7 @@ use crate::{
     },
     hello::{hello_command, run_hello, AwaitableHelloOptions, HelloReply},
     options::{ClientOptions, ServerAddress},
-    runtime::{self, stream::DEFAULT_CONNECT_TIMEOUT, WorkerHandle, WorkerHandleListener},
+    runtime::{self, WorkerHandle, WorkerHandleListener},
 };
 
 fn next_monitoring_connection_id() -> u32 {
@@ -220,18 +220,15 @@ impl Monitor {
         });
 
         let heartbeat_frequency = self.heartbeat_frequency();
-        let timeout = if self.connect_timeout().is_zero() {
-            // If connectTimeoutMS = 0, then the socket timeout for monitoring is unlimited.
-            Duration::MAX
-        } else if self.topology_version.is_some() {
+        let timeout = if self.topology_version.is_some() {
             // For streaming responses, use connectTimeoutMS + heartbeatFrequencyMS for socket
             // timeout.
             heartbeat_frequency
-                .checked_add(self.connect_timeout())
+                .checked_add(self.client_options.connect_timeout())
                 .unwrap_or(Duration::MAX)
         } else {
             // Otherwise, just use connectTimeoutMS.
-            self.connect_timeout()
+            self.client_options.connect_timeout()
         };
 
         let execute_hello = async {
@@ -374,12 +371,6 @@ impl Monitor {
         }
     }
 
-    fn connect_timeout(&self) -> Duration {
-        self.client_options
-            .connect_timeout
-            .unwrap_or(DEFAULT_CONNECT_TIMEOUT)
-    }
-
     fn heartbeat_frequency(&self) -> Duration {
         self.client_options
             .heartbeat_freq
@@ -452,10 +443,7 @@ impl RttMonitor {
         // keep executing until either the topology is closed or server monitor is done (i.e. the
         // sender is closed)
         while self.topology.is_alive() && !self.sender.is_closed() {
-            let timeout = self
-                .client_options
-                .connect_timeout
-                .unwrap_or(DEFAULT_CONNECT_TIMEOUT);
+            let timeout = self.client_options.connect_timeout();
 
             let perform_check = async {
                 match self.connection {
