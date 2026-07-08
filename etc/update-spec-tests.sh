@@ -28,7 +28,11 @@ tmpdir=`perl -MFile::Temp=tempdir -wle 'print tempdir(TMPDIR => 1, CLEANUP => 0)
 curl -sL "https://github.com/mongodb/specifications/archive/$REF.zip" -o "$tmpdir/specs.zip"
 unzip -q -d "$tmpdir" "$tmpdir/specs.zip"
 mkdir -p "${DEST}/$1"
-rsync -ah "$tmpdir/specifications-$REF"*"/source/$1/tests/" "${DEST}/$1" --delete
+EXCLUDE=""
+if [ "$1" = "client-side-encryption" ]; then
+  EXCLUDE="--exclude=legacy/"
+fi
+rsync -ah "$tmpdir/specifications-$REF"*"/source/$1/tests/" "${DEST}/$1" --delete "${EXCLUDE}"
 
 if [ "$1" = "client-side-encryption" ]; then
     mkdir -p "${DEST}/testdata/$1/data"
