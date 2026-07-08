@@ -2323,7 +2323,7 @@ source = "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#852b
 
 [[package]]
 name = "mongodb"
-version = "3.7.0"
+version = "3.8.0"
 dependencies = [
  "anyhow",
  "approx",
@@ -2405,7 +2405,7 @@ dependencies = [
 
 [[package]]
 name = "mongodb-internal-macros"
-version = "3.7.0"
+version = "3.8.0"
 dependencies = [
  "macro_magic",
  "proc-macro2",
