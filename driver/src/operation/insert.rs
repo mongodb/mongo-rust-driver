@@ -12,7 +12,13 @@ use crate::{
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, InsertManyError, Result},
-    operation::{OperationWithDefaults, Retryability, WriteResponseBody},
+    operation::{
+        OperationImpl,
+        OperationWithDefaults,
+        Retryability,
+        WithDefaults,
+        WriteResponseBody,
+    },
     options::{ClientOptions, InsertManyOptions, WriteConcern},
     results::InsertManyResult,
     Collection,
@@ -184,6 +190,10 @@ impl OperationWithDefaults for Insert<'_> {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Insert<'_> {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

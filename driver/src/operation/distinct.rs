@@ -6,7 +6,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::options::DistinctOptions,
     error::Result,
-    operation::{OperationWithDefaults, Retryability},
+    operation::{OperationImpl, OperationWithDefaults, Retryability, WithDefaults},
     options::{ClientOptions, SelectionCriteria},
     Collection,
 };
@@ -95,6 +95,10 @@ impl OperationWithDefaults for Distinct {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Distinct {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

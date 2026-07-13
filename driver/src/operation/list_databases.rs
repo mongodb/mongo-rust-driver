@@ -7,7 +7,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::ListDatabasesOptions,
     error::Result,
-    operation::{OperationWithDefaults, Retryability},
+    operation::{OperationImpl, OperationWithDefaults, Retryability, WithDefaults},
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
 
@@ -69,6 +69,10 @@ impl OperationWithDefaults for ListDatabases {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for ListDatabases {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

@@ -8,7 +8,13 @@ use crate::{
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{convert_insert_many_error, Result},
-    operation::{OperationWithDefaults, Retryability, WriteResponseBody},
+    operation::{
+        OperationImpl,
+        OperationWithDefaults,
+        Retryability,
+        WithDefaults,
+        WriteResponseBody,
+    },
     options::{ClientOptions, UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
     Collection,
@@ -215,6 +221,10 @@ impl OperationWithDefaults for Update {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Update {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

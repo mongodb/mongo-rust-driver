@@ -5,7 +5,13 @@ use crate::{
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options_to_raw_document, OperationWithDefaults, WriteConcernOnlyBody},
+    operation::{
+        append_options_to_raw_document,
+        OperationImpl,
+        OperationWithDefaults,
+        WithDefaults,
+        WriteConcernOnlyBody,
+    },
     options::{CreateCollectionOptions, WriteConcern},
 };
 
@@ -63,6 +69,10 @@ impl OperationWithDefaults for Create {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Create {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

@@ -7,7 +7,12 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     index::IndexModel,
-    operation::{append_options_to_raw_document, OperationWithDefaults},
+    operation::{
+        append_options_to_raw_document,
+        OperationImpl,
+        OperationWithDefaults,
+        WithDefaults,
+    },
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
 };
@@ -95,6 +100,10 @@ impl OperationWithDefaults for CreateIndexes {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for CreateIndexes {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

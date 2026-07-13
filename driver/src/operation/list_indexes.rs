@@ -5,7 +5,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
-    operation::OperationWithDefaults,
+    operation::{OperationImpl, OperationWithDefaults, WithDefaults},
     options::{ClientOptions, ListIndexesOptions},
     selection_criteria::{ReadPreference, SelectionCriteria},
     Collection,
@@ -76,6 +76,10 @@ impl OperationWithDefaults for ListIndexes {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for ListIndexes {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

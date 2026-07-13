@@ -15,8 +15,10 @@ use crate::{
     operation::{
         append_options_to_raw_document,
         find_and_modify::options::Modification,
+        OperationImpl,
         OperationWithDefaults,
         Retryability,
+        WithDefaults,
     },
     options::{ClientOptions, WriteConcern},
     Collection,
@@ -129,6 +131,10 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl<T: DeserializeOwned> OperationImpl for FindAndModify<T> {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

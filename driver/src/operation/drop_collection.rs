@@ -5,7 +5,13 @@ use crate::{
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, Result},
-    operation::{append_options_to_raw_document, OperationWithDefaults, WriteConcernOnlyBody},
+    operation::{
+        append_options_to_raw_document,
+        OperationImpl,
+        OperationWithDefaults,
+        WithDefaults,
+        WriteConcernOnlyBody,
+    },
     options::{DropCollectionOptions, WriteConcern},
 };
 
@@ -71,6 +77,10 @@ impl OperationWithDefaults for DropCollection {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for DropCollection {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

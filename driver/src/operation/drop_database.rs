@@ -5,7 +5,13 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::DropDatabaseOptions,
     error::Result,
-    operation::{append_options_to_raw_document, OperationWithDefaults, WriteConcernOnlyBody},
+    operation::{
+        append_options_to_raw_document,
+        OperationImpl,
+        OperationWithDefaults,
+        WithDefaults,
+        WriteConcernOnlyBody,
+    },
     options::WriteConcern,
 };
 
@@ -60,6 +66,10 @@ impl OperationWithDefaults for DropDatabase {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for DropDatabase {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]
