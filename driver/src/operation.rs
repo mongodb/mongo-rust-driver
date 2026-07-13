@@ -291,6 +291,12 @@ impl<T: Send + Sync> From<&Collection<T>> for OperationTarget {
     }
 }
 
+pub(crate) trait OperationImpl {
+    type Kind;
+}
+
+pub(crate) struct WithDefaults;
+
 // A mirror of the `Operation` trait, with default behavior where appropriate.  Should only be
 // implemented by operation types that do not delegate to other operations.
 pub(crate) trait OperationWithDefaults: Send + Sync {
@@ -411,7 +417,7 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     type Otel: crate::otel::OtelWitness<Op = Self>;
 }
 
-impl<T: OperationWithDefaults> Operation for T
+impl<T: OperationWithDefaults + OperationImpl<Kind = WithDefaults>> Operation for T
 where
     T: Send + Sync,
 {

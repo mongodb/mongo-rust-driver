@@ -6,6 +6,7 @@ use crate::{
     client::SESSIONS_UNSUPPORTED_COMMANDS,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{Error, Result},
+    operation::{OperationImpl, WithDefaults},
     options::ClientOptions,
     selection_criteria::SelectionCriteria,
     Database,
@@ -116,6 +117,10 @@ impl OperationWithDefaults for RunCommand<'_> {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for RunCommand<'_> {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

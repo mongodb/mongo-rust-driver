@@ -6,7 +6,13 @@ use crate::{
     client::Retry,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options_to_raw_document, OperationWithDefaults, Retryability},
+    operation::{
+        append_options_to_raw_document,
+        OperationImpl,
+        OperationWithDefaults,
+        Retryability,
+        WithDefaults,
+    },
     options::{Acknowledgment, ClientOptions, TransactionOptions, WriteConcern},
     Client,
 };
@@ -94,6 +100,10 @@ impl OperationWithDefaults for CommitTransaction {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for CommitTransaction {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

@@ -4,7 +4,7 @@ use crate::{
     client::{session::TransactionPin, Retry},
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::Retryability,
+    operation::{OperationImpl, Retryability, WithDefaults},
     options::{ClientOptions, SelectionCriteria, WriteConcern},
     Client,
 };
@@ -87,6 +87,10 @@ impl OperationWithDefaults for AbortTransaction {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for AbortTransaction {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

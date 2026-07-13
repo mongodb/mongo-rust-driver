@@ -17,7 +17,9 @@ use crate::{
     operation::{
         run_command::RunCommand,
         GetMore,
+        OperationImpl,
         OperationWithDefaults,
+        WithDefaults,
         MAX_ENCRYPTED_WRITE_SIZE,
     },
     options::{BulkWriteOptions, ClientOptions, OperationType, WriteModel},
@@ -526,6 +528,10 @@ where
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl<R: BulkWriteResult> OperationImpl for BulkWrite<'_, R> {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

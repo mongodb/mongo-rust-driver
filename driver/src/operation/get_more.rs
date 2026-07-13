@@ -7,7 +7,7 @@ use crate::{
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     cursor::common::{CursorInformation, CursorReply},
     error::Result,
-    operation::OperationWithDefaults,
+    operation::{OperationImpl, OperationWithDefaults, WithDefaults},
     options::SelectionCriteria,
     results::GetMoreResult,
     Namespace,
@@ -122,6 +122,10 @@ impl OperationWithDefaults for GetMore<'_> {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for GetMore<'_> {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

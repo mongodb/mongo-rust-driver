@@ -1,5 +1,6 @@
 use crate::{
     bson::rawdoc,
+    operation::{OperationImpl, WithDefaults},
     options::{ClientOptions, SelectionCriteria},
     Collection,
 };
@@ -86,6 +87,10 @@ impl OperationWithDefaults for Count {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Count {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]

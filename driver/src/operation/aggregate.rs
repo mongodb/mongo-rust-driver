@@ -7,7 +7,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
-    operation::{append_options, OperationTarget, Retryability},
+    operation::{append_options, OperationImpl, OperationTarget, Retryability, WithDefaults},
     options::{AggregateOptions, ClientOptions, ReadPreference, SelectionCriteria, WriteConcern},
 };
 
@@ -175,6 +175,10 @@ impl OperationWithDefaults for Aggregate {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Aggregate {
+    type Kind = WithDefaults;
 }
 
 #[cfg(feature = "opentelemetry")]
