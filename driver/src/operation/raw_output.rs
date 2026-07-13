@@ -1,11 +1,9 @@
 use futures_util::FutureExt;
 
 use crate::{
-    bson_compat::CStr,
-    client::Retry,
-    cmap::{Command, RawCommandResponse, StreamDescription},
+    cmap::RawCommandResponse,
     error::Result,
-    options::{ClientOptions, SelectionCriteria},
+    operation::{OperationImpl, OperationWrapper, Wrapper},
     BoxFuture,
 };
 
@@ -16,20 +14,17 @@ use super::{ExecutionContext, Operation};
 #[derive(Clone)]
 pub(crate) struct RawOutput<Op>(pub(crate) Op);
 
-impl<Op: Operation> Operation for RawOutput<Op> {
+impl<Op: Operation + Sync + Send> OperationWrapper for RawOutput<Op> {
+    type Wrapped = Op;
     type O = RawCommandResponse;
-    const NAME: &'static CStr = Op::NAME;
     const ZERO_COPY: bool = true;
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
-        self.0.build(description)
+    fn wrapped(&self) -> &Self::Wrapped {
+        &self.0
     }
 
-    fn extract_at_cluster_time(
-        &self,
-        response: &crate::bson::RawDocument,
-    ) -> Result<Option<crate::bson::Timestamp>> {
-        self.0.extract_at_cluster_time(response)
+    fn wrapped_mut(&mut self) -> &mut Self::Wrapped {
+        &mut self.0
     }
 
     fn handle_response<'a>(
@@ -40,60 +35,16 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         async move { Ok(response.into_owned()) }.boxed()
     }
 
-    fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {
-        Err(error)
-    }
-
-    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
-        self.0.selection_criteria()
-    }
-
-    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
-        self.0.read_concern()
-    }
-
-    fn write_concern(&self) -> super::Feature<&crate::options::WriteConcern> {
-        self.0.write_concern()
-    }
-
-    fn supports_sessions(&self) -> bool {
-        self.0.supports_sessions()
-    }
-
-    fn retryability(&self, options: &ClientOptions) -> super::Retryability {
-        self.0.retryability(options)
-    }
-
-    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
-        self.0.is_backpressure_retryable(options)
-    }
-
-    fn update_for_retry(&mut self, retry: Option<&Retry>) {
-        self.0.update_for_retry(retry)
-    }
-
-    fn override_criteria(&self) -> super::OverrideCriteriaFn {
-        self.0.override_criteria()
-    }
-
-    fn pinned_connection(&self) -> Option<&crate::cmap::conn::PinnedConnectionHandle> {
-        self.0.pinned_connection()
-    }
-
-    fn name(&self) -> &CStr {
-        self.0.name()
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        self.0.target()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
+impl<Op> OperationImpl for RawOutput<Op> {
+    type Kind = Wrapper;
+}
+
 #[cfg(feature = "opentelemetry")]
-impl<Op: Operation> crate::otel::OtelInfo for RawOutput<Op> {
+impl<Op: Operation + Sync + Send> crate::otel::OtelInfo for RawOutput<Op> {
     fn log_name(&self) -> &str {
         self.0.otel().log_name()
     }

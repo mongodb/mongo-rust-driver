@@ -3,12 +3,11 @@ use std::convert::TryInto;
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Document, RawDocument},
-    client::Retry,
-    cmap::{Command, RawCommandResponse, StreamDescription},
+    bson::{doc, Document},
+    cmap::RawCommandResponse,
     error::{Error, ErrorKind, Result},
-    operation::{aggregate::Aggregate, Operation},
-    options::{AggregateOptions, ClientOptions, CountOptions, SelectionCriteria},
+    operation::{aggregate::Aggregate, OperationImpl, OperationWrapper, Wrapper},
+    options::{AggregateOptions, ClientOptions, CountOptions},
 };
 
 use super::{ExecutionContext, Retryability, SingleCursorResult};
@@ -73,22 +72,17 @@ impl CountDocuments {
     }
 }
 
-impl Operation for CountDocuments {
+impl OperationWrapper for CountDocuments {
+    type Wrapped = Aggregate;
     type O = u64;
-
-    const NAME: &'static crate::bson_compat::CStr = Aggregate::NAME;
-
     const ZERO_COPY: bool = false;
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
-        self.aggregate.build(description)
+    fn wrapped(&self) -> &Self::Wrapped {
+        &self.aggregate
     }
 
-    fn extract_at_cluster_time(
-        &self,
-        response: &RawDocument,
-    ) -> Result<Option<crate::bson::Timestamp>> {
-        self.aggregate.extract_at_cluster_time(response)
+    fn wrapped_mut(&mut self) -> &mut Self::Wrapped {
+        &mut self.aggregate
     }
 
     fn handle_response<'a>(
@@ -104,10 +98,6 @@ impl Operation for CountDocuments {
         .boxed()
     }
 
-    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
-        self.aggregate.selection_criteria()
-    }
-
     fn retryability(&self, options: &ClientOptions) -> Retryability {
         Retryability::read(options)
     }
@@ -116,44 +106,12 @@ impl Operation for CountDocuments {
         options.retry_reads != Some(false)
     }
 
-    fn target(&self) -> super::OperationTarget {
-        self.aggregate.target()
-    }
-
-    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
-        self.aggregate.read_concern()
-    }
-
-    fn handle_error(&self, error: Error) -> Result<Self::O> {
-        Err(error)
-    }
-
-    fn write_concern(&self) -> super::Feature<&crate::options::WriteConcern> {
-        self.aggregate.write_concern()
-    }
-
-    fn supports_sessions(&self) -> bool {
-        self.aggregate.supports_sessions()
-    }
-
-    fn update_for_retry(&mut self, retry: Option<&Retry>) {
-        self.aggregate.update_for_retry(retry);
-    }
-
-    fn override_criteria(&self) -> super::OverrideCriteriaFn {
-        self.aggregate.override_criteria()
-    }
-
-    fn pinned_connection(&self) -> Option<&crate::cmap::conn::PinnedConnectionHandle> {
-        self.aggregate.pinned_connection()
-    }
-
-    fn name(&self) -> &crate::bson_compat::CStr {
-        self.aggregate.name()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for CountDocuments {
+    type Kind = Wrapper;
 }
 
 #[cfg(feature = "opentelemetry")]

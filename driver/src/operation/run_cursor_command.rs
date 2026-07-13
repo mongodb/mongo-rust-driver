@@ -2,13 +2,18 @@ use futures_util::FutureExt;
 
 use crate::{
     bson_compat::{cstr, CStr},
-    client::Retry,
-    cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
-    concern::WriteConcern,
+    cmap::RawCommandResponse,
     cursor::common::CursorSpecification,
-    error::{Error, Result},
-    operation::{run_command::RunCommand, Operation, SERVER_4_4_0_WIRE_VERSION},
-    options::{ClientOptions, RunCursorCommandOptions, SelectionCriteria},
+    error::Result,
+    operation::{
+        run_command::RunCommand,
+        Operation,
+        OperationImpl,
+        OperationWrapper,
+        Wrapper,
+        SERVER_4_4_0_WIRE_VERSION,
+    },
+    options::RunCursorCommandOptions,
     BoxFuture,
 };
 
@@ -32,70 +37,18 @@ impl<'conn> RunCursorCommand<'conn> {
     }
 }
 
-impl Operation for RunCursorCommand<'_> {
+impl<'conn> OperationWrapper for RunCursorCommand<'conn> {
+    type Wrapped = RunCommand<'conn>;
     type O = CursorSpecification;
-
     const NAME: &'static CStr = cstr!("run_cursor_command");
-
     const ZERO_COPY: bool = true;
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
-        self.run_command.build(description)
+    fn wrapped(&self) -> &Self::Wrapped {
+        &self.run_command
     }
 
-    fn extract_at_cluster_time(
-        &self,
-        response: &crate::bson::RawDocument,
-    ) -> Result<Option<crate::bson::Timestamp>> {
-        self.run_command.extract_at_cluster_time(response)
-    }
-
-    fn handle_error(&self, error: Error) -> Result<Self::O> {
-        Err(error)
-    }
-
-    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
-        self.run_command.selection_criteria()
-    }
-
-    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
-        self.run_command.read_concern()
-    }
-
-    fn write_concern(&self) -> super::Feature<&WriteConcern> {
-        self.run_command.write_concern()
-    }
-
-    fn supports_sessions(&self) -> bool {
-        self.run_command.supports_sessions()
-    }
-
-    fn retryability(&self, options: &ClientOptions) -> crate::operation::Retryability {
-        self.run_command.retryability(options)
-    }
-
-    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
-        self.run_command.is_backpressure_retryable(options)
-    }
-
-    fn update_for_retry(&mut self, retry: Option<&Retry>) {
-        self.run_command.update_for_retry(retry)
-    }
-
-    fn override_criteria(&self) -> super::OverrideCriteriaFn {
-        self.run_command.override_criteria()
-    }
-
-    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
-        self.run_command.pinned_connection()
-    }
-
-    fn name(&self) -> &CStr {
-        self.run_command.name()
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        self.run_command.target()
+    fn wrapped_mut(&mut self) -> &mut Self::Wrapped {
+        &mut self.run_command
     }
 
     fn handle_response<'a>(
@@ -126,6 +79,10 @@ impl Operation for RunCursorCommand<'_> {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for RunCursorCommand<'_> {
+    type Kind = Wrapper;
 }
 
 #[cfg(feature = "opentelemetry")]
