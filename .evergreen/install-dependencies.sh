@@ -48,10 +48,20 @@ for arg; do
     # Install tool for merging different junit reports into a single one
     cargo install merge-junit
   elif [ $arg == "libmongocrypt" ]; then
-    LIBMONGOCRYPT_TAG="1.20.0"
     mkdir ${PROJECT_DIRECTORY}/libmongocrypt
     cd ${PROJECT_DIRECTORY}/libmongocrypt
-    git clone https://github.com/mongodb/libmongocrypt --depth=1 --branch $LIBMONGOCRYPT_TAG
+
+    #LIBMONGOCRYPT_TAG="1.20.0"
+    #git clone https://github.com/mongodb/libmongocrypt --depth=1 --branch $LIBMONGOCRYPT_TAG
+
+    mkdir libmongocrypt
+    pushd libmongocrypt
+    git init
+    git remote add origin https://github.com/mongodb/libmongocrypt
+    git fetch origin c2f80a7153da3537fe32916eef8ff1d4cc08bc67 --depth=1
+    git reset --hard FETCH_HEAD
+    popd
+
     ./libmongocrypt/.evergreen/compile.sh
   elif [ $arg == "cargo-lambda" ]; then
     source ${CARGO_HOME}/env
