@@ -120,10 +120,10 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// details.
 ///
 /// ## Overload Retry Behavior
-/// All operations executed by a `Client` may retry if the selected server is overloaded. For
-/// details on server load-shedding, see the documentation for
-/// [Intelligent Workload Management](https://www.mongodb.com/docs/atlas/intelligent-workload-management/)
-/// and [Overload Errors](https://www.mongodb.com/docs/atlas/overload-errors).
+/// All operations executed by a `Client` may retry if the selected server is overloaded. An
+/// overload error is indicated by the
+/// [`SYSTEM_OVERLOADED_ERROR`](crate::error::SYSTEM_OVERLOADED_ERROR) error label. This behavior is
+/// functional with MongoDB Atlas server version 9.0 and above.
 ///
 /// The following options can be configured to customize this behavior:
 /// - Set [`ClientOptions::retry_reads`] to false to disable retrying all reads. Note that this will
