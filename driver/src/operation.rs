@@ -438,6 +438,73 @@ pub(crate) trait OperationDispatch<Kind> {
     type Otel: crate::otel::OtelWitness<Op = Self>;
 }
 
+macro_rules! operation_dispatch {
+    ($trait:path, $tag:ty, $handle_response:ident) => {
+        impl<T: $trait> OperationDispatch<$tag> for T {
+            operation_dispatch_body! { $trait, $handle_response }
+        }
+    };
+}
+
+macro_rules! operation_dispatch_body {
+    ($trait:path, $handle_response:ident) => {
+        type O = <T as $trait>::O;
+        const NAME: &'static CStr = <T as $trait>::NAME;
+        const ZERO_COPY: bool = <T as $trait>::ZERO_COPY;
+        fn build(&mut self, description: &StreamDescription) -> Result<Command> {
+            <T as $trait>::build(self, description)
+        }
+        fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
+            <T as $trait>::extract_at_cluster_time(self, response)
+        }
+        fn handle_response<'a>(
+            &'a self,
+            response: Cow<'a, RawCommandResponse>,
+            context: ExecutionContext<'a>,
+        ) -> BoxFuture<'a, Result<Self::O>> {
+            <T as $trait>::$handle_response(self, response, context)
+        }
+        fn handle_error(&self, error: Error) -> Result<Self::O> {
+            <T as $trait>::handle_error(self, error)
+        }
+        fn selection_criteria(&self) -> Feature<&SelectionCriteria> {
+            <T as $trait>::selection_criteria(self)
+        }
+        fn read_concern(&self) -> Feature<&ReadConcern> {
+            <T as $trait>::read_concern(self)
+        }
+        fn write_concern(&self) -> Feature<&WriteConcern> {
+            <T as $trait>::write_concern(self)
+        }
+        fn supports_sessions(&self) -> bool {
+            <T as $trait>::supports_sessions(self)
+        }
+        fn retryability(&self, options: &ClientOptions) -> Retryability {
+            <T as $trait>::retryability(self, options)
+        }
+        fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+            <T as $trait>::is_backpressure_retryable(self, options)
+        }
+        fn update_for_retry(&mut self, retry: Option<&Retry>) {
+            <T as $trait>::update_for_retry(self, retry)
+        }
+        fn override_criteria(&self) -> OverrideCriteriaFn {
+            <T as $trait>::override_criteria(self)
+        }
+        fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
+            <T as $trait>::pinned_connection(self)
+        }
+        fn name(&self) -> &CStr {
+            <T as $trait>::name(self)
+        }
+        fn target(&self) -> OperationTarget {
+            <T as $trait>::target(self)
+        }
+        #[cfg(feature = "opentelemetry")]
+        type Otel = <T as $trait>::Otel;
+    };
+}
+
 pub(crate) trait OperationImpl {
     type Kind;
 }
@@ -446,120 +513,12 @@ impl<K, T> Operation for T
 where
     T: OperationImpl<Kind = K> + OperationDispatch<K> + Send + Sync,
 {
-    type O = <T as OperationDispatch<K>>::O;
-    const NAME: &'static CStr = <T as OperationDispatch<K>>::NAME;
-    const ZERO_COPY: bool = <T as OperationDispatch<K>>::ZERO_COPY;
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
-        <T as OperationDispatch<K>>::build(self, description)
-    }
-    fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
-        <T as OperationDispatch<K>>::extract_at_cluster_time(self, response)
-    }
-    fn handle_response<'a>(
-        &'a self,
-        response: Cow<'a, RawCommandResponse>,
-        context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        <T as OperationDispatch<K>>::handle_response(self, response, context)
-    }
-    fn handle_error(&self, error: Error) -> Result<Self::O> {
-        <T as OperationDispatch<K>>::handle_error(self, error)
-    }
-    fn selection_criteria(&self) -> Feature<&SelectionCriteria> {
-        <T as OperationDispatch<K>>::selection_criteria(self)
-    }
-    fn read_concern(&self) -> Feature<&ReadConcern> {
-        <T as OperationDispatch<K>>::read_concern(self)
-    }
-    fn write_concern(&self) -> Feature<&WriteConcern> {
-        <T as OperationDispatch<K>>::write_concern(self)
-    }
-    fn supports_sessions(&self) -> bool {
-        <T as OperationDispatch<K>>::supports_sessions(self)
-    }
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        <T as OperationDispatch<K>>::retryability(self, options)
-    }
-    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
-        <T as OperationDispatch<K>>::is_backpressure_retryable(self, options)
-    }
-    fn update_for_retry(&mut self, retry: Option<&Retry>) {
-        <T as OperationDispatch<K>>::update_for_retry(self, retry)
-    }
-    fn override_criteria(&self) -> OverrideCriteriaFn {
-        <T as OperationDispatch<K>>::override_criteria(self)
-    }
-    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
-        <T as OperationDispatch<K>>::pinned_connection(self)
-    }
-    fn name(&self) -> &CStr {
-        <T as OperationDispatch<K>>::name(self)
-    }
-    fn target(&self) -> OperationTarget {
-        <T as OperationDispatch<K>>::target(self)
-    }
-    #[cfg(feature = "opentelemetry")]
-    type Otel = <T as OperationDispatch<K>>::Otel;
+    operation_dispatch_body! { OperationDispatch<K>, handle_response }
 }
 
 pub(crate) struct WithDefaults;
 
-impl<T: OperationWithDefaults> OperationDispatch<WithDefaults> for T {
-    type O = T::O;
-    const NAME: &'static CStr = T::NAME;
-    const ZERO_COPY: bool = T::ZERO_COPY;
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
-        self.build(description)
-    }
-    fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
-        self.extract_at_cluster_time(response)
-    }
-    fn handle_response<'a>(
-        &'a self,
-        response: Cow<'a, RawCommandResponse>,
-        context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        self.handle_response_async(response, context)
-    }
-    fn handle_error(&self, error: Error) -> Result<Self::O> {
-        self.handle_error(error)
-    }
-    fn selection_criteria(&self) -> Feature<&SelectionCriteria> {
-        self.selection_criteria()
-    }
-    fn read_concern(&self) -> Feature<&ReadConcern> {
-        self.read_concern()
-    }
-    fn write_concern(&self) -> Feature<&WriteConcern> {
-        self.write_concern()
-    }
-    fn supports_sessions(&self) -> bool {
-        self.supports_sessions()
-    }
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        self.retryability(options)
-    }
-    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
-        self.is_backpressure_retryable(options)
-    }
-    fn update_for_retry(&mut self, retry: Option<&Retry>) {
-        self.update_for_retry(retry)
-    }
-    fn override_criteria(&self) -> OverrideCriteriaFn {
-        self.override_criteria()
-    }
-    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
-        self.pinned_connection()
-    }
-    fn name(&self) -> &CStr {
-        self.name()
-    }
-    fn target(&self) -> OperationTarget {
-        self.target()
-    }
-    #[cfg(feature = "opentelemetry")]
-    type Otel = <Self as OperationWithDefaults>::Otel;
-}
+operation_dispatch! { OperationWithDefaults, WithDefaults, handle_response_async }
 
 pub(crate) trait OperationWrapper {
     // Required
@@ -626,62 +585,7 @@ pub(crate) trait OperationWrapper {
 
 pub(crate) struct Wrapper;
 
-impl<T: OperationWrapper> OperationDispatch<Wrapper> for T {
-    type O = T::O;
-    const NAME: &'static CStr = T::NAME;
-    const ZERO_COPY: bool = T::ZERO_COPY;
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
-        self.build(description)
-    }
-    fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
-        self.extract_at_cluster_time(response)
-    }
-    fn handle_response<'a>(
-        &'a self,
-        response: Cow<'a, RawCommandResponse>,
-        context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        self.handle_response(response, context)
-    }
-    fn handle_error(&self, error: Error) -> Result<Self::O> {
-        self.handle_error(error)
-    }
-    fn selection_criteria(&self) -> Feature<&SelectionCriteria> {
-        self.selection_criteria()
-    }
-    fn read_concern(&self) -> Feature<&ReadConcern> {
-        self.read_concern()
-    }
-    fn write_concern(&self) -> Feature<&WriteConcern> {
-        self.write_concern()
-    }
-    fn supports_sessions(&self) -> bool {
-        self.supports_sessions()
-    }
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        self.retryability(options)
-    }
-    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
-        self.is_backpressure_retryable(options)
-    }
-    fn update_for_retry(&mut self, retry: Option<&Retry>) {
-        self.update_for_retry(retry)
-    }
-    fn override_criteria(&self) -> OverrideCriteriaFn {
-        self.override_criteria()
-    }
-    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
-        self.pinned_connection()
-    }
-    fn name(&self) -> &CStr {
-        self.name()
-    }
-    fn target(&self) -> OperationTarget {
-        self.target()
-    }
-    #[cfg(feature = "opentelemetry")]
-    type Otel = <Self as OperationWrapper>::Otel;
-}
+operation_dispatch! { OperationWrapper, Wrapper, handle_response }
 
 fn should_redact_body(body: &RawDocumentBuf) -> bool {
     if let Some(Ok((command_name, _))) = body.into_iter().next() {
