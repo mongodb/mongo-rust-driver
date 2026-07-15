@@ -839,7 +839,7 @@ impl Client {
                         session.transaction.state,
                         TransactionState::None | TransactionState::Starting
                     )
-                    && op.read_concern().supported()
+                    && (op.read_concern().supported() || op.is_after_cluster_time_write())
                 {
                     cmd.set_after_cluster_time(session);
                 }

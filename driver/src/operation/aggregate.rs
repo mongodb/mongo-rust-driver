@@ -168,6 +168,10 @@ impl BaseOperation for Aggregate {
         self.target.clone()
     }
 
+    fn is_after_cluster_time_write(&self) -> bool {
+        false
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
