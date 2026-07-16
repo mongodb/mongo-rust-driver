@@ -1,4 +1,5 @@
 mod auth;
+mod causal_consistency;
 mod change_streams;
 mod collection_management;
 mod command_monitoring;
