@@ -4,7 +4,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
-    operation::{OperationImpl, BaseOperation, Retryability, Base},
+    operation::{Base, BaseOperation, OperationImpl, Retryability},
     options::{ClientOptions, ListCollectionsOptions, ReadPreference, SelectionCriteria},
     Database,
 };

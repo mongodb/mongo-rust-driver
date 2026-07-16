@@ -7,12 +7,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     index::IndexModel,
-    operation::{
-        append_options_to_raw_document,
-        OperationImpl,
-        BaseOperation,
-        Base,
-    },
+    operation::{append_options_to_raw_document, Base, BaseOperation, OperationImpl},
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
 };

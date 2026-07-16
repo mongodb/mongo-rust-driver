@@ -4,13 +4,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::{Error, Result},
-    operation::{
-        OperationImpl,
-        BaseOperation,
-        Retryability,
-        Base,
-        SERVER_4_4_0_WIRE_VERSION,
-    },
+    operation::{Base, BaseOperation, OperationImpl, Retryability, SERVER_4_4_0_WIRE_VERSION},
     options::{ClientOptions, CursorType, FindOptions, SelectionCriteria},
     Collection,
 };

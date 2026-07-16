@@ -6,10 +6,10 @@ use crate::{
     error::{convert_insert_many_error, Result},
     operation::{
         append_options,
-        OperationImpl,
-        BaseOperation,
-        Retryability,
         Base,
+        BaseOperation,
+        OperationImpl,
+        Retryability,
         WriteResponseBody,
     },
     options::{ClientOptions, DeleteOptions, Hint, WriteConcern},

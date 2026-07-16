@@ -7,7 +7,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::ListDatabasesOptions,
     error::Result,
-    operation::{OperationImpl, BaseOperation, Retryability, Base},
+    operation::{Base, BaseOperation, OperationImpl, Retryability},
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
 

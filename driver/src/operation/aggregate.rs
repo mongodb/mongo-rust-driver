@@ -7,16 +7,11 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
-    operation::{append_options, OperationImpl, OperationTarget, Retryability, Base},
+    operation::{append_options, Base, OperationImpl, OperationTarget, Retryability},
     options::{AggregateOptions, ClientOptions, ReadPreference, SelectionCriteria, WriteConcern},
 };
 
-use super::{
-    ExecutionContext,
-    BaseOperation,
-    WriteConcernOnlyBody,
-    SERVER_4_4_0_WIRE_VERSION,
-};
+use super::{BaseOperation, ExecutionContext, WriteConcernOnlyBody, SERVER_4_4_0_WIRE_VERSION};
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {

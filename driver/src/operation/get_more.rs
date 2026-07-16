@@ -7,7 +7,7 @@ use crate::{
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     cursor::common::{CursorInformation, CursorReply},
     error::Result,
-    operation::{OperationImpl, BaseOperation, Base},
+    operation::{Base, BaseOperation, OperationImpl},
     options::SelectionCriteria,
     results::GetMoreResult,
     Namespace,

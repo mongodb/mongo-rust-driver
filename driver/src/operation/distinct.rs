@@ -6,7 +6,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::options::DistinctOptions,
     error::Result,
-    operation::{OperationImpl, BaseOperation, Retryability, Base},
+    operation::{Base, BaseOperation, OperationImpl, Retryability},
     options::{ClientOptions, SelectionCriteria},
     Collection,
 };

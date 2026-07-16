@@ -15,10 +15,10 @@ use crate::{
     operation::{
         append_options_to_raw_document,
         find_and_modify::options::Modification,
-        OperationImpl,
-        BaseOperation,
-        Retryability,
         Base,
+        BaseOperation,
+        OperationImpl,
+        Retryability,
     },
     options::{ClientOptions, WriteConcern},
     Collection,

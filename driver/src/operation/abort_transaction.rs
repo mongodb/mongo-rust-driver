@@ -4,12 +4,12 @@ use crate::{
     client::{session::TransactionPin, Retry},
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{OperationImpl, Retryability, Base},
+    operation::{Base, OperationImpl, Retryability},
     options::{ClientOptions, SelectionCriteria, WriteConcern},
     Client,
 };
 
-use super::{ExecutionContext, BaseOperation, WriteConcernOnlyBody};
+use super::{BaseOperation, ExecutionContext, WriteConcernOnlyBody};
 
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,

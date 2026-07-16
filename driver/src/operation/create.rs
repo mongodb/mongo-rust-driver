@@ -7,9 +7,9 @@ use crate::{
     error::Result,
     operation::{
         append_options_to_raw_document,
-        OperationImpl,
-        BaseOperation,
         Base,
+        BaseOperation,
+        OperationImpl,
         WriteConcernOnlyBody,
     },
     options::{CreateCollectionOptions, WriteConcern},

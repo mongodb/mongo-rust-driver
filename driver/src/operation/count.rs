@@ -1,6 +1,6 @@
 use crate::{
     bson::rawdoc,
-    operation::{OperationImpl, Base},
+    operation::{Base, OperationImpl},
     options::{ClientOptions, SelectionCriteria},
     Collection,
 };

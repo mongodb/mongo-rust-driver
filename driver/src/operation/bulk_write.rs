@@ -16,10 +16,10 @@ use crate::{
     error::{BulkWriteError, Error, ErrorKind, Result},
     operation::{
         run_command::RunCommand,
+        Base,
+        BaseOperation,
         GetMore,
         OperationImpl,
-        BaseOperation,
-        Base,
         MAX_ENCRYPTED_WRITE_SIZE,
     },
     options::{BulkWriteOptions, ClientOptions, OperationType, WriteModel},

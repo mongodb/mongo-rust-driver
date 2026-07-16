@@ -5,7 +5,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
-    operation::{OperationImpl, BaseOperation, Base},
+    operation::{Base, BaseOperation, OperationImpl},
     options::{ClientOptions, ListIndexesOptions},
     selection_criteria::{ReadPreference, SelectionCriteria},
     Collection,

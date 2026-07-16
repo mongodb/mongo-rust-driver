@@ -5,12 +5,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{
-        append_options_to_raw_document,
-        OperationImpl,
-        BaseOperation,
-        Base,
-    },
+    operation::{append_options_to_raw_document, Base, BaseOperation, OperationImpl},
     options::{DropIndexOptions, WriteConcern},
 };
 
