@@ -3,7 +3,7 @@ use futures_util::FutureExt;
 use crate::{
     cmap::RawCommandResponse,
     error::Result,
-    operation::{OperationImpl, OperationWrapper, Wrapper},
+    operation::{OperationImpl, Wrapped, WrappedOperation},
     BoxFuture,
 };
 
@@ -14,7 +14,7 @@ use super::{ExecutionContext, Operation};
 #[derive(Clone)]
 pub(crate) struct RawOutput<Op>(pub(crate) Op);
 
-impl<Op: Operation + Sync + Send> OperationWrapper for RawOutput<Op> {
+impl<Op: Operation + Sync + Send> WrappedOperation for RawOutput<Op> {
     type Wrapped = Op;
     type O = RawCommandResponse;
     const ZERO_COPY: bool = true;
@@ -40,7 +40,7 @@ impl<Op: Operation + Sync + Send> OperationWrapper for RawOutput<Op> {
 }
 
 impl<Op> OperationImpl for RawOutput<Op> {
-    type Kind = Wrapper;
+    type Kind = Wrapped;
 }
 
 #[cfg(feature = "opentelemetry")]

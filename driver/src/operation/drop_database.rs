@@ -7,9 +7,9 @@ use crate::{
     error::Result,
     operation::{
         append_options_to_raw_document,
+        Base,
+        BaseOperation,
         OperationImpl,
-        OperationWithDefaults,
-        WithDefaults,
         WriteConcernOnlyBody,
     },
     options::WriteConcern,
@@ -29,7 +29,7 @@ impl DropDatabase {
     }
 }
 
-impl OperationWithDefaults for DropDatabase {
+impl BaseOperation for DropDatabase {
     type O = ();
 
     const NAME: &'static CStr = cstr!("dropDatabase");
@@ -69,7 +69,7 @@ impl OperationWithDefaults for DropDatabase {
 }
 
 impl OperationImpl for DropDatabase {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

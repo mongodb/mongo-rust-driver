@@ -126,10 +126,8 @@ impl Retryability {
     }
 }
 
-/// A trait modeling the behavior of a server side operation.
-///
-/// No methods in this trait should have default behaviors to ensure that wrapper operations
-/// replicate all behavior.  Default behavior is provided by the `OperationDefault` trait.
+/// A trait modeling the behavior of a server side operation.  This should not be implemented
+/// directly; use either the `BaseOperation` or `WrappedOperation` traits.
 pub(crate) trait Operation {
     /// The output type of this operation.
     type O;
@@ -291,9 +289,9 @@ impl<T: Send + Sync> From<&Collection<T>> for OperationTarget {
     }
 }
 
-// A mirror of the `Operation` trait, with default behavior where appropriate.  Should only be
+// A mirror of the `Operation` trait, with default behavior where appropriate.  Should be
 // implemented by operation types that do not delegate to other operations.
-pub(crate) trait OperationWithDefaults: Send + Sync {
+pub(crate) trait BaseOperation: Send + Sync {
     /// The output type of this operation.
     type O;
 
@@ -411,6 +409,16 @@ pub(crate) trait OperationWithDefaults: Send + Sync {
     type Otel: crate::otel::OtelWitness<Op = Self>;
 }
 
+/// We'd like both `BaseOperation` and `WrappedOperation` to automatically implement `Operation`.
+/// However, Rust only allows one blanket impl per trait, so we can't do both
+/// `impl<T: BaseOperation> Operation for T` and `impl<T: WrappedOperation> Operation for T`.
+///
+/// To work around this, `OperationDispatch` provides an indirection: the one blanket impl for
+/// `Operation` is a generic `OperationDispatch<K>`, and each specialized version of the trait
+/// has a blanket impl for `OperationDispatch` with a specific type parameter.
+///
+/// `OperationImpl` is a helper trait for this setup that binds specific impls to the appropriate
+/// dispatch type.
 pub(crate) trait OperationDispatch<Kind> {
     type O;
     const NAME: &'static CStr;
@@ -516,11 +524,12 @@ where
     operation_dispatch_body! { OperationDispatch<K>, handle_response }
 }
 
-pub(crate) struct WithDefaults;
+pub(crate) struct Base;
 
-operation_dispatch! { OperationWithDefaults, WithDefaults, handle_response_async }
+operation_dispatch! { BaseOperation, Base, handle_response_async }
 
-pub(crate) trait OperationWrapper {
+/// A trait for operations that delegate most behavior to another wrapped operation.
+pub(crate) trait WrappedOperation {
     // Required
     type Wrapped: Operation;
     type O;
@@ -583,9 +592,9 @@ pub(crate) trait OperationWrapper {
     }
 }
 
-pub(crate) struct Wrapper;
+pub(crate) struct Wrapped;
 
-operation_dispatch! { OperationWrapper, Wrapper, handle_response }
+operation_dispatch! { WrappedOperation, Wrapped, handle_response }
 
 fn should_redact_body(body: &RawDocumentBuf) -> bool {
     if let Some(Ok((command_name, _))) = body.into_iter().next() {

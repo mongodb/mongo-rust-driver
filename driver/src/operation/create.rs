@@ -8,8 +8,8 @@ use crate::{
     operation::{
         append_options_to_raw_document,
         OperationImpl,
-        OperationWithDefaults,
-        WithDefaults,
+        BaseOperation,
+        Base,
         WriteConcernOnlyBody,
     },
     options::{CreateCollectionOptions, WriteConcern},
@@ -32,7 +32,7 @@ impl Create {
     }
 }
 
-impl OperationWithDefaults for Create {
+impl BaseOperation for Create {
     type O = ();
 
     const NAME: &'static CStr = cstr!("create");
@@ -72,7 +72,7 @@ impl OperationWithDefaults for Create {
 }
 
 impl OperationImpl for Create {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

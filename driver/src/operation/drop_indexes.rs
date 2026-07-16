@@ -8,8 +8,8 @@ use crate::{
     operation::{
         append_options_to_raw_document,
         OperationImpl,
-        OperationWithDefaults,
-        WithDefaults,
+        BaseOperation,
+        Base,
     },
     options::{DropIndexOptions, WriteConcern},
 };
@@ -36,7 +36,7 @@ impl DropIndexes {
     }
 }
 
-impl OperationWithDefaults for DropIndexes {
+impl BaseOperation for DropIndexes {
     type O = ();
     const NAME: &'static CStr = cstr!("dropIndexes");
 
@@ -79,7 +79,7 @@ impl OperationWithDefaults for DropIndexes {
 }
 
 impl OperationImpl for DropIndexes {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

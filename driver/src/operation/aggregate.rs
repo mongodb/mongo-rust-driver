@@ -7,13 +7,13 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
-    operation::{append_options, OperationImpl, OperationTarget, Retryability, WithDefaults},
+    operation::{append_options, OperationImpl, OperationTarget, Retryability, Base},
     options::{AggregateOptions, ClientOptions, ReadPreference, SelectionCriteria, WriteConcern},
 };
 
 use super::{
     ExecutionContext,
-    OperationWithDefaults,
+    BaseOperation,
     WriteConcernOnlyBody,
     SERVER_4_4_0_WIRE_VERSION,
 };
@@ -51,7 +51,7 @@ impl Aggregate {
 
 // IMPORTANT: If new method implementations are added here, make sure `ChangeStreamAggregate` has
 // the equivalent delegations.
-impl OperationWithDefaults for Aggregate {
+impl BaseOperation for Aggregate {
     type O = CursorSpecification;
 
     const NAME: &'static CStr = cstr!("aggregate");
@@ -178,7 +178,7 @@ impl OperationWithDefaults for Aggregate {
 }
 
 impl OperationImpl for Aggregate {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

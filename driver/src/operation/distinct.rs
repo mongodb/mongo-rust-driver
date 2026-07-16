@@ -6,7 +6,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::options::DistinctOptions,
     error::Result,
-    operation::{OperationImpl, OperationWithDefaults, Retryability, WithDefaults},
+    operation::{OperationImpl, BaseOperation, Retryability, Base},
     options::{ClientOptions, SelectionCriteria},
     Collection,
 };
@@ -36,7 +36,7 @@ impl Distinct {
     }
 }
 
-impl OperationWithDefaults for Distinct {
+impl BaseOperation for Distinct {
     type O = Vec<Bson>;
 
     const NAME: &'static CStr = cstr!("distinct");
@@ -98,7 +98,7 @@ impl OperationWithDefaults for Distinct {
 }
 
 impl OperationImpl for Distinct {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

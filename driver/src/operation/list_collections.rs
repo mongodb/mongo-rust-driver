@@ -4,7 +4,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
-    operation::{OperationImpl, OperationWithDefaults, Retryability, WithDefaults},
+    operation::{OperationImpl, BaseOperation, Retryability, Base},
     options::{ClientOptions, ListCollectionsOptions, ReadPreference, SelectionCriteria},
     Database,
 };
@@ -32,7 +32,7 @@ impl ListCollections {
     }
 }
 
-impl OperationWithDefaults for ListCollections {
+impl BaseOperation for ListCollections {
     type O = CursorSpecification;
 
     const NAME: &'static CStr = cstr!("listCollections");
@@ -92,7 +92,7 @@ impl OperationWithDefaults for ListCollections {
 }
 
 impl OperationImpl for ListCollections {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

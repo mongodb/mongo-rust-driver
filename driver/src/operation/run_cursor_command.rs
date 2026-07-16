@@ -9,8 +9,8 @@ use crate::{
         run_command::RunCommand,
         Operation,
         OperationImpl,
-        OperationWrapper,
-        Wrapper,
+        Wrapped,
+        WrappedOperation,
         SERVER_4_4_0_WIRE_VERSION,
     },
     options::RunCursorCommandOptions,
@@ -37,7 +37,7 @@ impl<'conn> RunCursorCommand<'conn> {
     }
 }
 
-impl<'conn> OperationWrapper for RunCursorCommand<'conn> {
+impl<'conn> WrappedOperation for RunCursorCommand<'conn> {
     type Wrapped = RunCommand<'conn>;
     type O = CursorSpecification;
     const NAME: &'static CStr = cstr!("run_cursor_command");
@@ -82,7 +82,7 @@ impl<'conn> OperationWrapper for RunCursorCommand<'conn> {
 }
 
 impl OperationImpl for RunCursorCommand<'_> {
-    type Kind = Wrapper;
+    type Kind = Wrapped;
 }
 
 #[cfg(feature = "opentelemetry")]

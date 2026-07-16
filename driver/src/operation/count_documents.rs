@@ -6,7 +6,7 @@ use crate::{
     bson::{doc, Document},
     cmap::RawCommandResponse,
     error::{Error, ErrorKind, Result},
-    operation::{aggregate::Aggregate, OperationImpl, OperationWrapper, Wrapper},
+    operation::{aggregate::Aggregate, OperationImpl, Wrapped, WrappedOperation},
     options::{AggregateOptions, ClientOptions, CountOptions},
 };
 
@@ -72,7 +72,7 @@ impl CountDocuments {
     }
 }
 
-impl OperationWrapper for CountDocuments {
+impl WrappedOperation for CountDocuments {
     type Wrapped = Aggregate;
     type O = u64;
     const ZERO_COPY: bool = false;
@@ -111,7 +111,7 @@ impl OperationWrapper for CountDocuments {
 }
 
 impl OperationImpl for CountDocuments {
-    type Kind = Wrapper;
+    type Kind = Wrapped;
 }
 
 #[cfg(feature = "opentelemetry")]

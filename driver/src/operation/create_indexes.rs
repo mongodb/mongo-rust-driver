@@ -10,8 +10,8 @@ use crate::{
     operation::{
         append_options_to_raw_document,
         OperationImpl,
-        OperationWithDefaults,
-        WithDefaults,
+        BaseOperation,
+        Base,
     },
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
@@ -40,7 +40,7 @@ impl CreateIndexes {
     }
 }
 
-impl OperationWithDefaults for CreateIndexes {
+impl BaseOperation for CreateIndexes {
     type O = CreateIndexesResult;
     const NAME: &'static CStr = cstr!("createIndexes");
 
@@ -103,7 +103,7 @@ impl OperationWithDefaults for CreateIndexes {
 }
 
 impl OperationImpl for CreateIndexes {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

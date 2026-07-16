@@ -6,9 +6,9 @@ use crate::{
     error::{Error, Result},
     operation::{
         OperationImpl,
-        OperationWithDefaults,
+        BaseOperation,
         Retryability,
-        WithDefaults,
+        Base,
         SERVER_4_4_0_WIRE_VERSION,
     },
     options::{ClientOptions, CursorType, FindOptions, SelectionCriteria},
@@ -38,7 +38,7 @@ impl Find {
     }
 }
 
-impl OperationWithDefaults for Find {
+impl BaseOperation for Find {
     type O = CursorSpecification;
     const NAME: &'static CStr = cstr!("find");
     const ZERO_COPY: bool = true;
@@ -144,7 +144,7 @@ impl OperationWithDefaults for Find {
 }
 
 impl OperationImpl for Find {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

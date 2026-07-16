@@ -7,9 +7,9 @@ use crate::{
     operation::{
         append_options,
         OperationImpl,
-        OperationWithDefaults,
+        BaseOperation,
         Retryability,
-        WithDefaults,
+        Base,
         WriteResponseBody,
     },
     options::{ClientOptions, DeleteOptions, Hint, WriteConcern},
@@ -47,7 +47,7 @@ impl Delete {
     }
 }
 
-impl OperationWithDefaults for Delete {
+impl BaseOperation for Delete {
     type O = DeleteResult;
 
     const NAME: &'static CStr = cstr!("delete");
@@ -121,7 +121,7 @@ impl OperationWithDefaults for Delete {
 }
 
 impl OperationImpl for Delete {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

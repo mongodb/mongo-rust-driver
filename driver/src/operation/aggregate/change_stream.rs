@@ -12,8 +12,8 @@ use crate::{
         ExecutionContext,
         Operation,
         OperationImpl,
-        OperationWrapper,
-        Wrapper,
+        Wrapped,
+        WrappedOperation,
     },
     options::ChangeStreamOptions,
 };
@@ -49,7 +49,7 @@ impl ChangeStreamAggregate {
     }
 }
 
-impl OperationWrapper for ChangeStreamAggregate {
+impl WrappedOperation for ChangeStreamAggregate {
     type Wrapped = Aggregate;
     type O = (CursorSpecification, ChangeStreamData);
     const ZERO_COPY: bool = true;
@@ -110,7 +110,7 @@ impl OperationWrapper for ChangeStreamAggregate {
                 effective_criteria: context.effective_criteria,
             };
             let spec = {
-                use crate::operation::OperationWithDefaults;
+                use crate::operation::BaseOperation;
                 self.inner.handle_response_cow(response, inner_context)?
             };
 
@@ -143,7 +143,7 @@ impl OperationWrapper for ChangeStreamAggregate {
 }
 
 impl OperationImpl for ChangeStreamAggregate {
-    type Kind = Wrapper;
+    type Kind = Wrapped;
 }
 
 #[cfg(feature = "opentelemetry")]

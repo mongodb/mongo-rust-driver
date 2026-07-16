@@ -18,8 +18,8 @@ use crate::{
         run_command::RunCommand,
         GetMore,
         OperationImpl,
-        OperationWithDefaults,
-        WithDefaults,
+        BaseOperation,
+        Base,
         MAX_ENCRYPTED_WRITE_SIZE,
     },
     options::{BulkWriteOptions, ClientOptions, OperationType, WriteModel},
@@ -343,7 +343,7 @@ where
     }
 }
 
-impl<R> OperationWithDefaults for BulkWrite<'_, R>
+impl<R> BaseOperation for BulkWrite<'_, R>
 where
     R: BulkWriteResult,
 {
@@ -531,7 +531,7 @@ where
 }
 
 impl<R: BulkWriteResult> OperationImpl for BulkWrite<'_, R> {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

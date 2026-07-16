@@ -10,9 +10,9 @@ use crate::{
     error::{convert_insert_many_error, Result},
     operation::{
         OperationImpl,
-        OperationWithDefaults,
+        BaseOperation,
         Retryability,
-        WithDefaults,
+        Base,
         WriteResponseBody,
     },
     options::{ClientOptions, UpdateModifications, UpdateOptions, WriteConcern},
@@ -100,7 +100,7 @@ impl Update {
     }
 }
 
-impl OperationWithDefaults for Update {
+impl BaseOperation for Update {
     type O = UpdateResult;
 
     const NAME: &'static CStr = cstr!("update");
@@ -224,7 +224,7 @@ impl OperationWithDefaults for Update {
 }
 
 impl OperationImpl for Update {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

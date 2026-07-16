@@ -14,9 +14,9 @@ use crate::{
     error::{Error, ErrorKind, InsertManyError, Result},
     operation::{
         OperationImpl,
-        OperationWithDefaults,
+        BaseOperation,
         Retryability,
-        WithDefaults,
+        Base,
         WriteResponseBody,
     },
     options::{ClientOptions, InsertManyOptions, WriteConcern},
@@ -57,7 +57,7 @@ impl<'a> Insert<'a> {
     }
 }
 
-impl OperationWithDefaults for Insert<'_> {
+impl BaseOperation for Insert<'_> {
     type O = InsertManyResult;
 
     const NAME: &'static CStr = cstr!("insert");
@@ -193,7 +193,7 @@ impl OperationWithDefaults for Insert<'_> {
 }
 
 impl OperationImpl for Insert<'_> {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

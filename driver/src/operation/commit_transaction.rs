@@ -9,9 +9,9 @@ use crate::{
     operation::{
         append_options_to_raw_document,
         OperationImpl,
-        OperationWithDefaults,
+        BaseOperation,
         Retryability,
-        WithDefaults,
+        Base,
     },
     options::{Acknowledgment, ClientOptions, TransactionOptions, WriteConcern},
     Client,
@@ -33,7 +33,7 @@ impl CommitTransaction {
     }
 }
 
-impl OperationWithDefaults for CommitTransaction {
+impl BaseOperation for CommitTransaction {
     type O = ();
 
     const NAME: &'static CStr = cstr!("commitTransaction");
@@ -103,7 +103,7 @@ impl OperationWithDefaults for CommitTransaction {
 }
 
 impl OperationImpl for CommitTransaction {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

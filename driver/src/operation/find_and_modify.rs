@@ -16,9 +16,9 @@ use crate::{
         append_options_to_raw_document,
         find_and_modify::options::Modification,
         OperationImpl,
-        OperationWithDefaults,
+        BaseOperation,
         Retryability,
-        WithDefaults,
+        Base,
     },
     options::{ClientOptions, WriteConcern},
     Collection,
@@ -57,7 +57,7 @@ impl<T: DeserializeOwned> FindAndModify<T> {
     }
 }
 
-impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
+impl<T: DeserializeOwned> BaseOperation for FindAndModify<T> {
     type O = Option<T>;
     const NAME: &'static CStr = cstr!("findAndModify");
 
@@ -134,7 +134,7 @@ impl<T: DeserializeOwned> OperationWithDefaults for FindAndModify<T> {
 }
 
 impl<T: DeserializeOwned> OperationImpl for FindAndModify<T> {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

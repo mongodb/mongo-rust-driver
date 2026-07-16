@@ -7,7 +7,7 @@ use crate::{
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     cursor::common::{CursorInformation, CursorReply},
     error::Result,
-    operation::{OperationImpl, OperationWithDefaults, WithDefaults},
+    operation::{OperationImpl, BaseOperation, Base},
     options::SelectionCriteria,
     results::GetMoreResult,
     Namespace,
@@ -43,7 +43,7 @@ impl<'conn> GetMore<'conn> {
     }
 }
 
-impl OperationWithDefaults for GetMore<'_> {
+impl BaseOperation for GetMore<'_> {
     type O = GetMoreResult;
 
     const NAME: &'static CStr = cstr!("getMore");
@@ -125,7 +125,7 @@ impl OperationWithDefaults for GetMore<'_> {
 }
 
 impl OperationImpl for GetMore<'_> {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

@@ -6,13 +6,13 @@ use crate::{
     client::SESSIONS_UNSUPPORTED_COMMANDS,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{Error, Result},
-    operation::{OperationImpl, WithDefaults},
+    operation::{Base, OperationImpl},
     options::ClientOptions,
     selection_criteria::SelectionCriteria,
     Database,
 };
 
-use super::{ExecutionContext, OperationWithDefaults};
+use super::{BaseOperation, ExecutionContext};
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCommand<'conn> {
@@ -46,7 +46,7 @@ impl<'conn> RunCommand<'conn> {
     }
 }
 
-impl OperationWithDefaults for RunCommand<'_> {
+impl BaseOperation for RunCommand<'_> {
     type O = Document;
 
     // Since we can't actually specify a string statically here, we just put a descriptive string
@@ -120,7 +120,7 @@ impl OperationWithDefaults for RunCommand<'_> {
 }
 
 impl OperationImpl for RunCommand<'_> {
-    type Kind = WithDefaults;
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]
