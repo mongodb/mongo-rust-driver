@@ -1,0 +1,177 @@
+####################################################################
+# Shared utility functions used across the Rust driver's Evergreen  #
+# configurations (config.yml and benchmarks.yml).                   #
+####################################################################
+
+functions:
+  "fetch source":
+    # Executes git clone and applies the submitted patch, if any.
+    - command: git.get_project
+      params:
+        directory: "src"
+
+  "create expansions":
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/create-expansions.sh
+        include_expansions_in_env:
+          - is_patch
+          - version_id
+          - project
+    - command: expansions.update
+      params:
+        file: src/expansion.yml
+
+  "prepare resources":
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+        binary: bash
+        args:
+          - .evergreen/fetch-drivers-tools.sh
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+        binary: bash
+        args:
+          - .evergreen/find-python3.sh
+    - command: expansions.update
+      params:
+        file: src/python3.yml
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          echo "{ \"releases\": { \"default\": \"$MONGODB_BINARIES\" }}" > $MONGO_ORCHESTRATION_HOME/orchestration.config
+
+  "install rust":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        ${PREPARE_SHELL}
+        .evergreen/install-dependencies.sh rust
+
+  "upload-mo-artifacts":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          find $MONGO_ORCHESTRATION_HOME -name \*.log | xargs tar czf mongodb-logs.tar.gz
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: mongodb-logs.tar.gz
+        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${version_id}/${build_id}/logs/${task_id}-${execution}-mongodb-logs.tar.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: "mongodb-logs.tar.gz"
+
+  "init test-results":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          echo '{"results": [{ "status": "FAIL", "test_file": "Build", "log_raw": "No test-results.json found was created"  } ]}' > ${PROJECT_DIRECTORY}/test-results.json
+
+  "fix absolute paths":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          set +o xtrace
+          for filename in $(find ${DRIVERS_TOOLS} -name \*.json); do
+            perl -p -i -e "s|ABSOLUTE_PATH_REPLACEMENT_TOKEN|${DRIVERS_TOOLS}|g" $filename
+          done
+
+  "windows fix":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          set +o xtrace
+          for i in $(find ${DRIVERS_TOOLS}/.evergreen ${PROJECT_DIRECTORY}/.evergreen -name \*.sh); do
+            cat $i | tr -d '\r' > $i.new
+            mv $i.new $i
+          done
+
+          # Copy client certificate because symlinks do not work on Windows.
+          if [ "Windows_NT" = "$OS" ]; then # Magic variable in cygwin
+            cp ${DRIVERS_TOOLS}/.evergreen/x509gen/client.pem ${MONGO_ORCHESTRATION_HOME}/lib/client.pem
+          fi
+
+  "make files executable":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          set +o xtrace
+          for i in $(find ${DRIVERS_TOOLS}/.evergreen ${PROJECT_DIRECTORY}/.evergreen -name \*.sh); do
+            chmod +x $i
+          done
+
+  "cleanup":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          rm -rf $DRIVERS_TOOLS || true
+
+  "stop mongo orchestration":
+    - command: subprocess.exec
+      params:
+        binary: sh
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/run-mongodb.sh
+          - stop
+
+  "bootstrap mongo-orchestration":
+    - command: subprocess.exec
+      type: setup
+      params:
+        binary: sh
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/run-mongodb.sh
+          - start
+        include_expansions_in_env:
+          - AUTH
+          - SSL
+          - TOPOLOGY
+          - LOAD_BALANCER
+          - REQUIRE_API_VERSION
+          - MONGODB_VERSION
+          - ORCHESTRATION_FILE
+          - MONGODB_BINARIES
+    - command: expansions.update
+      params:
+        file: mo-expansion.yml
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/generate-uri.sh
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - MONGODB_URI
+          - SINGLE_MONGOS_LB_URI
+          - MULTI_MONGOS_LB_URI
+          - SSL
+    - command: expansions.update
+      params:
+        file: src/uri-expansions.yml
+    # The server needs some time after startup otherwise it won't include things like
+    # cluster time in replies.
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args: ["-c", "sleep 30"]
