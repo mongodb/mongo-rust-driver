@@ -18,7 +18,7 @@ use crate::{
     test::spec::unified_runner::{Entity, TestRunner},
 };
 
-use super::{with_mut_session, with_opt_session, TestOperation};
+use super::{with_opt_session, TestOperation};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

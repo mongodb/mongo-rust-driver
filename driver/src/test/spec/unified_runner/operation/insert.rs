@@ -10,7 +10,7 @@ use crate::{
     error::Result,
     options::{InsertManyOptions, InsertOneOptions},
     test::spec::unified_runner::{
-        operation::{with_mut_session, with_opt_session, TestOperation},
+        operation::{with_opt_session, TestOperation},
         Entity,
         TestRunner,
     },

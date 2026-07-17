@@ -286,14 +286,14 @@ pub enum TimeseriesGranularity {
 }
 
 /// Specifies the options to a [`Database::drop`](crate::Database::drop) operation.
-#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, TypedBuilder, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 #[export_tokens]
 pub struct DropDatabaseOptions {
     /// The write concern for the operation.
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub write_concern: Option<WriteConcern>,
 }
 

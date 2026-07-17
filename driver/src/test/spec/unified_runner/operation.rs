@@ -6,6 +6,7 @@ mod connection;
 mod count;
 #[cfg(feature = "in-use-encryption")]
 mod csfle;
+mod database;
 mod delete;
 mod failpoint;
 mod find;
@@ -48,6 +49,7 @@ use connection::*;
 use count::*;
 #[cfg(feature = "in-use-encryption")]
 use csfle::*;
+use database::*;
 use delete::*;
 use failpoint::*;
 use find::*;
@@ -120,6 +122,7 @@ pub(crate) trait TestOperation: Debug + Send + Sync {
 macro_rules! with_mut_session {
     ($test_runner:ident, $id:expr, |$session:ident| $body:expr) => {
         async {
+            use crate::test::spec::unified_runner::Entity;
             let id = $id;
             let entity = $test_runner.entities.write().await.remove(id).unwrap();
             match entity {
@@ -159,7 +162,12 @@ macro_rules! with_opt_session {
             let act = $act;
             match $id {
                 Some(id) => {
-                    with_mut_session!($test_runner, id, |session| act.session(session)).await
+                    crate::test::spec::unified_runner::operation::with_mut_session!(
+                        $test_runner,
+                        id,
+                        |session| act.session(session)
+                    )
+                    .await
                 }
                 None => act.await,
             }
@@ -339,6 +347,7 @@ impl<'de> Deserialize<'de> for Operation {
             }
             "createCollection" => deserialize_op::<CreateCollection>(definition.arguments),
             "dropCollection" => deserialize_op::<DropCollection>(definition.arguments),
+            "dropDatabase" => deserialize_op::<DropDatabase>(definition.arguments),
             "runCommand" => deserialize_op::<RunCommand>(definition.arguments),
             "runCursorCommand" => deserialize_op::<RunCursorCommand>(definition.arguments),
             "endSession" => deserialize_op::<EndSession>(definition.arguments),

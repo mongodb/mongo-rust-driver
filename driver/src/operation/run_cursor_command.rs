@@ -7,7 +7,6 @@ use crate::{
     error::Result,
     operation::{
         run_command::RunCommand,
-        Operation,
         OperationImpl,
         Wrapped,
         WrappedOperation,
@@ -84,6 +83,9 @@ impl<'conn> WrappedOperation for RunCursorCommand<'conn> {
 impl OperationImpl for RunCursorCommand<'_> {
     type Kind = Wrapped;
 }
+
+#[cfg(feature = "opentelemetry")]
+use crate::operation::Operation;
 
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfo for RunCursorCommand<'_> {
