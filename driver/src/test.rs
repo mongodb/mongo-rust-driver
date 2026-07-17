@@ -5,6 +5,9 @@
 #[path = "test/atlas_connectivity.rs"]
 mod atlas_connectivity_skip_ci; // requires Atlas URI environment variables set
 mod atlas_search;
+#[cfg(feature = "dns-resolver")]
+#[path = "test/atlas_sfp.rs"]
+mod atlas_sfp_skip_ci; // requires SFP environment variables set
 mod auth;
 mod bulk_write;
 mod change_stream;

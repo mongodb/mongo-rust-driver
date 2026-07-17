@@ -231,7 +231,7 @@ buildvariants:
     run_on:
       - rhel8-latest-small
     tasks:
-      - test-atlas-connectivity
+      - .atlas
 
   - name: aws-auth
     display_name: "AWS Authentication"
@@ -1072,8 +1072,14 @@ tasks:
       - func: "run gssapi auth test"
 
   - name: test-atlas-connectivity
+    tags: [atlas]
     commands:
       - func: "run atlas tests"
+
+  - name: test-atlas-sfp
+    tags: [atlas]
+    commands:
+      - func: "run sfp tests"
 
   - name: test-gcp-kms
     commands:
@@ -1783,7 +1789,6 @@ functions:
     - command: ec2.assume_role
       params:
         role_arn: ${aws_test_secrets_role}
-
     - command: subprocess.exec
       type: test
       params:
@@ -1791,6 +1796,24 @@ functions:
         binary: bash
         args:
           - .evergreen/run-atlas-tests.sh
+        include_expansions_in_env:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+
+  "run sfp tests":
+    - command: ec2.assume_role
+      params:
+        role_arn: ${aws_test_secrets_role}
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/run-sfp-tests.sh
         include_expansions_in_env:
           - AWS_ACCESS_KEY_ID
           - AWS_SECRET_ACCESS_KEY
@@ -2119,7 +2142,7 @@ functions:
         - AWS_ACCESS_KEY_ID
         - AWS_SECRET_ACCESS_KEY
         - AWS_SESSION_TOKEN
-  
+
   "fetch nextest archive":
   - command: s3.get
     type: setup
