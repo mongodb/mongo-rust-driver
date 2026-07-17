@@ -1,7 +1,4 @@
-####################################################################
-# Shared utility functions used across the Rust driver's Evergreen  #
-# configurations (config.yml and benchmarks.yml).                   #
-####################################################################
+# Shared utility functions for performing setup and teardown tasks.
 
 functions:
   "fetch source":
