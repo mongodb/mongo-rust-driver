@@ -16,8 +16,10 @@ use crate::{
     error::{BulkWriteError, Error, ErrorKind, Result},
     operation::{
         run_command::RunCommand,
+        Base,
+        BaseOperation,
         GetMore,
-        OperationWithDefaults,
+        OperationImpl,
         MAX_ENCRYPTED_WRITE_SIZE,
     },
     options::{BulkWriteOptions, ClientOptions, OperationType, WriteModel},
@@ -341,7 +343,7 @@ where
     }
 }
 
-impl<R> OperationWithDefaults for BulkWrite<'_, R>
+impl<R> BaseOperation for BulkWrite<'_, R>
 where
     R: BulkWriteResult,
 {
@@ -526,6 +528,10 @@ where
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl<R: BulkWriteResult> OperationImpl for BulkWrite<'_, R> {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

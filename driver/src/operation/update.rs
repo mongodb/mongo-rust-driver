@@ -8,7 +8,7 @@ use crate::{
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{convert_insert_many_error, Result},
-    operation::{OperationWithDefaults, Retryability, WriteResponseBody},
+    operation::{Base, BaseOperation, OperationImpl, Retryability, WriteResponseBody},
     options::{ClientOptions, UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
     Collection,
@@ -94,7 +94,7 @@ impl Update {
     }
 }
 
-impl OperationWithDefaults for Update {
+impl BaseOperation for Update {
     type O = UpdateResult;
 
     const NAME: &'static CStr = cstr!("update");
@@ -215,6 +215,10 @@ impl OperationWithDefaults for Update {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Update {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]
