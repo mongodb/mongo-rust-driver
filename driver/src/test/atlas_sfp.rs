@@ -72,7 +72,7 @@ async fn run_test(options: ClientOptions) {
 }
 
 fn get_var(var: &str) -> String {
-    std::env::var(var).expect(&format!("{var} must be defined"))
+    std::env::var(var).unwrap_or_else(|_| panic!("{var} must be defined"))
 }
 
 async fn get_standard_options() -> ClientOptions {
@@ -145,7 +145,10 @@ async fn scram() {
 
 #[tokio::test]
 async fn scram_compression() {
-    assert!(cfg!(feature = "snappy-compression"));
+    #[cfg(not(feature = "snappy-compression"))]
+    {
+        panic!("snappy-compression must be enabled");
+    }
     #[cfg(feature = "snappy-compression")]
     {
         let mut options = get_scram_options().await;
@@ -168,7 +171,10 @@ async fn x509() {
 
 #[tokio::test]
 async fn x509_compression() {
-    assert!(cfg!(feature = "snappy-compression"));
+    #[cfg(not(feature = "snappy-compression"))]
+    {
+        panic!("snappy-compression must be enabled");
+    }
     #[cfg(feature = "snappy-compression")]
     {
         let mut options = get_x509_options().await;
