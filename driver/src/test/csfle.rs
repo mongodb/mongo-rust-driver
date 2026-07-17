@@ -357,7 +357,7 @@ pub(crate) fn fill_kms_placeholders(
 
         for (key, value) in config.iter_mut() {
             if value.as_document() == Some(&placeholder) {
-                if key.to_ascii_lowercase() == "accesstoken" {
+                if key.eq_ignore_ascii_case("accesstoken") {
                     let token = if provider == KmsProvider::azure() {
                         &*FLE_AZURE_ACCESSTOKEN
                     } else if provider == KmsProvider::gcp() {

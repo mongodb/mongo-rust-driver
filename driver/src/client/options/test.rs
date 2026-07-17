@@ -189,8 +189,9 @@ async fn run_tests(path: &[&str], skipped_files: &[&str]) {
                         if let Some(expected_number) = get_int(expected_value) {
                             let actual_number = get_int(actual_value).unwrap_or_else(|| {
                                 panic!(
-                                    "{}: {} should be a numeric value but got {}",
-                                    &test_case.description, expected_key, actual_value
+                                    "{}: {expected_key} should be a numeric value but got \
+                                     {actual_value}",
+                                    test_case.description
                                 )
                             });
                             assert_eq!(actual_number, expected_number, "{}", test_case.description);

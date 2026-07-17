@@ -104,7 +104,7 @@ pub(super) async fn authenticate_stream(
     Ok(())
 }
 
-pub(super) const AWS_SESSION_TOKEN: &'static str = "AWS_SESSION_TOKEN";
+pub(super) const AWS_SESSION_TOKEN: &str = "AWS_SESSION_TOKEN";
 
 // Find credentials using MongoDB URI or AWS SDK
 pub(crate) async fn get_aws_credentials(credential: &Credential) -> Result<Credentials> {

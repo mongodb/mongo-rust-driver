@@ -57,10 +57,8 @@ async fn run_document_test(test_file: TestFile) {
                 assert_eq!(
                     specified_write_concern.is_empty(),
                     is_server_default,
-                    "is_server_default is {} but write concern is {:?}: {}",
-                    is_server_default,
-                    &specified_write_concern,
-                    description
+                    "{description}: is_server_default is {is_server_default} but write concern is \
+                     {specified_write_concern:?}",
                 );
             }
 
@@ -68,10 +66,8 @@ async fn run_document_test(test_file: TestFile) {
                 assert_eq!(
                     specified_write_concern.is_acknowledged(),
                     is_acknowledged,
-                    "is_acknowledged is {} but write concern is {:?}: {}",
-                    is_acknowledged,
-                    &specified_write_concern,
-                    description
+                    "{description}: is_acknowledged is {is_acknowledged} but write concern is \
+                     {specified_write_concern:?}",
                 );
             }
 

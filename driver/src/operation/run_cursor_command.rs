@@ -1,5 +1,7 @@
 use futures_util::FutureExt;
 
+#[cfg(feature = "opentelemetry")]
+use crate::operation::Operation;
 use crate::{
     bson_compat::{cstr, CStr},
     cmap::RawCommandResponse,
@@ -7,7 +9,6 @@ use crate::{
     error::Result,
     operation::{
         run_command::RunCommand,
-        Operation,
         OperationImpl,
         Wrapped,
         WrappedOperation,

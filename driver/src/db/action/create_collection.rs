@@ -74,7 +74,7 @@ impl Database {
             if let Some(enc_opts_fields) = enc_opts
                 .as_ref()
                 .and_then(|eo| eo.encrypted_fields_map.as_ref())
-                .and_then(|efm| efm.get(&format!("{}", &base_ns)))
+                .and_then(|efm| efm.get(&base_ns.to_string()))
             {
                 options
                     .get_or_insert_with(Default::default)

@@ -165,7 +165,7 @@ impl Client {
         attrs.extend([
             KeyValue::new(
                 "db.query.summary",
-                format!("{} {}", &cmd_attrs.name, op_target(op)),
+                format!("{} {}", cmd_attrs.name, op_target(op)),
             ),
             KeyValue::new("db.mongodb.driver_connection_id", otel_driver_conn_id),
             KeyValue::new("server.type", stream_desc.initial_server_type.to_string()),

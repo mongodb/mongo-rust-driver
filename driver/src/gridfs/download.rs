@@ -57,12 +57,12 @@ pub struct GridFsDownloadStream {
     file: FilesCollectionDocument,
 }
 
-type GetBytesFuture = BoxFuture<'static, Result<Idle>>;
+type GetBytesFuture = BoxFuture<'static, Result<Box<Idle>>>;
 
 enum State {
     // Idle is stored as an option so that its fields can be moved into a GetBytesFuture
     // without requiring ownership of the state. It can always be unwrapped safely.
-    Idle(Option<Idle>),
+    Idle(Option<Box<Idle>>),
     Busy(GetBytesFuture),
     Done,
 }
@@ -96,11 +96,11 @@ impl GridFsDownloadStream {
                 .sort(doc! { "n": 1 })
                 .batch()
                 .await?;
-            State::Idle(Some(Idle {
+            State::Idle(Some(Box::new(Idle {
                 buffer: Vec::new(),
                 cursor,
                 current_n: 0,
-            }))
+            })))
         };
         Ok(Self {
             state: initial_state,
@@ -170,11 +170,11 @@ impl AsyncRead for GridFsDownloadStream {
 }
 
 async fn get_bytes(
-    mut idle: Idle,
+    mut idle: Box<Idle>,
     chunk_size_bytes: u32,
     file_len: u64,
     buf_size: usize,
-) -> Result<Idle> {
+) -> Result<Box<Idle>> {
     while idle.buffer.len() < buf_size {
         let batch = match idle.cursor.next().await.transpose()? {
             Some(batch) => batch,

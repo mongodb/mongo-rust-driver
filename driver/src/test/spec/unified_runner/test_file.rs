@@ -174,14 +174,12 @@ impl RunOnRequirement {
                 #[cfg(feature = "in-use-encryption")]
                 Csfle::Version {
                     min_libmongocrypt_version,
-                } => {
-                    if crate::test::mongocrypt_version_lt(min_libmongocrypt_version) {
-                        return Err(format!(
-                            "requires at least libmongocrypt version {min_libmongocrypt_version} \
-                             but using version {},",
-                            mongocrypt::version()
-                        ));
-                    }
+                } if crate::test::mongocrypt_version_lt(min_libmongocrypt_version) => {
+                    return Err(format!(
+                        "requires at least libmongocrypt version {min_libmongocrypt_version} but \
+                         using version {}",
+                        mongocrypt::version()
+                    ));
                 }
                 _ => {}
             }

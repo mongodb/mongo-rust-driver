@@ -118,4 +118,5 @@ macro_rules! log_warning {
     }
 }
 
+#[allow(unused)]
 use log_warning;

@@ -440,7 +440,7 @@ async fn large_insert_unordered_with_errors() {
                 .clone()
                 .expect("should have write errors");
             assert_eq!(write_errors.len(), 3);
-            write_errors.sort_by(|lhs, rhs| lhs.index.cmp(&rhs.index));
+            write_errors.sort_by_key(|lhs| lhs.index);
 
             assert_eq!(write_errors[0].index, 7499);
             assert_eq!(write_errors[1].index, 22499);

@@ -107,7 +107,7 @@ impl Retry {
             let retryability = op.retryability(client.options());
             // Pool cleared errors should be retried for reads regardless of transaction status.
             retryability == Retryability::Read && error.is_pool_cleared()
-                || retryability.can_retry_error(&error) && !is_transaction_op
+                || retryability.can_retry_error(error) && !is_transaction_op
         };
         let overloaded = error.contains_label(SYSTEM_OVERLOADED_ERROR);
 

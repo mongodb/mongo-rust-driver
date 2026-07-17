@@ -103,7 +103,7 @@ impl TestRunner {
         );
 
         let test_description = match path.into() {
-            Some(path) => format!("{} ({:?})", &test_file.description, path),
+            Some(path) => format!("{} ({:?})", test_file.description, path),
             None => test_file.description.clone(),
         };
 
@@ -129,31 +129,28 @@ impl TestRunner {
         file_level_log(format!("Running tests from {test_description}"));
 
         for test_case in &test_file.tests {
-            if let Ok(description) = std::env::var("TEST_DESCRIPTION") {
-                if !test_case
-                    .description
+            let description = &test_case.description;
+
+            if let Ok(var_description) = std::env::var("TEST_DESCRIPTION") {
+                if !description
                     .to_lowercase()
-                    .contains(&description.to_lowercase())
+                    .contains(&var_description.to_lowercase())
                 {
                     continue;
                 }
             }
 
             if let Some(skipped_tests) = skipped_tests {
-                if skipped_tests.contains(&test_case.description.as_str()) {
+                if skipped_tests.contains(&description.as_str()) {
                     log_uncaptured(format!(
-                        "Skipping test case {}: test skipped manually",
-                        &test_case.description
+                        "Skipping test case {description}: test skipped manually",
                     ));
                     continue;
                 }
             }
 
             if let Some(skip_reason) = &test_case.skip_reason {
-                log_uncaptured(format!(
-                    "Skipping test case {:?}: {}",
-                    &test_case.description, skip_reason
-                ));
+                log_uncaptured(format!("Skipping test case {description}: {skip_reason}",));
                 continue;
             }
 
@@ -164,8 +161,7 @@ impl TestRunner {
                 .map(|op| op.name.as_str())
             {
                 log_uncaptured(format!(
-                    "Skipping test case {:?}: unsupported operation {}",
-                    &test_case.description, op
+                    "Skipping test case {description}: unsupported operation {op}"
                 ));
                 continue;
             }
@@ -180,16 +176,16 @@ impl TestRunner {
                     }
                 }
                 if !can_run_on {
+                    let errors = run_on_errors.join(",");
                     log_uncaptured(format!(
-                        "Skipping test case {:?}: client topology not compatible with test ({})",
-                        &test_case.description,
-                        run_on_errors.join(","),
+                        "Skipping test case {description}: client topology not compatible with \
+                         test ({errors})",
                     ));
                     continue;
                 }
             }
 
-            log_uncaptured(format!("Executing {:?}", &test_case.description));
+            log_uncaptured(format!("Executing {description}"));
 
             if let Some(ref initial_data) = test_file.initial_data {
                 // If a test:
@@ -212,8 +208,7 @@ impl TestRunner {
 
             self.entities.write().await.clear();
             if let Some(ref create_entities) = test_file.create_entities {
-                self.populate_entity_map(create_entities, &test_case.description)
-                    .await;
+                self.populate_entity_map(create_entities, description).await;
             }
 
             // Workaround for SERVER-39704:
@@ -226,7 +221,7 @@ impl TestRunner {
             {
                 self.internal_client.disable_command_events(true);
                 for server_address in self.internal_client.options().hosts.clone() {
-                    for (_, entity) in self.entities.read().await.iter() {
+                    for entity in self.entities.read().await.values() {
                         if let Entity::Collection(coll) = entity {
                             let coll = self
                                 .internal_client
@@ -256,13 +251,13 @@ impl TestRunner {
 
             for operation in &test_case.operations {
                 self.sync_workers().await;
-                operation.execute(self, &test_case.description).await;
+                operation.execute(self, description).await;
                 // This test (in spec/sessions/server-support.json) runs two
                 // operations with implicit sessions in sequence and then checks to see if they
                 // used the same lsid. We delay for one second to ensure that the
                 // implicit session used in the first operation is returned to the pool before
                 // the second operation is executed.
-                if test_case.description == "Server supports implicit sessions" {
+                if description == "Server supports implicit sessions" {
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
@@ -285,28 +280,23 @@ impl TestRunner {
                     if expected.ignore_extra_events.unwrap_or(false) {
                         assert!(
                             actual_events.len() >= expected_events.len(),
-                            "[{}] actual:\n{:#?}\nexpected:\n{:#?}",
-                            test_case.description,
-                            actual_events,
-                            expected_events
+                            "[{description}] \
+                             actual:\n{actual_events:#?}\nexpected:\n{expected_events:#?}",
                         )
                     } else {
                         assert_eq!(
                             actual_events.len(),
                             expected_events.len(),
-                            "[{}] actual:\n{:#?}\nexpected:\n{:#?}",
-                            test_case.description,
-                            actual_events,
-                            expected_events
+                            "[{description}] \
+                             actual:\n{actual_events:#?}\nexpected:\n{expected_events:#?}",
                         )
                     }
 
                     for (actual, expected) in actual_events.iter().zip(expected_events) {
                         if let Err(e) = events_match(actual, expected, Some(&entities)) {
                             panic!(
-                                "event mismatch in {}: expected = {:#?}, actual = {:#?}\nmismatch \
-                                 detail: {}",
-                                test_case.description, expected, actual, e,
+                                "event mismatch in {description}: expected = {expected:#?}, \
+                                 actual = {actual:#?}\nmismatch detail: {e}",
                             );
                         }
                     }
@@ -366,7 +356,7 @@ impl TestRunner {
             if let Some(expected) = &test_case.expect_tracing_messages {
                 for exp in expected {
                     if let Err(e) = self.match_spans(exp).await {
-                        panic!("[{}] {}", test_case.description, e);
+                        panic!("[{description}] {e}");
                     }
                 }
             }
