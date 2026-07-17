@@ -5,7 +5,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options_to_raw_document, OperationWithDefaults},
+    operation::{append_options_to_raw_document, Base, BaseOperation, OperationImpl},
     options::{DropIndexOptions, WriteConcern},
 };
 
@@ -31,7 +31,7 @@ impl DropIndexes {
     }
 }
 
-impl OperationWithDefaults for DropIndexes {
+impl BaseOperation for DropIndexes {
     type O = ();
     const NAME: &'static CStr = cstr!("dropIndexes");
 
@@ -71,6 +71,10 @@ impl OperationWithDefaults for DropIndexes {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for DropIndexes {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

@@ -4,7 +4,14 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     collation::Collation,
     error::{convert_insert_many_error, Result},
-    operation::{append_options, OperationWithDefaults, Retryability, WriteResponseBody},
+    operation::{
+        append_options,
+        Base,
+        BaseOperation,
+        OperationImpl,
+        Retryability,
+        WriteResponseBody,
+    },
     options::{ClientOptions, DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
     Collection,
@@ -40,7 +47,7 @@ impl Delete {
     }
 }
 
-impl OperationWithDefaults for Delete {
+impl BaseOperation for Delete {
     type O = DeleteResult;
 
     const NAME: &'static CStr = cstr!("delete");
@@ -111,6 +118,10 @@ impl OperationWithDefaults for Delete {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Delete {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

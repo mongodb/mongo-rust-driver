@@ -1,5 +1,6 @@
 use crate::{
     bson::rawdoc,
+    operation::{Base, OperationImpl},
     options::{ClientOptions, SelectionCriteria},
     Collection,
 };
@@ -11,7 +12,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::options::EstimatedDocumentCountOptions,
     error::{Error, Result},
-    operation::{OperationWithDefaults, Retryability},
+    operation::{BaseOperation, Retryability},
 };
 
 use super::{append_options_to_raw_document, ExecutionContext};
@@ -30,7 +31,7 @@ impl Count {
     }
 }
 
-impl OperationWithDefaults for Count {
+impl BaseOperation for Count {
     type O = u64;
 
     const NAME: &'static CStr = cstr!("count");
@@ -86,6 +87,10 @@ impl OperationWithDefaults for Count {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Count {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

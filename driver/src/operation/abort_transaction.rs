@@ -4,12 +4,12 @@ use crate::{
     client::{session::TransactionPin, Retry},
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::Retryability,
+    operation::{Base, OperationImpl, Retryability},
     options::{ClientOptions, SelectionCriteria, WriteConcern},
     Client,
 };
 
-use super::{ExecutionContext, OperationWithDefaults, WriteConcernOnlyBody};
+use super::{BaseOperation, ExecutionContext, WriteConcernOnlyBody};
 
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
@@ -31,7 +31,7 @@ impl AbortTransaction {
     }
 }
 
-impl OperationWithDefaults for AbortTransaction {
+impl BaseOperation for AbortTransaction {
     type O = ();
 
     const NAME: &'static CStr = cstr!("abortTransaction");
@@ -87,6 +87,10 @@ impl OperationWithDefaults for AbortTransaction {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for AbortTransaction {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

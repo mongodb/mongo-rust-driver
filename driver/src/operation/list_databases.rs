@@ -7,7 +7,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::ListDatabasesOptions,
     error::Result,
-    operation::{OperationWithDefaults, Retryability},
+    operation::{Base, BaseOperation, OperationImpl, Retryability},
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
 
@@ -30,7 +30,7 @@ impl ListDatabases {
     }
 }
 
-impl OperationWithDefaults for ListDatabases {
+impl BaseOperation for ListDatabases {
     type O = Vec<RawDocumentBuf>;
 
     const NAME: &'static CStr = cstr!("listDatabases");
@@ -69,6 +69,10 @@ impl OperationWithDefaults for ListDatabases {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for ListDatabases {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

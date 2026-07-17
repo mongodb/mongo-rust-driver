@@ -4,7 +4,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
-    operation::{OperationWithDefaults, Retryability},
+    operation::{Base, BaseOperation, OperationImpl, Retryability},
     options::{ClientOptions, ListCollectionsOptions, ReadPreference, SelectionCriteria},
     Database,
 };
@@ -32,7 +32,7 @@ impl ListCollections {
     }
 }
 
-impl OperationWithDefaults for ListCollections {
+impl BaseOperation for ListCollections {
     type O = CursorSpecification;
 
     const NAME: &'static CStr = cstr!("listCollections");
@@ -89,6 +89,10 @@ impl OperationWithDefaults for ListCollections {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for ListCollections {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

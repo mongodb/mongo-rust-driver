@@ -4,12 +4,18 @@ use crate::{
         common::{ChangeStreamData, WatchArgs},
         event::ResumeToken,
     },
-    client::Retry,
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
-    operation::{append_options, ExecutionContext, Operation, Retryability},
-    options::{ChangeStreamOptions, ClientOptions, SelectionCriteria, WriteConcern},
+    operation::{
+        append_options,
+        ExecutionContext,
+        Operation,
+        OperationImpl,
+        Wrapped,
+        WrappedOperation,
+    },
+    options::ChangeStreamOptions,
 };
 
 use super::Aggregate;
@@ -43,12 +49,18 @@ impl ChangeStreamAggregate {
     }
 }
 
-impl Operation for ChangeStreamAggregate {
+impl WrappedOperation for ChangeStreamAggregate {
+    type Wrapped = Aggregate;
     type O = (CursorSpecification, ChangeStreamData);
-
-    const NAME: &'static crate::bson_compat::CStr = Aggregate::NAME;
-
     const ZERO_COPY: bool = true;
+
+    fn wrapped(&self) -> &Self::Wrapped {
+        &self.inner
+    }
+
+    fn wrapped_mut(&mut self) -> &mut Self::Wrapped {
+        &mut self.inner
+    }
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if let Some(data) = &mut self.resume_data {
@@ -80,13 +92,6 @@ impl Operation for ChangeStreamAggregate {
         self.inner.build(description)
     }
 
-    fn extract_at_cluster_time(
-        &self,
-        response: &crate::bson::RawDocument,
-    ) -> Result<Option<crate::bson::Timestamp>> {
-        self.inner.extract_at_cluster_time(response)
-    }
-
     fn handle_response<'a>(
         &'a self,
         response: std::borrow::Cow<'a, RawCommandResponse>,
@@ -105,7 +110,7 @@ impl Operation for ChangeStreamAggregate {
                 effective_criteria: context.effective_criteria,
             };
             let spec = {
-                use crate::operation::OperationWithDefaults;
+                use crate::operation::BaseOperation;
                 self.inner.handle_response_cow(response, inner_context)?
             };
 
@@ -133,56 +138,12 @@ impl Operation for ChangeStreamAggregate {
         .boxed()
     }
 
-    fn selection_criteria(&self) -> crate::operation::Feature<&SelectionCriteria> {
-        self.inner.selection_criteria()
-    }
-
-    fn write_concern(&self) -> crate::operation::Feature<&WriteConcern> {
-        self.inner.write_concern()
-    }
-
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        self.inner.retryability(options)
-    }
-
-    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
-        self.inner.is_backpressure_retryable(options)
-    }
-
-    fn target(&self) -> crate::operation::OperationTarget {
-        self.inner.target()
-    }
-
-    fn handle_error(&self, error: crate::error::Error) -> Result<Self::O> {
-        Err(error)
-    }
-
-    fn read_concern(&self) -> crate::operation::Feature<&crate::options::ReadConcern> {
-        self.inner.read_concern()
-    }
-
-    fn supports_sessions(&self) -> bool {
-        self.inner.supports_sessions()
-    }
-
-    fn update_for_retry(&mut self, retry: Option<&Retry>) {
-        self.inner.update_for_retry(retry);
-    }
-
-    fn override_criteria(&self) -> crate::operation::OverrideCriteriaFn {
-        self.inner.override_criteria()
-    }
-
-    fn pinned_connection(&self) -> Option<&crate::cmap::conn::PinnedConnectionHandle> {
-        self.inner.pinned_connection()
-    }
-
-    fn name(&self) -> &crate::bson_compat::CStr {
-        self.inner.name()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for ChangeStreamAggregate {
+    type Kind = Wrapped;
 }
 
 #[cfg(feature = "opentelemetry")]
