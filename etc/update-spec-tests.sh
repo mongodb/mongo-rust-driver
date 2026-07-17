@@ -32,7 +32,7 @@ EXCLUDE=""
 if [ "$1" = "client-side-encryption" ]; then
   EXCLUDE="--exclude=legacy/"
 fi
-rsync -ah $EXCLUDE --delete "$tmpdir/specifications-$REF"*"/source/$1/tests/" "${DEST}/$1"
+rsync -ah ${EXCLUDE} --delete "$tmpdir/specifications-$REF"*"/source/$1/tests/" "${DEST}/$1"
 
 if [ "$1" = "client-side-encryption" ]; then
     mkdir -p "${DEST}/testdata/$1/data"
