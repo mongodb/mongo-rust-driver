@@ -191,6 +191,9 @@ pub(crate) trait Operation {
     /// The noun to this operation's verb.
     fn target(&self) -> OperationTarget;
 
+    /// Whether this is a write operation that needs `afterClusterTime` set.
+    fn is_after_cluster_time_write(&self) -> bool;
+
     #[cfg(feature = "opentelemetry")]
     type Otel: crate::otel::OtelWitness<Op = Self>;
 
@@ -405,6 +408,10 @@ pub(crate) trait BaseOperation: Send + Sync {
 
     fn target(&self) -> OperationTarget;
 
+    fn is_after_cluster_time_write(&self) -> bool {
+        self.write_concern().supported()
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel: crate::otel::OtelWitness<Op = Self>;
 }
@@ -442,6 +449,7 @@ pub(crate) trait OperationDispatch<Kind> {
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle>;
     fn name(&self) -> &CStr;
     fn target(&self) -> OperationTarget;
+    fn is_after_cluster_time_write(&self) -> bool;
     #[cfg(feature = "opentelemetry")]
     type Otel: crate::otel::OtelWitness<Op = Self>;
 }
@@ -507,6 +515,9 @@ macro_rules! operation_dispatch_body {
         }
         fn target(&self) -> OperationTarget {
             <T as $trait>::target(self)
+        }
+        fn is_after_cluster_time_write(&self) -> bool {
+            <T as $trait>::is_after_cluster_time_write(self)
         }
         #[cfg(feature = "opentelemetry")]
         type Otel = <T as $trait>::Otel;
@@ -589,6 +600,9 @@ pub(crate) trait WrappedOperation {
     }
     fn target(&self) -> OperationTarget {
         self.wrapped().target()
+    }
+    fn is_after_cluster_time_write(&self) -> bool {
+        self.wrapped().is_after_cluster_time_write()
     }
 }
 

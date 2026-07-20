@@ -1,7 +1,6 @@
 use crate::test::{
     spec::unified_runner::{
         operation::{with_mut_session, TestOperation},
-        Entity,
         TestRunner,
     },
     util::fail_point::FailPoint,

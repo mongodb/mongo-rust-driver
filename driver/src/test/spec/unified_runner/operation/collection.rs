@@ -106,7 +106,7 @@ impl TestOperation for DropCollection {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let database = test_runner.get_database(id).await;
-            let collection = database.collection::<Document>(&self.collection).clone();
+            let collection = database.collection::<Document>(&self.collection);
             with_opt_session!(
                 test_runner,
                 &self.session,

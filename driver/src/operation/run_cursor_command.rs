@@ -87,6 +87,9 @@ impl OperationImpl for RunCursorCommand<'_> {
 }
 
 #[cfg(feature = "opentelemetry")]
+use crate::operation::Operation;
+
+#[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfo for RunCursorCommand<'_> {
     fn log_name(&self) -> &str {
         self.run_command.otel().log_name()

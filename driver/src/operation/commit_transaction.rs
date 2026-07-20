@@ -92,6 +92,10 @@ impl BaseOperation for CommitTransaction {
         super::OperationTarget::admin(&self.target)
     }
 
+    fn is_after_cluster_time_write(&self) -> bool {
+        false
+    }
+
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
