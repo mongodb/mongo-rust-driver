@@ -81,7 +81,7 @@ where
 {
     pub(crate) fn new(cursor: Cursor<()>, args: WatchArgs, data: ChangeStreamData) -> Self {
         Self {
-            inner: StreamState::Idle(CursorWrapper::new(cursor, args, data)),
+            inner: StreamState::Idle(Box::new(CursorWrapper::new(cursor, args, data))),
         }
     }
 
@@ -169,7 +169,7 @@ type CursorWrapper = common::CursorWrapper<Cursor<()>>;
 // invariant, which breaks cursor zero-copy deserialization :(
 #[derive_where(Debug)]
 enum StreamState<T: DeserializeOwned> {
-    Idle(CursorWrapper),
+    Idle(Box<CursorWrapper>),
     Polling,
     Next(#[derive_where(skip)] BoxFuture<'static, NextDone<T>>),
 }
@@ -194,7 +194,7 @@ impl<T: DeserializeOwned> StreamState<T> {
         }
     }
 
-    fn take_state(self) -> CursorWrapper {
+    fn take_state(self) -> Box<CursorWrapper> {
         match self {
             Self::Idle(st) => st,
             _ => panic!("invalid change stream state access"),
@@ -212,7 +212,7 @@ impl<T: DeserializeOwned> Stream for StreamState<T> {
                     *self = StreamState::Next(
                         async move {
                             let out = state.next_if_any(&mut ()).await;
-                            NextDone { state, out }
+                            NextDone { state: *state, out }
                         }
                         .boxed(),
                     );
@@ -224,7 +224,7 @@ impl<T: DeserializeOwned> Stream for StreamState<T> {
                         return Poll::Pending;
                     }
                     Poll::Ready(NextDone { state, out }) => {
-                        *self = StreamState::Idle(state);
+                        *self = StreamState::Idle(Box::new(state));
                         match out {
                             Ok(Some(v)) => return Poll::Ready(Some(Ok(v))),
                             Ok(None) => continue,

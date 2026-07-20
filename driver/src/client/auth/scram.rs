@@ -418,7 +418,7 @@ impl ClientFirst {
         let nonce = auth::generate_nonce();
         let gs2_header = format!("{NO_CHANNEL_BINDING},,");
         let bare = format!("{USERNAME_KEY}={username},{NONCE_KEY}={nonce}");
-        let full = format!("{}{}", &gs2_header, &bare);
+        let full = format!("{gs2_header}{bare}");
         let end = full.len();
         ClientFirst {
             source: source.into(),

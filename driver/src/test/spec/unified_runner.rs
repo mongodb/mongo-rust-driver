@@ -215,7 +215,7 @@ async fn expect_failures(spec: &[&str], skipped_files: Option<&'static [&'static
             })
             .catch_unwind()
             .await
-            .expect_err(&format!("Tests from {:?} should have failed", &path));
+            .expect_err(&format!("Tests from {path:?} should have failed"));
         }
     }
 }

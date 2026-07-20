@@ -391,7 +391,7 @@ async fn run_test(test_file: TestFile) {
                     "{test_description}: {phase_description}: event list length mismatch:\n \
                      actual: {actual:#?}, expected: {expected:#?}"
                 );
-                for (actual, expected) in actual.zip(expected.into_iter()) {
+                for (actual, expected) in actual.zip(expected) {
                     assert_eq!(
                         actual, expected,
                         "{test_description}: {phase_description}: SDAM events do not match:\n \

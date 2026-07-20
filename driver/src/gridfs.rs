@@ -77,7 +77,8 @@ impl FilesCollectionDocument {
 
     fn n_from_vals(length: u64, chunk_size_bytes: u32) -> u32 {
         let chunk_size_bytes = chunk_size_bytes as u64;
-        let n = Checked::new(length) / chunk_size_bytes + u64::from(length % chunk_size_bytes != 0);
+        let n = Checked::new(length) / chunk_size_bytes
+            + u64::from(!length.is_multiple_of(chunk_size_bytes));
         n.try_into().unwrap()
     }
 

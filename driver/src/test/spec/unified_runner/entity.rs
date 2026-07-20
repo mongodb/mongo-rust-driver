@@ -418,42 +418,42 @@ impl Entity {
     pub(crate) fn as_client(&self) -> &ClientEntity {
         match self {
             Self::Client(client) => client,
-            _ => panic!("Expected client entity, got {:?}", &self),
+            _ => panic!("Expected client entity, got {self:?}"),
         }
     }
 
     pub(crate) fn as_mut_client(&mut self) -> &mut ClientEntity {
         match self {
             Self::Client(client) => client,
-            _ => panic!("Expected client, got {:?}", &self),
+            _ => panic!("Expected client, got {self:?}"),
         }
     }
 
     pub(crate) fn as_database(&self) -> &Database {
         match self {
             Self::Database(database) => database,
-            _ => panic!("Expected database entity, got {:?}", &self),
+            _ => panic!("Expected database entity, got {self:?}"),
         }
     }
 
     pub(crate) fn as_collection(&self) -> &Collection<Document> {
         match self {
             Self::Collection(collection) => collection,
-            _ => panic!("Expected collection entity, got {:?}", &self),
+            _ => panic!("Expected collection entity, got {self:?}"),
         }
     }
 
     pub(crate) fn as_session_entity(&self) -> &SessionEntity {
         match self {
             Self::Session(client_session) => client_session,
-            _ => panic!("Expected client session entity, got {:?}", &self),
+            _ => panic!("Expected client session entity, got {self:?}"),
         }
     }
 
     pub fn as_bucket_entity(&self) -> &GridFsBucket {
         match self {
             Self::Bucket(gridfs_bucket) => gridfs_bucket,
-            _ => panic!("Expected bucket entity, got {:?}", &self),
+            _ => panic!("Expected bucket entity, got {self:?}"),
         }
     }
 
@@ -461,21 +461,21 @@ impl Entity {
         match self {
             Self::Session(client_session) => &mut *client_session,
             Self::SessionPtr(ptr) => unsafe { &mut *ptr.0 },
-            _ => panic!("Expected mutable client session entity, got {:?}", &self),
+            _ => panic!("Expected mutable client session entity, got {self:?}"),
         }
     }
 
     pub(crate) fn as_bson(&self) -> &Bson {
         match self {
             Self::Bson(bson) => bson,
-            _ => panic!("Expected BSON entity, got {:?}", &self),
+            _ => panic!("Expected BSON entity, got {self:?}"),
         }
     }
 
     pub(crate) fn as_mut_cursor(&mut self) -> &mut TestCursor {
         match self {
             Self::Cursor(cursor) => cursor,
-            _ => panic!("Expected cursor, got {:?}", &self),
+            _ => panic!("Expected cursor, got {self:?}"),
         }
     }
 
@@ -496,7 +496,7 @@ impl Entity {
     pub(crate) fn into_cursor(self) -> TestCursor {
         match self {
             Self::Cursor(cursor) => cursor,
-            _ => panic!("Expected cursor, got {:?}", &self),
+            _ => panic!("Expected cursor, got {self:?}"),
         }
     }
 
@@ -524,7 +524,7 @@ impl Entity {
     pub fn as_client_encryption(&self) -> &Arc<crate::client_encryption::ClientEncryption> {
         match self {
             Self::ClientEncryption(ce) => ce,
-            _ => panic!("Expected ClientEncryption, got {:?}", &self),
+            _ => panic!("Expected ClientEncryption, got {self:?}"),
         }
     }
 }

@@ -582,7 +582,7 @@ impl Error {
                 for write_concern_error in bulk_write_error.write_concern_errors.iter_mut() {
                     write_concern_error.redact();
                 }
-                for (_, write_error) in bulk_write_error.write_errors.iter_mut() {
+                for write_error in bulk_write_error.write_errors.values_mut() {
                     write_error.redact();
                 }
             }

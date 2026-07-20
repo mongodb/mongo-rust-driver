@@ -161,8 +161,8 @@ impl TestOperation for Aggregate {
                                     .session(&mut *session)
                                     .await?
                             }
-                            AggregateEntity::Other(debug) => {
-                                panic!("Cannot execute aggregate on {}", &debug)
+                            AggregateEntity::Other(other) => {
+                                panic!("Cannot execute aggregate on {other}")
                             }
                         };
                         cursor.stream(session).try_collect::<Vec<Document>>().await
@@ -183,7 +183,7 @@ impl TestOperation for Aggregate {
                                 .with_options(self.options.clone())
                                 .await?
                         }
-                        other => panic!("Cannot execute aggregate on {:?}", &other),
+                        other => panic!("Cannot execute aggregate on {other:?}"),
                     };
                     cursor.try_collect::<Vec<Document>>().await?
                 }

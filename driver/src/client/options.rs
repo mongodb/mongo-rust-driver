@@ -1930,7 +1930,7 @@ impl ConnectionString {
             if let Some(username) = &credential.username {
                 res.push_str(&percent_encode(username));
                 if let Some(password) = &credential.password {
-                    res.push_str(&format!(":{}", &percent_encode(password)))
+                    res.push_str(&format!(":{}", percent_encode(password)))
                 }
                 res.push('@');
             }
@@ -2153,7 +2153,7 @@ impl ConnectionString {
             if !auth_mechanism_properties.is_empty() {
                 opts.push_str(&format!(
                     "&authMechanismProperties={}",
-                    &auth_mechanism_properties
+                    auth_mechanism_properties
                         .iter()
                         .map(|(k, v)| format!("{k}:{v}"))
                         .collect::<Vec<_>>()

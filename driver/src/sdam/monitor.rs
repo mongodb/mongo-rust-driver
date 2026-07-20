@@ -72,6 +72,7 @@ pub(crate) struct Monitor {
 }
 
 impl Monitor {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn start(
         address: ServerAddress,
         topology_updater: TopologyUpdater,

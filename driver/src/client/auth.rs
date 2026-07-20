@@ -211,7 +211,7 @@ impl AuthMechanism {
                 if credential
                     .mechanism_properties
                     .as_ref()
-                    .map_or(false, |mp| mp.contains_key(aws::AWS_SESSION_TOKEN))
+                    .is_some_and(|mp| mp.contains_key(aws::AWS_SESSION_TOKEN))
                 {
                     crate::log_warning!(
                         "Auth mechanism {:?} for MONGODB-AWS is deprecated and will be removed in \

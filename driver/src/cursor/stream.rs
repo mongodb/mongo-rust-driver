@@ -158,11 +158,11 @@ impl<Raw: AsyncStream<Item = Result<RawBatch>> + Unpin> BatchBuffer<Raw> {
                     .to_owned(),
             );
         }
-        return Ok(if self.batch.is_empty() {
+        Ok(if self.batch.is_empty() {
             AdvanceResult::Waiting
         } else {
             AdvanceResult::Advanced
-        });
+        })
     }
 }
 

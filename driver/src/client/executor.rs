@@ -434,7 +434,7 @@ impl Client {
                     return Err(retry.last_error());
                 }
                 Some(ref retry) => {
-                    op.update_for_retry(Some(&retry));
+                    op.update_for_retry(Some(retry));
                     if retry.overloaded {
                         let backoff = retry.calculate_backoff(
                             #[cfg(test)]
