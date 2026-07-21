@@ -1,0 +1,19 @@
+name: Check for forbidden strings
+
+on: pull_request
+
+jobs:
+  check-for-add-expansions-to-env:
+    name: Check for "add_expansions_to_env"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: |
+          FORBIDDEN="add_expansions_to_env"
+
+          if git grep -F "$FORBIDDEN" -- ':(glob).evergreen/**/*.yml'; then
+            echo "$FORBIDDEN should not be used. Replace with include_expansions_in_env and specify a precise list of expansions needed."
+            exit 1
+          else
+            echo "$FORBIDDEN not found."
+          fi
