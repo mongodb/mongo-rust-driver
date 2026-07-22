@@ -552,6 +552,13 @@ impl Error {
         }
     }
 
+    pub(crate) fn base_backoff_ms(&self) -> Option<f64> {
+        match self.kind.as_ref() {
+            ErrorKind::Command(command_error) => command_error.base_backoff_ms,
+            _ => None,
+        }
+    }
+
     /// Per the CLAM spec, for sensitive commands we must redact everything besides the
     /// error labels, error code, and error code name from errors received in response to
     /// sensitive commands. Currently, the only field besides those that we expose is the
@@ -898,6 +905,9 @@ pub struct CommandError {
     /// The topology version reported by the server in the error response.
     #[serde(rename = "topologyVersion")]
     pub(crate) topology_version: Option<TopologyVersion>,
+
+    #[serde(rename = "baseBackoffMS")]
+    pub(crate) base_backoff_ms: Option<f64>,
 }
 
 impl CommandError {

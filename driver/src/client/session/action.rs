@@ -218,7 +218,7 @@ fn compute_backoff(attempt: u32, #[cfg(test)] test_jitter: Option<f64>) -> Durat
     #[cfg(test)]
     let jitter = test_jitter.unwrap_or(jitter);
 
-    let computed_backoff = jitter * BACKOFF_INITIAL_MS * RETRY_BASE.powf(f64::from(attempt - 1));
+    let computed_backoff = jitter * BACKOFF_INITIAL_MS * RETRY_BASE.powf(f64::from(attempt));
     let max_backoff = jitter * BACKOFF_MAX_MS;
     let backoff: u64 = std::cmp::min(round_clamp(computed_backoff), round_clamp(max_backoff));
     Duration::from_millis(backoff)

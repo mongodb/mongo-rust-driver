@@ -1123,8 +1123,8 @@ async fn operation_retry_uses_exponential_backoff() {
     let duration_with_backoff = start.elapsed();
 
     let difference =
-        duration_with_backoff.abs_diff(duration_no_backoff + Duration::from_millis(300));
-    assert!(difference < Duration::from_millis(300));
+        duration_with_backoff.abs_diff(duration_no_backoff + Duration::from_millis(600));
+    assert!(difference < Duration::from_millis(600));
 }
 
 // backpressure prose test #2
@@ -1238,4 +1238,51 @@ async fn overload_errors_retried_max_adaptive_retries_times() {
 
     let events = client.events.get_command_started_events(&["find"]);
     assert_eq!(events.len(), 2);
+}
+
+// backpressure prose test #5
+#[tokio::test(flavor = "multi_thread")]
+async fn override_base_backoff_ms() {
+    if server_version_lt(9, 0).await {
+        log_uncaptured("skipping override_base_backoff_ms: requires 9.0+");
+        return;
+    }
+
+    async fn set_base_backoff_ms(client: &Client, ms: i32) {
+        client
+            .database("admin")
+            .run_command(doc! { "setParameter": 1, "externalClientBaseBackoffMS": ms })
+            .await
+            .unwrap();
+    }
+
+    let mut options = get_client_options().await.clone();
+    options.test_options_mut().jitter = Some(1f64);
+    let client = Client::for_test().options(options).await;
+    let coll = client.database("db").collection("override_base_backoff_ms");
+
+    let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::AlwaysOn)
+        .error_code(462)
+        .error_labels(vec![SYSTEM_OVERLOADED_ERROR, RETRYABLE_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let start = Instant::now();
+    let result = coll.insert_one(doc! { "a": 1 }).await;
+    let duration_secs = start.elapsed().as_secs_f32();
+
+    assert!(duration_secs >= 0.6);
+    assert!(result.is_err());
+
+    set_base_backoff_ms(&client, 50).await;
+
+    let start = Instant::now();
+    let result = coll.insert_one(doc! { "a": 1 }).await;
+    let duration_secs = start.elapsed().as_secs_f32();
+
+    set_base_backoff_ms(&client, 0).await;
+
+    assert!(duration_secs >= 0.3);
+    assert!(duration_secs < 0.6);
+    let error = result.unwrap_err();
+    assert_eq!(error.base_backoff_ms(), Some(50f64));
 }
