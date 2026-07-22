@@ -300,6 +300,7 @@ async fn run_test(test_file: TestFile) {
                     code_name: "dummy error".to_string(),
                     message: "dummy".to_string(),
                     topology_version: None,
+                    base_backoff_ms: None,
                 })))
             } else if command_response == Default::default() {
                 Err(Error::from(ErrorKind::Io(Arc::new(

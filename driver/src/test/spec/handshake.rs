@@ -471,7 +471,7 @@ async fn append_metadata_duplicate_empty_strings_initial() {
 }
 
 #[tokio::test]
-async fn handshake_includes_backpressure_true() {
+async fn handshake_includes_backpressure() {
     let mut options = get_client_options().await.clone();
     let hello = watch_hello(&mut options);
     let client = Client::for_test().options(options).await;
@@ -482,5 +482,5 @@ async fn handshake_includes_backpressure_true() {
         .unwrap();
 
     let command = hello.lock().unwrap();
-    assert!(command.body.get_bool("backpressure").unwrap());
+    assert_eq!(command.body.get_str("backpressure").unwrap(), "2");
 }
