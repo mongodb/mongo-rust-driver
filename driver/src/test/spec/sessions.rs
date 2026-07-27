@@ -205,6 +205,7 @@ async fn implicit_session_after_connection() {
 
 // Sessions prose test 20
 #[tokio::test]
+#[ignore = "SERVER-128517"]
 async fn no_cluster_time_in_sdam() {
     if topology_is_load_balanced().await {
         log_uncaptured("Skipping no_cluster_time_in_sdam: load-balanced topology");
