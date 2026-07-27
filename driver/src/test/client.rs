@@ -1258,7 +1258,10 @@ async fn override_base_backoff_ms() {
 
     let mut options = get_client_options().await.clone();
     options.test_options_mut().jitter = Some(1f64);
-    let client = Client::for_test().options(options).await;
+    let client = Client::for_test()
+        .options(options)
+        .use_single_mongos()
+        .await;
     let coll = client.database("db").collection("override_base_backoff_ms");
 
     let fail_point = FailPoint::fail_command(&["insert"], FailPointMode::AlwaysOn)
