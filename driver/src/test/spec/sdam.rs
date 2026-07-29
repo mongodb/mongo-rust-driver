@@ -25,6 +25,7 @@ use crate::{
 };
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "SERVER-128517"]
 async fn run_unified() {
     // TODO RUST-1222: Unskip this file
     let mut skipped_files = vec!["interruptInUse-pool-clear.json"];
@@ -59,6 +60,7 @@ async fn run_unified() {
 
 /// Streaming protocol prose test 1 from SDAM spec tests.
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "SERVER-128517"]
 async fn streaming_min_heartbeat_frequency() {
     if cfg!(target_os = "macos") {
         log_uncaptured("skipping streaming_min_heartbeat_frequency: flaky on macos");

@@ -599,6 +599,7 @@ async fn topology_closed_event_last() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "SERVER-128517"]
 async fn heartbeat_events() {
     if topology_is_load_balanced().await {
         log_uncaptured("skipping heartbeat_events tests due to load-balanced topology");
