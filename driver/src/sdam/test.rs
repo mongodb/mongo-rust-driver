@@ -90,6 +90,7 @@ async fn min_heartbeat_frequency() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "SERVER-128517"]
 async fn sdam_pool_management() {
     if cfg!(target_os = "macos") {
         log_uncaptured("skipping sdam_pool_management: flaky on macos");
