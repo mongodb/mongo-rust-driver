@@ -421,8 +421,8 @@ mod custom_endpoint {
     #[tokio::test]
     async fn azure() -> Result<()> {
         let master_key = AzureMasterKey::builder()
-            .key_vault_endpoint("key-vault-csfle.vault.azure.net")
-            .key_name("key-name-csfle")
+            .key_vault_endpoint("drivers-3392-key-vault.vault.azure.net")
+            .key_name("drivers-3392-keyname")
             .build();
 
         let client_encryption = custom_endpoint_setup(true).await?;

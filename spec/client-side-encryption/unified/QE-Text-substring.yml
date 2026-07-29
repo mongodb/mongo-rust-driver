@@ -4,7 +4,7 @@ runOnRequirements:
   - minServerVersion: "9.0.0" # Server 9.0.0 adds stable support for QE text substring queries.
     topologies: ["replicaset", "sharded", "load-balanced"] # QE does not support standalone.
     csfle:
-      minLibmongocryptVersion: 1.20.0 # For MONOGCRYPT-936.
+      minLibmongocryptVersion: 1.20.0 # For MONGOCRYPT-936.
 createEntities:
   - client:
       id: &client "client"
