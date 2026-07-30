@@ -94,6 +94,7 @@ functions:
       params:
         working_dir: src
         include_expansions_in_env:
+          - PROJECT_DIRECTORY
           - DRIVERS_TOOLS
           - DRY_RUN
         binary: bash
@@ -125,6 +126,7 @@ functions:
       params:
         working_dir: "src"
         include_expansions_in_env:
+          - PROJECT_DIRECTORY
           - CARGO_REGISTRY_TOKEN
           - DRY_RUN
           - PACKAGE_ONLY
@@ -203,7 +205,8 @@ tasks:
     commands:
       - func: "fetch source"
       - func: "install dependencies"
-      - func: "fetch tag"
+      # TEMPORARY: commented out for main-branch dry run; UNCOMMENT before merging!
+      # - func: "fetch tag"
       - func: "build vars"
       - func: "publish release"
       - func: "publish papertrail"
