@@ -24,7 +24,7 @@
 #
 # Make sure to uncomment the call before merging!
 
-exec_timeout_secs: 3600 
+exec_timeout_secs: 3600
 
 functions:
   "fetch source":
@@ -94,6 +94,9 @@ functions:
       params:
         working_dir: src
         include_expansions_in_env:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
           - PROJECT_DIRECTORY
           - DRIVERS_TOOLS
           - DRY_RUN
@@ -205,8 +208,7 @@ tasks:
     commands:
       - func: "fetch source"
       - func: "install dependencies"
-      # TEMPORARY: commented out for main-branch dry run; UNCOMMENT before merging!
-      # - func: "fetch tag"
+      - func: "fetch tag"
       - func: "build vars"
       - func: "publish release"
       - func: "publish papertrail"
