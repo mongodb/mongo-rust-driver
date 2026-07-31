@@ -147,7 +147,7 @@ macro_rules! convenient_run {
 
         'transaction: loop {
             if attempt > 0 {
-                let backoff = compute_backoff(
+                let backoff = calculate_backoff(
                     attempt,
                     #[cfg(test)]
                     $session.convenient_transaction_jitter,
@@ -209,16 +209,15 @@ macro_rules! convenient_run {
     }};
 }
 
-fn compute_backoff(attempt: u32, #[cfg(test)] test_jitter: Option<f64>) -> Duration {
+fn calculate_backoff(attempt: u32, #[cfg(test)] test_jitter: Option<f64>) -> Duration {
     const BACKOFF_INITIAL_MS: f64 = 5f64;
     const BACKOFF_MAX_MS: f64 = 500f64;
-    const RETRY_BASE: f64 = 1.5f64;
 
     let jitter = rand::random_range(0f64..1f64);
     #[cfg(test)]
     let jitter = test_jitter.unwrap_or(jitter);
 
-    let computed_backoff = jitter * BACKOFF_INITIAL_MS * RETRY_BASE.powf(f64::from(attempt - 1));
+    let computed_backoff = jitter * BACKOFF_INITIAL_MS * 1.5f64.powf(f64::from(attempt));
     let max_backoff = jitter * BACKOFF_MAX_MS;
     let backoff: u64 = std::cmp::min(round_clamp(computed_backoff), round_clamp(max_backoff));
     Duration::from_millis(backoff)

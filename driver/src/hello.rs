@@ -58,7 +58,7 @@ pub(crate) fn hello_command(
         (body, LEGACY_HELLO_COMMAND_NAME)
     };
 
-    body.append(cstr!("backpressure"), true);
+    body.append(cstr!("backpressure"), "2");
 
     if let Some(opts) = awaitable_options {
         body.append(cstr!("topologyVersion"), opts.topology_version);

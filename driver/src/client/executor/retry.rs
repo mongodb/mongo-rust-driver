@@ -22,6 +22,7 @@ pub(crate) struct Retry {
     txn_number: Option<i64>,
     pub(crate) overloaded: bool,
     max_retries: u32,
+    base_backoff_ms: Option<f64>,
 }
 
 struct Failure {
@@ -110,6 +111,7 @@ impl Retry {
                 || retryability.can_retry_error(error) && !is_transaction_op
         };
         let overloaded = error.contains_label(SYSTEM_OVERLOADED_ERROR);
+        let base_backoff_ms = error.base_backoff_ms().filter(|ms| *ms > 0f64);
 
         let max_adaptive_retries = overloaded.then_some(
             client
@@ -155,6 +157,7 @@ impl Retry {
                 if let Some(max_adaptive_retries) = max_adaptive_retries {
                     retry.max_retries = max_adaptive_retries;
                 }
+                retry.base_backoff_ms = base_backoff_ms;
                 Ok(retry)
             }
             None => {
@@ -170,6 +173,7 @@ impl Retry {
                     txn_number,
                     overloaded,
                     max_retries: max_adaptive_retries.unwrap_or(MAX_RW_RETRIES),
+                    base_backoff_ms,
                 })
             }
         }
@@ -192,17 +196,16 @@ impl Retry {
             return backoff;
         }
 
-        const BACKOFF_INITIAL_MS: f64 = 100f64;
-        const BACKOFF_MAX_MS: f64 = 10_000f64;
-        const RETRY_BASE: f64 = 2f64;
+        const DEFAULT_BASE_BACKOFF_MS: f64 = 100f64;
+        const MAX_BACKOFF_MS: f64 = 10_000f64;
 
         let jitter = rand::random_range(0f64..1f64);
         #[cfg(test)]
         let jitter = test_options.and_then(|o| o.jitter).unwrap_or(jitter);
 
-        let computed_backoff =
-            jitter * BACKOFF_INITIAL_MS * RETRY_BASE.powf(f64::from(self.attempt - 1));
-        let max_backoff = jitter * BACKOFF_MAX_MS;
+        let base_backoff_ms = self.base_backoff_ms.unwrap_or(DEFAULT_BASE_BACKOFF_MS);
+        let computed_backoff = jitter * base_backoff_ms * 2f64.powf(f64::from(self.attempt));
+        let max_backoff = jitter * MAX_BACKOFF_MS;
         let backoff: u64 = std::cmp::min(round_clamp(computed_backoff), round_clamp(max_backoff));
         Duration::from_millis(backoff)
     }
