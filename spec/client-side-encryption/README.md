@@ -473,8 +473,8 @@ test.
 
         ```javascript
         {
-          "keyVaultEndpoint": "key-vault-csfle.vault.azure.net",
-          "keyName": "key-name-csfle"
+          "keyVaultEndpoint": "drivers-3392-key-vault.vault.azure.net",
+          "keyName": "drivers-3392-keyname"
         }
         ```
 
@@ -925,8 +925,8 @@ The method of passing TLS options for KMIP TLS connections is driver dependent.
 
     ```javascript
     {
-       "keyVaultEndpoint": "key-vault-csfle.vault.azure.net",
-       "keyName": "key-name-csfle"
+       "keyVaultEndpoint": "drivers-3392-key-vault.vault.azure.net",
+       "keyName": "drivers-3392-keyname"
     }
     ```
 
@@ -2318,8 +2318,8 @@ For "azure":
 
 ```javascript
 {
-   "keyVaultEndpoint": "key-vault-csfle.vault.azure.net",
-   "keyName": "key-name-csfle"
+   "keyVaultEndpoint": "drivers-3392-key-vault.vault.azure.net",
+   "keyName": "drivers-3392-keyname"
 }
 ```
 

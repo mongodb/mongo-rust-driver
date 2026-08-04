@@ -1733,7 +1733,12 @@ functions:
       params:
         working_dir: src
         binary: bash
-        include_expansions_in_env: ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"]
+        include_expansions_in_env:
+          - "AWS_ACCESS_KEY_ID"
+          - "AWS_SECRET_ACCESS_KEY"
+          - "AWS_SESSION_TOKEN"
+        env:
+          FLE_AZURE_USE_CORPORATE: YES
         args:
           - ${DRIVERS_TOOLS}/.evergreen/csfle/setup-secrets.sh
     - command: subprocess.exec

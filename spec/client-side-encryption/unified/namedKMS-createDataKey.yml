@@ -74,8 +74,8 @@ tests:
           kmsProvider: "azure:name1"
           opts:
             masterKey: &new_azure_masterkey
-              keyVaultEndpoint: key-vault-csfle.vault.azure.net
-              keyName: key-name-csfle
+              keyVaultEndpoint: drivers-3392-key-vault.vault.azure.net
+              keyName: drivers-3392-keyname
         expectResult: { $$type: binData }
     expectEvents:
       - client: *client0
