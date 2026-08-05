@@ -663,8 +663,72 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
     ids
 }
 
+#[cfg(feature = "tracing")]
+mod trace_buffer {
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Debug, Clone)]
+    pub(super) struct TracingBuffer(Arc<Mutex<TracingBufferInner>>);
+
+    #[derive(Debug)]
+    struct TracingBufferInner {
+        span_count: u64,
+        event_count: u64,
+    }
+
+    impl TracingBuffer {
+        fn new() -> Self {
+            Self(Arc::new(Mutex::new(TracingBufferInner {
+                span_count: 0,
+                event_count: 0,
+            })))
+        }
+
+        pub(super) fn register() -> Self {
+            let out = Self::new();
+            tracing::subscriber::set_global_default(out.clone()).unwrap();
+            out
+        }
+
+        pub(super) fn span_count(&self) -> u64 {
+            self.0.lock().unwrap().span_count
+        }
+
+        pub(super) fn event_count(&self) -> u64 {
+            self.0.lock().unwrap().event_count
+        }
+    }
+
+    impl tracing::Subscriber for TracingBuffer {
+        fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
+            metadata.target().starts_with("mongodb")
+        }
+
+        fn new_span(&self, _span: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+            let mut inner = self.0.lock().unwrap();
+            inner.span_count += 1;
+            tracing::span::Id::from_u64(inner.span_count)
+        }
+
+        fn record(&self, _span: &tracing::span::Id, _values: &tracing::span::Record<'_>) {}
+
+        fn record_follows_from(&self, _span: &tracing::span::Id, _follows: &tracing::span::Id) {}
+
+        fn event(&self, _event: &tracing::Event<'_>) {
+            self.0.lock().unwrap().event_count += 1;
+        }
+
+        fn enter(&self, _span: &tracing::span::Id) {}
+
+        fn exit(&self, _span: &tracing::span::Id) {}
+    }
+}
+
 #[tokio::main]
 async fn main() {
+    #[cfg(feature = "tracing")]
+    let buffer = trace_buffer::TracingBuffer::register();
+
     // ensure MAX_ID is kept up to date.
     assert!(
         BenchmarkId::try_from(MAX_ID + 1).is_err(),
@@ -782,6 +846,13 @@ async fn main() {
     for score in composite_scores.iter() {
         println!("{}", score);
     }
+
+    #[cfg(feature = "tracing")]
+    println!(
+        "Tracing: spans={} events={}",
+        buffer.span_count(),
+        buffer.event_count(),
+    );
 
     if let Some(output_file) = output_file {
         // attach the individual benchmark results

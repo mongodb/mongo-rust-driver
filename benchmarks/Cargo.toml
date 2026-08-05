@@ -8,6 +8,10 @@ edition.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+tracing = ["dep:tracing", "mongodb/tracing-unstable"]
+
 [dependencies]
 mongodb = { path = "../driver" }
 serde_json = "1.0.59"
@@ -22,3 +26,4 @@ anyhow = "1.0.34"
 serde = "1"
 num_enum = "0.5"
 futures-util = "0.3.30"
+tracing = { version = "0.1.36", optional = true }
