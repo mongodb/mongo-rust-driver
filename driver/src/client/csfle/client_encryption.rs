@@ -482,8 +482,7 @@ impl<T: AsyncRead + AsyncWrite + Send + Unpin> KmsStream for T {}
 /// returns any type that implements the [`KmsStream`] trait.
 ///
 /// The driver wraps the returned [`KmsStream`] with TLS using the TLS options configured for the
-/// KMS provider. The TLS configuration must target the KMS host, not the address to which the
-/// stream returned from callback is connected.
+/// KMS provider.
 ///
 /// See [`KmsConnectCallback::new`] for details on how to construct this type.
 #[derive(Clone)]
@@ -501,7 +500,7 @@ impl KmsConnectCallback {
     /// containing the logic to establish the KMS stream.
     ///
     /// ```no_run
-    /// use futures::FuturesExt;
+    /// use futures::FutureExt;
     /// use mongodb::client_encryption::KmsConnectCallback;
     /// let callback = KmsConnectCallback::new(move |server_address| {
     ///     async move {
