@@ -1,6 +1,8 @@
 //! Contains the events and functionality to monitor the commands and responses that a `Client`
 //! sends and receives from the server.
 
+pub(crate) mod raw;
+
 use std::time::Duration;
 
 use serde::Serialize;

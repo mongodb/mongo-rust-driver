@@ -33,7 +33,8 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{Error, ErrorKind, Result},
-    event::command::CommandEvent,
+    event::command::{raw::RawCommandEvent, CommandEvent},
+    log_warning,
     operation::OverrideCriteriaFn,
     options::{
         ClientOptions,
@@ -326,7 +327,10 @@ impl Client {
         }
     }
 
-    pub(crate) async fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
+    pub(crate) async fn emit_command_event(
+        &self,
+        generate_event: impl FnOnce() -> RawCommandEvent,
+    ) {
         #[cfg(test)]
         if self
             .inner
@@ -355,18 +359,27 @@ impl Client {
             return;
         }
 
-        let event = generate_event();
+        let raw_event = generate_event();
+        let mut event: Option<Result<CommandEvent>> = None;
         if let Some(tx) = test_channel {
-            let (msg, ack) = crate::runtime::AcknowledgedMessage::package(event.clone());
-            let _ = tx.send(msg).await;
-            ack.wait_for_acknowledgment().await;
+            if let Ok(event) = event.get_or_insert_with(|| raw_event.clone().try_into()) {
+                let (msg, ack) = crate::runtime::AcknowledgedMessage::package(event.clone());
+                let _ = tx.send(msg).await;
+                ack.wait_for_acknowledgment().await;
+            } else {
+                log_warning!("failed to parse raw event");
+            };
         }
         #[cfg(feature = "tracing-unstable")]
         if let Some(ref tracing_emitter) = tracing_emitter {
-            tracing_emitter.handle(event.clone());
+            tracing_emitter.handle(raw_event.clone());
         }
         if let Some(handler) = &self.options().command_event_handler {
-            handler.handle(event);
+            if let Ok(event) = event.unwrap_or_else(|| raw_event.try_into()) {
+                handler.handle(event);
+            } else {
+                log_warning!("failed to parse raw event");
+            }
         }
     }
 

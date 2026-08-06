@@ -29,6 +29,17 @@ pub(crate) fn cstr_to_str(cs: &CStr) -> &str {
     }
 }
 
+pub(crate) fn str_to_cstr(s: &str) -> crate::error::Result<&CStr> {
+    #[cfg(feature = "bson-3")]
+    {
+        Ok(s.try_into()?)
+    }
+    #[cfg(not(feature = "bson-3"))]
+    {
+        Ok(s)
+    }
+}
+
 #[cfg(feature = "bson-3")]
 pub(crate) trait RawDocumentBufExt: Sized {
     fn append_ref<'a>(

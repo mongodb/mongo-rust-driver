@@ -44,7 +44,9 @@ impl crate::error::Error {
                 Ok(document) => doc_to_json_str(document, max_document_length),
                 Err(_) => {
                     let mut hex_string = hex::encode(server_response.as_bytes());
-                    truncate_on_char_boundary(&mut hex_string, max_document_length);
+                    if truncate_on_char_boundary(&mut hex_string, max_document_length) {
+                        hex_string.push_str("...");
+                    }
                     hex_string
                 }
             };

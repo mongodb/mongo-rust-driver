@@ -325,33 +325,143 @@ pub(crate) mod option_u64_as_i64 {
 /// Truncates the given string at the closest UTF-8 character boundary >= the provided length.
 /// If the new length is >= the current length, does nothing.
 #[cfg(any(feature = "tracing-unstable", feature = "opentelemetry"))]
-pub(crate) fn truncate_on_char_boundary(s: &mut String, new_len: usize) {
+#[must_use]
+pub(crate) fn truncate_on_char_boundary(s: &mut String, new_len: usize) -> bool {
     let original_len = s.len();
-    if original_len > new_len {
-        // to avoid generating invalid UTF-8, find the first index >= max_length_bytes that is
-        // the end of a character.
-        // TODO: RUST-1496 we should use ceil_char_boundary here but it's currently nightly-only.
-        // see: https://doc.rust-lang.org/std/string/struct.String.html#method.ceil_char_boundary
-        let mut truncate_index = new_len;
-        // is_char_boundary returns true when the provided value == the length of the string, so
-        // if we reach the end of the string this loop will terminate.
-        while !s.is_char_boundary(truncate_index) {
-            truncate_index += 1;
-        }
-        s.truncate(truncate_index);
-        // due to the "rounding up" behavior we might not actually end up truncating anything.
-        // if we did, spec requires we add a trailing "...".
-        if truncate_index < original_len {
-            s.push_str("...")
-        }
+    if new_len >= original_len {
+        return false;
     }
+
+    // to avoid generating invalid UTF-8, find the first index >= max_length_bytes that is
+    // the end of a character.
+    // TODO: RUST-1496 we should use ceil_char_boundary here but it's currently nightly-only.
+    // see: https://doc.rust-lang.org/std/string/struct.String.html#method.ceil_char_boundary
+    let mut truncate_index = new_len;
+    // is_char_boundary returns true when the provided value == the length of the string, so
+    // if we reach the end of the string this loop will terminate.
+    while !s.is_char_boundary(truncate_index) {
+        truncate_index += 1;
+    }
+    s.truncate(truncate_index);
+    // due to the "rounding up" behavior we might not actually end up truncating anything.
+    truncate_index < original_len
 }
 
 #[cfg(any(feature = "tracing-unstable", feature = "opentelemetry"))]
 pub(crate) fn doc_to_json_str(doc: crate::bson::Document, max_length_bytes: usize) -> String {
     let mut ext_json = Bson::Document(doc).into_relaxed_extjson().to_string();
-    truncate_on_char_boundary(&mut ext_json, max_length_bytes);
+    if truncate_on_char_boundary(&mut ext_json, max_length_bytes) {
+        ext_json.push_str("...");
+    }
     ext_json
+}
+
+#[cfg(feature = "tracing-unstable")]
+macro_rules! push_trunc {
+    ($out:ident, $max:ident, $s:expr) => {{
+        let s = $s;
+        let new_len = $out.len().saturating_add(s.len());
+        if new_len > $max {
+            let delta = $max.abs_diff(new_len);
+            let new_len = s.len().saturating_sub(delta);
+            let mut s = s.to_owned();
+            let _ = truncate_on_char_boundary(&mut s, new_len);
+            $out.push_str(&s);
+            $out.push_str("...");
+            return $out;
+        }
+        $out.push_str(s);
+    }};
+}
+
+#[cfg(feature = "tracing-unstable")]
+macro_rules! ok_or_invalid {
+    ($r:expr) => {{
+        match $r {
+            Ok(v) => v,
+            Err(e) => return format!("<invalid document: {e}>"),
+        }
+    }};
+}
+
+#[cfg(feature = "tracing-unstable")]
+pub(crate) fn rawdoc_to_json_str(
+    doc: &crate::bson::RawDocument,
+    max_length_bytes: usize,
+) -> String {
+    let mut out = String::new();
+    let mut stack = vec![]; // [(iter, is_array)]
+    let mut current = doc.iter_elements();
+    let mut is_array = false;
+    let mut is_first = true;
+    push_trunc!(out, max_length_bytes, "{ ");
+    'outer: loop {
+        while let Some(elt) = current.next() {
+            use crate::bson_compat::cstr_to_str;
+
+            if !is_first {
+                push_trunc!(out, max_length_bytes, ", ");
+            }
+            is_first = false;
+
+            let elt = ok_or_invalid!(elt);
+            let value = ok_or_invalid!(elt.value());
+
+            if !is_array {
+                let key = ok_or_invalid!(serde_json::to_string(cstr_to_str(elt.key())));
+                push_trunc!(out, max_length_bytes, &key);
+                push_trunc!(out, max_length_bytes, ": ");
+            }
+            match value {
+                RawBsonRef::Document(d) => {
+                    push_trunc!(out, max_length_bytes, "{ ");
+                    let mut tmp = d.iter_elements();
+                    std::mem::swap(&mut current, &mut tmp);
+                    stack.push((tmp, is_array));
+                    is_array = false;
+                    is_first = true;
+                    continue 'outer;
+                }
+                RawBsonRef::Array(a) => {
+                    push_trunc!(out, max_length_bytes, "[ ");
+                    // bson 2.x doesn't have .iter_elements() on RawArray, so we have to jump
+                    // through some hoops...
+                    let mut tmp =
+                        ok_or_invalid!(crate::bson::RawDocument::from_bytes(a.as_bytes()))
+                            .iter_elements();
+                    std::mem::swap(&mut current, &mut tmp);
+                    stack.push((tmp, is_array));
+                    is_array = true;
+                    is_first = true;
+                    continue 'outer;
+                }
+                _ => {
+                    let parsed: Bson = ok_or_invalid!(value.try_into());
+                    push_trunc!(
+                        out,
+                        max_length_bytes,
+                        &parsed.into_relaxed_extjson().to_string()
+                    );
+                }
+            }
+        }
+        if is_first {
+            // nothing was emitted for this container, so drop the space from the opener to
+            // produce "{}" rather than "{  }".
+            out.pop();
+            push_trunc!(out, max_length_bytes, if is_array { "]" } else { "}" });
+        } else {
+            push_trunc!(out, max_length_bytes, if is_array { " ]" } else { " }" });
+        }
+        let Some(outer) = stack.pop() else {
+            break;
+        };
+        current = outer.0;
+        is_array = outer.1;
+        is_first = false;
+    }
+
+    out
 }
 
 #[cfg(test)]
