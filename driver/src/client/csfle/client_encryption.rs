@@ -500,18 +500,21 @@ impl KmsConnectCallback {
     /// containing the logic to establish the KMS stream.
     ///
     /// ```no_run
+    /// # use mongodb::{error::Result, options::ServerAddress};
+    /// # use tokio::net::TcpStream;
+    /// # async fn connect_through_proxy(address: ServerAddress) -> Result<TcpStream> {
+    /// #     todo!()
+    /// # }
     /// use futures::FutureExt;
     /// use mongodb::client_encryption::KmsConnectCallback;
     /// let callback = KmsConnectCallback::new(move |server_address| {
-    ///     async move {
-    ///         todo!("connect to KMS provider")
-    ///     }.boxed()
+    ///     async move { connect_through_proxy(server_address).await }.boxed()
     /// });
     /// ```
     ///
     /// The callback returns this crate's [`Result`] type. Where possible, errors from the callback
     /// should be converted directly into [`Error`] using the `?` operator (e.g. `std::io::Error`s).
-    /// For error types that cannot be converted, the [`Error::custom`] constructor can be used.
+    /// The [`Error::custom`] constructor can be used for error types that cannot be converted.
     pub fn new<F, S>(callback: F) -> Self
     where
         F: Fn(ServerAddress) -> BoxFuture<'static, Result<S>> + Send + Sync + 'static,
