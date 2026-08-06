@@ -26,7 +26,6 @@ use crate::{
         RawDocumentBuf,
     },
     client_encryption::{
-        AwsMasterKey,
         AzureMasterKey,
         ClientEncryption,
         EncryptKey,
@@ -71,6 +70,7 @@ use super::{
     validate_roundtrip,
     Result,
     AWS_KMS,
+    AWS_MASTER_KEY,
     DISABLE_CRYPT_SHARED,
     EXTRA_OPTIONS,
     KV_NAMESPACE,
@@ -320,18 +320,9 @@ mod custom_endpoint {
     async fn custom_endpoint_aws_ok(endpoint: Option<String>) -> Result<()> {
         let client_encryption = custom_endpoint_setup(true).await?;
 
-        let key_id = client_encryption
-            .create_data_key(
-                AwsMasterKey::builder()
-                    .region("us-east-1")
-                    .key(
-                        "arn:aws:kms:us-east-1:579766882180:key/\
-                         89fcc2c4-08b0-4bd9-9f25-e30687b580d0",
-                    )
-                    .endpoint(endpoint)
-                    .build(),
-            )
-            .await?;
+        let mut master_key = AWS_MASTER_KEY.clone();
+        master_key.endpoint = endpoint;
+        let key_id = client_encryption.create_data_key(master_key).await?;
         validate_roundtrip(&client_encryption, key_id).await?;
 
         Ok(())
@@ -378,18 +369,9 @@ mod custom_endpoint {
     async fn aws_invalid_region() -> Result<()> {
         let client_encryption = custom_endpoint_setup(true).await?;
 
-        let result = client_encryption
-            .create_data_key(
-                AwsMasterKey::builder()
-                    .region("us-east-1")
-                    .key(
-                        "arn:aws:kms:us-east-1:579766882180:key/\
-                         89fcc2c4-08b0-4bd9-9f25-e30687b580d0",
-                    )
-                    .endpoint(Some("kms.us-east-2.amazonaws.com".to_string()))
-                    .build(),
-            )
-            .await;
+        let mut master_key = AWS_MASTER_KEY.clone();
+        master_key.endpoint = Some("kms.us-east-2.amazonaws.com".to_string());
+        let result = client_encryption.create_data_key(master_key).await;
         assert!(result.unwrap_err().is_csfle_error());
 
         Ok(())
@@ -400,18 +382,9 @@ mod custom_endpoint {
     async fn aws_invalid_domain() -> Result<()> {
         let client_encryption = custom_endpoint_setup(true).await?;
 
-        let result = client_encryption
-            .create_data_key(
-                AwsMasterKey::builder()
-                    .region("us-east-1")
-                    .key(
-                        "arn:aws:kms:us-east-1:579766882180:key/\
-                         89fcc2c4-08b0-4bd9-9f25-e30687b580d0",
-                    )
-                    .endpoint(Some("doesnotexist.invalid".to_string()))
-                    .build(),
-            )
-            .await;
+        let mut master_key = AWS_MASTER_KEY.clone();
+        master_key.endpoint = Some("doesnotexist.invalid".to_string());
+        let result = client_encryption.create_data_key(master_key).await;
         assert!(result.unwrap_err().is_network_error());
 
         Ok(())
@@ -1673,13 +1646,7 @@ mod auto_encryption_keys {
 
     #[tokio::test]
     async fn aws() -> Result<()> {
-        auto_encryption_keys(
-            AwsMasterKey::builder()
-                .region("us-east-1")
-                .key("arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0")
-                .build(),
-        )
-        .await
+        auto_encryption_keys(AWS_MASTER_KEY.clone()).await
     }
 }
 

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::{bson::Document, error::Result, options::ClientOptions, Client};
 
-use super::options::AutoEncryptionOptions;
+use super::{client_encryption::KmsConnectCallback, options::AutoEncryptionOptions};
 
 /// A builder for constructing a `Client` with auto-encryption enabled.
 ///
@@ -105,6 +105,13 @@ impl EncryptedClientBuilder {
     /// to 60 seconds if unset.
     pub fn key_cache_expiration(mut self, expiration: impl Into<Option<Duration>>) -> Self {
         self.enc_opts.key_cache_expiration = expiration.into();
+        self
+    }
+
+    /// Set a callback used to establish connections to KMS providers. See the documentation for
+    /// [`KmsConnectCallback`] for more details.
+    pub fn kms_connect_callback(mut self, callback: impl Into<Option<KmsConnectCallback>>) -> Self {
+        self.enc_opts.kms_connect_callback = callback.into();
         self
     }
 

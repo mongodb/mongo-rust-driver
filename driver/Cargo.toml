@@ -232,7 +232,7 @@ semver = "1.0.0"
 time = "0.3.9"
 tokio = { version = ">= 0.0.0", features = ["fs", "parking_lot"] }
 regex = "1.6.0"
-reqwest = { version = "0.12.2", features = ["rustls-tls"] }
+reqwest = { version = "0.12.2", features = ["json", "rustls-tls"] }
 serde-hex = "0.1.0"
 serde_path_to_error = "0.1"
 

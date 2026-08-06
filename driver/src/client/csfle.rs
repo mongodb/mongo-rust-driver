@@ -76,6 +76,7 @@ impl ClientState {
             client.options().socks5_proxy.clone(),
             #[cfg(not(feature = "socks5-proxy"))]
             None,
+            opts.kms_connect_callback.clone(),
         )
         .await?;
 

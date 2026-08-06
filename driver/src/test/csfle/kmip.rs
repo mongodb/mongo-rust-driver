@@ -32,6 +32,7 @@ use super::{
     KmsInfo,
     KmsProviderList,
     Result,
+    AWS_MASTER_KEY,
     CSFLE_TLS_CERT_DIR,
     DISABLE_CRYPT_SHARED,
     EXTRA_OPTIONS,
@@ -92,14 +93,7 @@ async fn data_key_double_encryption() -> Result<()> {
 
     let mut events = client.events.stream();
     let provider_keys: [(KmsProvider, MasterKey); 5] = [
-        (
-            KmsProvider::aws(),
-            AwsMasterKey::builder()
-                .region("us-east-1")
-                .key("arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0")
-                .build()
-                .into(),
-        ),
+        (KmsProvider::aws(), AWS_MASTER_KEY.clone().into()),
         (
             KmsProvider::azure(),
             AzureMasterKey::builder()
@@ -206,7 +200,7 @@ async fn data_key_double_encryption() -> Result<()> {
             .await;
         let err = result.unwrap_err();
         assert!(
-            matches!(*err.kind, ErrorKind::Encryption(..)) || err.is_command_error(),
+            matches!(*err.kind, ErrorKind::Encryption(..) | ErrorKind::Command(_)),
             "unexpected error: {err}"
         );
     }
@@ -589,17 +583,10 @@ mod kms_tls {
         )?;
 
         // Test
+        let mut master_key = AWS_MASTER_KEY.clone();
+        master_key.endpoint = Some(endpoint.into());
         client_encryption
-            .create_data_key(
-                AwsMasterKey::builder()
-                    .region("us-east-1")
-                    .key(
-                        "arn:aws:kms:us-east-1:579766882180:key/\
-                         89fcc2c4-08b0-4bd9-9f25-e30687b580d0",
-                    )
-                    .endpoint(Some(endpoint.into()))
-                    .build(),
-            )
+            .create_data_key(master_key)
             .await
             .map(|_| ())
     }
@@ -765,11 +752,9 @@ async fn kms_tls_options() -> Result<()> {
 
     // Case 1: AWS
     fn aws_key(endpoint: impl Into<String>) -> AwsMasterKey {
-        AwsMasterKey::builder()
-            .region("us-east-1")
-            .key("arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0")
-            .endpoint(Some(endpoint.into()))
-            .build()
+        let mut master_key = AWS_MASTER_KEY.clone();
+        master_key.endpoint = Some(endpoint.into());
+        master_key
     }
 
     provider_test(

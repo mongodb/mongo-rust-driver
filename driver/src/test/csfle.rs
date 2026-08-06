@@ -4,6 +4,8 @@ mod azure_imds; // requires mock IMDS server
 #[cfg(feature = "openssl-tls")]
 #[path = "csfle/kmip.rs"]
 mod kmip; // requires KMIP server
+#[path = "csfle/kms_http_proxy.rs"]
+mod kms_http_proxy; // requires HTTP proxy servers
 #[cfg(not(feature = "openssl-tls"))]
 #[path = "csfle/kms_retry.rs"]
 mod kms_retry; // requires mock HTTP server
@@ -20,7 +22,10 @@ mod spec; // requires environment variables listed below
 
 use std::{env, path::PathBuf};
 
-use crate::bson::{doc, Document, RawBson};
+use crate::{
+    bson::{doc, Document, RawBson},
+    client_encryption::AwsMasterKey,
+};
 use anyhow::Context;
 use mongocrypt::ctx::{Algorithm, KmsProvider, KmsProviderType};
 use std::sync::LazyLock;
@@ -215,6 +220,13 @@ static KV_NAMESPACE: LazyLock<Namespace> =
     LazyLock::new(|| Namespace::from_str("keyvault.datakeys").unwrap());
 static DISABLE_CRYPT_SHARED: LazyLock<bool> =
     LazyLock::new(|| env::var("DISABLE_CRYPT_SHARED").is_ok_and(|s| s == "true"));
+
+static AWS_MASTER_KEY: LazyLock<AwsMasterKey> = LazyLock::new(|| {
+    AwsMasterKey::builder()
+        .region("us-east-1")
+        .key("arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0")
+        .build()
+});
 
 async fn init_client() -> Result<(EventClient, Collection<Document>)> {
     let client = Client::for_test().monitor_events().await;

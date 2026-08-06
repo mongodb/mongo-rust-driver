@@ -12,6 +12,8 @@ use crate::{
     Namespace,
 };
 
+use super::client_encryption::KmsConnectCallback;
+
 /// Options related to automatic encryption.
 ///
 /// Automatic encryption is an enterprise only feature that only applies to operations on a
@@ -68,6 +70,8 @@ pub(crate) struct AutoEncryptionOptions {
         deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis"
     )]
     pub(crate) key_cache_expiration: Option<Duration>,
+    #[serde(skip)]
+    pub(crate) kms_connect_callback: Option<KmsConnectCallback>,
 }
 
 fn default_key_vault_namespace() -> Namespace {
@@ -91,6 +95,7 @@ impl AutoEncryptionOptions {
             #[cfg(test)]
             disable_crypt_shared: None,
             key_cache_expiration: None,
+            kms_connect_callback: None,
         }
     }
 }

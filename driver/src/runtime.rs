@@ -58,7 +58,11 @@ compile_error!(
      enabled."
 );
 
+#[cfg(feature = "in-use-encryption")]
+pub(crate) use tls::tls_connect;
 pub(crate) use tls::TlsConfig;
+#[cfg(all(test, feature = "in-use-encryption"))]
+pub(crate) use tls::TlsStream;
 
 /// Spawn a task in the background to run a future.
 ///

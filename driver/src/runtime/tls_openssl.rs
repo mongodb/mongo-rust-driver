@@ -12,7 +12,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
 };
 
-pub(super) type TlsStream<T> = SslStream<T>;
+pub(crate) type TlsStream<T> = SslStream<T>;
 
 /// Configuration required to use TLS. Creating this is expensive, so its best to cache this value
 /// and reuse it for multiple connections.
@@ -40,7 +40,7 @@ impl TlsConfig {
     }
 }
 
-pub(super) async fn tls_connect<T: AsyncRead + AsyncWrite + Unpin>(
+pub(crate) async fn tls_connect<T: AsyncRead + AsyncWrite + Unpin>(
     host: &str,
     tcp_stream: T,
     cfg: &TlsConfig,

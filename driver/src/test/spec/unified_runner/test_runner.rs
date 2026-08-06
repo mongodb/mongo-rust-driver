@@ -559,6 +559,7 @@ impl TestRunner {
                             bypass_query_analysis: opts.bypass_query_analysis,
                             disable_crypt_shared: None,
                             key_cache_expiration: opts.key_cache_expiration,
+                            kms_connect_callback: None,
                         };
                         entity
                             .client()
