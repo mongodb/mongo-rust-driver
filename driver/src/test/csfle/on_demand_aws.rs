@@ -2,14 +2,9 @@
 
 use mongocrypt::ctx::KmsProvider;
 
-use crate::{
-    bson::doc,
-    client_encryption::{AwsMasterKey, ClientEncryption},
-    error::Result,
-    Client,
-};
+use crate::{bson::doc, client_encryption::ClientEncryption, error::Result, Client};
 
-use super::KV_NAMESPACE;
+use super::{AWS_MASTER_KEY, KV_NAMESPACE};
 
 async fn try_create_data_key() -> Result<()> {
     let ce = ClientEncryption::new(
@@ -17,14 +12,7 @@ async fn try_create_data_key() -> Result<()> {
         KV_NAMESPACE.clone(),
         [(KmsProvider::aws(), doc! {}, None)],
     )?;
-    ce.create_data_key(
-        AwsMasterKey::builder()
-            .region("us-east-1")
-            .key("arn:aws:kms:us-east-1:579766882180:key/89fcc2c4-08b0-4bd9-9f25-e30687b580d0")
-            .build(),
-    )
-    .await
-    .map(|_| ())
+    ce.create_data_key(AWS_MASTER_KEY.clone()).await.map(|_| ())
 }
 
 #[tokio::test]

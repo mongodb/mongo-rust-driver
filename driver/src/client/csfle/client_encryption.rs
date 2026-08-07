@@ -3,10 +3,11 @@
 mod create_data_key;
 mod encrypt;
 
-use std::time::Duration;
+use std::{fmt, sync::Arc, time::Duration};
 
 use mongocrypt::{ctx::KmsProvider, Crypt};
 use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncRead, AsyncWrite};
 use typed_builder::TypedBuilder;
 
 #[cfg(feature = "bson-3")]
@@ -16,8 +17,9 @@ use crate::{
     client::options::TlsOptions,
     coll::options::CollectionOptions,
     error::{Error, Result},
-    options::{ReadConcern, WriteConcern},
+    options::{ReadConcern, ServerAddress, WriteConcern},
     results::DeleteResult,
+    BoxFuture,
     Client,
     Collection,
     Cursor,
@@ -109,6 +111,7 @@ impl ClientEncryption {
             key_vault_namespace,
             kms_providers: kms_providers.into_iter().collect(),
             key_cache_expiration: None,
+            kms_connect_callback: None,
         }
     }
 
@@ -219,6 +222,7 @@ pub struct ClientEncryptionBuilder {
     key_vault_namespace: Namespace,
     kms_providers: Vec<(KmsProvider, crate::bson::Document, Option<TlsOptions>)>,
     key_cache_expiration: Option<Duration>,
+    kms_connect_callback: Option<KmsConnectCallback>,
 }
 
 impl ClientEncryptionBuilder {
@@ -226,6 +230,13 @@ impl ClientEncryptionBuilder {
     /// to 60 seconds if unset.
     pub fn key_cache_expiration(mut self, expiration: impl Into<Option<Duration>>) -> Self {
         self.key_cache_expiration = expiration.into();
+        self
+    }
+
+    /// Set a callback used to establish connections to KMS providers. See the documentation for
+    /// [`KmsConnectCallback`] for more details.
+    pub fn kms_connect_callback(mut self, callback: impl Into<Option<KmsConnectCallback>>) -> Self {
+        self.kms_connect_callback = callback.into();
         self
     }
 
@@ -254,6 +265,7 @@ impl ClientEncryptionBuilder {
             self.key_vault_client.weak(),
             self.key_vault_namespace.clone(),
             kms_providers,
+            self.kms_connect_callback,
         )?;
         let key_vault = self
             .key_vault_client
@@ -458,3 +470,72 @@ impl MasterKey {
 // pub struct RewrapManyDataKeyResult {
 // pub bulk_write_result: Option<BulkWriteResult>,
 // }
+
+/// A trait representing a stream connected to a KMS provider. This trait is automatically
+/// implemented for all types that implement [`AsyncRead`], [`AsyncWrite`], `Send`, and `Unpin`.
+pub trait KmsStream: AsyncRead + AsyncWrite + Send + Unpin {}
+impl<T: AsyncRead + AsyncWrite + Send + Unpin> KmsStream for T {}
+
+/// The callback to use to connect to KMS providers.
+///
+/// A `KmsConnectCallback` accepts a [`ServerAddress`] representing the address of the KMS host and
+/// returns any type that implements the [`KmsStream`] trait.
+///
+/// The driver wraps the returned [`KmsStream`] with TLS using the TLS options configured for the
+/// KMS provider.
+///
+/// See [`KmsConnectCallback::new`] for details on how to construct this type.
+#[derive(Clone)]
+#[non_exhaustive]
+pub struct KmsConnectCallback(
+    #[allow(clippy::type_complexity)]
+    Arc<dyn Fn(ServerAddress) -> BoxFuture<'static, Result<Box<dyn KmsStream>>> + Send + Sync>,
+);
+
+impl KmsConnectCallback {
+    /// Create a new KMS connect callback.
+    ///
+    /// Due to limitations in the Rust compiler, this type cannot be constructed directly from an
+    /// async closure. Instead, this function accepts a sync closure that returns a [`BoxFuture`]
+    /// containing the logic to establish the KMS stream.
+    ///
+    /// ```no_run
+    /// # use mongodb::{error::Result, options::ServerAddress};
+    /// # use tokio::net::TcpStream;
+    /// # async fn connect_through_proxy(address: ServerAddress) -> Result<TcpStream> {
+    /// #     todo!()
+    /// # }
+    /// use futures::FutureExt;
+    /// use mongodb::client_encryption::KmsConnectCallback;
+    /// let callback = KmsConnectCallback::new(move |server_address| {
+    ///     async move { connect_through_proxy(server_address).await }.boxed()
+    /// });
+    /// ```
+    ///
+    /// The callback returns this crate's [`Result`] type. Where possible, errors from the callback
+    /// should be converted directly into [`Error`] using the `?` operator (e.g. `std::io::Error`s).
+    /// The [`Error::custom`] constructor can be used for error types that cannot be converted.
+    pub fn new<F, S>(callback: F) -> Self
+    where
+        F: Fn(ServerAddress) -> BoxFuture<'static, Result<S>> + Send + Sync + 'static,
+        S: KmsStream + 'static,
+    {
+        Self(Arc::new(move |address| {
+            let future = callback(address);
+            Box::pin(async move { Ok(Box::new(future.await?) as Box<dyn KmsStream>) })
+        }))
+    }
+
+    pub(crate) fn connect(
+        &self,
+        address: ServerAddress,
+    ) -> BoxFuture<'static, Result<Box<dyn KmsStream>>> {
+        (self.0)(address)
+    }
+}
+
+impl fmt::Debug for KmsConnectCallback {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KmsConnectCallback").finish()
+    }
+}
