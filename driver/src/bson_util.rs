@@ -364,20 +364,36 @@ pub(crate) fn rawdoc_to_json_str_otel(
 }
 
 #[cfg(any(feature = "tracing-unstable", feature = "opentelemetry"))]
+pub(crate) fn doc_err(e: Error) -> String {
+    serde_json::json!({
+        "serialization error": e.to_string()
+    })
+    .to_string()
+}
+
+#[cfg(any(feature = "tracing-unstable", feature = "opentelemetry"))]
+fn push_trunc(out: &mut String, max: usize, s: &str) -> bool {
+    let new_len = out.len().saturating_add(s.len());
+    if new_len <= max {
+        out.push_str(s);
+        return false;
+    }
+
+    let delta = max.abs_diff(new_len);
+    let new_len = s.len().saturating_sub(delta);
+    let mut s = s.to_owned();
+    let _ = truncate_on_char_boundary(&mut s, new_len);
+    out.push_str(&s);
+    out.push_str("...");
+    true
+}
+
+#[cfg(any(feature = "tracing-unstable", feature = "opentelemetry"))]
 macro_rules! push_trunc {
-    ($out:ident, $max:ident, $s:expr) => {{
-        let s = $s;
-        let new_len = $out.len().saturating_add(s.len());
-        if new_len > $max {
-            let delta = $max.abs_diff(new_len);
-            let new_len = s.len().saturating_sub(delta);
-            let mut s = s.to_owned();
-            let _ = truncate_on_char_boundary(&mut s, new_len);
-            $out.push_str(&s);
-            $out.push_str("...");
+    ($out:expr, $max:expr, $s:expr) => {{
+        if push_trunc(&mut $out, $max, $s) {
             return Ok($out);
         }
-        $out.push_str(s);
     }};
 }
 
@@ -397,8 +413,6 @@ fn rawdoc_to_json_str_inner(
     push_trunc!(out, max_length_bytes, "{ ");
     'outer: loop {
         while let Some(elt) = current.next() {
-            use crate::bson_compat::cstr_to_str;
-
             let elt = elt?;
             let value = elt.value()?;
             // The opentelemetry spec requires omitting some toplevel fields.
@@ -422,8 +436,10 @@ fn rawdoc_to_json_str_inner(
             is_first = false;
 
             if !is_array {
-                let key = serde_json::to_string(cstr_to_str(elt.key()))
-                    .map_err(|e| Error::internal(format!("invalid document key: {e}")))?;
+                let key = serde_json::Value::String(
+                    crate::bson_compat::cstr_to_str(elt.key()).to_owned(),
+                )
+                .to_string();
                 push_trunc!(out, max_length_bytes, &key);
                 push_trunc!(out, max_length_bytes, ": ");
             }

@@ -197,7 +197,7 @@ impl Client {
             attrs.push(KeyValue::new(
                 "db.query.text",
                 crate::bson_util::rawdoc_to_json_str_otel(&doc, text_max_len)
-                    .unwrap_or_else(|e| format!("<invalid document: {e}>")),
+                    .unwrap_or_else(crate::bson_util::doc_err),
             ));
         }
         if let Some(cursor_id) = op.cursor_id() {

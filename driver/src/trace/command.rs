@@ -1,7 +1,7 @@
 use crate::bson::oid::ObjectId;
 
 use crate::{
-    bson_util::rawdoc_to_json_str,
+    bson_util::{doc_err, rawdoc_to_json_str},
     event::command::raw::RawCommandEvent,
     trace::{TracingRepresentation, COMMAND_TRACING_EVENT_TARGET},
 };
@@ -33,8 +33,7 @@ impl CommandTracingEventEmitter {
                 tracing::debug!(
                     target: COMMAND_TRACING_EVENT_TARGET,
                     topologyId = self.topology_id.tracing_representation(),
-                    command = rawdoc_to_json_str(&event.command, self.max_document_length_bytes)
-                        .unwrap_or_else(|e| format!("<invalid document: {e}>")),
+                    command = rawdoc_to_json_str(&event.command, self.max_document_length_bytes).unwrap_or_else(doc_err),
                     databaseName = event.db,
                     commandName = event.command_name,
                     requestId = event.request_id,
@@ -50,8 +49,7 @@ impl CommandTracingEventEmitter {
                 tracing::debug!(
                     target: COMMAND_TRACING_EVENT_TARGET,
                     topologyId = self.topology_id.tracing_representation(),
-                    reply = rawdoc_to_json_str(&event.reply, self.max_document_length_bytes)
-                        .unwrap_or_else(|e| format!("<invalid document: {e}>")),
+                    reply = rawdoc_to_json_str(&event.reply, self.max_document_length_bytes).unwrap_or_else(doc_err),
                     commandName = event.command_name,
                     requestId = event.request_id,
                     driverConnectionId = event.connection.id,

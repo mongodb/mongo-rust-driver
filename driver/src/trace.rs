@@ -1,4 +1,3 @@
-#[cfg(feature = "bson-3")]
 use crate::{
     bson_util::{rawdoc_to_json_str, truncate_on_char_boundary},
     client::options::{ServerAddress, DEFAULT_PORT},

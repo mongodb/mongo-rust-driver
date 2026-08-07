@@ -75,7 +75,7 @@ tracing-unstable = ["dep:tracing", "log", "bson3?/serde_json-1", "dep:serde_json
 text-indexes-unstable = []
 
 # Enable support for opentelemetry instrumentation
-opentelemetry = ["dep:opentelemetry"]
+opentelemetry = ["dep:opentelemetry", "bson3?/serde_json-1", "dep:serde_json"]
 
 # Capture backtraces in errors.  This can be slow, memory intensive, and very verbose.
 error-backtrace = []

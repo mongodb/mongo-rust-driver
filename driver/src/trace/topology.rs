@@ -1,7 +1,7 @@
 use crate::bson::oid::ObjectId;
 
 use crate::{
-    bson_util::rawdoc_to_json_str,
+    bson_util::{doc_err, rawdoc_to_json_str},
     event::sdam::{
         SdamEvent,
         ServerClosedEvent,
@@ -167,14 +167,13 @@ impl TopologyTracingEventEmitter {
             target: TOPOLOGY_TRACING_EVENT_TARGET,
             TracingOrLogLevel::Debug
         ) {
-            let reply = event
-                .reply
+            let reply = (&event.reply)
                 .try_into()
                 .map_err(crate::error::Error::from)
                 .and_then(|r: crate::bson::RawDocumentBuf| {
                     rawdoc_to_json_str(&r, self.max_document_length_bytes)
                 })
-                .unwrap_or_else(|e| format!("<invalid document: {e}>"));
+                .unwrap_or_else(doc_err);
             tracing::debug!(
                 target: TOPOLOGY_TRACING_EVENT_TARGET,
                 topologyId = self.topology_id.tracing_representation(),

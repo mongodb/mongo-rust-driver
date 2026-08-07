@@ -93,7 +93,7 @@ impl TryFrom<Command> for Message {
 }
 
 impl Message {
-    /// Gets this message's command as a Document. If serialization fails, returns a document
+    /// Gets this message's command as a RawDocumentBuf. If serialization fails, returns a document
     /// containing the error.
     pub(crate) fn get_raw_command_document(&self) -> RawDocumentBuf {
         let mut command = self.document_payload.clone();
