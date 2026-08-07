@@ -212,7 +212,7 @@ async fn command_logging_truncation_mid_codepoint() {
 
     // 215 falls in the middle of an emoji (each is 4 bytes), so we should round up to 218, + 3 for
     // trailing "..."
-    assert_eq!(command.len(), 221);
+    assert_eq!(command.len(), 221, "truncated: {command:?}");
 
     coll.find(doc! {})
         .projection(doc! { "_id": 0, "🤔": 1 })

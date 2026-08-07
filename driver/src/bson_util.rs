@@ -410,7 +410,7 @@ fn rawdoc_to_json_str_inner(
     let mut current = doc.iter_elements();
     let mut is_array = false;
     let mut is_first = true;
-    push_trunc!(out, max_length_bytes, "{ ");
+    push_trunc!(out, max_length_bytes, "{");
     'outer: loop {
         while let Some(elt) = current.next() {
             let elt = elt?;
@@ -431,7 +431,7 @@ fn rawdoc_to_json_str_inner(
             }
 
             if !is_first {
-                push_trunc!(out, max_length_bytes, ", ");
+                push_trunc!(out, max_length_bytes, ",");
             }
             is_first = false;
 
@@ -441,11 +441,11 @@ fn rawdoc_to_json_str_inner(
                 )
                 .to_string();
                 push_trunc!(out, max_length_bytes, &key);
-                push_trunc!(out, max_length_bytes, ": ");
+                push_trunc!(out, max_length_bytes, ":");
             }
             match value {
                 RawBsonRef::Document(d) => {
-                    push_trunc!(out, max_length_bytes, "{ ");
+                    push_trunc!(out, max_length_bytes, "{");
                     let mut tmp = d.iter_elements();
                     std::mem::swap(&mut current, &mut tmp);
                     stack.push((tmp, is_array));
@@ -454,7 +454,7 @@ fn rawdoc_to_json_str_inner(
                     continue 'outer;
                 }
                 RawBsonRef::Array(a) => {
-                    push_trunc!(out, max_length_bytes, "[ ");
+                    push_trunc!(out, max_length_bytes, "[");
                     // bson 2.x doesn't have .iter_elements() on RawArray, so we have to jump
                     // through some hoops...
                     let mut tmp =
@@ -475,14 +475,7 @@ fn rawdoc_to_json_str_inner(
                 }
             }
         }
-        if is_first {
-            // nothing was emitted for this container, so drop the space from the opener to
-            // produce "{}" rather than "{  }".
-            out.pop();
-            push_trunc!(out, max_length_bytes, if is_array { "]" } else { "}" });
-        } else {
-            push_trunc!(out, max_length_bytes, if is_array { " ]" } else { " }" });
-        }
+        push_trunc!(out, max_length_bytes, if is_array { "]" } else { "}" });
         let Some(outer) = stack.pop() else {
             break;
         };
