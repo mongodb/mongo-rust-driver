@@ -49,12 +49,15 @@ functions:
           echo "{ \"releases\": { \"default\": \"$MONGODB_BINARIES\" }}" > $MONGO_ORCHESTRATION_HOME/orchestration.config
 
   "install rust":
-    command: shell.exec
+    command: subprocess.exec
     params:
       working_dir: src
-      script: |
-        ${PREPARE_SHELL}
-        .evergreen/install-dependencies.sh rust
+      include_expansions_in_env:
+        - PROJECT_DIRECTORY
+      binary: bash
+      args:
+        - .evergreen/install-dependencies.sh
+        - rust
 
   "upload-mo-artifacts":
     - command: shell.exec

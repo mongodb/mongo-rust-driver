@@ -69,12 +69,15 @@ functions:
           rm expansion.yml
 
   "install dependencies":
-    - command: shell.exec
+    - command: subprocess.exec
       params:
-        working_dir: "src"
-        script: |
-          ${PREPARE_SHELL}
-          .evergreen/install-dependencies.sh rust
+        working_dir: src
+        include_expansions_in_env:
+          - PROJECT_DIRECTORY
+        binary: bash
+        args:
+          - .evergreen/install-dependencies.sh
+          - rust
 
     - command: subprocess.exec
       params:

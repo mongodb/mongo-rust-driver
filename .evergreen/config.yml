@@ -1633,28 +1633,37 @@ functions:
           .evergreen/run-x509-tests.sh
 
   "install libmongocrypt":
-    command: shell.exec
+    command: subprocess.exec
     params:
       working_dir: src
-      script: |
-        ${PREPARE_SHELL}
-        .evergreen/install-dependencies.sh libmongocrypt
+      include_expansions_in_env:
+        - PROJECT_DIRECTORY
+      binary: bash
+      args:
+        - .evergreen/install-dependencies.sh
+        - libmongocrypt
 
   "install junit dependencies":
-    command: shell.exec
+    command: subprocess.exec
     params:
       working_dir: src
-      script: |
-        ${PREPARE_SHELL}
-        .evergreen/install-dependencies.sh junit-dependencies
+      include_expansions_in_env:
+        - PROJECT_DIRECTORY
+      binary: bash
+      args:
+        - .evergreen/install-dependencies.sh
+        - junit-dependencies
 
   "install cargo-lambda":
-    command: shell.exec
+    command: subprocess.exec
     params:
       working_dir: src
-      script: |
-        ${PREPARE_SHELL}
-        .evergreen/install-dependencies.sh cargo-lambda
+      include_expansions_in_env:
+        - PROJECT_DIRECTORY
+      binary: bash
+      args:
+        - .evergreen/install-dependencies.sh
+        - cargo-lambda
 
   "run driver test suite":
     - command: subprocess.exec
