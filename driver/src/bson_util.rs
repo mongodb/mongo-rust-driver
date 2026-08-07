@@ -347,16 +347,23 @@ pub(crate) fn truncate_on_char_boundary(s: &mut String, new_len: usize) -> bool 
     truncate_index < original_len
 }
 
-#[cfg(any(feature = "tracing-unstable", feature = "opentelemetry"))]
-pub(crate) fn doc_to_json_str(doc: crate::bson::Document, max_length_bytes: usize) -> String {
-    let mut ext_json = Bson::Document(doc).into_relaxed_extjson().to_string();
-    if truncate_on_char_boundary(&mut ext_json, max_length_bytes) {
-        ext_json.push_str("...");
-    }
-    ext_json
+#[cfg(feature = "tracing-unstable")]
+pub(crate) fn rawdoc_to_json_str(
+    doc: &crate::bson::RawDocument,
+    max_length_bytes: usize,
+) -> Result<String> {
+    rawdoc_to_json_str_inner(doc, max_length_bytes, false)
 }
 
-#[cfg(feature = "tracing-unstable")]
+#[cfg(feature = "opentelemetry")]
+pub(crate) fn rawdoc_to_json_str_otel(
+    doc: &crate::bson::RawDocument,
+    max_length_bytes: usize,
+) -> Result<String> {
+    rawdoc_to_json_str_inner(doc, max_length_bytes, true)
+}
+
+#[cfg(any(feature = "tracing-unstable", feature = "opentelemetry"))]
 macro_rules! push_trunc {
     ($out:ident, $max:ident, $s:expr) => {{
         let s = $s;
@@ -368,27 +375,20 @@ macro_rules! push_trunc {
             let _ = truncate_on_char_boundary(&mut s, new_len);
             $out.push_str(&s);
             $out.push_str("...");
-            return $out;
+            return Ok($out);
         }
         $out.push_str(s);
     }};
 }
 
-#[cfg(feature = "tracing-unstable")]
-macro_rules! ok_or_invalid {
-    ($r:expr) => {{
-        match $r {
-            Ok(v) => v,
-            Err(e) => return format!("<invalid document: {e}>"),
-        }
-    }};
-}
-
-#[cfg(feature = "tracing-unstable")]
-pub(crate) fn rawdoc_to_json_str(
+#[cfg(any(feature = "tracing-unstable", feature = "opentelemetry"))]
+fn rawdoc_to_json_str_inner(
     doc: &crate::bson::RawDocument,
     max_length_bytes: usize,
-) -> String {
+    otel: bool,
+) -> Result<String> {
+    use crate::bson_compat::cstr;
+
     let mut out = String::new();
     let mut stack = vec![]; // [(iter, is_array)]
     let mut current = doc.iter_elements();
@@ -399,16 +399,31 @@ pub(crate) fn rawdoc_to_json_str(
         while let Some(elt) = current.next() {
             use crate::bson_compat::cstr_to_str;
 
+            let elt = elt?;
+            let value = elt.value()?;
+            // The opentelemetry spec requires omitting some toplevel fields.
+            if otel && stack.is_empty() {
+                if [
+                    cstr!("lsid"),
+                    cstr!("$db"),
+                    cstr!("$clusterTime"),
+                    cstr!("signature"),
+                ]
+                .iter()
+                .any(|k| *k == elt.key())
+                {
+                    continue;
+                }
+            }
+
             if !is_first {
                 push_trunc!(out, max_length_bytes, ", ");
             }
             is_first = false;
 
-            let elt = ok_or_invalid!(elt);
-            let value = ok_or_invalid!(elt.value());
-
             if !is_array {
-                let key = ok_or_invalid!(serde_json::to_string(cstr_to_str(elt.key())));
+                let key = serde_json::to_string(cstr_to_str(elt.key()))
+                    .map_err(|e| Error::internal(format!("invalid document key: {e}")))?;
                 push_trunc!(out, max_length_bytes, &key);
                 push_trunc!(out, max_length_bytes, ": ");
             }
@@ -427,8 +442,7 @@ pub(crate) fn rawdoc_to_json_str(
                     // bson 2.x doesn't have .iter_elements() on RawArray, so we have to jump
                     // through some hoops...
                     let mut tmp =
-                        ok_or_invalid!(crate::bson::RawDocument::from_bytes(a.as_bytes()))
-                            .iter_elements();
+                        crate::bson::RawDocument::from_bytes(a.as_bytes())?.iter_elements();
                     std::mem::swap(&mut current, &mut tmp);
                     stack.push((tmp, is_array));
                     is_array = true;
@@ -436,7 +450,7 @@ pub(crate) fn rawdoc_to_json_str(
                     continue 'outer;
                 }
                 _ => {
-                    let parsed: Bson = ok_or_invalid!(value.try_into());
+                    let parsed: Bson = value.try_into()?;
                     push_trunc!(
                         out,
                         max_length_bytes,
@@ -461,7 +475,7 @@ pub(crate) fn rawdoc_to_json_str(
         is_first = false;
     }
 
-    out
+    Ok(out)
 }
 
 #[cfg(test)]

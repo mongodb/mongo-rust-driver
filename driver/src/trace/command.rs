@@ -33,7 +33,8 @@ impl CommandTracingEventEmitter {
                 tracing::debug!(
                     target: COMMAND_TRACING_EVENT_TARGET,
                     topologyId = self.topology_id.tracing_representation(),
-                    command = rawdoc_to_json_str(&event.command, self.max_document_length_bytes),
+                    command = rawdoc_to_json_str(&event.command, self.max_document_length_bytes)
+                        .unwrap_or_else(|e| format!("<invalid document: {e}>")),
                     databaseName = event.db,
                     commandName = event.command_name,
                     requestId = event.request_id,
@@ -49,7 +50,8 @@ impl CommandTracingEventEmitter {
                 tracing::debug!(
                     target: COMMAND_TRACING_EVENT_TARGET,
                     topologyId = self.topology_id.tracing_representation(),
-                    reply = rawdoc_to_json_str(&event.reply, self.max_document_length_bytes),
+                    reply = rawdoc_to_json_str(&event.reply, self.max_document_length_bytes)
+                        .unwrap_or_else(|e| format!("<invalid document: {e}>")),
                     commandName = event.command_name,
                     requestId = event.request_id,
                     driverConnectionId = event.connection.id,

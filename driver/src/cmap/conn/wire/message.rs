@@ -113,12 +113,6 @@ impl Message {
         command
     }
 
-    #[cfg(feature = "opentelemetry")]
-    pub(crate) fn get_command_document(&self) -> crate::bson::Document {
-        crate::bson::Document::try_from(self.get_raw_command_document())
-            .unwrap_or_else(|e| doc! { "serialization error": e.to_string() })
-    }
-
     /// Reads bytes from `reader` and deserializes them into a Message.
     pub(crate) async fn read_from<T: AsyncRead + Unpin + Send>(
         mut reader: T,
