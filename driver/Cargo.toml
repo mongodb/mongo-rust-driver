@@ -68,14 +68,14 @@ in-use-encryption-unstable = ["in-use-encryption"]
 # Enables support for emitting tracing events.
 # The tracing API is unstable and may have backwards-incompatible changes in minor version updates.
 # TODO: pending https://github.com/tokio-rs/tracing/issues/2036 stop depending directly on log.
-tracing-unstable = ["dep:tracing", "log", "bson3?/serde_json-1"]
+tracing-unstable = ["dep:tracing", "log", "bson3?/serde_json-1", "dep:serde_json"]
 
 # Backwards compatibility feature; this previously enabled Queryable Encryption text indexes, but
 # those are now GA and require no special feature flag.
 text-indexes-unstable = []
 
 # Enable support for opentelemetry instrumentation
-opentelemetry = ["dep:opentelemetry"]
+opentelemetry = ["dep:opentelemetry", "bson3?/serde_json-1", "dep:serde_json"]
 
 # Capture backtraces in errors.  This can be slow, memory intensive, and very verbose.
 error-backtrace = []
@@ -115,6 +115,7 @@ pkcs8 = { version = "0.11.0", features = ["encryption", "pkcs5"], optional = tru
 rand = { version = "0.9", features = ["small_rng"] }
 rayon = { version = "1.5.3", optional = true }
 rustc_version_runtime = "0.3.0"
+serde_json = { version = "1.0", optional = true }
 serde_with = { version = "3.8.1", default-features = false, features = ["macros"] }
 sha1 = "0.11.0"
 sha2 = "0.11.0"

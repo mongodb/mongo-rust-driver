@@ -1,7 +1,5 @@
-#[cfg(feature = "bson-3")]
-use crate::bson_compat::RawDocumentBufExt;
 use crate::{
-    bson_util::{doc_to_json_str, truncate_on_char_boundary},
+    bson_util::{rawdoc_to_json_str, truncate_on_char_boundary},
     client::options::{ServerAddress, DEFAULT_PORT},
 };
 
@@ -40,14 +38,17 @@ impl crate::error::Error {
             self.source
         );
         if let Some(server_response) = self.server_response() {
-            let server_response_string = match server_response.to_document() {
-                Ok(document) => doc_to_json_str(document, max_document_length),
-                Err(_) => {
-                    let mut hex_string = hex::encode(server_response.as_bytes());
-                    truncate_on_char_boundary(&mut hex_string, max_document_length);
-                    hex_string
-                }
-            };
+            let server_response_string =
+                match rawdoc_to_json_str(server_response, max_document_length) {
+                    Ok(s) => s,
+                    Err(_) => {
+                        let mut hex_string = hex::encode(server_response.as_bytes());
+                        if truncate_on_char_boundary(&mut hex_string, max_document_length) {
+                            hex_string.push_str("...");
+                        }
+                        hex_string
+                    }
+                };
             error_string.push_str(", server response: ");
             error_string.push_str(&server_response_string);
         }

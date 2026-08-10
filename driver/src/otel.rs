@@ -192,13 +192,12 @@ impl Client {
         }
         let text_max_len = self.options().otel_query_text_max_length();
         if text_max_len > 0 {
-            let mut doc = message.get_command_document();
-            for key in ["lsid", "$db", "$clusterTime", "signature"] {
-                doc.remove(key);
-            }
+            let doc = message.get_raw_command_document();
+
             attrs.push(KeyValue::new(
                 "db.query.text",
-                crate::bson_util::doc_to_json_str(doc, text_max_len),
+                crate::bson_util::rawdoc_to_json_str_otel(&doc, text_max_len)
+                    .unwrap_or_else(crate::bson_util::doc_err),
             ));
         }
         if let Some(cursor_id) = op.cursor_id() {

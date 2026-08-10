@@ -11,10 +11,8 @@ use std::{
 use futures_core::future::BoxFuture;
 use serde::de::DeserializeOwned;
 
-#[cfg(feature = "in-use-encryption")]
-use crate::bson::RawDocumentBuf;
 use crate::{
-    bson::{doc, Document, RawBsonRef, RawDocument, Timestamp},
+    bson::{Document, RawBsonRef, RawDocument, RawDocumentBuf, Timestamp},
     change_stream::{
         common::{ChangeStreamData, WatchArgs},
         event::ChangeStreamEvent,
@@ -47,10 +45,8 @@ use crate::{
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
     event::command::{
-        CommandEvent,
+        raw::{RawCommandEvent, RawCommandStartedEvent, RawCommandSucceededEvent},
         CommandFailedEvent,
-        CommandStartedEvent,
-        CommandSucceededEvent,
     },
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
@@ -643,11 +639,11 @@ impl Client {
 
             self.emit_command_event(|| {
                 let command_body = if should_redact {
-                    Document::new()
+                    RawDocumentBuf::new()
                 } else {
-                    message.get_command_document()
+                    message.get_raw_command_document()
                 };
-                CommandEvent::Started(CommandStartedEvent {
+                RawCommandEvent::Started(RawCommandStartedEvent {
                     command: command_body,
                     db: target_db.clone(),
                     command_name: cmd_name.clone(),
@@ -682,7 +678,7 @@ impl Client {
                             err.redact();
                         }
 
-                        CommandEvent::Failed(CommandFailedEvent {
+                        RawCommandEvent::Failed(CommandFailedEvent {
                             duration,
                             command_name: cmd_name.clone(),
                             failure: err,
@@ -709,14 +705,12 @@ impl Client {
                 Ok(response) => {
                     self.emit_command_event(|| {
                         let reply = if should_redact {
-                            Document::new()
+                            RawDocumentBuf::new()
                         } else {
-                            response
-                                .body()
-                                .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() })
+                            response.raw_body().to_owned()
                         };
 
-                        CommandEvent::Succeeded(CommandSucceededEvent {
+                        RawCommandEvent::Succeeded(RawCommandSucceededEvent {
                             duration,
                             reply,
                             command_name: cmd_name.clone(),

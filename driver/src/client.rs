@@ -33,7 +33,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{Error, ErrorKind, Result},
-    event::command::CommandEvent,
+    event::command::{raw::RawCommandEvent, CommandEvent},
     operation::OverrideCriteriaFn,
     options::{
         ClientOptions,
@@ -326,7 +326,10 @@ impl Client {
         }
     }
 
-    pub(crate) async fn emit_command_event(&self, generate_event: impl FnOnce() -> CommandEvent) {
+    pub(crate) async fn emit_command_event(
+        &self,
+        generate_event: impl FnOnce() -> RawCommandEvent,
+    ) {
         #[cfg(test)]
         if self
             .inner
@@ -355,17 +358,20 @@ impl Client {
             return;
         }
 
-        let event = generate_event();
+        let raw_event = generate_event();
+        let mut event: Option<CommandEvent> = None;
         if let Some(tx) = test_channel {
+            let event = event.get_or_insert_with(|| raw_event.clone().into());
             let (msg, ack) = crate::runtime::AcknowledgedMessage::package(event.clone());
             let _ = tx.send(msg).await;
             ack.wait_for_acknowledgment().await;
         }
         #[cfg(feature = "tracing-unstable")]
         if let Some(ref tracing_emitter) = tracing_emitter {
-            tracing_emitter.handle(event.clone());
+            tracing_emitter.handle(raw_event.clone());
         }
         if let Some(handler) = &self.options().command_event_handler {
+            let event = event.unwrap_or_else(|| raw_event.into());
             handler.handle(event);
         }
     }

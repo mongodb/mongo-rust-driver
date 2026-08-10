@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use crate::bson::{doc, Array, Document};
+use crate::bson::doc;
 use bitflags::bitflags;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -11,7 +11,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 ))]
 use crate::options::Compressor;
 use crate::{
-    bson::RawDocumentBuf,
+    bson::{RawArrayBuf, RawDocumentBuf},
     bson_util,
     checked::Checked,
     cmap::{conn::wire::util::SyncCountReader, Command},
@@ -93,23 +93,21 @@ impl TryFrom<Command> for Message {
 }
 
 impl Message {
-    /// Gets this message's command as a Document. If serialization fails, returns a document
+    /// Gets this message's command as a RawDocumentBuf. If serialization fails, returns a document
     /// containing the error.
-    pub(crate) fn get_command_document(&self) -> Document {
-        let mut command = match Document::try_from(self.document_payload.as_ref()) {
-            Ok(document) => document,
-            Err(error) => return doc! { "serialization error": error.to_string() },
-        };
+    pub(crate) fn get_raw_command_document(&self) -> RawDocumentBuf {
+        let mut command = self.document_payload.clone();
 
         for document_sequence in &self.document_sequences {
-            let mut documents = Array::new();
+            let ident_cstr = match crate::bson_compat::str_to_cstr(&document_sequence.identifier) {
+                Ok(cs) => cs,
+                Err(e) => return crate::bson::rawdoc! { "serialization error": e.to_string() },
+            };
+            let mut documents = RawArrayBuf::new();
             for document in &document_sequence.documents {
-                match Document::try_from(document.as_ref()) {
-                    Ok(document) => documents.push(document.into()),
-                    Err(error) => return doc! { "serialization error": error.to_string() },
-                }
+                documents.push(document.to_owned());
             }
-            command.insert(document_sequence.identifier.clone(), documents);
+            command.append(ident_cstr, documents);
         }
 
         command

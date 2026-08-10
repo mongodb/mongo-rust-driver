@@ -1,8 +1,8 @@
 use crate::bson::oid::ObjectId;
 
 use crate::{
-    bson_util::doc_to_json_str,
-    event::command::CommandEvent,
+    bson_util::{doc_err, rawdoc_to_json_str},
+    event::command::raw::RawCommandEvent,
     trace::{TracingRepresentation, COMMAND_TRACING_EVENT_TARGET},
 };
 
@@ -27,13 +27,13 @@ impl CommandTracingEventEmitter {
         }
     }
 
-    pub(crate) fn handle(&self, event: CommandEvent) {
+    pub(crate) fn handle(&self, event: RawCommandEvent) {
         match event {
-            CommandEvent::Started(event) => {
+            RawCommandEvent::Started(event) => {
                 tracing::debug!(
                     target: COMMAND_TRACING_EVENT_TARGET,
                     topologyId = self.topology_id.tracing_representation(),
-                    command = doc_to_json_str(event.command, self.max_document_length_bytes),
+                    command = rawdoc_to_json_str(&event.command, self.max_document_length_bytes).unwrap_or_else(doc_err),
                     databaseName = event.db,
                     commandName = event.command_name,
                     requestId = event.request_id,
@@ -45,11 +45,11 @@ impl CommandTracingEventEmitter {
                     "Command started"
                 );
             }
-            CommandEvent::Succeeded(event) => {
+            RawCommandEvent::Succeeded(event) => {
                 tracing::debug!(
                     target: COMMAND_TRACING_EVENT_TARGET,
                     topologyId = self.topology_id.tracing_representation(),
-                    reply = doc_to_json_str(event.reply, self.max_document_length_bytes),
+                    reply = rawdoc_to_json_str(&event.reply, self.max_document_length_bytes).unwrap_or_else(doc_err),
                     commandName = event.command_name,
                     requestId = event.request_id,
                     driverConnectionId = event.connection.id,
@@ -61,7 +61,7 @@ impl CommandTracingEventEmitter {
                     "Command succeeded"
                 );
             }
-            CommandEvent::Failed(event) => {
+            RawCommandEvent::Failed(event) => {
                 tracing::debug!(
                     target: COMMAND_TRACING_EVENT_TARGET,
                     topologyId = self.topology_id.tracing_representation(),

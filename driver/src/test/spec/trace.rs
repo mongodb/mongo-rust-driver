@@ -46,32 +46,32 @@ fn tracing_truncation() {
     assert_eq!(s.len(), 8);
 
     // start of string is a boundary, so we should truncate there
-    truncate_on_char_boundary(&mut s, 0);
-    assert_eq!(s, String::from("..."));
+    assert!(truncate_on_char_boundary(&mut s, 0));
+    assert_eq!(s, String::from(""));
 
     // we should "round up" to the end of the first emoji
     s.clone_from(&two_emoji);
-    truncate_on_char_boundary(&mut s, 1);
-    assert_eq!(s, String::from("🤔..."));
+    assert!(truncate_on_char_boundary(&mut s, 1));
+    assert_eq!(s, String::from("🤔"));
 
     // 4 is a boundary, so we should truncate there
     s.clone_from(&two_emoji);
-    truncate_on_char_boundary(&mut s, 4);
-    assert_eq!(s, String::from("🤔..."));
+    assert!(truncate_on_char_boundary(&mut s, 4));
+    assert_eq!(s, String::from("🤔"));
 
     // we should round up to the full string
     s.clone_from(&two_emoji);
-    truncate_on_char_boundary(&mut s, 5);
+    assert!(!truncate_on_char_boundary(&mut s, 5));
     assert_eq!(s, two_emoji);
 
     // end of string is a boundary, so we should truncate there
     s.clone_from(&two_emoji);
-    truncate_on_char_boundary(&mut s, 8);
+    assert!(!truncate_on_char_boundary(&mut s, 8));
     assert_eq!(s, two_emoji);
 
     // we should get the full string back if the new length is longer than the original
     s.clone_from(&two_emoji);
-    truncate_on_char_boundary(&mut s, 10);
+    assert!(!truncate_on_char_boundary(&mut s, 10));
     assert_eq!(s, two_emoji);
 }
 
@@ -212,7 +212,7 @@ async fn command_logging_truncation_mid_codepoint() {
 
     // 215 falls in the middle of an emoji (each is 4 bytes), so we should round up to 218, + 3 for
     // trailing "..."
-    assert_eq!(command.len(), 221);
+    assert_eq!(command.len(), 221, "truncated: {command:?}");
 
     coll.find(doc! {})
         .projection(doc! { "_id": 0, "🤔": 1 })

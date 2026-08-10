@@ -9,6 +9,7 @@ mod atlas_search;
 #[path = "test/atlas_sfp.rs"]
 mod atlas_sfp_skip_ci; // requires SFP environment variables set
 mod auth;
+mod bson_util;
 mod bulk_write;
 mod change_stream;
 mod client;
