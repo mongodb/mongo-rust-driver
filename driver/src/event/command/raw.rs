@@ -1,7 +1,8 @@
 use std::time::Duration;
 
 use crate::{
-    bson::{oid::ObjectId, RawDocumentBuf},
+    bson::{doc, oid::ObjectId, RawDocumentBuf},
+    bson_compat::RawError,
     event::command::{CommandEvent, CommandFailedEvent, CommandSucceededEvent},
 };
 
@@ -36,13 +37,13 @@ pub(crate) struct RawCommandSucceededEvent {
     pub(crate) service_id: Option<ObjectId>,
 }
 
-impl TryInto<CommandEvent> for RawCommandEvent {
-    type Error = crate::error::Error;
-
-    fn try_into(self) -> Result<CommandEvent, Self::Error> {
-        Ok(match self {
+impl Into<CommandEvent> for RawCommandEvent {
+    fn into(self) -> CommandEvent {
+        match self {
             RawCommandEvent::Started(ev) => CommandEvent::Started(CommandStartedEvent {
-                command: ev.command.try_into()?,
+                command: ev.command.try_into().unwrap_or_else(
+                    |e: RawError| doc! { "invalid command document": e.to_string() },
+                ),
                 db: ev.db,
                 command_name: ev.command_name,
                 request_id: ev.request_id,
@@ -51,13 +52,16 @@ impl TryInto<CommandEvent> for RawCommandEvent {
             }),
             RawCommandEvent::Succeeded(ev) => CommandEvent::Succeeded(CommandSucceededEvent {
                 duration: ev.duration,
-                reply: ev.reply.try_into()?,
+                reply: ev
+                    .reply
+                    .try_into()
+                    .unwrap_or_else(|e: RawError| doc! { "invalid reply document": e.to_string() }),
                 command_name: ev.command_name,
                 request_id: ev.request_id,
                 connection: ev.connection,
                 service_id: ev.service_id,
             }),
             RawCommandEvent::Failed(ev) => CommandEvent::Failed(ev),
-        })
+        }
     }
 }

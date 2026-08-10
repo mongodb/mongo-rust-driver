@@ -34,7 +34,6 @@ use crate::{
     db::Database,
     error::{Error, ErrorKind, Result},
     event::command::{raw::RawCommandEvent, CommandEvent},
-    log_warning,
     operation::OverrideCriteriaFn,
     options::{
         ClientOptions,
@@ -360,26 +359,20 @@ impl Client {
         }
 
         let raw_event = generate_event();
-        let mut event: Option<Result<CommandEvent>> = None;
+        let mut event: Option<CommandEvent> = None;
         if let Some(tx) = test_channel {
-            if let Ok(event) = event.get_or_insert_with(|| raw_event.clone().try_into()) {
-                let (msg, ack) = crate::runtime::AcknowledgedMessage::package(event.clone());
-                let _ = tx.send(msg).await;
-                ack.wait_for_acknowledgment().await;
-            } else {
-                log_warning!("failed to parse raw event");
-            };
+            let event = event.get_or_insert_with(|| raw_event.clone().into());
+            let (msg, ack) = crate::runtime::AcknowledgedMessage::package(event.clone());
+            let _ = tx.send(msg).await;
+            ack.wait_for_acknowledgment().await;
         }
         #[cfg(feature = "tracing-unstable")]
         if let Some(ref tracing_emitter) = tracing_emitter {
             tracing_emitter.handle(raw_event.clone());
         }
         if let Some(handler) = &self.options().command_event_handler {
-            if let Ok(event) = event.unwrap_or_else(|| raw_event.try_into()) {
-                handler.handle(event);
-            } else {
-                log_warning!("failed to parse raw event");
-            }
+            let event = event.unwrap_or_else(|| raw_event.into());
+            handler.handle(event);
         }
     }
 
