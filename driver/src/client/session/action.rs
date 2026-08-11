@@ -153,7 +153,7 @@ macro_rules! convenient_run {
                     $session.convenient_transaction_jitter,
                 );
                 if start_time.elapsed() + backoff >= max_time {
-                    return Err(last_error);
+                    return Err(make_timeout_error(last_error));
                 }
                 $sleep(backoff).$await;
             }
@@ -170,9 +170,7 @@ macro_rules! convenient_run {
                     ) {
                         $abort_transaction?;
                     }
-                    if e.contains_label(TRANSIENT_TRANSACTION_ERROR)
-                        && start_time.elapsed() < max_time
-                    {
+                    if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
                         last_error = e;
                         continue 'transaction;
                     }
@@ -191,17 +189,20 @@ macro_rules! convenient_run {
                 match $commit_transaction {
                     Ok(()) => return Ok(ret),
                     Err(e) => {
-                        if e.is_max_time_ms_expired_error() || start_time.elapsed() >= max_time {
-                            return Err(e);
-                        }
-                        if e.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
-                            continue 'commit;
-                        }
-                        if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
+                        if e.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT)
+                            && !e.is_max_time_ms_expired_error()
+                        {
+                            if start_time.elapsed() >= max_time {
+                                return Err(make_timeout_error(e));
+                            } else {
+                                continue 'commit;
+                            }
+                        } else if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
                             last_error = e;
                             continue 'transaction;
+                        } else {
+                            return Err(e);
                         }
-                        return Err(e);
                     }
                 }
             }
@@ -221,6 +222,16 @@ fn calculate_backoff(attempt: u32, #[cfg(test)] test_jitter: Option<f64>) -> Dur
     let max_backoff = jitter * BACKOFF_MAX_MS;
     let backoff: u64 = std::cmp::min(round_clamp(computed_backoff), round_clamp(max_backoff));
     Duration::from_millis(backoff)
+}
+
+fn make_timeout_error(error: Error) -> Error {
+    Error::from(ErrorKind::Transaction {
+        message: format!(
+            "convenient transaction exceeded maximum time ({} seconds)",
+            MAX_CONVENIENT_TRANSACTION_TIME.as_secs()
+        ),
+    })
+    .with_source(error)
 }
 
 // convenient_run needs an ident to access on the result from std::thread::sleep, so we use a dummy
@@ -244,6 +255,10 @@ impl StartTransaction<&mut ClientSession> {
     /// caller.  If the callback needs to provide its own error information, the
     /// [`Error::custom`](crate::error::Error::custom) method can accept an arbitrary payload that
     /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom).
+    ///
+    /// Retries will be performed for up to 120 seconds total, after which an error of
+    /// [`ErrorKind::Transaction`] will be returned indicating that a timeout occurred. The last
+    /// error observed will be preserved in the [`Error::source`] field.
     ///
     /// If a command inside the callback fails, it may cause the transaction on the server to be
     /// aborted. This situation is normally handled transparently by the driver. However, if the
@@ -309,6 +324,10 @@ impl StartTransaction<&mut ClientSession> {
     /// caller.  If the callback needs to provide its own error information, the
     /// [`Error::custom`](crate::error::Error::custom) method can accept an arbitrary payload that
     /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom).
+    ///
+    /// Retries will be performed for up to 120 seconds total, after which an error of
+    /// [`ErrorKind::Transaction`] will be returned indicating that a timeout occurred. The last
+    /// error observed will be preserved in the [`Error::source`] field.
     ///
     /// If a command inside the callback fails, it may cause the transaction on the server to be
     /// aborted. This situation is normally handled transparently by the driver. However, if the
@@ -391,6 +410,10 @@ impl StartTransaction<&mut crate::sync::ClientSession> {
     /// caller.  If the callback needs to provide its own error information, the
     /// [`Error::custom`](crate::error::Error::custom) method can accept an arbitrary payload that
     /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom).
+    ///
+    /// Retries will be performed for up to 120 seconds total, after which an error of
+    /// [`ErrorKind::Transaction`] will be returned indicating that a timeout occurred. The last
+    /// error observed will be preserved in the [`Error::source`] field.
     ///
     /// If a command inside the callback fails, it may cause the transaction on the server to be
     /// aborted. This situation is normally handled transparently by the driver. However, if the

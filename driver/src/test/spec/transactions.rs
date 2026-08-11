@@ -4,7 +4,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{doc, Document},
-    error::{Error, Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
+    error::{
+        Error,
+        ErrorKind,
+        Result,
+        TRANSIENT_TRANSACTION_ERROR,
+        UNKNOWN_TRANSACTION_COMMIT_RESULT,
+    },
     options::{CollectionOptions, WriteConcern},
     test::{
         get_client_options,
@@ -142,6 +148,13 @@ async fn convenient_api_returned_value() {
     assert_eq!(42, value);
 }
 
+fn error_is_convenient_api_timeout(error: &Error) -> bool {
+    matches!(error.kind.as_ref(), ErrorKind::Transaction { .. })
+        && error
+            .message()
+            .is_some_and(|m| m.contains("exceeded maximum time"))
+}
+
 #[tokio::test]
 async fn convenient_api_retry_timeout_callback() {
     if !transactions_supported().await {
@@ -167,8 +180,11 @@ async fn convenient_api_retry_timeout_callback() {
         .await;
 
     let err = result.unwrap_err();
-    assert_eq!(&42, err.get_custom::<i32>().unwrap());
-    assert!(err.contains_label(TRANSIENT_TRANSACTION_ERROR));
+    assert!(error_is_convenient_api_timeout(&err), "{}", &err);
+
+    let source = err.source.unwrap();
+    assert_eq!(&42, source.get_custom::<i32>().unwrap());
+    assert!(source.contains_label(TRANSIENT_TRANSACTION_ERROR));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -207,7 +223,11 @@ async fn convenient_api_retry_timeout_commit_unknown() {
         .await;
 
     let err = result.unwrap_err();
-    assert_eq!(Some(251), err.sdam_code());
+    assert!(error_is_convenient_api_timeout(&err), "{}", &err);
+
+    let source = err.source.unwrap();
+    assert_eq!(Some(251), source.sdam_code());
+    assert!(source.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -246,7 +266,11 @@ async fn convenient_api_retry_timeout_commit_transient() {
         .await;
 
     let err = result.unwrap_err();
-    assert!(err.contains_label(TRANSIENT_TRANSACTION_ERROR));
+    assert!(error_is_convenient_api_timeout(&err), "{}", &err);
+
+    let source = err.source.unwrap();
+    assert_eq!(Some(251), source.sdam_code());
+    assert!(source.contains_label(TRANSIENT_TRANSACTION_ERROR));
 }
 
 #[tokio::test]
