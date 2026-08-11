@@ -23,6 +23,7 @@ pub(crate) mod raw_output;
 pub(crate) mod run_command;
 pub(crate) mod run_cursor_command;
 mod search_index;
+pub(crate) mod stream_processing;
 mod update;
 
 use std::{borrow::Cow, fmt::Debug, ops::Deref};
