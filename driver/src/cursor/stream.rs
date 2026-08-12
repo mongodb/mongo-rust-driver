@@ -122,8 +122,8 @@ impl<Raw: AsyncStream<Item = Result<RawBatch>> + Unpin> BatchBuffer<Raw> {
     /// Return whether or not the cursor has been advanced.
     pub(super) async fn advance(&mut self) -> Result<bool> {
         loop {
-            match self.advance_internal().await? {
-                AdvanceResult::Advanced => return Ok(true),
+            match self.try_advance().await? {
+                AdvanceResult::Advanced(_) => return Ok(true),
                 AdvanceResult::Exhausted => return Ok(false),
                 AdvanceResult::Waiting => continue,
             }
@@ -132,17 +132,11 @@ impl<Raw: AsyncStream<Item = Result<RawBatch>> + Unpin> BatchBuffer<Raw> {
 
     /// Attempt to advance the cursor forward to the next item. If there are no items cached
     /// locally, perform a single getMore to attempt to retrieve more.
-    pub(super) async fn try_advance(&mut self) -> Result<bool> {
-        self.advance_internal()
-            .await
-            .map(|ar| matches!(ar, AdvanceResult::Advanced))
-    }
-
-    async fn advance_internal(&mut self) -> Result<AdvanceResult> {
+    pub(crate) async fn try_advance(&mut self) -> Result<AdvanceResult> {
         // Next stored batch item
         self.batch.pop_front();
         if !self.batch.is_empty() {
-            return Ok(AdvanceResult::Advanced);
+            return Ok(AdvanceResult::Advanced(()));
         }
 
         // Batch is empty, need a new one
@@ -161,20 +155,47 @@ impl<Raw: AsyncStream<Item = Result<RawBatch>> + Unpin> BatchBuffer<Raw> {
         Ok(if self.batch.is_empty() {
             AdvanceResult::Waiting
         } else {
-            AdvanceResult::Advanced
+            AdvanceResult::Advanced(())
         })
     }
 }
 
 /// The result of one attempt to advance a cursor.
-#[derive(Debug)]
-enum AdvanceResult {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AdvanceResult<T = ()> {
     /// The cursor was successfully advanced and the buffer has at least one item.
-    Advanced,
+    Advanced(T),
     /// The cursor does not have any more items and will not return any more in the future.
     Exhausted,
     /// The cursor does not currently have any items, but future calls to getMore may yield more.
     Waiting,
+}
+
+impl<T> AdvanceResult<T> {
+    pub(crate) fn map<U>(self, f: impl FnOnce(T) -> U) -> AdvanceResult<U> {
+        match self {
+            Self::Advanced(t) => AdvanceResult::Advanced(f(t)),
+            Self::Exhausted => AdvanceResult::Exhausted,
+            Self::Waiting => AdvanceResult::Waiting,
+        }
+    }
+
+    pub(crate) fn into_option(self) -> Option<T> {
+        match self {
+            Self::Advanced(t) => Some(t),
+            Self::Exhausted | Self::Waiting => None,
+        }
+    }
+}
+
+impl<T, E> AdvanceResult<std::result::Result<T, E>> {
+    pub(crate) fn transpose(self) -> std::result::Result<AdvanceResult<T>, E> {
+        match self {
+            Self::Advanced(rt) => rt.map(AdvanceResult::Advanced),
+            Self::Exhausted => Ok(AdvanceResult::Exhausted),
+            Self::Waiting => Ok(AdvanceResult::Waiting),
+        }
+    }
 }
 
 impl<'a, Raw: 'a + AsyncStream<Item = Result<RawBatch>> + Send + Unpin, T: DeserializeOwned>
