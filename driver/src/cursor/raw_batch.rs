@@ -140,7 +140,7 @@ struct CursorState {
     exhausted: bool,
     pinned_connection: PinnedConnection,
     post_batch_resume_token: Option<ResumeToken>,
-    buffered_reply: Option<RawDocumentBuf>,
+    buffered_reply: Option<BufferedReply>,
 }
 
 impl CursorState {
@@ -150,7 +150,7 @@ impl CursorState {
             info: spec.info,
             pinned_connection: PinnedConnection::new(pin),
             post_batch_resume_token: spec.post_batch_resume_token,
-            buffered_reply: Some(spec.initial_reply),
+            buffered_reply: Some(BufferedReply::new(spec.initial_reply)),
         }
     }
 
@@ -160,23 +160,11 @@ impl CursorState {
     }
 
     fn has_next(&self) -> bool {
-        if !self.exhausted {
-            return true;
-        }
-        let Some(batch) = self
-            .buffered_reply
-            .as_ref()
-            .and_then(|reply| reply.get_document(CURSOR).ok())
-            .and_then(|cursor| {
-                cursor
-                    .get_array(FIRST_BATCH)
-                    .or_else(|_| cursor.get_array(NEXT_BATCH))
-                    .ok()
-            })
-        else {
-            return false;
-        };
-        !batch.is_empty()
+        !self.exhausted
+            || self
+                .buffered_reply
+                .as_ref()
+                .is_some_and(|buffered| buffered.has_docs)
     }
 
     fn poll_next_batch<'s, S: ClientSessionHandle<'s>>(
@@ -191,7 +179,7 @@ impl CursorState {
                 let get_more_out = ready!(Pin::new(future).poll(cx));
                 let error = match get_more_out.result {
                     Ok(out) => {
-                        self.buffered_reply = Some(out.raw_reply);
+                        self.buffered_reply = Some(BufferedReply::new(out.raw_reply));
                         self.post_batch_resume_token = out.post_batch_resume_token;
                         if out.exhausted {
                             self.mark_exhausted();
@@ -222,8 +210,8 @@ impl CursorState {
             }
 
             // Yield any buffered reply.
-            if let Some(reply) = self.buffered_reply.take() {
-                return Poll::Ready(Some(Ok(RawBatch::new(reply))));
+            if let Some(buffered) = self.buffered_reply.take() {
+                return Poll::Ready(Some(Ok(RawBatch::new(buffered.reply))));
             }
 
             // If not exhausted and the connection is valid, start a getMore and iterate.
@@ -239,6 +227,29 @@ impl CursorState {
             // Otherwise, we're done.
             return Poll::Ready(None);
         }
+    }
+}
+
+/// A server reply along with cached "has documents" status.
+#[derive(Debug)]
+struct BufferedReply {
+    reply: RawDocumentBuf,
+    has_docs: bool,
+}
+
+impl BufferedReply {
+    fn new(reply: RawDocumentBuf) -> Self {
+        let has_docs = reply
+            .get_document(CURSOR)
+            .ok()
+            .and_then(|cursor| {
+                cursor
+                    .get_array(FIRST_BATCH)
+                    .or_else(|_| cursor.get_array(NEXT_BATCH))
+                    .ok()
+            })
+            .is_some_and(|batch| !batch.is_empty());
+        Self { reply, has_docs }
     }
 }
 
