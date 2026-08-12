@@ -227,6 +227,9 @@ impl<T: DeserializeOwned> Stream for StreamState<T> {
                         *self = StreamState::Idle(Box::new(state));
                         match out {
                             Ok(Some(v)) => return Poll::Ready(Some(Ok(v))),
+                            Ok(None) if self.state().cursor.raw().is_exhausted() => {
+                                return Poll::Ready(None)
+                            }
                             Ok(None) => continue,
                             Err(e) => return Poll::Ready(Some(Err(e))),
                         }
