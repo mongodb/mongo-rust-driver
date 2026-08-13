@@ -7,7 +7,6 @@ pub mod session;
 #[cfg(test)]
 use std::collections::VecDeque;
 use std::{
-    ops::ControlFlow,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -21,10 +20,7 @@ use tokio::sync::oneshot;
 
 use crate::{
     change_stream::event::ResumeToken,
-    cursor::{
-        poll_state::{poll_panic, PollState},
-        stream::AdvanceResult,
-    },
+    cursor::poll_state::{poll_panic, PollState},
     error::Result,
     Cursor,
 };
@@ -180,24 +176,19 @@ where
             cx,
             |mut state| {
                 async move {
-                    let out = state.next_if_any(&mut ()).await;
+                    let out = state.next_event(&mut ()).await;
                     (state, out)
                 }
                 .boxed()
             },
-            |_, out| match out {
-                Ok(AdvanceResult::Advanced(v)) => ControlFlow::Break(Some(Ok(v))),
-                Ok(AdvanceResult::Waiting) => ControlFlow::Continue(()),
-                Ok(AdvanceResult::Exhausted) => ControlFlow::Break(None),
-                Err(e) => ControlFlow::Break(Some(Err(e))),
-            },
+            |_, out| out.transpose(),
         )
     }
 }
 
 type CursorWrapper = common::CursorWrapper<Cursor<()>>;
 
-type ChangeStreamState<T> = PollState<'static, Box<CursorWrapper>, Result<AdvanceResult<T>>>;
+type ChangeStreamState<T> = PollState<'static, Box<CursorWrapper>, Result<Option<T>>>;
 
 impl common::InnerCursor for Cursor<()> {
     type Session = ();

@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, ops::ControlFlow, task::Poll};
+use std::{collections::VecDeque, task::Poll};
 
 use derive_where::derive_where;
 use futures_core::Stream as AsyncStream;
@@ -193,12 +193,10 @@ impl<'a, Raw: 'a + AsyncStream<Item = Result<RawBatch>> + Send + Unpin, T: Deser
                 }
                 .boxed()
             },
-            |buffer, out| {
-                ControlFlow::Break(match out {
-                    Err(e) => Some(Err(e)),
-                    Ok(false) => None,
-                    Ok(true) => Some(buffer.deserialize_current()),
-                })
+            |buffer, out| match out {
+                Err(e) => Some(Err(e)),
+                Ok(false) => None,
+                Ok(true) => Some(buffer.deserialize_current()),
             },
         )
     }

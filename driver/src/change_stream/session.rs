@@ -1,7 +1,7 @@
 //! Types for change streams using sessions.
 use serde::de::DeserializeOwned;
 
-use crate::{cursor::stream::AdvanceResult, error::Result, ClientSession, SessionCursor};
+use crate::{error::Result, ClientSession, SessionCursor};
 
 use super::{
     event::{ChangeStreamEvent, ResumeToken},
@@ -92,13 +92,7 @@ where
     /// # }
     /// ```
     pub async fn next(&mut self, session: &mut ClientSession) -> Result<Option<T>> {
-        loop {
-            match self.inner.next_if_any(session).await? {
-                AdvanceResult::Advanced(t) => return Ok(Some(t)),
-                AdvanceResult::Waiting => continue,
-                AdvanceResult::Exhausted => return Ok(None),
-            }
-        }
+        self.inner.next_event(session).await
     }
 
     /// Returns whether the change stream will continue to receive events.

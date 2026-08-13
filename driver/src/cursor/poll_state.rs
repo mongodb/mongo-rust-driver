@@ -1,7 +1,4 @@
-use std::{
-    ops::ControlFlow,
-    task::{Context, Poll},
-};
+use std::task::{Context, Poll};
 
 use derive_where::derive_where;
 use futures_util::FutureExt;
@@ -55,14 +52,14 @@ impl<'a, S, O> PollState<'a, S, O> {
         }
     }
 
-    /// Drive the machine.
+    /// Drive the machine as a [`futures_core::Stream::poll_next`].
     /// * `start` builds the future for the Idle -> Running state transition.
-    /// * `finish` inspects future output and either yields a value or keeps looping.
+    /// * `finish` turns that future's output into a stream item, with `None` ending the stream.
     pub(crate) fn poll_next_step<T>(
         &mut self,
         cx: &mut Context<'_>,
         mut start: impl FnMut(S) -> BoxFuture<'a, (S, O)>,
-        mut finish: impl FnMut(&mut S, O) -> ControlFlow<Option<Result<T>>>,
+        mut finish: impl FnMut(&mut S, O) -> Option<Result<T>>,
     ) -> Poll<Option<Result<T>>> {
         loop {
             match std::mem::replace(self, Self::Polling) {
@@ -76,12 +73,9 @@ impl<'a, S, O> PollState<'a, S, O> {
                         return Poll::Pending;
                     }
                     Poll::Ready((mut state, out)) => {
-                        let step = finish(&mut state, out);
+                        let item = finish(&mut state, out);
                         *self = Self::Idle(state);
-                        match step {
-                            ControlFlow::Break(item) => return Poll::Ready(item),
-                            ControlFlow::Continue(()) => continue,
-                        }
+                        return Poll::Ready(item);
                     }
                 },
                 Self::Polling => {

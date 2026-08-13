@@ -75,6 +75,24 @@ impl<Inner> CursorWrapper<Inner> {
         Self { cursor, args, data }
     }
 
+    /// Retrieve the next event, waiting through batches that arrive empty.  Returns `None` only
+    /// when the cursor is exhausted and no further events can arrive.
+    pub(super) async fn next_event<T: DeserializeOwned>(
+        &mut self,
+        session: &mut Inner::Session,
+    ) -> Result<Option<T>>
+    where
+        Inner: InnerCursor,
+    {
+        loop {
+            match self.next_if_any(session).await? {
+                AdvanceResult::Advanced(event) => return Ok(Some(event)),
+                AdvanceResult::Waiting => continue,
+                AdvanceResult::Exhausted => return Ok(None),
+            }
+        }
+    }
+
     pub(super) async fn next_if_any<T: DeserializeOwned>(
         &mut self,
         session: &mut Inner::Session,
