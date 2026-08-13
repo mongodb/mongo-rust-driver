@@ -1,4 +1,5 @@
 pub(crate) mod common;
+pub(crate) mod poll_state;
 pub mod raw_batch;
 pub(crate) mod session;
 pub(crate) mod stream;
@@ -15,6 +16,7 @@ use serde::{de::DeserializeOwned, Deserialize};
 use crate::{
     bson::RawDocument,
     cmap::conn::PinnedConnectionHandle,
+    cursor::poll_state::poll_panic,
     error::Result,
     Client,
     ClientSession,
@@ -86,6 +88,16 @@ pub struct Cursor<T> {
     stream: stream::Stream<'static, raw_batch::RawBatchCursor, T>,
 }
 
+#[allow(dead_code)]
+const _: fn() = || {
+    /// `Cursor<T>` must stay covariant in `T` for zero-copy deserialization to work: a cursor
+    /// yielding a type that borrows for a long lifetime has to be usable where one borrowing for a
+    /// shorter lifetime is expected.
+    fn assert_covariant<'long: 'short, 'short>(cursor: Cursor<&'long str>) -> Cursor<&'short str> {
+        cursor
+    }
+};
+
 impl<T> Cursor<T> {
     /// Move the cursor forward, potentially triggering requests to the database for more results
     /// if the local buffer has been exhausted.
@@ -113,7 +125,7 @@ impl<T> Cursor<T> {
     /// # }
     /// ```
     pub async fn advance(&mut self) -> Result<bool> {
-        self.stream.buffer_mut().advance().await
+        self.stream.buffer_mut()?.advance().await
     }
 
     /// Returns a reference to the current result in the cursor.
@@ -136,12 +148,12 @@ impl<T> Cursor<T> {
     /// # }
     /// ```
     pub fn current(&self) -> &RawDocument {
-        self.stream.buffer().current()
+        poll_panic!(self.stream.buffer()).current()
     }
 
     /// Returns true if the cursor has any additional items to return and false otherwise.
     pub fn has_next(&self) -> bool {
-        let state = self.stream.buffer();
+        let state = poll_panic!(self.stream.buffer());
         !state.batch().is_empty() || state.raw.has_next()
     }
 
@@ -177,7 +189,7 @@ impl<T> Cursor<T> {
     where
         T: Deserialize<'a>,
     {
-        self.stream.buffer().deserialize_current()
+        self.stream.buffer()?.deserialize_current()
     }
 
     /// Update the type streamed values will be parsed as.
@@ -190,20 +202,20 @@ impl<T> Cursor<T> {
         }
     }
 
-    pub(crate) fn raw(&self) -> &raw_batch::RawBatchCursor {
-        &self.stream.buffer().raw
+    pub(crate) fn raw(&self) -> Result<&raw_batch::RawBatchCursor> {
+        Ok(&self.stream.buffer()?.raw)
     }
 
-    pub(crate) fn raw_mut(&mut self) -> &mut raw_batch::RawBatchCursor {
-        &mut self.stream.buffer_mut().raw
+    pub(crate) fn raw_mut(&mut self) -> Result<&mut raw_batch::RawBatchCursor> {
+        Ok(&mut self.stream.buffer_mut()?.raw)
     }
 
     pub(crate) async fn try_advance(&mut self) -> Result<stream::AdvanceResult> {
-        self.stream.buffer_mut().try_advance().await
+        self.stream.buffer_mut()?.try_advance().await
     }
 
-    pub(crate) fn batch(&self) -> &std::collections::VecDeque<crate::bson::RawDocumentBuf> {
-        self.stream.buffer().batch()
+    pub(crate) fn batch(&self) -> Result<&std::collections::VecDeque<crate::bson::RawDocumentBuf>> {
+        Ok(self.stream.buffer()?.batch())
     }
 }
 

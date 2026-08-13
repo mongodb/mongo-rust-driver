@@ -337,7 +337,7 @@ async fn batch_mid_resume_token() -> Result<()> {
 
         // if after iterating the stream last time there's one document left,
         // then we're done here and can continue to the assertions.
-        if stream.current_batch().len() == 1 {
+        if stream.current_batch()?.len() == 1 {
             break;
         }
     }

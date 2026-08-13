@@ -100,7 +100,7 @@ impl<Inner> CursorWrapper<Inner> {
                         .execute_watch(self.args.clone(), self.data.take(), session)
                         .await?;
                     // Ensure that the old cursor is killed on the server selected for the new one.
-                    self.cursor.set_drop_address(&new_cursor);
+                    self.cursor.set_drop_address(&new_cursor)?;
                     self.cursor = new_cursor;
                     self.args = new_args;
                     continue;
@@ -138,5 +138,5 @@ pub(super) trait InnerCursor: Sized {
         data: ChangeStreamData,
         session: &mut Self::Session,
     ) -> Result<(Self, WatchArgs)>;
-    fn set_drop_address(&mut self, from: &Self);
+    fn set_drop_address(&mut self, from: &Self) -> Result<()>;
 }

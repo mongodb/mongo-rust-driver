@@ -97,11 +97,11 @@ pub(crate) enum TestCursor {
 }
 
 impl TestCursor {
-    pub(crate) async fn make_kill_watcher(&mut self) -> oneshot::Receiver<()> {
-        match self {
+    pub(crate) async fn make_kill_watcher(&mut self) -> Result<oneshot::Receiver<()>> {
+        Ok(match self {
             Self::Normal(cursor) => {
                 let (tx, rx) = oneshot::channel();
-                cursor.lock().await.raw_mut().set_kill_watcher(tx);
+                cursor.lock().await.raw_mut()?.set_kill_watcher(tx);
                 rx
             }
             Self::Session { cursor, .. } => {
@@ -111,11 +111,11 @@ impl TestCursor {
             }
             Self::ChangeStream(stream) => {
                 let (tx, rx) = oneshot::channel();
-                stream.lock().await.set_kill_watcher(tx);
+                stream.lock().await.set_kill_watcher(tx)?;
                 rx
             }
             Self::Closed => panic!("cannot set a kill_watcher on a closed cursor"),
-        }
+        })
     }
 }
 
@@ -126,13 +126,14 @@ pub(crate) enum TestChangeStream {
 }
 
 impl TestChangeStream {
-    pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) {
+    pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) -> Result<()> {
         match self {
-            Self::Event(cse) => cse.set_kill_watcher(tx),
-            Self::Doc(csd) => csd.set_kill_watcher(tx),
+            Self::Event(cse) => cse.set_kill_watcher(tx)?,
+            Self::Doc(csd) => csd.set_kill_watcher(tx)?,
         }
+        Ok(())
     }
-    pub(crate) fn client(&self) -> &crate::Client {
+    pub(crate) fn client(&self) -> Result<&crate::Client> {
         match self {
             Self::Event(cse) => cse.client(),
             Self::Doc(csd) => csd.client(),
@@ -510,10 +511,10 @@ impl Entity {
             Entity::Bucket(bucket) => Some(bucket.client().topology().id),
             Entity::Cursor(cursor) => match cursor {
                 TestCursor::Normal(cursor) => {
-                    Some(cursor.lock().await.raw().client().topology().id)
+                    Some(cursor.lock().await.raw().ok()?.client().topology().id)
                 }
                 TestCursor::Session { cursor, .. } => Some(cursor.raw().client().topology().id),
-                TestCursor::ChangeStream(cs) => Some(cs.lock().await.client().topology().id),
+                TestCursor::ChangeStream(cs) => Some(cs.lock().await.client().ok()?.topology().id),
                 TestCursor::Closed => None,
             },
             _ => None,

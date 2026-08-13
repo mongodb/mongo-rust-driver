@@ -5,8 +5,8 @@ use futures_util::StreamExt;
 
 use crate::{
     bson::{Document, RawDocument},
-    cursor::raw_batch::SessionRawBatchCursor,
-    error::Result,
+    cursor::{poll_state::poll_panic, raw_batch::SessionRawBatchCursor},
+    error::{Error, Result},
     raw_batch_cursor::SessionRawBatchCursorStream,
     ClientSession,
 };
@@ -180,22 +180,28 @@ impl<T> SessionCursor<T> {
     /// # }
     /// ```
     pub async fn advance(&mut self, session: &mut ClientSession) -> Result<bool> {
-        self.stream(session).stream.buffer_mut().advance().await
+        self.stream(session).stream.buffer_mut()?.advance().await
     }
 
     pub(crate) async fn try_advance(
         &mut self,
         session: &mut ClientSession,
     ) -> Result<stream::AdvanceResult> {
-        self.stream(session).stream.buffer_mut().try_advance().await
+        self.stream(session)
+            .stream
+            .buffer_mut()?
+            .try_advance()
+            .await
     }
 
-    fn buffer(&self) -> &stream::BatchBuffer<()> {
-        self.buffer.as_ref().unwrap()
+    fn buffer(&self) -> Result<&stream::BatchBuffer<()>> {
+        self.buffer
+            .as_ref()
+            .ok_or_else(|| Error::internal("cursor buffer lost"))
     }
 
-    pub(crate) fn batch(&self) -> &std::collections::VecDeque<crate::bson::RawDocumentBuf> {
-        self.buffer().batch()
+    pub(crate) fn batch(&self) -> Result<&std::collections::VecDeque<crate::bson::RawDocumentBuf>> {
+        Ok(self.buffer()?.batch())
     }
 
     /// Returns a reference to the current result in the cursor.
@@ -219,7 +225,7 @@ impl<T> SessionCursor<T> {
     /// # }
     /// ```
     pub fn current(&self) -> &RawDocument {
-        self.buffer().current()
+        poll_panic!(self.buffer()).current()
     }
 
     /// Deserialize the current result to the generic type associated with this cursor.
@@ -256,7 +262,7 @@ impl<T> SessionCursor<T> {
     where
         T: Deserialize<'a>,
     {
-        self.buffer().deserialize_current()
+        poll_panic!(self.buffer()).deserialize_current()
     }
 
     /// Update the type streamed values will be parsed as.
@@ -292,7 +298,7 @@ pub struct SessionCursorStream<'cursor, 'session, T = Document> {
 
 impl<T> Drop for SessionCursorStream<'_, '_, T> {
     fn drop(&mut self) {
-        *self.parent = Some(self.stream.take_buffer().map(|_| ()));
+        *self.parent = self.stream.take_buffer().map(|b| b.map(|_| ()));
     }
 }
 

@@ -147,7 +147,7 @@ impl super::common::InnerCursor for SessionCursor<()> {
     }
 
     fn get_resume_token(&self) -> Result<Option<ResumeToken>> {
-        super::common::get_resume_token(self.batch(), self.raw().post_batch_resume_token())
+        super::common::get_resume_token(self.batch()?, self.raw().post_batch_resume_token())
     }
 
     fn current(&self) -> &crate::bson::RawDocument {
@@ -175,8 +175,9 @@ impl super::common::InnerCursor for SessionCursor<()> {
         Ok((new_inner.cursor, new_inner.args))
     }
 
-    fn set_drop_address(&mut self, from: &Self) {
+    fn set_drop_address(&mut self, from: &Self) -> Result<()> {
         self.raw_mut()
             .set_drop_address(from.raw().address().clone());
+        Ok(())
     }
 }
