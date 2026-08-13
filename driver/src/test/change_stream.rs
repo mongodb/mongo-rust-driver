@@ -595,3 +595,30 @@ async fn _collection_watch_typed() {
     let _: Option<crate::error::Result<ChangeStreamEvent<crate::bson::RawDocumentBuf>>> =
         stream.next().await;
 }
+
+// Regression test: dropping a watched collection could cause an infinite loop.
+#[tokio::test]
+async fn drop_infinite_loop() -> Result<()> {
+    if !(topology_is_replica_set().await || topology_is_sharded().await) {
+        log_uncaptured("skipping change stream test on unsupported topology");
+        return Ok(());
+    }
+    let client = Client::for_test().await;
+    let coll = client
+        .database("changestream_drop_spin")
+        .collection::<Document>("watched");
+
+    coll.drop().await.ok();
+    coll.insert_one(doc! { "x": 1 }).await?;
+
+    let mut stream = coll.watch().await?;
+    coll.drop().await?;
+
+    for _ in 1..=10 {
+        if let None = stream.try_next().await? {
+            break;
+        }
+    }
+
+    return Ok(());
+}
