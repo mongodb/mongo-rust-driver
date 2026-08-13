@@ -19,7 +19,6 @@ if [ "Windows_NT" == "$OS" ]; then
   export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
 fi
 
-#cargo_test ""
-cargo_test "change_stream"
+cargo_test ""
 
 exit $CARGO_RESULT
