@@ -87,6 +87,20 @@ tasks:
           TOPOLOGY: server
       - func: "run driver test suite"
 
+  - name: test-9.0-standalone
+    tags: [9.0, standalone]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
+    commands:
+      - func: "fetch nextest archive"
+      - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 9.0
+          TOPOLOGY: server
+      - func: "run driver test suite"
+
   - name: test-rapid-standalone
     tags: [rapid, standalone]
     depends_on:
@@ -199,6 +213,20 @@ tasks:
           TOPOLOGY: replica_set
       - func: "run driver test suite"
 
+  - name: test-9.0-replicaset
+    tags: [9.0, replicaset]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
+    commands:
+      - func: "fetch nextest archive"
+      - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 9.0
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+
   - name: test-rapid-replicaset
     tags: [rapid, replicaset]
     depends_on:
@@ -308,6 +336,20 @@ tasks:
         type: setup
         vars:
           MONGODB_VERSION: 8.0
+          TOPOLOGY: sharded_cluster
+      - func: "run driver test suite"
+
+  - name: test-9.0-sharded
+    tags: [9.0, sharded]
+    depends_on:
+      - name: build-nextest-archive
+        patch_optional: true
+    commands:
+      - func: "fetch nextest archive"
+      - func: "bootstrap mongo-orchestration"
+        type: setup
+        vars:
+          MONGODB_VERSION: 9.0
           TOPOLOGY: sharded_cluster
       - func: "run driver test suite"
 
