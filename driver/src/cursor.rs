@@ -1,7 +1,7 @@
 pub(crate) mod common;
 pub mod raw_batch;
 pub(crate) mod session;
-mod stream;
+pub(crate) mod stream;
 #[cfg(feature = "sync")]
 pub(crate) mod sync;
 
@@ -198,7 +198,7 @@ impl<T> Cursor<T> {
         &mut self.stream.buffer_mut().raw
     }
 
-    pub(crate) async fn try_advance(&mut self) -> Result<bool> {
+    pub(crate) async fn try_advance(&mut self) -> Result<stream::AdvanceResult> {
         self.stream.buffer_mut().try_advance().await
     }
 

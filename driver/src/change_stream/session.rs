@@ -1,7 +1,7 @@
 //! Types for change streams using sessions.
 use serde::de::DeserializeOwned;
 
-use crate::{error::Result, ClientSession, SessionCursor};
+use crate::{cursor::stream::AdvanceResult, error::Result, ClientSession, SessionCursor};
 
 use super::{
     event::{ChangeStreamEvent, ResumeToken},
@@ -93,11 +93,10 @@ where
     /// ```
     pub async fn next(&mut self, session: &mut ClientSession) -> Result<Option<T>> {
         loop {
-            let maybe_next = self.next_if_any(session).await?;
-            match maybe_next {
-                Some(t) => return Ok(Some(t)),
-                None if self.is_alive() => continue,
-                None => return Ok(None),
+            match self.inner.next_if_any(session).await? {
+                AdvanceResult::Advanced(t) => return Ok(Some(t)),
+                AdvanceResult::Waiting => continue,
+                AdvanceResult::Exhausted => return Ok(None),
             }
         }
     }
@@ -133,14 +132,17 @@ where
     /// # }
     /// ```
     pub async fn next_if_any(&mut self, session: &mut ClientSession) -> Result<Option<T>> {
-        self.inner.next_if_any(session).await
+        Ok(self.inner.next_if_any(session).await?.into_option())
     }
 }
 
 impl super::common::InnerCursor for SessionCursor<()> {
     type Session = ClientSession;
 
-    async fn try_advance(&mut self, session: &mut Self::Session) -> Result<bool> {
+    async fn try_advance(
+        &mut self,
+        session: &mut Self::Session,
+    ) -> Result<crate::cursor::stream::AdvanceResult> {
         self.try_advance(session).await
     }
 

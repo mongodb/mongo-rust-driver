@@ -11,7 +11,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::error::Error;
+use crate::{cursor::stream::AdvanceResult, error::Error};
 use derive_where::derive_where;
 use futures_core::{future::BoxFuture, Stream};
 use futures_util::FutureExt;
@@ -132,7 +132,12 @@ where
     /// # }
     /// ```
     pub async fn next_if_any(&mut self) -> Result<Option<T>> {
-        self.inner.state_mut().next_if_any(&mut ()).await
+        Ok(self
+            .inner
+            .state_mut()
+            .next_if_any(&mut ())
+            .await?
+            .into_option())
     }
 
     #[cfg(test)]
@@ -176,7 +181,7 @@ enum StreamState<T: DeserializeOwned> {
 
 struct NextDone<T> {
     state: CursorWrapper,
-    out: Result<Option<T>>,
+    out: Result<AdvanceResult<T>>,
 }
 
 impl<T: DeserializeOwned> StreamState<T> {
@@ -226,8 +231,9 @@ impl<T: DeserializeOwned> Stream for StreamState<T> {
                     Poll::Ready(NextDone { state, out }) => {
                         *self = StreamState::Idle(Box::new(state));
                         match out {
-                            Ok(Some(v)) => return Poll::Ready(Some(Ok(v))),
-                            Ok(None) => continue,
+                            Ok(AdvanceResult::Advanced(v)) => return Poll::Ready(Some(Ok(v))),
+                            Ok(AdvanceResult::Waiting) => continue,
+                            Ok(AdvanceResult::Exhausted) => return Poll::Ready(None),
                             Err(e) => return Poll::Ready(Some(Err(e))),
                         }
                     }
@@ -245,7 +251,10 @@ impl<T: DeserializeOwned> Stream for StreamState<T> {
 impl common::InnerCursor for Cursor<()> {
     type Session = ();
 
-    async fn try_advance(&mut self, _session: &mut Self::Session) -> Result<bool> {
+    async fn try_advance(
+        &mut self,
+        _session: &mut Self::Session,
+    ) -> Result<crate::cursor::stream::AdvanceResult> {
         self.try_advance().await
     }
 
