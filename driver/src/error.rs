@@ -909,7 +909,7 @@ pub struct CommandError {
         deserialize_with = "deserialize_duration_option_from_u64_millis",
         default
     )]
-    pub(crate) base_backoff: Option<Duration>,
+    pub base_backoff: Option<Duration>,
 }
 
 impl CommandError {
