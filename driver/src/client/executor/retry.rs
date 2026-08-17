@@ -198,13 +198,13 @@ impl Retry {
         const DEFAULT_BASE_BACKOFF: Duration = Duration::from_millis(100);
         const MAX_BACKOFF: Duration = Duration::from_millis(10_000);
 
-        let jitter = rand::random_range(0f64..1f64);
+        let jitter = rand::random::<f32>();
         #[cfg(test)]
         let jitter = test_options.and_then(|o| o.jitter).unwrap_or(jitter);
 
         let base_backoff = self.base_backoff.unwrap_or(DEFAULT_BASE_BACKOFF);
         let backoff = std::cmp::min(base_backoff * 2u32.pow(self.attempt), MAX_BACKOFF);
-        backoff.mul_f64(jitter)
+        backoff.mul_f32(jitter)
     }
 }
 
