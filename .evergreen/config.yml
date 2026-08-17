@@ -14,8 +14,10 @@ command_type: system
 pre_error_fails_task: true
 
 include:
-  - filename: .evergreen/suite-tasks.yml
   - filename: .evergreen/util.yml
+  - filename: .evergreen/suite-tasks.yml
+  - filename: .evergreen/load-balancer.yml
+  - filename: .evergreen/in-use-encryption.yml
 
 # Functions to run before all tasks (except those in task groups).
 pre:
@@ -1253,104 +1255,6 @@ tasks:
           TOPOLOGY: replica_set
       - func: "start csfle servers"
       - func: "run csfle tests"
-
-  - name: test-load-balancer-5.0
-    tags: [load-balancer]
-    depends_on:
-      - name: build-nextest-archive
-    commands:
-      - func: "fetch nextest archive"
-      - func: bootstrap mongo-orchestration
-        vars:
-          MONGODB_VERSION: 5.0
-          TOPOLOGY: sharded_cluster
-          LOAD_BALANCER: true
-      - func: start load balancer
-      - func: run driver test suite
-
-  - name: test-load-balancer-6.0
-    tags: [load-balancer]
-    depends_on:
-      - name: build-nextest-archive
-    commands:
-      - func: "fetch nextest archive"
-      - func: bootstrap mongo-orchestration
-        vars:
-          MONGODB_VERSION: 6.0
-          TOPOLOGY: sharded_cluster
-          LOAD_BALANCER: true
-      - func: start load balancer
-      - func: run driver test suite
-
-  - name: test-load-balancer-7.0
-    tags: [load-balancer]
-    depends_on:
-      - name: build-nextest-archive
-    commands:
-      - func: "fetch nextest archive"
-      - func: bootstrap mongo-orchestration
-        vars:
-          MONGODB_VERSION: 7.0
-          TOPOLOGY: sharded_cluster
-          LOAD_BALANCER: true
-      - func: start load balancer
-      - func: run driver test suite
-
-  - name: test-load-balancer-8.0
-    tags: [load-balancer]
-    depends_on:
-      - name: build-nextest-archive
-    commands:
-      - func: "fetch nextest archive"
-      - func: bootstrap mongo-orchestration
-        vars:
-          MONGODB_VERSION: 8.0
-          TOPOLOGY: sharded_cluster
-          LOAD_BALANCER: true
-      - func: start load balancer
-      - func: run driver test suite
-
-  - name: test-load-balancer-9.0
-    tags: [load-balancer]
-    depends_on:
-      - name: build-nextest-archive
-    commands:
-      - func: "fetch nextest archive"
-      - func: bootstrap mongo-orchestration
-        vars:
-          MONGODB_VERSION: 9.0
-          TOPOLOGY: sharded_cluster
-          LOAD_BALANCER: true
-      - func: start load balancer
-      - func: run driver test suite
-
-  - name: test-load-balancer-rapid
-    tags: [load-balancer]
-    depends_on:
-      - name: build-nextest-archive
-    commands:
-      - func: "fetch nextest archive"
-      - func: bootstrap mongo-orchestration
-        vars:
-          MONGODB_VERSION: rapid
-          TOPOLOGY: sharded_cluster
-          LOAD_BALANCER: true
-      - func: start load balancer
-      - func: run driver test suite
-
-  - name: test-load-balancer-latest
-    tags: [load-balancer]
-    depends_on:
-      - name: build-nextest-archive
-    commands:
-      - func: "fetch nextest archive"
-      - func: bootstrap mongo-orchestration
-        vars:
-          MONGODB_VERSION: latest
-          TOPOLOGY: sharded_cluster
-          LOAD_BALANCER: true
-      - func: start load balancer
-      - func: run driver test suite
 
   - name: test-aws-lambda-deployed
     commands:
