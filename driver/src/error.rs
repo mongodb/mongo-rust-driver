@@ -7,6 +7,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Debug},
     sync::Arc,
+    time::Duration,
 };
 
 use serde::{Deserialize, Serialize};
@@ -17,6 +18,7 @@ use crate::{
     cmap::RawCommandResponse,
     options::ServerAddress,
     sdam::{ServerType, TopologyVersion},
+    serde_util::deserialize_duration_option_from_u64_millis,
 };
 
 pub use bulk_write::{BulkWriteError, PartialBulkWriteResult};
@@ -547,9 +549,10 @@ impl Error {
         }
     }
 
-    pub(crate) fn base_backoff_ms(&self) -> Option<f64> {
+    /// Returns the value for [`CommandError::base_backoff`] if this error is a command error.
+    pub fn base_backoff(&self) -> Option<Duration> {
         match self.kind.as_ref() {
-            ErrorKind::Command(command_error) => command_error.base_backoff_ms,
+            ErrorKind::Command(command_error) => command_error.base_backoff,
             _ => None,
         }
     }
@@ -901,8 +904,12 @@ pub struct CommandError {
     #[serde(rename = "topologyVersion")]
     pub(crate) topology_version: Option<TopologyVersion>,
 
-    #[serde(rename = "baseBackoffMS")]
-    pub(crate) base_backoff_ms: Option<f64>,
+    #[serde(
+        rename = "baseBackoffMS",
+        deserialize_with = "deserialize_duration_option_from_u64_millis"
+        default,
+    )]
+    pub(crate) base_backoff: Option<Duration>,
 }
 
 impl CommandError {

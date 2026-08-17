@@ -1287,5 +1287,5 @@ async fn override_base_backoff_ms() {
     assert!(duration_secs >= 0.3);
     assert!(duration_secs < 0.6);
     let error = result.unwrap_err();
-    assert_eq!(error.base_backoff_ms(), Some(50f64));
+    assert_eq!(error.base_backoff(), Some(Duration::from_millis(50)));
 }

@@ -3,7 +3,6 @@ use std::{collections::HashSet, time::Duration};
 #[cfg(test)]
 use crate::options::TestOptions;
 use crate::{
-    bson_util::round_clamp,
     error::{Error, Result, NO_WRITES_PERFORMED, RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
     operation::{Operation, Retryability},
     options::ServerAddress,
@@ -22,7 +21,7 @@ pub(crate) struct Retry {
     txn_number: Option<i64>,
     pub(crate) overloaded: bool,
     max_retries: u32,
-    base_backoff_ms: Option<f64>,
+    base_backoff: Option<Duration>,
 }
 
 struct Failure {
@@ -111,7 +110,7 @@ impl Retry {
                 || retryability.can_retry_error(error) && !is_transaction_op
         };
         let overloaded = error.contains_label(SYSTEM_OVERLOADED_ERROR);
-        let base_backoff_ms = error.base_backoff_ms().filter(|ms| *ms > 0f64);
+        let base_backoff = error.base_backoff().filter(|duration| !duration.is_zero());
 
         let max_adaptive_retries = overloaded.then_some(
             client
@@ -157,7 +156,7 @@ impl Retry {
                 if let Some(max_adaptive_retries) = max_adaptive_retries {
                     retry.max_retries = max_adaptive_retries;
                 }
-                retry.base_backoff_ms = base_backoff_ms;
+                retry.base_backoff = base_backoff;
                 Ok(retry)
             }
             None => {
@@ -173,7 +172,7 @@ impl Retry {
                     txn_number,
                     overloaded,
                     max_retries: max_adaptive_retries.unwrap_or(MAX_RW_RETRIES),
-                    base_backoff_ms,
+                    base_backoff,
                 })
             }
         }
@@ -196,18 +195,16 @@ impl Retry {
             return backoff;
         }
 
-        const DEFAULT_BASE_BACKOFF_MS: f64 = 100f64;
-        const MAX_BACKOFF_MS: f64 = 10_000f64;
+        const DEFAULT_BASE_BACKOFF: Duration = Duration::from_millis(100);
+        const MAX_BACKOFF: Duration = Duration::from_millis(10_000);
 
         let jitter = rand::random_range(0f64..1f64);
         #[cfg(test)]
         let jitter = test_options.and_then(|o| o.jitter).unwrap_or(jitter);
 
-        let base_backoff_ms = self.base_backoff_ms.unwrap_or(DEFAULT_BASE_BACKOFF_MS);
-        let computed_backoff = jitter * base_backoff_ms * 2f64.powf(f64::from(self.attempt));
-        let max_backoff = jitter * MAX_BACKOFF_MS;
-        let backoff: u64 = std::cmp::min(round_clamp(computed_backoff), round_clamp(max_backoff));
-        Duration::from_millis(backoff)
+        let base_backoff = self.base_backoff.unwrap_or(DEFAULT_BASE_BACKOFF);
+        let backoff = std::cmp::min(base_backoff * 2u32.pow(self.attempt), MAX_BACKOFF);
+        backoff.mul_f64(jitter)
     }
 }
 

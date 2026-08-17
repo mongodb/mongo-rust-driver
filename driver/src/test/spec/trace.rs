@@ -318,7 +318,7 @@ fn error_redaction() {
             code_name: "CodeName".to_string(),
             message: "Hello".to_string(),
             topology_version: None,
-            base_backoff_ms: None,
+            base_backoff: None,
         }),
         labels.clone(),
     );
