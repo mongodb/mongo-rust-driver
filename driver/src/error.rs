@@ -904,6 +904,7 @@ pub struct CommandError {
     #[serde(rename = "topologyVersion")]
     pub(crate) topology_version: Option<TopologyVersion>,
 
+    /// The base amount of time to back off before retrying an operation.
     #[serde(
         rename = "baseBackoffMS",
         deserialize_with = "deserialize_duration_option_from_u64_millis",
