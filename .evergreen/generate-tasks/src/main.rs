@@ -81,7 +81,7 @@ fn in_use_encryption() {
 
 fn load_balancer() {
     println!("{HEADER}");
-    for version in all_versions() {
+    for version in VERSIONS_5_0_PLUS {
         println!(
             "
   - name: test-load-balancer-{version}
