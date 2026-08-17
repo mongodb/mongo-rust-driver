@@ -906,8 +906,8 @@ pub struct CommandError {
 
     #[serde(
         rename = "baseBackoffMS",
-        deserialize_with = "deserialize_duration_option_from_u64_millis"
-        default,
+        deserialize_with = "deserialize_duration_option_from_u64_millis",
+        default
     )]
     pub(crate) base_backoff: Option<Duration>,
 }
