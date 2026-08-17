@@ -5,125 +5,134 @@ tasks:
   - name: test-in-use-encryption-4.2
     tags: [in-use-encryption]
     depends_on:
-    - name: build-nextest-archive
+      - name: build-nextest-archive
     commands:
-    - func: fetch nextest archive
-    - func: install libmongocrypt
-    - func: bootstrap mongo-orchestration
+      - func: fetch nextest archive
+      - func: install libmongocrypt
+      - func: bootstrap mongo-orchestration
+        type: setup
         vars:
-        MONGODB_VERSION: 4.2
-        TOPOLOGY: replica_set
-    - func: start csfle servers
-    - func: run csfle tests
+          MONGODB_VERSION: 4.2
+          TOPOLOGY: replica_set
+      - func: start csfle servers
+      - func: run csfle tests
 
   - name: test-in-use-encryption-4.4
     tags: [in-use-encryption]
     depends_on:
-    - name: build-nextest-archive
+      - name: build-nextest-archive
     commands:
-    - func: fetch nextest archive
-    - func: install libmongocrypt
-    - func: bootstrap mongo-orchestration
+      - func: fetch nextest archive
+      - func: install libmongocrypt
+      - func: bootstrap mongo-orchestration
+        type: setup
         vars:
-        MONGODB_VERSION: 4.4
-        TOPOLOGY: replica_set
-    - func: start csfle servers
-    - func: run csfle tests
+          MONGODB_VERSION: 4.4
+          TOPOLOGY: replica_set
+      - func: start csfle servers
+      - func: run csfle tests
 
   - name: test-in-use-encryption-5.0
     tags: [in-use-encryption]
     depends_on:
-    - name: build-nextest-archive
+      - name: build-nextest-archive
     commands:
-    - func: fetch nextest archive
-    - func: install libmongocrypt
-    - func: bootstrap mongo-orchestration
+      - func: fetch nextest archive
+      - func: install libmongocrypt
+      - func: bootstrap mongo-orchestration
+        type: setup
         vars:
-        MONGODB_VERSION: 5.0
-        TOPOLOGY: replica_set
-    - func: start csfle servers
-    - func: run csfle tests
+          MONGODB_VERSION: 5.0
+          TOPOLOGY: replica_set
+      - func: start csfle servers
+      - func: run csfle tests
 
   - name: test-in-use-encryption-6.0
     tags: [in-use-encryption]
     depends_on:
-    - name: build-nextest-archive
+      - name: build-nextest-archive
     commands:
-    - func: fetch nextest archive
-    - func: install libmongocrypt
-    - func: bootstrap mongo-orchestration
+      - func: fetch nextest archive
+      - func: install libmongocrypt
+      - func: bootstrap mongo-orchestration
+        type: setup
         vars:
-        MONGODB_VERSION: 6.0
-        TOPOLOGY: replica_set
-    - func: start csfle servers
-    - func: run csfle tests
+          MONGODB_VERSION: 6.0
+          TOPOLOGY: replica_set
+      - func: start csfle servers
+      - func: run csfle tests
 
   - name: test-in-use-encryption-7.0
     tags: [in-use-encryption]
     depends_on:
-    - name: build-nextest-archive
+      - name: build-nextest-archive
     commands:
-    - func: fetch nextest archive
-    - func: install libmongocrypt
-    - func: bootstrap mongo-orchestration
+      - func: fetch nextest archive
+      - func: install libmongocrypt
+      - func: bootstrap mongo-orchestration
+        type: setup
         vars:
-        MONGODB_VERSION: 7.0
-        TOPOLOGY: replica_set
-    - func: start csfle servers
-    - func: run csfle tests
+          MONGODB_VERSION: 7.0
+          TOPOLOGY: replica_set
+      - func: start csfle servers
+      - func: run csfle tests
 
   - name: test-in-use-encryption-8.0
     tags: [in-use-encryption]
     depends_on:
-    - name: build-nextest-archive
+      - name: build-nextest-archive
     commands:
-    - func: fetch nextest archive
-    - func: install libmongocrypt
-    - func: bootstrap mongo-orchestration
+      - func: fetch nextest archive
+      - func: install libmongocrypt
+      - func: bootstrap mongo-orchestration
+        type: setup
         vars:
-        MONGODB_VERSION: 8.0
-        TOPOLOGY: replica_set
-    - func: start csfle servers
-    - func: run csfle tests
+          MONGODB_VERSION: 8.0
+          TOPOLOGY: replica_set
+      - func: start csfle servers
+      - func: run csfle tests
 
   - name: test-in-use-encryption-9.0
     tags: [in-use-encryption]
     depends_on:
-    - name: build-nextest-archive
+      - name: build-nextest-archive
     commands:
-    - func: fetch nextest archive
-    - func: install libmongocrypt
-    - func: bootstrap mongo-orchestration
+      - func: fetch nextest archive
+      - func: install libmongocrypt
+      - func: bootstrap mongo-orchestration
+        type: setup
         vars:
-        MONGODB_VERSION: 9.0
-        TOPOLOGY: replica_set
-    - func: start csfle servers
-    - func: run csfle tests
+          MONGODB_VERSION: 9.0
+          TOPOLOGY: replica_set
+      - func: start csfle servers
+      - func: run csfle tests
 
   - name: test-in-use-encryption-rapid
     tags: [in-use-encryption]
     depends_on:
-    - name: build-nextest-archive
+      - name: build-nextest-archive
     commands:
-    - func: fetch nextest archive
-    - func: install libmongocrypt
-    - func: bootstrap mongo-orchestration
+      - func: fetch nextest archive
+      - func: install libmongocrypt
+      - func: bootstrap mongo-orchestration
+        type: setup
         vars:
-        MONGODB_VERSION: rapid
-        TOPOLOGY: replica_set
-    - func: start csfle servers
-    - func: run csfle tests
+          MONGODB_VERSION: rapid
+          TOPOLOGY: replica_set
+      - func: start csfle servers
+      - func: run csfle tests
 
   - name: test-in-use-encryption-latest
     tags: [in-use-encryption]
     depends_on:
-    - name: build-nextest-archive
+      - name: build-nextest-archive
     commands:
-    - func: fetch nextest archive
-    - func: install libmongocrypt
-    - func: bootstrap mongo-orchestration
+      - func: fetch nextest archive
+      - func: install libmongocrypt
+      - func: bootstrap mongo-orchestration
+        type: setup
         vars:
-        MONGODB_VERSION: latest
-        TOPOLOGY: replica_set
-    - func: start csfle servers
-    - func: run csfle tests
+          MONGODB_VERSION: latest
+          TOPOLOGY: replica_set
+      - func: start csfle servers
+      - func: run csfle tests
