@@ -25,8 +25,8 @@ fn main() {
 
     match suite.as_deref() {
         None => driver_tests(),
-        Some("csfle") => csfle(),
         Some("in-use-encryption") => in_use_encryption(),
+        Some("load-balancer") => load_balancer(),
         Some(other) => eprintln!("Suite {other} not recognized"),
     }
 }
@@ -55,7 +55,7 @@ fn driver_tests() {
     }
 }
 
-fn csfle() {
+fn in_use_encryption() {
     println!("{HEADER}");
     for version in all_versions() {
         println!(
@@ -77,7 +77,7 @@ fn csfle() {
     }
 }
 
-fn in_use_encryption() {
+fn load_balancer() {
     println!("{HEADER}");
     for version in all_versions() {
         println!(
