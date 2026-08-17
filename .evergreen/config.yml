@@ -16,8 +16,8 @@ pre_error_fails_task: true
 include:
   - filename: .evergreen/util.yml
   - filename: .evergreen/suite-tasks.yml
-  - filename: .evergreen/load-balancer.yml
-  - filename: .evergreen/in-use-encryption.yml
+  - filename: .evergreen/load-balancer-tasks.yml
+  - filename: .evergreen/in-use-encryption-tasks.yml
 
 # Functions to run before all tasks (except those in task groups).
 pre:
