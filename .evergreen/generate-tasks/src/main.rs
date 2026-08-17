@@ -24,10 +24,11 @@ fn main() {
     }
 
     match suite.as_deref() {
-        None => driver_tests(),
+        Some("driver-tests") => driver_tests(),
         Some("in-use-encryption") => in_use_encryption(),
         Some("load-balancer") => load_balancer(),
         Some(other) => eprintln!("Suite {other} not recognized"),
+        None => eprintln!("Test suite to generate not specified"),
     }
 }
 
@@ -63,16 +64,17 @@ fn in_use_encryption() {
   - name: test-in-use-encryption-{version}
     tags: [in-use-encryption]
     depends_on:
-    - name: build-nextest-archive
+      - name: build-nextest-archive
     commands:
-    - func: fetch nextest archive
-    - func: install libmongocrypt
-    - func: bootstrap mongo-orchestration
+      - func: fetch nextest archive
+      - func: install libmongocrypt
+      - func: bootstrap mongo-orchestration
+        type: setup
         vars:
-        MONGODB_VERSION: {version}
-        TOPOLOGY: {REPLICA_SET}
-    - func: start csfle servers
-    - func: run csfle tests"
+          MONGODB_VERSION: {version}
+          TOPOLOGY: {REPLICA_SET}
+      - func: start csfle servers
+      - func: run csfle tests"
         );
     }
 }
@@ -85,16 +87,17 @@ fn load_balancer() {
   - name: test-load-balancer-{version}
     tags: [load-balancer]
     depends_on:
-    - name: build-nextest-archive
+      - name: build-nextest-archive
     commands:
-    - func: fetch nextest archive
-    - func: bootstrap mongo-orchestration
+      - func: fetch nextest archive
+      - func: bootstrap mongo-orchestration
+        type: setup
         vars:
-        MONGODB_VERSION: {version}
-        TOPOLOGY: sharded_cluster
-        LOAD_BALANCER: true
-    - func: start load balancer
-    - func: run driver test suite"
+          MONGODB_VERSION: {version}
+          TOPOLOGY: {SHARDED_CLUSTER}
+          LOAD_BALANCER: true
+      - func: start load balancer
+      - func: run driver test suite"
         );
     }
 }
