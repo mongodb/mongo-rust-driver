@@ -262,7 +262,7 @@ impl<T> SessionCursor<T> {
     where
         T: Deserialize<'a>,
     {
-        poll_panic!(self.buffer()).deserialize_current()
+        self.buffer()?.deserialize_current()
     }
 
     /// Update the type streamed values will be parsed as.
