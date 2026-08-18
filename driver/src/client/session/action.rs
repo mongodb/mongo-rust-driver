@@ -258,7 +258,7 @@ impl StartTransaction<&mut ClientSession> {
     ///
     /// Retries will be performed for up to 120 seconds total, after which an error of
     /// [`ErrorKind::Transaction`] will be returned indicating that a timeout occurred. The last
-    /// error observed will be preserved in the [`Error::source`] field.
+    /// error observed is preserved as the error's [`source`](std::error::Error::source).
     ///
     /// If a command inside the callback fails, it may cause the transaction on the server to be
     /// aborted. This situation is normally handled transparently by the driver. However, if the
@@ -327,7 +327,7 @@ impl StartTransaction<&mut ClientSession> {
     ///
     /// Retries will be performed for up to 120 seconds total, after which an error of
     /// [`ErrorKind::Transaction`] will be returned indicating that a timeout occurred. The last
-    /// error observed will be preserved in the [`Error::source`] field.
+    /// error observed is preserved as the error's [`source`](std::error::Error::source).
     ///
     /// If a command inside the callback fails, it may cause the transaction on the server to be
     /// aborted. This situation is normally handled transparently by the driver. However, if the
@@ -413,7 +413,7 @@ impl StartTransaction<&mut crate::sync::ClientSession> {
     ///
     /// Retries will be performed for up to 120 seconds total, after which an error of
     /// [`ErrorKind::Transaction`] will be returned indicating that a timeout occurred. The last
-    /// error observed will be preserved in the [`Error::source`] field.
+    /// error observed is preserved as the error's [`source`](std::error::Error::source).
     ///
     /// If a command inside the callback fails, it may cause the transaction on the server to be
     /// aborted. This situation is normally handled transparently by the driver. However, if the

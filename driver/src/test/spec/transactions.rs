@@ -15,6 +15,7 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
+        server_version_gte,
         spec::unified_runner::run_unified_tests,
         topology_is_sharded,
         transactions_supported,
@@ -227,7 +228,10 @@ async fn convenient_api_retry_timeout_commit_unknown() {
 
     let source = err.source.unwrap();
     assert_eq!(Some(251), source.sdam_code());
-    assert!(source.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT));
+    // failpoint labels are only supported on 4.4+
+    if server_version_gte(4, 4).await {
+        assert!(source.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT));
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
