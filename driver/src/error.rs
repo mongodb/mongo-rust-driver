@@ -17,7 +17,7 @@ use crate::{
     bson::{doc, rawdoc, Bson, Document, RawDocumentBuf},
     cmap::RawCommandResponse,
     options::ServerAddress,
-    sdam::{ServerType, TopologyVersion},
+    sdam::TopologyVersion,
     serde_util::deserialize_duration_option_from_u64_millis,
 };
 
@@ -31,26 +31,14 @@ pub(crate) const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
 /// Codes indicating the node is shutting down. Strict subset of RECOVERING_CODES;
 /// both sets must be updated together if new codes are added.
 pub(crate) const SHUTTING_DOWN_CODES: [i32; 2] = [11600, 91];
-/// Codes that make a read operation retryable (wire version <= 8).
-/// Superset of RETRYABLE_WRITE_CODES — includes code 134 (ReadConcernMajorityNotAvailableYet).
+/// Codes that make a read operation retryable.
 pub(crate) const RETRYABLE_READ_CODES: [i32; 13] = [
     11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 134, 262,
-];
-/// Codes that make a write operation retryable (wire version <= 8).
-/// Subset of RETRYABLE_READ_CODES.
-pub(crate) const RETRYABLE_WRITE_CODES: [i32; 12] = [
-    11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 262,
 ];
 const UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL_CODES: [i32; 3] = [50, 64, 91];
 const REAUTHENTICATION_REQUIRED_CODE: i32 = 391;
 /// Code 43 is CursorNotFound, which is always resumable regardless of wire version.
 const CURSOR_NOT_FOUND_CODE: i32 = 43;
-/// Error codes indicating a change stream is resumable on servers with wire version < 9
-/// (MongoDB < 4.4). On wire version >= 9, the server instead sets the
-/// "ResumableChangeStreamError" label directly.
-const RESUMABLE_CHANGE_STREAM_CODES: [i32; 17] = [
-    6, 7, 89, 91, 189, 262, 9001, 10107, 11600, 11602, 13435, 13436, 63, 150, 13388, 234, 133,
-];
 
 /// Retryable write error label. This label will be added to an error when the error is
 /// write-retryable.
@@ -69,6 +57,8 @@ pub const SYSTEM_OVERLOADED_ERROR: &str = "SystemOverloadedError";
 pub const RETRYABLE_ERROR: &str = "RetryableError";
 /// Indicates that no writes were performed before the error occurred.
 pub const NO_WRITES_PERFORMED: &str = "NoWritesPerformed";
+/// Indicates that a change stream can be resumed.
+pub const RESUMABLE_CHANGE_STREAM_ERROR: &str = "ResumableChangeStreamError";
 
 /// The result type for all methods that can return an error in the `mongodb` crate.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -238,47 +228,9 @@ impl Error {
         self.contains_label(RETRYABLE_WRITE_ERROR)
     }
 
-    fn is_write_concern_error(&self) -> bool {
-        match *self.kind {
-            ErrorKind::Write(WriteFailure::WriteConcernError(_)) => true,
-            ErrorKind::InsertMany(ref insert_many_error)
-                if insert_many_error.write_concern_error.is_some() =>
-            {
-                true
-            }
-            _ => false,
-        }
-    }
-
-    /// Whether a "RetryableWriteError" label should be added to this error. If max_wire_version
-    /// indicates a 4.4+ server, a label should only be added if the error is a network error.
-    /// Otherwise, a label should be added if the error is a network error or the error code
-    /// matches one of the retryable write codes.
-    pub(crate) fn should_add_retryable_write_label(
-        &self,
-        max_wire_version: Option<i32>,
-        server_type: Option<ServerType>,
-    ) -> bool {
-        const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
-
-        if max_wire_version
-            .map(|mwv| mwv > SERVER_4_2_0_WIRE_VERSION)
-            .unwrap_or(true)
-        {
-            return self.is_network_error();
-        }
-        if self.is_network_error() {
-            return true;
-        }
-
-        if server_type == Some(ServerType::Mongos) && self.is_write_concern_error() {
-            return false;
-        }
-
-        match &self.sdam_code() {
-            Some(code) => RETRYABLE_WRITE_CODES.contains(code),
-            None => false,
-        }
+    /// Whether a "RetryableWriteError" label should be added to this error.
+    pub(crate) fn should_add_retryable_write_label(&self) -> bool {
+        self.is_network_error()
     }
 
     pub(crate) fn should_add_unknown_transaction_commit_result_label(&self) -> bool {
@@ -514,17 +466,7 @@ impl Error {
         if code == Some(CURSOR_NOT_FOUND_CODE) {
             return true;
         }
-        if matches!(self.wire_version, Some(v) if v >= 9)
-            && self.contains_label("ResumableChangeStreamError")
-        {
-            return true;
-        }
-        if let (Some(code), true) = (code, matches!(self.wire_version, Some(v) if v < 9)) {
-            if RESUMABLE_CHANGE_STREAM_CODES.contains(&code) {
-                return true;
-            }
-        }
-        false
+        self.contains_label(RESUMABLE_CHANGE_STREAM_ERROR)
     }
 
     pub(crate) fn is_incompatible_server(&self) -> bool {

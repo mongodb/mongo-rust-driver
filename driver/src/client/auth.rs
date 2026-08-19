@@ -93,8 +93,6 @@ pub enum AuthMechanism {
     /// equivalent environment variable value in your script or application. Alternatively, you
     /// can create an AWS profile specifically for your MongoDB credentials and set the
     /// `AWS_PROFILE` environment variable to that profile name.
-    ///
-    /// Note: Only server versions 4.4+ support AWS authentication.
     #[cfg(feature = "aws-auth")]
     MongoDbAws,
 

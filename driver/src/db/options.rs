@@ -117,8 +117,6 @@ pub struct CreateCollectionOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 
     /// Map of encrypted fields for the created collection.
@@ -320,8 +318,6 @@ pub struct ListCollectionsOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 
     /// Filters the list operation.
@@ -348,8 +344,6 @@ pub struct ListDatabasesOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 
     /// Filters the query.

@@ -463,13 +463,6 @@ impl Client {
         self.inner.session_pool.contains(id).await
     }
 
-    #[cfg(test)]
-    pub(crate) fn disable_command_events(&self, disable: bool) {
-        self.inner
-            .disable_command_events
-            .store(disable, std::sync::atomic::Ordering::SeqCst);
-    }
-
     /// Get the address of the server selected according to the given criteria.
     /// This method is only used in tests.
     #[cfg(test)]

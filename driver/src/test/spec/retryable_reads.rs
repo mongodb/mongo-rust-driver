@@ -18,7 +18,6 @@ use crate::{
     test::{
         get_client_options,
         log_uncaptured,
-        server_version_lt,
         spec::unified_runner::run_unified_tests,
         topology_is_load_balanced,
         topology_is_replica_set,
@@ -293,10 +292,10 @@ async fn retry_read_same_mongos() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn overload_error_retried_on_different_server_retargeting_enabled() {
-    if server_version_lt(4, 4).await || !topology_is_replica_set().await {
+    if !topology_is_replica_set().await {
         log_uncaptured(
             "skipping overload_error_retried_on_different_server_retargeting_enabled: requires \
-             4.4+ replica set",
+             replica set",
         );
         return;
     }
@@ -333,10 +332,8 @@ async fn overload_error_retried_on_different_server_retargeting_enabled() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn non_overload_error_retried_on_same_server() {
-    if server_version_lt(4, 4).await || !topology_is_replica_set().await {
-        log_uncaptured(
-            "skipping non_overload_error_retried_on_same_server: requires 4.4+ replica set",
-        );
+    if !topology_is_replica_set().await {
+        log_uncaptured("skipping non_overload_error_retried_on_same_server: requires replica set");
         return;
     }
 
@@ -370,9 +367,9 @@ async fn non_overload_error_retried_on_same_server() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn overload_error_retried_on_same_server_retargeting_disabled() {
-    if server_version_lt(4, 4).await || !topology_is_replica_set().await {
+    if !topology_is_replica_set().await {
         log_uncaptured(
-            "skipping overload_error_retried_on_same_server_retargeting_disabled: requires 4.4+ \
+            "skipping overload_error_retried_on_same_server_retargeting_disabled: requires \
              replica set",
         );
         return;
@@ -409,9 +406,9 @@ async fn overload_error_retried_on_same_server_retargeting_disabled() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn mix_of_overload_and_non_overload_errors() {
-    if server_version_lt(4, 4).await || !topology_is_replica_set().await {
+    if !topology_is_replica_set().await {
         log_uncaptured(
-            "skipping max_retries_when_overload_error_encountered: requires 4.4+ replica set",
+            "skipping max_retries_when_overload_error_encountered: requires replica set",
         );
         return;
     }

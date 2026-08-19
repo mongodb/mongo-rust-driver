@@ -2,20 +2,6 @@
 
 tasks:
 
-  - name: test-4.2-standalone
-    tags: [4.2, standalone]
-    depends_on:
-      - name: build-nextest-archive
-        patch_optional: true
-    commands:
-      - func: fetch nextest archive
-      - func: bootstrap mongo-orchestration
-        type: setup
-        vars:
-          MONGODB_VERSION: 4.2
-          TOPOLOGY: server
-      - func: run driver test suite
-
   - name: test-4.4-standalone
     tags: [4.4, standalone]
     depends_on:
@@ -128,20 +114,6 @@ tasks:
           TOPOLOGY: server
       - func: run driver test suite
 
-  - name: test-4.2-replicaset
-    tags: [4.2, replicaset]
-    depends_on:
-      - name: build-nextest-archive
-        patch_optional: true
-    commands:
-      - func: fetch nextest archive
-      - func: bootstrap mongo-orchestration
-        type: setup
-        vars:
-          MONGODB_VERSION: 4.2
-          TOPOLOGY: replica_set
-      - func: run driver test suite
-
   - name: test-4.4-replicaset
     tags: [4.4, replicaset]
     depends_on:
@@ -252,20 +224,6 @@ tasks:
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: replica_set
-      - func: run driver test suite
-
-  - name: test-4.2-sharded
-    tags: [4.2, sharded]
-    depends_on:
-      - name: build-nextest-archive
-        patch_optional: true
-    commands:
-      - func: fetch nextest archive
-      - func: bootstrap mongo-orchestration
-        type: setup
-        vars:
-          MONGODB_VERSION: 4.2
-          TOPOLOGY: sharded_cluster
       - func: run driver test suite
 
   - name: test-4.4-sharded

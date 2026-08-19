@@ -621,8 +621,8 @@ async fn x509_auth_skip_ci() {
 /// Test that commitTransaction succeeds on retry after a checkout failure.
 #[tokio::test(flavor = "multi_thread")]
 async fn retry_commit_txn_check_out() {
-    if !topology_is_replica_set().await || server_version_lt(4, 4).await {
-        log_uncaptured("skipping retry_commit_txn_check_out: requires 4.4+ replica set");
+    if !topology_is_replica_set().await {
+        log_uncaptured("skipping retry_commit_txn_check_out: requires replica set");
         return;
     }
 
@@ -1088,10 +1088,6 @@ async fn operation_retry_uses_exponential_backoff() {
         log_uncaptured("skipping operation_retry_uses_exponential_backoff: flaky on macos");
         return;
     }
-    if server_version_lt(4, 4).await {
-        log_uncaptured("skipping operation_retry_uses_exponential_backoff: requires 4.4+");
-        return;
-    }
 
     let mut options = get_client_options().await.clone();
     if topology_is_sharded().await {
@@ -1152,11 +1148,6 @@ async fn token_bucket_capacity_enforced() {
 // backpressure prose test #3
 #[tokio::test(flavor = "multi_thread")]
 async fn overload_errors_retried_max_retries_times() {
-    if server_version_lt(4, 4).await {
-        log_uncaptured("skipping overload_errors_retried_max_retries_times: requires 4.4+");
-        return;
-    }
-
     let mut options = get_client_options().await.clone();
     if topology_is_sharded().await {
         options.hosts.drain(1..);
@@ -1181,11 +1172,6 @@ async fn overload_errors_retried_max_retries_times() {
 /** disabled until backpressure phase 2 is implemented
 #[tokio::test(flavor = "multi_thread")]
 async fn adaptive_retries_limited_by_token_bucket_tokens() {
-    if server_version_lt(4, 4).await {
-        log_uncaptured("skipping adaptive_retries_limited_by_token_bucket_tokens: requires 4.4+");
-        return;
-    }
-
     let mut options = get_client_options().await.clone();
     if topology_is_sharded().await {
         options.hosts.drain(1..);
@@ -1212,13 +1198,6 @@ async fn adaptive_retries_limited_by_token_bucket_tokens() {
 // backpressure prose test #4
 #[tokio::test(flavor = "multi_thread")]
 async fn overload_errors_retried_max_adaptive_retries_times() {
-    if server_version_lt(4, 4).await {
-        log_uncaptured(
-            "skipping overload_errors_retried_max_adaptive_retries_times: requires 4.4+",
-        );
-        return;
-    }
-
     let mut options = get_client_options().await.clone();
     if topology_is_sharded().await {
         options.hosts.drain(1..);

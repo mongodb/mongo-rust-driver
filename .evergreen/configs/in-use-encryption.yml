@@ -2,21 +2,6 @@
 
 tasks:
 
-  - name: test-in-use-encryption-4.2
-    tags: [in-use-encryption]
-    depends_on:
-      - name: build-nextest-archive
-    commands:
-      - func: fetch nextest archive
-      - func: install libmongocrypt
-      - func: bootstrap mongo-orchestration
-        type: setup
-        vars:
-          MONGODB_VERSION: 4.2
-          TOPOLOGY: replica_set
-      - func: start csfle servers
-      - func: run csfle tests
-
   - name: test-in-use-encryption-4.4
     tags: [in-use-encryption]
     depends_on:

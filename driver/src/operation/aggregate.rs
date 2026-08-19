@@ -11,7 +11,7 @@ use crate::{
     options::{AggregateOptions, ClientOptions, ReadPreference, SelectionCriteria, WriteConcern},
 };
 
-use super::{BaseOperation, ExecutionContext, SERVER_4_4_0_WIRE_VERSION};
+use super::{BaseOperation, ExecutionContext};
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {
@@ -86,22 +86,16 @@ impl BaseOperation for Aggregate {
         if self.is_out_or_merge {
             response.validate_single_write()?;
         };
-
-        let description = context.connection.stream_description()?;
-
-        // The comment should only be propagated to getMore calls on 4.4+.
-        let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
-            None
-        } else {
-            self.options.as_ref().and_then(|opts| opts.comment.clone())
-        };
-
         CursorSpecification::new(
             response.into_owned(),
-            description.server_address.clone(),
+            context
+                .connection
+                .stream_description()?
+                .server_address
+                .clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
-            comment,
+            self.options.as_ref().and_then(|opts| opts.comment.clone()),
         )
     }
 
