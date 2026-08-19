@@ -7,13 +7,7 @@ use crate::{
     cmap::RawCommandResponse,
     cursor::common::CursorSpecification,
     error::Result,
-    operation::{
-        run_command::RunCommand,
-        OperationImpl,
-        Wrapped,
-        WrappedOperation,
-        SERVER_4_4_0_WIRE_VERSION,
-    },
+    operation::{run_command::RunCommand, OperationImpl, Wrapped, WrappedOperation},
     options::RunCursorCommandOptions,
     BoxFuture,
 };
@@ -58,21 +52,16 @@ impl<'conn> WrappedOperation for RunCursorCommand<'conn> {
         context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
-            let description = context.connection.stream_description()?;
-
-            // The comment should only be propagated to getMore calls on 4.4+.
-            let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
-                None
-            } else {
-                self.options.as_ref().and_then(|opts| opts.comment.clone())
-            };
-
             CursorSpecification::new(
                 response.into_owned(),
-                description.server_address.clone(),
+                context
+                    .connection
+                    .stream_description()?
+                    .server_address
+                    .clone(),
                 self.options.as_ref().and_then(|opts| opts.batch_size),
                 self.options.as_ref().and_then(|opts| opts.max_time),
-                comment,
+                self.options.as_ref().and_then(|opts| opts.comment.clone()),
             )
         }
         .boxed()

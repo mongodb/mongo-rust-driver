@@ -575,9 +575,9 @@ async fn error_propagation_some_errors_with_no_writes_performed() {
 // retryable writes prose test #6, cases #4 and #5
 #[tokio::test(flavor = "multi_thread")]
 async fn mix_of_overload_and_non_overload_errors() {
-    if server_version_lt(4, 4).await || !topology_is_replica_set().await {
+    if !topology_is_replica_set().await {
         log_uncaptured(
-            "skipping max_retries_when_overload_error_encountered: requires 4.4+ replica set",
+            "skipping max_retries_when_overload_error_encountered: requires replica set",
         );
         return;
     }

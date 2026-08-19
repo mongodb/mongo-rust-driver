@@ -61,18 +61,7 @@ impl<T: DeserializeOwned> BaseOperation for FindAndModify<T> {
     type O = Option<T>;
     const NAME: &'static CStr = cstr!("findAndModify");
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
-        if let Some(ref options) = self.options {
-            if options.hint.is_some() && description.max_wire_version.unwrap_or(0) < 8 {
-                return Err(ErrorKind::InvalidArgument {
-                    message: "Specifying a hint to find_one_and_x is not supported on server \
-                              versions < 4.4"
-                        .to_string(),
-                }
-                .into());
-            }
-        }
-
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.target.name(),
             "query": RawDocumentBuf::try_from(&self.query)?,

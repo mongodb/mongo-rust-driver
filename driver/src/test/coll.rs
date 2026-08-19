@@ -28,8 +28,6 @@ use crate::{
         get_max_bson_object_size,
         get_max_message_size_bytes,
         log_uncaptured,
-        server_version_eq,
-        server_version_lt,
         topology_is_replica_set,
         topology_is_standalone,
         EventClient,
@@ -528,11 +526,6 @@ async fn find_allow_disk_use_not_specified() {
 
 #[function_name::named]
 async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>) {
-    if server_version_lt(4, 3).await {
-        log_uncaptured("skipping allow_disk_use_test due to server version < 4.3");
-        return;
-    }
-
     let event_client = Client::for_test().monitor_events().await;
     let coll = event_client
         .database(function_name!())
@@ -601,11 +594,11 @@ async fn delete_hint_not_specified() {
 async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>, name: &str) {
     let client = Client::for_test().monitor_events().await;
 
-    let coll = client.database(name).collection(name);
-    let _: Result<Option<Document>> = coll
-        .find_one_and_delete(doc! {})
+    let coll = client.database(name).collection::<Document>(name);
+    coll.find_one_and_delete(doc! {})
         .with_options(options.clone())
-        .await;
+        .await
+        .unwrap();
 
     let events = client.events.get_command_started_events(&["findAndModify"]);
     assert_eq!(events.len(), 1);
@@ -641,27 +634,6 @@ async fn find_one_and_delete_hint_string_specified() {
 #[function_name::named]
 async fn find_one_and_delete_hint_not_specified() {
     find_one_and_delete_hint_test(None, function_name!()).await;
-}
-
-#[tokio::test]
-#[function_name::named]
-async fn find_one_and_delete_hint_server_version() {
-    let client = Client::for_test().monitor_events().await;
-    let coll = client
-        .database(function_name!())
-        .collection::<Document>("coll");
-
-    let res = coll
-        .find_one_and_delete(doc! {})
-        .hint(Hint::Name(String::new()))
-        .await;
-
-    if server_version_eq(4, 2).await {
-        let error = res.expect_err("find one and delete should fail");
-        assert!(matches!(*error.kind, ErrorKind::Command { .. }));
-    } else {
-        assert!(res.is_ok());
-    }
 }
 
 #[tokio::test]

@@ -3,8 +3,6 @@ use crate::error::{
     Redact,
     NOTWRITABLEPRIMARY_CODES,
     RECOVERING_CODES,
-    RETRYABLE_READ_CODES,
-    RETRYABLE_WRITE_CODES,
     SHUTTING_DOWN_CODES,
 };
 
@@ -42,29 +40,6 @@ fn not_writeable_primary_codes_disjoint_from_recovering_codes() {
             .all(|c| !RECOVERING_CODES.contains(c)),
         "NOTWRITABLEPRIMARY_CODES must be disjoint from RECOVERING_CODES",
     )
-}
-
-#[test]
-fn retryable_write_codes_subset_of_retryable_read_codes() {
-    assert!(
-        is_subset(&RETRYABLE_WRITE_CODES, &RETRYABLE_READ_CODES),
-        "RETRYABLE_WRITE_CODES must be a subset of RETRYABLE_READ_CODES"
-    );
-}
-
-#[test]
-fn retryable_read_codes_differ_from_write_codes_by_exactly_134() {
-    let read_only: Vec<i32> = RETRYABLE_READ_CODES
-        .iter()
-        .copied()
-        .filter(|c| !RETRYABLE_WRITE_CODES.contains(c))
-        .collect();
-    assert_eq!(
-        read_only,
-        vec![134],
-        "RETRYABLE_READ_CODES should differ from RETRYABLE_WRITE_CODES only by code 134 \
-         (ReadConcernMajorityNotAvailableYet)"
-    );
 }
 
 #[test]

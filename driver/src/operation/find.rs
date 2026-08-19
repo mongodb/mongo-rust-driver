@@ -4,7 +4,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::{Error, Result},
-    operation::{Base, BaseOperation, OperationImpl, Retryability, SERVER_4_4_0_WIRE_VERSION},
+    operation::{Base, BaseOperation, OperationImpl, Retryability},
     options::{ClientOptions, CursorType, FindOptions, SelectionCriteria},
     Collection,
 };
@@ -93,21 +93,16 @@ impl BaseOperation for Find {
         response: std::borrow::Cow<'a, RawCommandResponse>,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let description = context.connection.stream_description()?;
-
-        // The comment should only be propagated to getMore calls on 4.4+.
-        let comment = if description.max_wire_version.unwrap_or(0) < SERVER_4_4_0_WIRE_VERSION {
-            None
-        } else {
-            self.options.as_ref().and_then(|opts| opts.comment.clone())
-        };
-
         CursorSpecification::new(
             response.into_owned(),
-            description.server_address.clone(),
+            context
+                .connection
+                .stream_description()?
+                .server_address
+                .clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
-            comment,
+            self.options.as_ref().and_then(|opts| opts.comment.clone()),
         )
     }
 
