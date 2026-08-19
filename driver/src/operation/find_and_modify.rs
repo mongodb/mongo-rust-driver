@@ -11,7 +11,7 @@ use crate::{
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::options::UpdateModifications,
-    error::{ErrorKind, Result},
+    error::{convert_insert_many_error, Error, ErrorKind, Result},
     operation::{
         append_options_to_raw_document,
         find_and_modify::options::Modification,
@@ -19,6 +19,7 @@ use crate::{
         BaseOperation,
         OperationImpl,
         Retryability,
+        WriteResponseBody,
     },
     options::{ClientOptions, WriteConcern},
     Collection,
@@ -96,21 +97,19 @@ impl<T: DeserializeOwned> BaseOperation for FindAndModify<T> {
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         #[derive(Debug, Deserialize)]
-        pub(crate) struct Response {
+        struct Response {
+            // deserializing directly into Option<T> doesn't report an error if `value` is missing
             value: RawBson,
         }
-        let response: Response = response.body()?;
-
-        match response.value {
-            RawBson::Document(doc) => Ok(Some(deserialize_from_slice(doc.as_bytes())?)),
+        let body: WriteResponseBody<Response> = response.body()?;
+        body.validate().map_err(convert_insert_many_error)?;
+        match body.value {
+            RawBson::Document(ref doc) => Ok(Some(deserialize_from_slice(doc.as_bytes())?)),
             RawBson::Null => Ok(None),
-            other => Err(ErrorKind::InvalidResponse {
-                message: format!(
-                    "expected document for value field of findAndModify response, but instead got \
-                     {other:?}"
-                ),
-            }
-            .into()),
+            ref other => Err(Error::invalid_response(format!(
+                "expected document for value field of findAndModify response, but instead got \
+                 {other:?}",
+            ))),
         }
     }
 
