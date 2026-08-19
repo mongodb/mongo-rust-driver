@@ -5,13 +5,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, Result},
-    operation::{
-        append_options_to_raw_document,
-        Base,
-        BaseOperation,
-        OperationImpl,
-        WriteConcernOnlyBody,
-    },
+    operation::{append_options_to_raw_document, Base, BaseOperation, OperationImpl},
     options::{DropCollectionOptions, WriteConcern},
 };
 
@@ -52,8 +46,7 @@ impl BaseOperation for DropCollection {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()
+        response.extract_single_write_error()
     }
 
     fn handle_error(&self, error: Error) -> Result<Self::O> {

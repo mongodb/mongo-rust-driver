@@ -9,7 +9,7 @@ use crate::{
     Client,
 };
 
-use super::{BaseOperation, ExecutionContext, WriteConcernOnlyBody};
+use super::{BaseOperation, ExecutionContext};
 
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
@@ -49,8 +49,7 @@ impl BaseOperation for AbortTransaction {
         response: &RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()
+        response.extract_single_write_error()
     }
 
     fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {

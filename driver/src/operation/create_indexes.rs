@@ -12,7 +12,7 @@ use crate::{
     results::CreateIndexesResult,
 };
 
-use super::{ExecutionContext, WriteConcernOnlyBody};
+use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct CreateIndexes {
@@ -72,8 +72,7 @@ impl BaseOperation for CreateIndexes {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()?;
+        response.extract_single_write_error()?;
         let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
         Ok(CreateIndexesResult { index_names })
     }

@@ -11,7 +11,7 @@ use crate::{
     Client,
 };
 
-use super::{ExecutionContext, WriteConcernOnlyBody};
+use super::ExecutionContext;
 
 pub(crate) struct CommitTransaction {
     options: Option<TransactionOptions>,
@@ -47,8 +47,7 @@ impl BaseOperation for CommitTransaction {
         response: &RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()
+        response.extract_single_write_error()
     }
 
     fn write_concern(&self) -> super::Feature<&WriteConcern> {

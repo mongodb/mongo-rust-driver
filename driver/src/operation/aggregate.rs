@@ -11,7 +11,7 @@ use crate::{
     options::{AggregateOptions, ClientOptions, ReadPreference, SelectionCriteria, WriteConcern},
 };
 
-use super::{BaseOperation, ExecutionContext, WriteConcernOnlyBody, SERVER_4_4_0_WIRE_VERSION};
+use super::{BaseOperation, ExecutionContext, SERVER_4_4_0_WIRE_VERSION};
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {
@@ -84,8 +84,7 @@ impl BaseOperation for Aggregate {
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         if self.is_out_or_merge {
-            let wc_error_info = response.body::<WriteConcernOnlyBody>()?;
-            wc_error_info.validate()?;
+            response.extract_single_write_error()?;
         };
 
         let description = context.connection.stream_description()?;

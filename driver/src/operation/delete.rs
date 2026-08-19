@@ -3,15 +3,8 @@ use crate::{
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     collation::Collation,
-    error::{convert_insert_many_error, Result},
-    operation::{
-        append_options,
-        Base,
-        BaseOperation,
-        OperationImpl,
-        Retryability,
-        WriteResponseBody,
-    },
+    error::Result,
+    operation::{append_options, Base, BaseOperation, OperationImpl, Retryability},
     options::{ClientOptions, DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
     Collection,
@@ -85,11 +78,9 @@ impl BaseOperation for Delete {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteResponseBody = response.body()?;
-        response.validate().map_err(convert_insert_many_error)?;
-
+        response.extract_single_write_error()?;
         Ok(DeleteResult {
-            deleted_count: response.n,
+            deleted_count: response.extract_n()?,
         })
     }
 

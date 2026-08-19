@@ -26,7 +26,7 @@ use crate::{
     options::ServerAddress,
     runtime::AsyncStream,
 };
-pub(crate) use command::{Command, RawCommandResponse};
+pub(crate) use command::{Command, RawCommandResponse, WriteErrorBody};
 pub(crate) use stream_description::StreamDescription;
 
 #[cfg(any(

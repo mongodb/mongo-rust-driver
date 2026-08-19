@@ -11,7 +11,7 @@ use crate::{
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::options::UpdateModifications,
-    error::{convert_insert_many_error, Error, ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     operation::{
         append_options_to_raw_document,
         find_and_modify::options::Modification,
@@ -19,7 +19,6 @@ use crate::{
         BaseOperation,
         OperationImpl,
         Retryability,
-        WriteResponseBody,
     },
     options::{ClientOptions, WriteConcern},
     Collection,
@@ -96,13 +95,13 @@ impl<T: DeserializeOwned> BaseOperation for FindAndModify<T> {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
+        response.extract_single_write_error()?;
         #[derive(Debug, Deserialize)]
         struct Response {
             // deserializing directly into Option<T> doesn't report an error if `value` is missing
             value: RawBson,
         }
-        let body: WriteResponseBody<Response> = response.body()?;
-        body.validate().map_err(convert_insert_many_error)?;
+        let body = response.body::<Response>()?;
         match body.value {
             RawBson::Document(ref doc) => Ok(Some(deserialize_from_slice(doc.as_bytes())?)),
             RawBson::Null => Ok(None),
