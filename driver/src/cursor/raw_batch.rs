@@ -118,8 +118,8 @@ impl RawBatch {
 pub struct RawBatchCursor {
     client: Client,
     drop_token: AsyncDropToken,
-    info: CursorInformation,
-    state: RawBatchCursorState,
+    state: CursorState,
+    provider: GetMoreRawProvider<'static, ImplicitClientSessionHandle>,
     drop_address: Option<ServerAddress>,
     #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
@@ -133,12 +133,124 @@ const _: fn() = || {
     assert_unpin(_rb);
 };
 
-struct RawBatchCursorState {
+/// The state of a server-side cursor, shared by [`RawBatchCursor`] and [`SessionRawBatchCursor`].
+#[derive(Debug)]
+struct CursorState {
+    info: CursorInformation,
     exhausted: bool,
     pinned_connection: PinnedConnection,
     post_batch_resume_token: Option<ResumeToken>,
-    provider: GetMoreRawProvider<'static, ImplicitClientSessionHandle>,
-    buffered_reply: Option<RawDocumentBuf>,
+    buffered_reply: Option<BufferedReply>,
+}
+
+impl CursorState {
+    fn new(spec: CursorSpecification, pin: Option<PinnedConnectionHandle>) -> Self {
+        Self {
+            exhausted: spec.info.id == 0,
+            info: spec.info,
+            pinned_connection: PinnedConnection::new(pin),
+            post_batch_resume_token: spec.post_batch_resume_token,
+            buffered_reply: Some(BufferedReply::new(spec.initial_reply)),
+        }
+    }
+
+    fn mark_exhausted(&mut self) {
+        self.exhausted = true;
+        self.pinned_connection = PinnedConnection::Unpinned;
+    }
+
+    fn has_next(&self) -> bool {
+        !self.exhausted
+            || self
+                .buffered_reply
+                .as_ref()
+                .is_some_and(|buffered| buffered.has_docs)
+    }
+
+    fn poll_next_batch<'s, S: ClientSessionHandle<'s>>(
+        &mut self,
+        provider: &mut GetMoreRawProvider<'s, S>,
+        client: &Client,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<RawBatch>>> {
+        loop {
+            // If a getMore is in flight, poll it and update state.
+            if let Some(future) = provider.executing_future() {
+                let get_more_out = ready!(Pin::new(future).poll(cx));
+                let error = match get_more_out.result {
+                    Ok(out) => {
+                        self.buffered_reply = Some(BufferedReply::new(out.raw_reply));
+                        self.post_batch_resume_token = out.post_batch_resume_token;
+                        if out.exhausted {
+                            self.mark_exhausted();
+                        }
+                        if out.id != 0 {
+                            self.info.id = out.id;
+                        }
+                        self.info.ns = out.ns;
+                        None
+                    }
+                    Err(e) => {
+                        if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
+                        {
+                            self.mark_exhausted();
+                        }
+                        if e.is_network_error() {
+                            // Flag the connection as invalid, preventing a killCursors
+                            // command, but leave the connection pinned.
+                            self.pinned_connection.invalidate();
+                        }
+                        Some(e)
+                    }
+                };
+                provider.clear_execution(get_more_out.session, self.exhausted);
+                if let Some(e) = error {
+                    return Poll::Ready(Some(Err(e)));
+                }
+            }
+
+            // Yield any buffered reply.
+            if let Some(buffered) = self.buffered_reply.take() {
+                return Poll::Ready(Some(Ok(RawBatch::new(buffered.reply))));
+            }
+
+            // If not exhausted and the connection is valid, start a getMore and iterate.
+            if !self.exhausted && !matches!(self.pinned_connection, PinnedConnection::Invalid(_)) {
+                provider.start_execution(
+                    self.info.clone(),
+                    client.clone(),
+                    self.pinned_connection.handle(),
+                );
+                continue;
+            }
+
+            // Otherwise, we're done.
+            return Poll::Ready(None);
+        }
+    }
+}
+
+/// A server reply along with cached "has documents" status.
+#[derive(Debug)]
+struct BufferedReply {
+    reply: RawDocumentBuf,
+    has_docs: bool,
+}
+
+impl BufferedReply {
+    fn new(reply: RawDocumentBuf) -> Self {
+        let has_docs = reply
+            .get_document(CURSOR)
+            .ok()
+            .and_then(|cursor| {
+                cursor
+                    .get_array(FIRST_BATCH)
+                    .or_else(|_| cursor.get_array(NEXT_BATCH))
+                    .ok()
+            })
+            .is_some_and(|batch| !batch.is_empty());
+        Self { reply, has_docs }
+    }
 }
 
 impl crate::cursor::NewCursor for RawBatchCursor {
@@ -163,20 +275,14 @@ impl RawBatchCursor {
         Self {
             client: client.clone(),
             drop_token: client.register_async_drop(),
-            info: spec.info,
             drop_address: None,
             #[cfg(test)]
             kill_watcher: None,
-            state: RawBatchCursorState {
-                exhausted,
-                pinned_connection: PinnedConnection::new(pin),
-                post_batch_resume_token: spec.post_batch_resume_token,
-                provider: if exhausted {
-                    GetMoreRawProvider::Done
-                } else {
-                    GetMoreRawProvider::Idle(Box::new(ImplicitClientSessionHandle(session)))
-                },
-                buffered_reply: Some(spec.initial_reply),
+            state: CursorState::new(spec, pin),
+            provider: if exhausted {
+                GetMoreRawProvider::Done
+            } else {
+                GetMoreRawProvider::Idle(Box::new(ImplicitClientSessionHandle(session)))
             },
         }
     }
@@ -186,24 +292,7 @@ impl RawBatchCursor {
     }
 
     pub(crate) fn has_next(&self) -> bool {
-        if !self.is_exhausted() {
-            return true;
-        }
-        let Some(batch) = self
-            .state
-            .buffered_reply
-            .as_ref()
-            .and_then(|reply| reply.get_document(CURSOR).ok())
-            .and_then(|cursor| {
-                cursor
-                    .get_array(FIRST_BATCH)
-                    .or_else(|_| cursor.get_array(NEXT_BATCH))
-                    .ok()
-            })
-        else {
-            return false;
-        };
-        !batch.is_empty()
+        self.state.has_next()
     }
 
     pub(crate) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
@@ -211,7 +300,7 @@ impl RawBatchCursor {
     }
 
     pub(crate) fn address(&self) -> &ServerAddress {
-        &self.info.address
+        &self.state.info.address
     }
 
     pub(crate) fn set_drop_address(&mut self, address: ServerAddress) {
@@ -220,11 +309,6 @@ impl RawBatchCursor {
 
     pub(crate) fn client(&self) -> &Client {
         &self.client
-    }
-
-    fn mark_exhausted(&mut self) {
-        self.state.exhausted = true;
-        self.state.pinned_connection = PinnedConnection::Unpinned;
     }
 
     #[cfg(test)]
@@ -238,74 +322,17 @@ impl RawBatchCursor {
 
     /// Extracts the stored implicit [`ClientSession`], if any.
     pub(crate) fn take_implicit_session(&mut self) -> Option<ClientSession> {
-        self.state.provider.take_implicit_session()
+        self.provider.take_implicit_session()
     }
 }
 
 impl Stream for RawBatchCursor {
     type Item = Result<RawBatch>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        loop {
-            // If a getMore is in flight, poll it and update state.
-            if let Some(future) = self.state.provider.executing_future() {
-                let get_more_out = ready!(Pin::new(future).poll(cx));
-                match get_more_out.result {
-                    Ok(out) => {
-                        self.state.buffered_reply = Some(out.raw_reply);
-                        self.state.post_batch_resume_token = out.post_batch_resume_token;
-                        if out.exhausted {
-                            self.mark_exhausted();
-                        }
-                        if out.id != 0 {
-                            self.info.id = out.id;
-                        }
-                        self.info.ns = out.ns;
-                    }
-                    Err(e) => {
-                        if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                        {
-                            self.mark_exhausted();
-                        }
-                        if e.is_network_error() {
-                            // Flag the connection as invalid, preventing a killCursors
-                            // command, but leave the connection pinned.
-                            self.state.pinned_connection.invalidate();
-                        }
-                        let exhausted_now = self.state.exhausted;
-                        self.state
-                            .provider
-                            .clear_execution(get_more_out.session, exhausted_now);
-                        return Poll::Ready(Some(Err(e)));
-                    }
-                }
-                let exhausted_now = self.state.exhausted;
-                self.state
-                    .provider
-                    .clear_execution(get_more_out.session, exhausted_now);
-            }
-
-            // Yield any buffered reply.
-            if let Some(reply) = self.state.buffered_reply.take() {
-                return Poll::Ready(Some(Ok(RawBatch::new(reply))));
-            }
-
-            // If not exhausted and the connection is valid, start a getMore and iterate.
-            if !self.state.exhausted
-                && !matches!(self.state.pinned_connection, PinnedConnection::Invalid(_))
-            {
-                let info = self.info.clone();
-                let client = self.client.clone();
-                let state = &mut self.state;
-                state
-                    .provider
-                    .start_execution(info, client, state.pinned_connection.handle());
-                continue;
-            }
-
-            // Otherwise, we're done.
-            return Poll::Ready(None);
-        }
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        this.state
+            .poll_next_batch(&mut this.provider, &this.client, cx)
     }
 }
 
@@ -317,8 +344,8 @@ impl Drop for RawBatchCursor {
         kill_cursor(
             self.client.clone(),
             &mut self.drop_token,
-            &self.info.ns,
-            self.info.id,
+            &self.state.info.ns,
+            self.state.info.id,
             self.state.pinned_connection.replicate(),
             self.drop_address.take(),
             #[cfg(test)]
@@ -332,11 +359,7 @@ impl Drop for RawBatchCursor {
 pub struct SessionRawBatchCursor {
     client: Client,
     drop_token: AsyncDropToken,
-    info: CursorInformation,
-    exhausted: bool,
-    pinned_connection: PinnedConnection,
-    post_batch_resume_token: Option<ResumeToken>,
-    buffered_reply: Option<RawDocumentBuf>,
+    state: CursorState,
     drop_address: Option<ServerAddress>,
     #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
@@ -359,15 +382,10 @@ impl SessionRawBatchCursor {
         spec: CursorSpecification,
         pinned: Option<PinnedConnectionHandle>,
     ) -> Self {
-        let exhausted = spec.info.id == 0;
         Self {
             drop_token: client.register_async_drop(),
             client,
-            info: spec.info,
-            exhausted,
-            pinned_connection: PinnedConnection::new(pinned),
-            post_batch_resume_token: spec.post_batch_resume_token,
-            buffered_reply: Some(spec.initial_reply),
+            state: CursorState::new(spec, pinned),
             drop_address: None,
             #[cfg(test)]
             kill_watcher: None,
@@ -387,24 +405,19 @@ impl SessionRawBatchCursor {
     }
 
     pub(crate) fn address(&self) -> &ServerAddress {
-        &self.info.address
+        &self.state.info.address
     }
 
     pub(crate) fn set_drop_address(&mut self, address: ServerAddress) {
         self.drop_address = Some(address);
     }
 
-    fn mark_exhausted(&mut self) {
-        self.exhausted = true;
-        self.pinned_connection = PinnedConnection::Unpinned;
-    }
-
     pub(crate) fn is_exhausted(&self) -> bool {
-        self.exhausted
+        self.state.exhausted
     }
 
     pub(crate) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
-        self.post_batch_resume_token.as_ref()
+        self.state.post_batch_resume_token.as_ref()
     }
 
     #[cfg(test)]
@@ -429,9 +442,9 @@ impl Drop for SessionRawBatchCursor {
         kill_cursor(
             self.client.clone(),
             &mut self.drop_token,
-            &self.info.ns,
-            self.info.id,
-            self.pinned_connection.replicate(),
+            &self.state.info.ns,
+            self.state.info.id,
+            self.state.pinned_connection.replicate(),
             self.drop_address.take(),
             #[cfg(test)]
             self.kill_watcher.take(),
@@ -449,69 +462,11 @@ pub struct SessionRawBatchCursorStream<'cursor, 'session> {
 impl Stream for SessionRawBatchCursorStream<'_, '_> {
     type Item = Result<RawBatch>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        loop {
-            // If a getMore is in flight, poll it and update state.
-            if let Some(future) = self.provider.executing_future() {
-                let get_more_out = ready!(Pin::new(future).poll(cx));
-                match get_more_out.result {
-                    Ok(out) => {
-                        if out.exhausted {
-                            self.parent.mark_exhausted();
-                        }
-                        if out.id != 0 {
-                            self.parent.info.id = out.id;
-                        }
-                        self.parent.info.ns = out.ns;
-                        self.parent.post_batch_resume_token = out.post_batch_resume_token;
-                        // Buffer next reply to yield on following polls.
-                        self.parent.buffered_reply = Some(out.raw_reply);
-                    }
-                    Err(e) => {
-                        if matches!(*e.kind, ErrorKind::Command(ref ce) if ce.code == 43 || ce.code == 237)
-                        {
-                            self.parent.mark_exhausted();
-                        }
-                        if e.is_network_error() {
-                            // Flag the connection as invalid, preventing a killCursors
-                            // command, but leave the connection pinned.
-                            self.parent.pinned_connection.invalidate();
-                        }
-                        let exhausted_now = self.parent.exhausted;
-                        self.provider
-                            .clear_execution(get_more_out.session, exhausted_now);
-                        return Poll::Ready(Some(Err(e)));
-                    }
-                }
-                let exhausted_now = self.parent.exhausted;
-                self.provider
-                    .clear_execution(get_more_out.session, exhausted_now);
-            }
-
-            // Yield any buffered reply.
-            if let Some(reply) = self.parent.buffered_reply.take() {
-                return Poll::Ready(Some(Ok(RawBatch::new(reply))));
-            }
-
-            // If not exhausted and the connection is valid, start a getMore and iterate.
-            if !self.parent.exhausted
-                && !matches!(self.parent.pinned_connection, PinnedConnection::Invalid(_))
-            {
-                let info = self.parent.info.clone();
-                let client = self.parent.client.clone();
-                let pinned_owned = self
-                    .parent
-                    .pinned_connection
-                    .handle()
-                    .map(|c| c.replicate());
-                let pinned_ref = pinned_owned.as_ref();
-                self.provider.start_execution(info, client, pinned_ref);
-                continue;
-            }
-
-            // Otherwise, we're done.
-            return Poll::Ready(None);
-        }
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        this.parent
+            .state
+            .poll_next_batch(&mut this.provider, &this.parent.client, cx)
     }
 }
 

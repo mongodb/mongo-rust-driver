@@ -11,15 +11,19 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{cursor::stream::AdvanceResult, error::Error};
 use derive_where::derive_where;
-use futures_core::{future::BoxFuture, Stream};
+use futures_core::Stream;
 use futures_util::FutureExt;
 use serde::de::DeserializeOwned;
 #[cfg(test)]
 use tokio::sync::oneshot;
 
-use crate::{change_stream::event::ResumeToken, error::Result, Cursor};
+use crate::{
+    change_stream::event::ResumeToken,
+    cursor::poll_state::{poll_panic, PollState},
+    error::Result,
+    Cursor,
+};
 use common::{ChangeStreamData, WatchArgs};
 
 /// A `ChangeStream` streams the ongoing changes of its associated collection, database or
@@ -72,7 +76,7 @@ pub struct ChangeStream<T>
 where
     T: DeserializeOwned,
 {
-    inner: StreamState<T>,
+    inner: ChangeStreamState<T>,
 }
 
 impl<T> ChangeStream<T>
@@ -81,7 +85,7 @@ where
 {
     pub(crate) fn new(cursor: Cursor<()>, args: WatchArgs, data: ChangeStreamData) -> Self {
         Self {
-            inner: StreamState::Idle(Box::new(CursorWrapper::new(cursor, args, data))),
+            inner: PollState::new(Box::new(CursorWrapper::new(cursor, args, data))),
         }
     }
 
@@ -92,19 +96,19 @@ where
     /// [here](https://www.mongodb.com/docs/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
     pub fn resume_token(&self) -> Option<ResumeToken> {
-        self.inner.state().data.resume_token.clone()
+        poll_panic!(self.inner.state()).data.resume_token.clone()
     }
 
     /// Update the type streamed values will be parsed as.
     pub fn with_type<D: DeserializeOwned>(self) -> ChangeStream<D> {
         ChangeStream {
-            inner: StreamState::Idle(self.inner.take_state()),
+            inner: PollState::new(poll_panic!(self.inner.into_state())),
         }
     }
 
     /// Returns whether the change stream will continue to receive events.
     pub fn is_alive(&self) -> bool {
-        !self.inner.state().cursor.raw().is_exhausted()
+        !poll_panic!(self.inner.state().and_then(|state| state.cursor.raw())).is_exhausted()
     }
 
     /// Retrieves the next result from the change stream, if any.
@@ -134,25 +138,30 @@ where
     pub async fn next_if_any(&mut self) -> Result<Option<T>> {
         Ok(self
             .inner
-            .state_mut()
+            .state_mut()?
             .next_if_any(&mut ())
             .await?
             .into_option())
     }
 
     #[cfg(test)]
-    pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) {
-        self.inner.state_mut().cursor.raw_mut().set_kill_watcher(tx);
+    pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) -> Result<()> {
+        self.inner
+            .state_mut()?
+            .cursor
+            .raw_mut()?
+            .set_kill_watcher(tx);
+        Ok(())
     }
 
     #[cfg(test)]
-    pub(crate) fn current_batch(&self) -> &VecDeque<crate::bson::RawDocumentBuf> {
-        self.inner.state().cursor.batch()
+    pub(crate) fn current_batch(&self) -> Result<&VecDeque<crate::bson::RawDocumentBuf>> {
+        self.inner.state()?.cursor.batch()
     }
 
     #[cfg(test)]
-    pub(crate) fn client(&self) -> &crate::Client {
-        self.inner.state().cursor.raw().client()
+    pub(crate) fn client(&self) -> Result<&crate::Client> {
+        Ok(self.inner.state()?.cursor.raw()?.client())
     }
 }
 
@@ -162,91 +171,24 @@ where
 {
     type Item = Result<T>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.inner).poll_next(cx)
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.get_mut().inner.poll_next_step(
+            cx,
+            |mut state| {
+                async move {
+                    let out = state.next_event(&mut ()).await;
+                    (state, out)
+                }
+                .boxed()
+            },
+            |_, out| out.transpose(),
+        )
     }
 }
 
 type CursorWrapper = common::CursorWrapper<Cursor<()>>;
 
-// This is almost entirely the same as `crate::cursor::stream::Stream`.  However, making a generic
-// version to underlie both has the side effect of changing the variance on `T` from covariant to
-// invariant, which breaks cursor zero-copy deserialization :(
-#[derive_where(Debug)]
-enum StreamState<T: DeserializeOwned> {
-    Idle(Box<CursorWrapper>),
-    Polling,
-    Next(#[derive_where(skip)] BoxFuture<'static, NextDone<T>>),
-}
-
-struct NextDone<T> {
-    state: CursorWrapper,
-    out: Result<AdvanceResult<T>>,
-}
-
-impl<T: DeserializeOwned> StreamState<T> {
-    fn state(&self) -> &CursorWrapper {
-        match self {
-            Self::Idle(st) => st,
-            _ => panic!("invalid change stream state access"),
-        }
-    }
-
-    fn state_mut(&mut self) -> &mut CursorWrapper {
-        match self {
-            Self::Idle(st) => st,
-            _ => panic!("invalid change stream state access"),
-        }
-    }
-
-    fn take_state(self) -> Box<CursorWrapper> {
-        match self {
-            Self::Idle(st) => st,
-            _ => panic!("invalid change stream state access"),
-        }
-    }
-}
-
-impl<T: DeserializeOwned> Stream for StreamState<T> {
-    type Item = Result<T>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        loop {
-            match std::mem::replace(&mut *self, StreamState::Polling) {
-                StreamState::Idle(mut state) => {
-                    *self = StreamState::Next(
-                        async move {
-                            let out = state.next_if_any(&mut ()).await;
-                            NextDone { state: *state, out }
-                        }
-                        .boxed(),
-                    );
-                    continue;
-                }
-                StreamState::Next(mut fut) => match fut.poll_unpin(cx) {
-                    Poll::Pending => {
-                        *self = StreamState::Next(fut);
-                        return Poll::Pending;
-                    }
-                    Poll::Ready(NextDone { state, out }) => {
-                        *self = StreamState::Idle(Box::new(state));
-                        match out {
-                            Ok(AdvanceResult::Advanced(v)) => return Poll::Ready(Some(Ok(v))),
-                            Ok(AdvanceResult::Waiting) => continue,
-                            Ok(AdvanceResult::Exhausted) => return Poll::Ready(None),
-                            Err(e) => return Poll::Ready(Some(Err(e))),
-                        }
-                    }
-                },
-                StreamState::Polling => {
-                    return Poll::Ready(Some(Err(Error::internal(
-                        "attempt to poll change stream already in polling state",
-                    ))))
-                }
-            }
-        }
-    }
-}
+type ChangeStreamState<T> = PollState<'static, Box<CursorWrapper>, Result<Option<T>>>;
 
 impl common::InnerCursor for Cursor<()> {
     type Session = ();
@@ -259,7 +201,7 @@ impl common::InnerCursor for Cursor<()> {
     }
 
     fn get_resume_token(&self) -> Result<Option<ResumeToken>> {
-        common::get_resume_token(self.batch(), self.raw().post_batch_resume_token())
+        common::get_resume_token(self.batch()?, self.raw()?.post_batch_resume_token())
     }
 
     fn current(&self) -> &crate::bson::RawDocument {
@@ -272,18 +214,18 @@ impl common::InnerCursor for Cursor<()> {
         mut data: ChangeStreamData,
         _session: &mut Self::Session,
     ) -> Result<(Self, WatchArgs)> {
-        data.implicit_session = self.raw_mut().take_implicit_session();
-        let new_stream: ChangeStream<event::ChangeStreamEvent<()>> = self
-            .raw()
-            .client()
+        data.implicit_session = self.raw_mut()?.take_implicit_session();
+        let client = self.raw()?.client().clone();
+        let new_stream: ChangeStream<event::ChangeStreamEvent<()>> = client
             .execute_watch(args.pipeline, args.options, args.target, Some(data))
             .await?;
-        let new_wrapper = new_stream.inner.take_state();
+        let new_wrapper = new_stream.inner.into_state()?;
         Ok((new_wrapper.cursor, new_wrapper.args))
     }
 
-    fn set_drop_address(&mut self, from: &Self) {
-        self.raw_mut()
-            .set_drop_address(from.raw().address().clone());
+    fn set_drop_address(&mut self, from: &Self) -> Result<()> {
+        self.raw_mut()?
+            .set_drop_address(from.raw()?.address().clone());
+        Ok(())
     }
 }

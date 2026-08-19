@@ -8,10 +8,9 @@ use serde::{de::DeserializeOwned, Deserialize};
 use crate::{
     bson::{RawDocument, RawDocumentBuf},
     error::{Error, Result},
-    BoxFuture,
 };
 
-use super::raw_batch::RawBatch;
+use super::{poll_state::PollState, raw_batch::RawBatch};
 
 /// `Stream` represents an "introspectable" cursor stream - an implementation of an async `Stream`
 /// with a buffer that's available for external use when the stream isn't actively being polled.
@@ -20,7 +19,7 @@ use super::raw_batch::RawBatch;
 /// future is dropped without being fully polled, which is documented as unsupported by the driver.
 #[derive_where(Debug)]
 pub(super) struct Stream<'a, Raw, T> {
-    state: StreamState<'a, Raw>,
+    state: PollState<'a, BatchBuffer<Raw>, Result<bool>>,
     _phantom: std::marker::PhantomData<fn() -> T>,
 }
 
@@ -31,30 +30,21 @@ impl<'a, Raw, T> Stream<'a, Raw, T> {
 
     pub(super) fn from_cursor(cs: BatchBuffer<Raw>) -> Self {
         Self {
-            state: StreamState::Idle(cs),
+            state: PollState::new(cs),
             _phantom: std::marker::PhantomData,
         }
     }
 
-    pub(super) fn buffer(&self) -> &BatchBuffer<Raw> {
-        match &self.state {
-            StreamState::Idle(state) => state,
-            _ => panic!("state access while streaming"),
-        }
+    pub(super) fn buffer(&self) -> Result<&BatchBuffer<Raw>> {
+        self.state.state()
     }
 
-    pub(super) fn buffer_mut(&mut self) -> &mut BatchBuffer<Raw> {
-        match &mut self.state {
-            StreamState::Idle(state) => state,
-            _ => panic!("state access while streaming"),
-        }
+    pub(super) fn buffer_mut(&mut self) -> Result<&mut BatchBuffer<Raw>> {
+        self.state.state_mut()
     }
 
-    pub(super) fn take_buffer(&mut self) -> BatchBuffer<Raw> {
-        match std::mem::replace(&mut self.state, StreamState::Polling) {
-            StreamState::Idle(state) => state,
-            _ => panic!("state access while streaming"),
-        }
+    pub(super) fn take_buffer(&mut self) -> Option<BatchBuffer<Raw>> {
+        self.state.take_state()
     }
 
     pub(super) fn with_type<D>(self) -> Stream<'a, Raw, D> {
@@ -63,19 +53,6 @@ impl<'a, Raw, T> Stream<'a, Raw, T> {
             _phantom: std::marker::PhantomData,
         }
     }
-}
-
-#[derive_where(Debug)]
-enum StreamState<'a, Raw> {
-    Idle(BatchBuffer<Raw>),
-    Polling,
-    Advance(#[derive_where(skip)] BoxFuture<'a, AdvanceDone<Raw>>),
-}
-
-#[derive_where(Debug)]
-struct AdvanceDone<Raw> {
-    buffer: BatchBuffer<Raw>,
-    out: Result<bool>,
 }
 
 #[derive_where(Debug)]
@@ -207,41 +184,20 @@ impl<'a, Raw: 'a + AsyncStream<Item = Result<RawBatch>> + Send + Unpin, T: Deser
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        loop {
-            match std::mem::replace(&mut self.state, StreamState::Polling) {
-                StreamState::Idle(mut buffer) => {
-                    self.state = StreamState::Advance(
-                        async move {
-                            let out = buffer.advance().await;
-                            AdvanceDone { buffer, out }
-                        }
-                        .boxed(),
-                    );
-                    continue;
+        self.state.poll_next_step(
+            cx,
+            |mut buffer| {
+                async move {
+                    let out = buffer.advance().await;
+                    (buffer, out)
                 }
-                StreamState::Advance(mut fut) => {
-                    return match fut.poll_unpin(cx) {
-                        Poll::Pending => {
-                            self.state = StreamState::Advance(fut);
-                            Poll::Pending
-                        }
-                        Poll::Ready(ar) => {
-                            let out = match ar.out {
-                                Err(e) => Some(Err(e)),
-                                Ok(false) => None,
-                                Ok(true) => Some(ar.buffer.deserialize_current()),
-                            };
-                            self.state = StreamState::Idle(ar.buffer);
-                            return Poll::Ready(out);
-                        }
-                    }
-                }
-                StreamState::Polling => {
-                    return Poll::Ready(Some(Err(Error::internal(
-                        "attempt to poll cursor already in polling state",
-                    ))))
-                }
-            }
-        }
+                .boxed()
+            },
+            |buffer, out| match out {
+                Err(e) => Some(Err(e)),
+                Ok(false) => None,
+                Ok(true) => Some(buffer.deserialize_current()),
+            },
+        )
     }
 }

@@ -75,6 +75,24 @@ impl<Inner> CursorWrapper<Inner> {
         Self { cursor, args, data }
     }
 
+    /// Retrieve the next event, waiting through batches that arrive empty.  Returns `None` only
+    /// when the cursor is exhausted and no further events can arrive.
+    pub(super) async fn next_event<T: DeserializeOwned>(
+        &mut self,
+        session: &mut Inner::Session,
+    ) -> Result<Option<T>>
+    where
+        Inner: InnerCursor,
+    {
+        loop {
+            match self.next_if_any(session).await? {
+                AdvanceResult::Advanced(event) => return Ok(Some(event)),
+                AdvanceResult::Waiting => continue,
+                AdvanceResult::Exhausted => return Ok(None),
+            }
+        }
+    }
+
     pub(super) async fn next_if_any<T: DeserializeOwned>(
         &mut self,
         session: &mut Inner::Session,
@@ -100,7 +118,7 @@ impl<Inner> CursorWrapper<Inner> {
                         .execute_watch(self.args.clone(), self.data.take(), session)
                         .await?;
                     // Ensure that the old cursor is killed on the server selected for the new one.
-                    self.cursor.set_drop_address(&new_cursor);
+                    self.cursor.set_drop_address(&new_cursor)?;
                     self.cursor = new_cursor;
                     self.args = new_args;
                     continue;
@@ -138,5 +156,5 @@ pub(super) trait InnerCursor: Sized {
         data: ChangeStreamData,
         session: &mut Self::Session,
     ) -> Result<(Self, WatchArgs)>;
-    fn set_drop_address(&mut self, from: &Self);
+    fn set_drop_address(&mut self, from: &Self) -> Result<()>;
 }

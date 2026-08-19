@@ -55,7 +55,7 @@ impl TestOperation for Close {
                 }
                 Entity::Cursor(_) => {
                     let cursor = entities.get_mut(id).unwrap().as_mut_cursor();
-                    let rx = cursor.make_kill_watcher().await;
+                    let rx = cursor.make_kill_watcher().await?;
                     *cursor = TestCursor::Closed;
                     drop(entities);
                     let _ = rx.await;

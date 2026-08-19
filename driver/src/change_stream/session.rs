@@ -1,7 +1,7 @@
 //! Types for change streams using sessions.
 use serde::de::DeserializeOwned;
 
-use crate::{cursor::stream::AdvanceResult, error::Result, ClientSession, SessionCursor};
+use crate::{error::Result, ClientSession, SessionCursor};
 
 use super::{
     event::{ChangeStreamEvent, ResumeToken},
@@ -92,13 +92,7 @@ where
     /// # }
     /// ```
     pub async fn next(&mut self, session: &mut ClientSession) -> Result<Option<T>> {
-        loop {
-            match self.inner.next_if_any(session).await? {
-                AdvanceResult::Advanced(t) => return Ok(Some(t)),
-                AdvanceResult::Waiting => continue,
-                AdvanceResult::Exhausted => return Ok(None),
-            }
-        }
+        self.inner.next_event(session).await
     }
 
     /// Returns whether the change stream will continue to receive events.
@@ -147,7 +141,7 @@ impl super::common::InnerCursor for SessionCursor<()> {
     }
 
     fn get_resume_token(&self) -> Result<Option<ResumeToken>> {
-        super::common::get_resume_token(self.batch(), self.raw().post_batch_resume_token())
+        super::common::get_resume_token(self.batch()?, self.raw().post_batch_resume_token())
     }
 
     fn current(&self) -> &crate::bson::RawDocument {
@@ -175,8 +169,9 @@ impl super::common::InnerCursor for SessionCursor<()> {
         Ok((new_inner.cursor, new_inner.args))
     }
 
-    fn set_drop_address(&mut self, from: &Self) {
+    fn set_drop_address(&mut self, from: &Self) -> Result<()> {
         self.raw_mut()
             .set_drop_address(from.raw().address().clone());
+        Ok(())
     }
 }
