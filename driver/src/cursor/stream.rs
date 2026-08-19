@@ -2,13 +2,13 @@ use std::{collections::VecDeque, task::Poll};
 
 use derive_where::derive_where;
 use futures_core::Stream as AsyncStream;
-use futures_util::{FutureExt, stream::StreamExt};
-use serde::{Deserialize, de::DeserializeOwned};
+use futures_util::{stream::StreamExt, FutureExt};
+use serde::{de::DeserializeOwned, Deserialize};
 
 use crate::{
-    BoxFuture,
     bson::{RawDocument, RawDocumentBuf},
     error::{Error, Result},
+    BoxFuture,
 };
 
 use super::raw_batch::RawBatch;
