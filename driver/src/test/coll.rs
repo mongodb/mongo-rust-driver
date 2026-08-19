@@ -1321,6 +1321,14 @@ async fn aggregate_with_generics() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn find_and_modify_write_concern_error() {
+    if server_version_lt(4, 4).await {
+        log_uncaptured(
+            "skipping find_and_modify_write_concern_error due to missing fail command error label \
+             support",
+        );
+        return;
+    }
+
     let client = Client::for_test().use_single_mongos().await;
 
     let coll = client
