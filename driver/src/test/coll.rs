@@ -7,7 +7,7 @@ use std::sync::LazyLock;
 use crate::{
     bson::{doc, rawdoc, serde_helpers::HumanReadable, Bson, Document, RawDocumentBuf},
     bson_compat::serialize_to_document,
-    error::{ErrorKind, Result, WriteFailure},
+    error::{ErrorKind, Result, WriteFailure, RETRYABLE_WRITE_ERROR},
     options::{
         Acknowledgment,
         CollectionOptions,
@@ -32,6 +32,7 @@ use crate::{
         server_version_lt,
         topology_is_replica_set,
         topology_is_standalone,
+        util::fail_point::{FailPoint, FailPointMode},
         EventClient,
     },
     Client,
@@ -1316,4 +1317,34 @@ async fn aggregate_with_generics() {
     let lens: Vec<B> = cursor.try_collect().await.unwrap();
     let first_len: usize = lens[0].len.try_into().unwrap();
     assert_eq!(first_len, len);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn find_and_modify_write_concern_error() {
+    if server_version_lt(4, 4).await {
+        log_uncaptured(
+            "skipping find_and_modify_write_concern_error due to missing fail command error label \
+             support",
+        );
+        return;
+    }
+
+    let client = Client::for_test().use_single_mongos().await;
+
+    let coll = client
+        .database("db")
+        .collection("find_and_modify_write_concern_error");
+    coll.drop().await.unwrap();
+    coll.insert_one(doc! { "x": 1 }).await.unwrap();
+
+    let fail_point = FailPoint::fail_command(&["findAndModify"], FailPointMode::Times(2))
+        .write_concern_error(doc! { "code": 64 })
+        .error_labels(vec![RETRYABLE_WRITE_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let error = coll.find_one_and_delete(doc! { "x": 2 }).await.unwrap_err();
+    let ErrorKind::Write(WriteFailure::WriteConcernError(write_concern_error)) = *error.kind else {
+        panic!("expected write concern error, got {error}");
+    };
+    assert_eq!(write_concern_error.code, 64);
 }

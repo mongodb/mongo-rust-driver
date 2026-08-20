@@ -5,13 +5,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::DropDatabaseOptions,
     error::Result,
-    operation::{
-        append_options_to_raw_document,
-        Base,
-        BaseOperation,
-        OperationImpl,
-        WriteConcernOnlyBody,
-    },
+    operation::{append_options_to_raw_document, Base, BaseOperation, OperationImpl},
     options::WriteConcern,
 };
 
@@ -49,8 +43,7 @@ impl BaseOperation for DropDatabase {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()
+        response.validate_single_write()
     }
 
     fn write_concern(&self) -> super::Feature<&WriteConcern> {
