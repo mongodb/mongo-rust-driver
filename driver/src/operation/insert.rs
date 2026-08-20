@@ -11,8 +11,8 @@ use crate::{
     },
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    error::{Error, ErrorKind, InsertManyError, Result},
-    operation::{OperationWithDefaults, Retryability, WriteResponseBody},
+    error::{ErrorKind, Result},
+    operation::{Base, BaseOperation, OperationImpl, Retryability},
     options::{ClientOptions, InsertManyOptions, WriteConcern},
     results::InsertManyResult,
     Collection,
@@ -51,7 +51,7 @@ impl<'a> Insert<'a> {
     }
 }
 
-impl OperationWithDefaults for Insert<'_> {
+impl BaseOperation for Insert<'_> {
     type O = InsertManyResult;
 
     const NAME: &'static CStr = cstr!("insert");
@@ -133,41 +133,39 @@ impl OperationWithDefaults for Insert<'_> {
         response: &'b RawCommandResponse,
         _context: ExecutionContext<'b>,
     ) -> Result<Self::O> {
-        let response: WriteResponseBody = response.body()?;
-        let response_n = Checked::<usize>::try_from(response.n)?;
+        let n: usize = Checked::new(response.extract_n()?).try_into()?;
+        let inserted_ids = || {
+            self.inserted_ids
+                .iter()
+                .cloned()
+                .enumerate()
+                .take(n)
+                .collect()
+        };
 
-        let mut map = HashMap::new();
-        if self.options.ordered == Some(true) {
-            // in ordered inserts, only the first n were attempted.
-            for (i, id) in self.inserted_ids.iter().enumerate().take(response_n.get()?) {
-                map.insert(i, id.clone());
-            }
-        } else {
-            // for unordered, add all the attempted ids and then remove the ones that have
-            // associated write errors.
-            for (i, id) in self.inserted_ids.iter().enumerate() {
-                map.insert(i, id.clone());
-            }
-
-            if let Some(write_errors) = response.write_errors.as_ref() {
-                for err in write_errors {
-                    map.remove(&err.index);
-                }
+        match response.validate_insert_many() {
+            Ok(()) => Ok(InsertManyResult {
+                inserted_ids: inserted_ids(),
+            }),
+            Err(mut error) => {
+                if let ErrorKind::InsertMany(ref mut insert_many_error) = *error.kind {
+                    let inserted_ids = if self.options.ordered == Some(false) {
+                        let mut all_inserted_ids: HashMap<_, _> =
+                            self.inserted_ids.iter().cloned().enumerate().collect();
+                        if let Some(ref write_errors) = insert_many_error.write_errors {
+                            for write_error in write_errors {
+                                all_inserted_ids.remove(&write_error.index);
+                            }
+                        }
+                        all_inserted_ids
+                    } else {
+                        inserted_ids()
+                    };
+                    insert_many_error.inserted_ids = inserted_ids;
+                };
+                Err(error)
             }
         }
-
-        if response.write_errors.is_some() || response.write_concern_error.is_some() {
-            return Err(Error::new(
-                ErrorKind::InsertMany(InsertManyError {
-                    write_errors: response.write_errors,
-                    write_concern_error: response.write_concern_error,
-                    inserted_ids: map,
-                }),
-                response.labels,
-            ));
-        }
-
-        Ok(InsertManyResult { inserted_ids: map })
     }
 
     fn write_concern(&self) -> super::Feature<&WriteConcern> {
@@ -184,6 +182,10 @@ impl OperationWithDefaults for Insert<'_> {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Insert<'_> {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

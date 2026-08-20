@@ -10,7 +10,7 @@ use crate::{
     SearchIndexModel,
 };
 
-use super::{ExecutionContext, OperationWithDefaults};
+use super::{Base, BaseOperation, ExecutionContext, OperationImpl};
 
 #[derive(Debug)]
 pub(crate) struct CreateSearchIndexes {
@@ -24,7 +24,7 @@ impl CreateSearchIndexes {
     }
 }
 
-impl OperationWithDefaults for CreateSearchIndexes {
+impl BaseOperation for CreateSearchIndexes {
     type O = Vec<String>;
     const NAME: &'static CStr = cstr!("createSearchIndexes");
 
@@ -76,6 +76,10 @@ impl OperationWithDefaults for CreateSearchIndexes {
     type Otel = crate::otel::Witness<Self>;
 }
 
+impl OperationImpl for CreateSearchIndexes {
+    type Kind = Base;
+}
+
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for CreateSearchIndexes {}
 
@@ -96,7 +100,7 @@ impl UpdateSearchIndex {
     }
 }
 
-impl OperationWithDefaults for UpdateSearchIndex {
+impl BaseOperation for UpdateSearchIndex {
     type O = ();
     const NAME: &'static CStr = cstr!("updateSearchIndex");
 
@@ -135,6 +139,10 @@ impl OperationWithDefaults for UpdateSearchIndex {
     type Otel = crate::otel::Witness<Self>;
 }
 
+impl OperationImpl for UpdateSearchIndex {
+    type Kind = Base;
+}
+
 #[cfg(feature = "opentelemetry")]
 impl crate::otel::OtelInfoDefaults for UpdateSearchIndex {}
 
@@ -150,7 +158,7 @@ impl DropSearchIndex {
     }
 }
 
-impl OperationWithDefaults for DropSearchIndex {
+impl BaseOperation for DropSearchIndex {
     type O = ();
     const NAME: &'static CStr = cstr!("dropSearchIndex");
 
@@ -190,6 +198,10 @@ impl OperationWithDefaults for DropSearchIndex {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for DropSearchIndex {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

@@ -5,7 +5,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options_to_raw_document, OperationWithDefaults, WriteConcernOnlyBody},
+    operation::{append_options_to_raw_document, Base, BaseOperation, OperationImpl},
     options::{CreateCollectionOptions, WriteConcern},
 };
 
@@ -26,7 +26,7 @@ impl Create {
     }
 }
 
-impl OperationWithDefaults for Create {
+impl BaseOperation for Create {
     type O = ();
 
     const NAME: &'static CStr = cstr!("create");
@@ -46,8 +46,7 @@ impl OperationWithDefaults for Create {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()
+        response.validate_single_write()
     }
 
     fn write_concern(&self) -> super::Feature<&WriteConcern> {
@@ -63,6 +62,10 @@ impl OperationWithDefaults for Create {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Create {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

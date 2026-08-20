@@ -1,10 +1,22 @@
+use std::collections::HashMap;
+
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::wire::{message::DocumentSequence, Message};
 use crate::{
     bson::{Document, RawDocument, RawDocumentBuf},
+    bson_compat::{deserialize_from_slice, Utf8Lossy},
+    bson_util::get_u64_raw,
     client::{options::ServerApi, ClusterTime},
-    error::{Error, ErrorKind, Result},
+    error::{
+        Error,
+        ErrorKind,
+        IndexedWriteError,
+        InsertManyError,
+        Result,
+        WriteConcernError,
+        WriteFailure,
+    },
     hello::{HelloCommandResponse, HelloReply},
     operation::{CommandErrorBody, CommandResponse, Feature, Operation},
     options::{ReadConcernInternal, ReadConcernLevel, ServerAddress, WriteConcern},
@@ -210,6 +222,17 @@ pub(crate) struct RawCommandResponse {
     raw: RawDocumentBuf,
 }
 
+/// A helper struct to deserialize write-error-specific fields from a server response.
+#[derive(Debug, Deserialize)]
+pub(crate) struct WriteErrorBody {
+    #[serde(rename = "writeErrors")]
+    pub(crate) write_errors: Option<Utf8Lossy<Vec<IndexedWriteError>>>,
+    #[serde(rename = "writeConcernError")]
+    pub(crate) write_concern_error: Option<Utf8Lossy<WriteConcernError>>,
+    #[serde(rename = "errorLabels")]
+    pub(crate) labels: Option<Vec<String>>,
+}
+
 impl RawCommandResponse {
     #[cfg(test)]
     pub(crate) fn with_document_and_address(source: ServerAddress, doc: Document) -> Result<Self> {
@@ -230,10 +253,59 @@ impl RawCommandResponse {
     }
 
     pub(crate) fn body<'a, T: Deserialize<'a>>(&'a self) -> Result<T> {
-        crate::bson_compat::deserialize_from_slice(self.raw.as_bytes()).map_err(|e| {
+        deserialize_from_slice(self.raw.as_bytes()).map_err(|e| {
             Error::from(ErrorKind::InvalidResponse {
                 message: format!("{e}"),
             })
+        })
+    }
+
+    pub(crate) fn validate_single_write(&self) -> Result<()> {
+        let body: WriteErrorBody = self.body()?;
+
+        if let Some(write_error) = body
+            .write_errors
+            .and_then(|write_errors| write_errors.0.into_iter().next())
+        {
+            Err(Error::new(
+                ErrorKind::Write(WriteFailure::WriteError(write_error.into())),
+                body.labels,
+            ))
+        } else if let Some(write_concern_error) = body.write_concern_error {
+            Err(Error::new(
+                ErrorKind::Write(WriteFailure::WriteConcernError(write_concern_error.0)),
+                body.labels,
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub(crate) fn validate_insert_many(&self) -> Result<()> {
+        let body: WriteErrorBody = self.body()?;
+
+        if body.write_errors.is_none() && body.write_concern_error.is_none() {
+            return Ok(());
+        }
+
+        Err(Error::new(
+            ErrorKind::InsertMany(InsertManyError {
+                write_errors: body.write_errors.map(|lossy| lossy.0),
+                write_concern_error: body.write_concern_error.map(|lossy| lossy.0),
+                inserted_ids: HashMap::new(),
+            }),
+            body.labels,
+        ))
+    }
+
+    pub(crate) fn extract_n(&self) -> Result<u64> {
+        let Some(n) = self.raw.get("n")? else {
+            return Err(Error::invalid_response(
+                "expected n field in server response",
+            ));
+        };
+        get_u64_raw(&n).ok_or_else(|| {
+            Error::invalid_response(format!("expected numeric value for n, got {n:?}"))
         })
     }
 

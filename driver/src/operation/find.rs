@@ -4,7 +4,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::{Error, Result},
-    operation::{OperationWithDefaults, Retryability, SERVER_4_4_0_WIRE_VERSION},
+    operation::{Base, BaseOperation, OperationImpl, Retryability, SERVER_4_4_0_WIRE_VERSION},
     options::{ClientOptions, CursorType, FindOptions, SelectionCriteria},
     Collection,
 };
@@ -32,7 +32,7 @@ impl Find {
     }
 }
 
-impl OperationWithDefaults for Find {
+impl BaseOperation for Find {
     type O = CursorSpecification;
     const NAME: &'static CStr = cstr!("find");
     const ZERO_COPY: bool = true;
@@ -135,6 +135,10 @@ impl OperationWithDefaults for Find {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Find {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

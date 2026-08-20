@@ -7,16 +7,11 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
-    operation::{append_options, OperationTarget, Retryability},
+    operation::{append_options, Base, OperationImpl, OperationTarget, Retryability},
     options::{AggregateOptions, ClientOptions, ReadPreference, SelectionCriteria, WriteConcern},
 };
 
-use super::{
-    ExecutionContext,
-    OperationWithDefaults,
-    WriteConcernOnlyBody,
-    SERVER_4_4_0_WIRE_VERSION,
-};
+use super::{BaseOperation, ExecutionContext, SERVER_4_4_0_WIRE_VERSION};
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {
@@ -51,7 +46,7 @@ impl Aggregate {
 
 // IMPORTANT: If new method implementations are added here, make sure `ChangeStreamAggregate` has
 // the equivalent delegations.
-impl OperationWithDefaults for Aggregate {
+impl BaseOperation for Aggregate {
     type O = CursorSpecification;
 
     const NAME: &'static CStr = cstr!("aggregate");
@@ -89,8 +84,7 @@ impl OperationWithDefaults for Aggregate {
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         if self.is_out_or_merge {
-            let wc_error_info = response.body::<WriteConcernOnlyBody>()?;
-            wc_error_info.validate()?;
+            response.validate_single_write()?;
         };
 
         let description = context.connection.stream_description()?;
@@ -175,6 +169,10 @@ impl OperationWithDefaults for Aggregate {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Aggregate {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

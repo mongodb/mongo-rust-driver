@@ -5,7 +5,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, Result},
-    operation::{append_options_to_raw_document, OperationWithDefaults, WriteConcernOnlyBody},
+    operation::{append_options_to_raw_document, Base, BaseOperation, OperationImpl},
     options::{DropCollectionOptions, WriteConcern},
 };
 
@@ -26,7 +26,7 @@ impl DropCollection {
     }
 }
 
-impl OperationWithDefaults for DropCollection {
+impl BaseOperation for DropCollection {
     type O = ();
 
     const NAME: &'static CStr = cstr!("drop");
@@ -46,8 +46,7 @@ impl OperationWithDefaults for DropCollection {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()
+        response.validate_single_write()
     }
 
     fn handle_error(&self, error: Error) -> Result<Self::O> {
@@ -71,6 +70,10 @@ impl OperationWithDefaults for DropCollection {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for DropCollection {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

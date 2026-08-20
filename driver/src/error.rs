@@ -1027,6 +1027,24 @@ impl IndexedWriteError {
     }
 }
 
+impl From<IndexedWriteError> for WriteError {
+    fn from(error: IndexedWriteError) -> Self {
+        let IndexedWriteError {
+            index: _index,
+            code,
+            code_name,
+            message,
+            details,
+        } = error;
+        Self {
+            code,
+            code_name,
+            message,
+            details,
+        }
+    }
+}
+
 /// The set of errors that occurred during a call to
 /// [`insert_many`](crate::Collection::insert_many).
 #[derive(Clone, Debug, Serialize, Deserialize)]

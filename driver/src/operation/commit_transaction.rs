@@ -6,12 +6,12 @@ use crate::{
     client::Retry,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options_to_raw_document, OperationWithDefaults, Retryability},
+    operation::{append_options_to_raw_document, Base, BaseOperation, OperationImpl, Retryability},
     options::{Acknowledgment, ClientOptions, TransactionOptions, WriteConcern},
     Client,
 };
 
-use super::{ExecutionContext, WriteConcernOnlyBody};
+use super::ExecutionContext;
 
 pub(crate) struct CommitTransaction {
     options: Option<TransactionOptions>,
@@ -27,7 +27,7 @@ impl CommitTransaction {
     }
 }
 
-impl OperationWithDefaults for CommitTransaction {
+impl BaseOperation for CommitTransaction {
     type O = ();
 
     const NAME: &'static CStr = cstr!("commitTransaction");
@@ -47,8 +47,7 @@ impl OperationWithDefaults for CommitTransaction {
         response: &RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()
+        response.validate_single_write()
     }
 
     fn write_concern(&self) -> super::Feature<&WriteConcern> {
@@ -94,6 +93,10 @@ impl OperationWithDefaults for CommitTransaction {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for CommitTransaction {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

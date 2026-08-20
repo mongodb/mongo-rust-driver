@@ -3,8 +3,8 @@ use crate::{
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     collation::Collation,
-    error::{convert_insert_many_error, Result},
-    operation::{append_options, OperationWithDefaults, Retryability, WriteResponseBody},
+    error::Result,
+    operation::{append_options, Base, BaseOperation, OperationImpl, Retryability},
     options::{ClientOptions, DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
     Collection,
@@ -40,7 +40,7 @@ impl Delete {
     }
 }
 
-impl OperationWithDefaults for Delete {
+impl BaseOperation for Delete {
     type O = DeleteResult;
 
     const NAME: &'static CStr = cstr!("delete");
@@ -78,11 +78,9 @@ impl OperationWithDefaults for Delete {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteResponseBody = response.body()?;
-        response.validate().map_err(convert_insert_many_error)?;
-
+        response.validate_single_write()?;
         Ok(DeleteResult {
-            deleted_count: response.n,
+            deleted_count: response.extract_n()?,
         })
     }
 
@@ -111,6 +109,10 @@ impl OperationWithDefaults for Delete {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for Delete {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

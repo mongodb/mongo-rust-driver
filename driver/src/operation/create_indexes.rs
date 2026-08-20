@@ -7,12 +7,12 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     index::IndexModel,
-    operation::{append_options_to_raw_document, OperationWithDefaults},
+    operation::{append_options_to_raw_document, Base, BaseOperation, OperationImpl},
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
 };
 
-use super::{ExecutionContext, WriteConcernOnlyBody};
+use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct CreateIndexes {
@@ -35,7 +35,7 @@ impl CreateIndexes {
     }
 }
 
-impl OperationWithDefaults for CreateIndexes {
+impl BaseOperation for CreateIndexes {
     type O = CreateIndexesResult;
     const NAME: &'static CStr = cstr!("createIndexes");
 
@@ -72,8 +72,7 @@ impl OperationWithDefaults for CreateIndexes {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteConcernOnlyBody = response.body()?;
-        response.validate()?;
+        response.validate_single_write()?;
         let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
         Ok(CreateIndexesResult { index_names })
     }
@@ -95,6 +94,10 @@ impl OperationWithDefaults for CreateIndexes {
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
+}
+
+impl OperationImpl for CreateIndexes {
+    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]
