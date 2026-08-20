@@ -12,6 +12,7 @@ use serde::de::DeserializeOwned;
 use crate::bson_compat::RawBsonRefExt as _;
 use crate::{
     change_stream::event::ResumeToken,
+    cursor::stream::AdvanceResult,
     error::{ErrorKind, Result},
     ClientSession,
 };
@@ -77,22 +78,21 @@ impl<Inner> CursorWrapper<Inner> {
     pub(super) async fn next_if_any<T: DeserializeOwned>(
         &mut self,
         session: &mut Inner::Session,
-    ) -> Result<Option<T>>
+    ) -> Result<AdvanceResult<T>>
     where
         Inner: InnerCursor,
     {
         loop {
             match self.cursor.try_advance(session).await {
-                Ok(has) => {
+                Ok(advanced) => {
                     self.data.resume_token = self.cursor.get_resume_token()?;
-                    return if has {
-                        self.data.document_returned = true;
-                        deserialize_from_slice(self.cursor.current().as_bytes())
-                            .map(Some)
-                            .map_err(Error::from)
-                    } else {
-                        Ok(None)
-                    };
+                    return advanced
+                        .map(|()| {
+                            self.data.document_returned = true;
+                            deserialize_from_slice(self.cursor.current().as_bytes())
+                                .map_err(Error::from)
+                        })
+                        .transpose();
                 }
                 Err(e) if e.is_resumable() => {
                     let (new_cursor, new_args) = self
@@ -129,7 +129,7 @@ pub(super) fn get_resume_token(
 pub(super) trait InnerCursor: Sized {
     type Session;
 
-    async fn try_advance(&mut self, session: &mut Self::Session) -> Result<bool>;
+    async fn try_advance(&mut self, session: &mut Self::Session) -> Result<AdvanceResult>;
     fn get_resume_token(&self) -> Result<Option<ResumeToken>>;
     fn current(&self) -> &RawDocument;
     async fn execute_watch(

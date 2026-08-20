@@ -183,7 +183,10 @@ impl<T> SessionCursor<T> {
         self.stream(session).stream.buffer_mut().advance().await
     }
 
-    pub(crate) async fn try_advance(&mut self, session: &mut ClientSession) -> Result<bool> {
+    pub(crate) async fn try_advance(
+        &mut self,
+        session: &mut ClientSession,
+    ) -> Result<stream::AdvanceResult> {
         self.stream(session).stream.buffer_mut().try_advance().await
     }
 
