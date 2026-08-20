@@ -25,7 +25,7 @@ pub(crate) mod run_cursor_command;
 mod search_index;
 mod update;
 
-use std::{borrow::Cow, fmt::Debug, ops::Deref};
+use std::{borrow::Cow, fmt::Debug};
 
 use bson::{RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
 use futures_util::FutureExt;
@@ -42,16 +42,7 @@ use crate::{
         RawCommandResponse,
         StreamDescription,
     },
-    error::{
-        CommandError,
-        Error,
-        ErrorKind,
-        IndexedWriteError,
-        InsertManyError,
-        Result,
-        WriteConcernError,
-        WriteFailure,
-    },
+    error::{CommandError, Error, ErrorKind, Result},
     options::{ClientOptions, ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
     BoxFuture,
@@ -701,95 +692,6 @@ pub(crate) fn append_options_to_raw_document<T: Serialize>(
         extend_raw_document_buf(doc, options_raw_doc)?;
     }
     Ok(())
-}
-
-#[derive(Deserialize, Debug)]
-pub(crate) struct SingleWriteBody {
-    n: u64,
-}
-
-/// Body of a write response that could possibly have a write concern error but not write errors.
-#[derive(Debug, Deserialize, Default, Clone)]
-pub(crate) struct WriteConcernOnlyBody {
-    #[serde(rename = "writeConcernError")]
-    write_concern_error: Option<WriteConcernError>,
-
-    #[serde(rename = "errorLabels")]
-    labels: Option<Vec<String>>,
-}
-
-impl WriteConcernOnlyBody {
-    fn validate(&self) -> Result<()> {
-        match self.write_concern_error {
-            Some(ref wc_error) => Err(Error::new(
-                ErrorKind::Write(WriteFailure::WriteConcernError(wc_error.clone())),
-                self.labels.clone(),
-            )),
-            None => Ok(()),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct WriteResponseBody<T = SingleWriteBody> {
-    body: T,
-    write_errors: Option<Vec<IndexedWriteError>>,
-    write_concern_error: Option<WriteConcernError>,
-    labels: Option<Vec<String>>,
-}
-
-impl<'de, T: Deserialize<'de>> Deserialize<'de> for WriteResponseBody<T> {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use crate::bson_compat::Utf8Lossy;
-        #[derive(Deserialize)]
-        struct Helper<T> {
-            #[serde(flatten)]
-            body: T,
-            #[serde(rename = "writeErrors")]
-            write_errors: Option<Utf8Lossy<Vec<IndexedWriteError>>>,
-            #[serde(rename = "writeConcernError")]
-            write_concern_error: Option<Utf8Lossy<WriteConcernError>>,
-            #[serde(rename = "errorLabels")]
-            labels: Option<Vec<String>>,
-        }
-        let helper = Helper::deserialize(deserializer)?;
-        Ok(Self {
-            body: helper.body,
-            write_errors: helper.write_errors.map(|l| l.0),
-            write_concern_error: helper.write_concern_error.map(|l| l.0),
-            labels: helper.labels,
-        })
-    }
-}
-
-impl<T> WriteResponseBody<T> {
-    fn validate(&self) -> Result<()> {
-        if self.write_errors.is_none() && self.write_concern_error.is_none() {
-            return Ok(());
-        };
-
-        let failure = InsertManyError {
-            write_errors: self.write_errors.clone(),
-            write_concern_error: self.write_concern_error.clone(),
-            inserted_ids: Default::default(),
-        };
-
-        Err(Error::new(
-            ErrorKind::InsertMany(failure),
-            self.labels.clone(),
-        ))
-    }
-}
-
-impl<T> Deref for WriteResponseBody<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.body
-    }
 }
 
 fn cursor_get_at_cluster_time(response: &RawDocument) -> Result<Option<Timestamp>> {

@@ -11,7 +11,7 @@ use crate::{
     bson_util::{self, RawDocumentCollection},
     checked::Checked,
     client::session::TransactionState,
-    cmap::{Command, RawCommandResponse, StreamDescription},
+    cmap::{conn::WriteErrorBody, Command, RawCommandResponse, StreamDescription},
     cursor::{common::CursorSpecification, NewCursor},
     error::{BulkWriteError, Error, ErrorKind, Result},
     operation::{
@@ -31,13 +31,7 @@ use crate::{
     SessionCursor,
 };
 
-use super::{
-    ExecutionContext,
-    Retryability,
-    WriteResponseBody,
-    OP_MSG_OVERHEAD_BYTES,
-    SERVER_8_0_0_WIRE_VERSION,
-};
+use super::{ExecutionContext, Retryability, OP_MSG_OVERHEAD_BYTES, SERVER_8_0_0_WIRE_VERSION};
 
 use server_responses::*;
 
@@ -405,22 +399,23 @@ where
         mut context: ExecutionContext<'b>,
     ) -> BoxFuture<'b, Result<Self::O>> {
         async move {
-            let response: WriteResponseBody<SummaryInfo> = raw_response.body()?;
-            let n_errors: usize = Checked::new(response.body.n_errors).try_into()?;
+            let write_error: WriteErrorBody = raw_response.body()?;
+            let summary_info: SummaryInfo = raw_response.body()?;
+            let n_errors: usize = Checked::new(summary_info.n_errors).try_into()?;
 
             let mut error: BulkWriteError = Default::default();
             let mut result: R = Default::default();
 
             result.populate_summary_info(
-                response.body.n_inserted,
-                response.body.n_matched,
-                response.body.n_modified,
-                response.body.n_upserted,
-                response.body.n_deleted,
+                summary_info.n_inserted,
+                summary_info.n_matched,
+                summary_info.n_modified,
+                summary_info.n_upserted,
+                summary_info.n_deleted,
             );
 
-            if let Some(write_concern_error) = response.write_concern_error {
-                error.write_concern_errors.push(write_concern_error);
+            if let Some(write_concern_error) = write_error.write_concern_error {
+                error.write_concern_errors.push(write_concern_error.0);
             }
 
             let specification = CursorSpecification::new(
@@ -495,7 +490,7 @@ where
                     error.partial_result = Some(result.into_partial_result());
                 }
 
-                let error = Error::new(ErrorKind::BulkWrite(error), response.labels)
+                let error = Error::new(ErrorKind::BulkWrite(error), write_error.labels)
                     .with_source(iteration_result.err());
                 Err(error)
             }

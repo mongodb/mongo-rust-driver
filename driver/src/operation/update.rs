@@ -7,8 +7,8 @@ use crate::{
     bson_compat::{cstr, CStr},
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    error::{convert_insert_many_error, Result},
-    operation::{Base, BaseOperation, OperationImpl, Retryability, WriteResponseBody},
+    error::Result,
+    operation::{Base, BaseOperation, OperationImpl, Retryability},
     options::{ClientOptions, UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
     Collection,
@@ -166,8 +166,8 @@ impl BaseOperation for Update {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        let response: WriteResponseBody<UpdateBody> = response.body()?;
-        response.validate().map_err(convert_insert_many_error)?;
+        response.validate_single_write()?;
+        let response: UpdateBody = response.body()?;
 
         let modified_count = response.n_modified;
         let upserted_id = response
@@ -177,11 +177,7 @@ impl BaseOperation for Update {
             .and_then(|doc| doc.get("_id"))
             .cloned();
 
-        let matched_count = if upserted_id.is_some() {
-            0
-        } else {
-            response.body.n
-        };
+        let matched_count = if upserted_id.is_some() { 0 } else { response.n };
 
         Ok(UpdateResult {
             matched_count,
