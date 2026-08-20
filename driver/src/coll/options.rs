@@ -842,7 +842,9 @@ pub struct FindOptions {
     /// across the wire as an integer number of milliseconds.
     #[serde(
         rename = "maxTimeMS",
-        serialize_with = "serde_util::serialize_duration_option_as_int_millis"
+        serialize_with = "serde_util::serialize_duration_option_as_int_millis",
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis",
+        default
     )]
     pub max_time: Option<Duration>,
 
@@ -1215,5 +1217,45 @@ impl<'de> Deserialize<'de> for CommitQuorum {
             }
             IntOrString::Int(i) => Ok(CommitQuorum::Nodes(i)),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::time::Duration;
+
+    use super::{AggregateOptions, FindOptions};
+    use crate::bson::doc;
+
+    #[test]
+    fn max_time_deserializes_from_millis() {
+        let options: FindOptions =
+            crate::bson_compat::deserialize_from_document(doc! { "maxTimeMS": 5000 }).unwrap();
+        assert_eq!(options.max_time, Some(Duration::from_millis(5000)));
+
+        // `FindOptions` and `AggregateOptions` should accept the same representation.
+        let aggregate: AggregateOptions =
+            crate::bson_compat::deserialize_from_document(doc! { "maxTimeMS": 5000 }).unwrap();
+        assert_eq!(aggregate.max_time, options.max_time);
+    }
+
+    #[test]
+    fn max_time_round_trips() {
+        let options = FindOptions::builder()
+            .max_time(Duration::from_millis(5000))
+            .build();
+        let document = crate::bson_compat::serialize_to_document(&options).unwrap();
+        assert_eq!(document.get_i32("maxTimeMS").unwrap(), 5000);
+
+        let round_tripped: FindOptions =
+            crate::bson_compat::deserialize_from_document(document).unwrap();
+        assert_eq!(round_tripped.max_time, options.max_time);
+    }
+
+    #[test]
+    fn max_time_is_optional() {
+        let options: FindOptions =
+            crate::bson_compat::deserialize_from_document(doc! { "limit": 1_i64 }).unwrap();
+        assert_eq!(options.max_time, None);
     }
 }
