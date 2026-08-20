@@ -49,7 +49,7 @@ impl BaseOperation for AbortTransaction {
         response: &RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        response.extract_single_write_error()
+        response.validate_single_write()
     }
 
     fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {

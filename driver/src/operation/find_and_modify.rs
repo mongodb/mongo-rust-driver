@@ -95,7 +95,7 @@ impl<T: DeserializeOwned> BaseOperation for FindAndModify<T> {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        response.extract_single_write_error()?;
+        response.validate_single_write()?;
         #[derive(Debug, Deserialize)]
         struct Response {
             // deserializing directly into Option<T> doesn't report an error if `value` is missing

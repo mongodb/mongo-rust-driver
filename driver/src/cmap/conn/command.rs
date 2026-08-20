@@ -260,7 +260,7 @@ impl RawCommandResponse {
         })
     }
 
-    pub(crate) fn extract_single_write_error(&self) -> Result<()> {
+    pub(crate) fn validate_single_write(&self) -> Result<()> {
         let body: WriteErrorBody = self.body()?;
 
         if let Some(write_error) = body
@@ -281,7 +281,7 @@ impl RawCommandResponse {
         }
     }
 
-    pub(crate) fn extract_insert_many_error(&self) -> Result<()> {
+    pub(crate) fn validate_insert_many(&self) -> Result<()> {
         let body: WriteErrorBody = self.body()?;
 
         if body.write_errors.is_none() && body.write_concern_error.is_none() {

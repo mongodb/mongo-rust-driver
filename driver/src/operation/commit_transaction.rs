@@ -47,7 +47,7 @@ impl BaseOperation for CommitTransaction {
         response: &RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        response.extract_single_write_error()
+        response.validate_single_write()
     }
 
     fn write_concern(&self) -> super::Feature<&WriteConcern> {

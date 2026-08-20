@@ -84,7 +84,7 @@ impl BaseOperation for Aggregate {
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         if self.is_out_or_merge {
-            response.extract_single_write_error()?;
+            response.validate_single_write()?;
         };
 
         let description = context.connection.stream_description()?;

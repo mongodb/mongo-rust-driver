@@ -46,7 +46,7 @@ impl BaseOperation for DropCollection {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        response.extract_single_write_error()
+        response.validate_single_write()
     }
 
     fn handle_error(&self, error: Error) -> Result<Self::O> {

@@ -143,7 +143,7 @@ impl BaseOperation for Insert<'_> {
                 .collect()
         };
 
-        match response.extract_insert_many_error() {
+        match response.validate_insert_many() {
             Ok(()) => Ok(InsertManyResult {
                 inserted_ids: inserted_ids(),
             }),

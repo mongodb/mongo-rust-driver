@@ -78,7 +78,7 @@ impl BaseOperation for Delete {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        response.extract_single_write_error()?;
+        response.validate_single_write()?;
         Ok(DeleteResult {
             deleted_count: response.extract_n()?,
         })

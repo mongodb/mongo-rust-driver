@@ -72,7 +72,7 @@ impl BaseOperation for CreateIndexes {
         response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
-        response.extract_single_write_error()?;
+        response.validate_single_write()?;
         let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
         Ok(CreateIndexesResult { index_names })
     }
