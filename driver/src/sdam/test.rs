@@ -96,12 +96,6 @@ async fn sdam_pool_management() {
         log_uncaptured("skipping sdam_pool_management: flaky on macos");
         return;
     }
-    if !server_version_matches(">= 4.2.9").await {
-        log_uncaptured(
-            "skipping sdam_pool_management test due to server not supporting appName failCommand",
-        );
-        return;
-    }
 
     let mut options = get_client_options().await.clone();
     if options.load_balanced.unwrap_or(false) {

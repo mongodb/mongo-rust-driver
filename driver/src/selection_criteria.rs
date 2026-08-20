@@ -240,9 +240,9 @@ pub struct ReadPreferenceOptions {
     )]
     pub max_staleness: Option<Duration>,
 
-    /// Specifies hedging behavior for reads. These options only apply to sharded clusters on
-    /// servers that are at least version 4.4. Note that hedged reads are automatically enabled for
-    /// read preference mode "nearest" on server versions less than 8.0.
+    /// Specifies hedging behavior for reads. These options only apply to sharded clusters. Note
+    /// that hedged reads are automatically enabled for read preference mode "nearest" on
+    /// server versions less than 8.0.
     ///
     /// See the [MongoDB docs](https://www.mongodb.com/docs/manual/core/read-preference-hedge-option/) for more details.
     #[deprecated(

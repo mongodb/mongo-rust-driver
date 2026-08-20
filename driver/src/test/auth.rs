@@ -16,7 +16,7 @@ use crate::{
 async fn plain_auth_skip_local() {
     let options = ClientOptions::builder()
         .hosts(vec![ServerAddress::Tcp {
-            host: "ldaptest.10gen.cc".into(),
+            host: "ldaptest.build.10gen.cc".into(),
             port: None,
         }])
         .credential(

@@ -222,41 +222,10 @@ impl ScramVersion {
         server_final.validate(salted_password.as_slice(), &client_final, self)?;
 
         if !server_final.done {
-            // Normal SCRAM implementations would cease here. The following round trip is MongoDB
-            // implementation specific on server versions < 4.4 and just consists of a client no-op
-            // followed by a server no-op with "done: true".
-            let noop = SaslContinue::new(
-                source.into(),
-                server_final.conversation_id().clone(),
-                Vec::new(),
-                server_api.cloned(),
-            );
-            let command = noop.into_command();
-
-            let server_noop_response = conn.send_message(command).await?;
-            let server_noop_response_document: Document =
-                server_noop_response.auth_response_body("SCRAM")?;
-
-            if server_noop_response_document
-                .get("conversationId")
-                .map(|id| id == server_final.conversation_id())
-                != Some(true)
-            {
-                return Err(Error::authentication_error(
-                    "SCRAM",
-                    "mismatched conversationId's",
-                ));
-            };
-
-            if !server_noop_response_document
-                .get_bool("done")
-                .unwrap_or(false)
-            {
-                return Err(Error::authentication_error(
-                    "SCRAM",
-                    "authentication did not complete successfully",
-                ));
-            }
+            return Err(Error::authentication_error(
+                "SCRAM",
+                "expected SCRAM authentication to have completed",
+            ));
         }
 
         if should_update_cache {
@@ -712,10 +681,6 @@ impl ServerFinal {
                 Err(Error::authentication_error("SCRAM", err.as_str()))
             }
         }
-    }
-
-    fn conversation_id(&self) -> &Bson {
-        &self.conversation_id
     }
 }
 

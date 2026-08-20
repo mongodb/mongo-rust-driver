@@ -80,6 +80,7 @@ impl Find {
             hint: self.hint.clone(),
             limit: self.limit,
             max: self.max.clone(),
+            #[allow(deprecated)]
             max_scan: self.max_scan,
             max_time: self.max_time,
             min: self.min.clone(),

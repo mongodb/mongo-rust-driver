@@ -5,7 +5,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     bson_util::to_raw_bson_array_ser,
     cmap::{Command, RawCommandResponse, StreamDescription},
-    error::{ErrorKind, Result},
+    error::Result,
     index::IndexModel,
     operation::{append_options_to_raw_document, Base, BaseOperation, OperationImpl},
     options::{CreateIndexOptions, WriteConcern},
@@ -39,22 +39,7 @@ impl BaseOperation for CreateIndexes {
     type O = CreateIndexesResult;
     const NAME: &'static CStr = cstr!("createIndexes");
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
-        // commit quorum is not supported on < 4.4
-        if description.max_wire_version.unwrap_or(0) < 9
-            && self
-                .options
-                .as_ref()
-                .is_some_and(|options| options.commit_quorum.is_some())
-        {
-            return Err(ErrorKind::InvalidArgument {
-                message: "Specifying a commit quorum to create_index(es) is not supported on \
-                          server versions < 4.4"
-                    .to_string(),
-            }
-            .into());
-        }
-
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         self.indexes.iter_mut().for_each(|i| i.update_name()); // Generate names for unnamed indexes.
         let indexes = to_raw_bson_array_ser(&self.indexes)?;
         let mut body = rawdoc! {

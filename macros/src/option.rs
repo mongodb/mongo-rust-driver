@@ -55,10 +55,13 @@ pub fn option_setters(
             Some(f) => f.clone(),
             None => continue,
         };
-        // doc and cfg attrs
+        // doc, cfg, and deprecated attrs
         let mut attrs = vec![];
         for attr in &field.attrs {
-            if attr.path().is_ident("doc") || attr.path().is_ident("cfg") {
+            if attr.path().is_ident("doc")
+                || attr.path().is_ident("cfg")
+                || attr.path().is_ident("deprecated")
+            {
                 attrs.push(attr.clone());
             }
         }
@@ -110,6 +113,7 @@ pub fn option_setters(
         };
         impl_in.items.push(parse_quote! {
             #(#attrs)*
+            #[allow(deprecated)]
             pub fn #name(mut self, value: #accept) -> Self {
                 self.options().#name = Some(#value);
                 self
