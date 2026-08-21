@@ -746,7 +746,7 @@ pub(crate) struct TestOptions {
     pub(crate) hello_cb: Option<EventHandler<crate::cmap::Command>>,
 
     /// The value to use for jitter when calculating retry backoff.
-    pub(crate) jitter: Option<f64>,
+    pub(crate) jitter: Option<f32>,
 
     /// The amount of time to use for all retry backoffs. Set to a large number to detect the
     /// absence/presence of backoff.

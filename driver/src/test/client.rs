@@ -1097,7 +1097,7 @@ async fn operation_retry_uses_exponential_backoff() {
     if topology_is_sharded().await {
         options.hosts.drain(1..);
     }
-    options.test_options_mut().jitter = Some(0f64);
+    options.test_options_mut().jitter = Some(0f32);
     let client = Client::for_test().options(options).await;
     let coll = client.database("db").collection("coll");
 
@@ -1114,7 +1114,7 @@ async fn operation_retry_uses_exponential_backoff() {
     if topology_is_sharded().await {
         options.hosts.drain(1..);
     }
-    options.test_options_mut().jitter = Some(1f64);
+    options.test_options_mut().jitter = Some(1f32);
     let client = Client::for_test().options(options).await;
     let coll = client.database("db").collection("coll");
 
@@ -1257,7 +1257,7 @@ async fn override_base_backoff_ms() {
     }
 
     let mut options = get_client_options().await.clone();
-    options.test_options_mut().jitter = Some(1f64);
+    options.test_options_mut().jitter = Some(1f32);
     let client = Client::for_test()
         .options(options)
         .use_single_mongos()
@@ -1287,5 +1287,5 @@ async fn override_base_backoff_ms() {
     assert!(duration_secs >= 0.3);
     assert!(duration_secs < 0.6);
     let error = result.unwrap_err();
-    assert_eq!(error.base_backoff_ms(), Some(50f64));
+    assert_eq!(error.base_backoff(), Some(Duration::from_millis(50)));
 }
