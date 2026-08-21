@@ -15,11 +15,11 @@ pre_error_fails_task: true
 
 include:
   - filename: .evergreen/util.yml
-  - filename: .evergreen/tasks/driver-tests.yml
-  - filename: .evergreen/load-balancer.yml
-  - filename: .evergreen/in-use-encryption.yml
-  - filename: .evergreen/checks.yml
-  - filename: .evergreen/compression.yml
+  - filename: .evergreen/configs/driver-tests.yml
+  - filename: .evergreen/configs/load-balancer.yml
+  - filename: .evergreen/configs/in-use-encryption.yml
+  - filename: .evergreen/configs/checks.yml
+  - filename: .evergreen/configs/compression.yml
 
 # Functions to run before all tasks (except those in task groups).
 pre:
