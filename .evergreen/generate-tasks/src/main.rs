@@ -99,7 +99,30 @@ fn load_balancer() {
           TOPOLOGY: {SHARDED_CLUSTER}
           LOAD_BALANCER: true
       - func: start load balancer
-      - func: run driver test suite"
+      - func: run driver test suite
+"
         );
     }
+    println!("\nfunctions:");
+    println!(
+        "
+  start load balancer:
+    - command: shell.exec
+      params:
+        script: |
+          ${{PREPARE_SHELL}}
+          export MONGODB_URI=\"${{MONGODB_URI}}\"
+          ${{DRIVERS_TOOLS}}/.evergreen/run-load-balancer.sh start
+    - command: expansions.update
+      params:
+        file: lb-expansion.yml
+
+  stop load balancer:
+    - command: shell.exec
+      params:
+        script: |
+          ${{PREPARE_SHELL}}
+          ${{DRIVERS_TOOLS}}/.evergreen/run-load-balancer.sh stop
+"
+    );
 }

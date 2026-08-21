@@ -17,6 +17,7 @@ tasks:
       - func: start load balancer
       - func: run driver test suite
 
+
   - name: test-load-balancer-6.0
     tags: [load-balancer]
     depends_on:
@@ -31,6 +32,7 @@ tasks:
           LOAD_BALANCER: true
       - func: start load balancer
       - func: run driver test suite
+
 
   - name: test-load-balancer-7.0
     tags: [load-balancer]
@@ -47,6 +49,7 @@ tasks:
       - func: start load balancer
       - func: run driver test suite
 
+
   - name: test-load-balancer-8.0
     tags: [load-balancer]
     depends_on:
@@ -61,6 +64,7 @@ tasks:
           LOAD_BALANCER: true
       - func: start load balancer
       - func: run driver test suite
+
 
   - name: test-load-balancer-9.0
     tags: [load-balancer]
@@ -77,6 +81,7 @@ tasks:
       - func: start load balancer
       - func: run driver test suite
 
+
   - name: test-load-balancer-rapid
     tags: [load-balancer]
     depends_on:
@@ -92,6 +97,7 @@ tasks:
       - func: start load balancer
       - func: run driver test suite
 
+
   - name: test-load-balancer-latest
     tags: [load-balancer]
     depends_on:
@@ -106,3 +112,25 @@ tasks:
           LOAD_BALANCER: true
       - func: start load balancer
       - func: run driver test suite
+
+
+functions:
+
+  start load balancer:
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          export MONGODB_URI="${MONGODB_URI}"
+          ${DRIVERS_TOOLS}/.evergreen/run-load-balancer.sh start
+    - command: expansions.update
+      params:
+        file: lb-expansion.yml
+
+  stop load balancer:
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          ${DRIVERS_TOOLS}/.evergreen/run-load-balancer.sh stop
+
