@@ -1,0 +1,33 @@
+tasks:
+  - name: test-zstd-compression
+    tags: [compression]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: rapid
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+        vars:
+          ZSTD: true
+
+  - name: test-zlib-compression
+    tags: [compression]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: rapid
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+        vars:
+          ZLIB: true
+
+  - name: test-snappy-compression
+    tags: [compression]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: rapid
+          TOPOLOGY: replica_set
+      - func: "run driver test suite"
+        vars:
+          SNAPPY: true

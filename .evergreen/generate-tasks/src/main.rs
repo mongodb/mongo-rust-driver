@@ -102,4 +102,24 @@ fn load_balancer() {
       - func: run driver test suite"
         );
     }
+    println!(
+        "\nfunctions:
+  start load balancer:
+    - command: shell.exec
+      params:
+        script: |
+          ${{PREPARE_SHELL}}
+          export MONGODB_URI=\"${{MONGODB_URI}}\"
+          ${{DRIVERS_TOOLS}}/.evergreen/run-load-balancer.sh start
+    - command: expansions.update
+      params:
+        file: lb-expansion.yml
+
+  stop load balancer:
+    - command: shell.exec
+      params:
+        script: |
+          ${{PREPARE_SHELL}}
+          ${{DRIVERS_TOOLS}}/.evergreen/run-load-balancer.sh stop"
+    );
 }
