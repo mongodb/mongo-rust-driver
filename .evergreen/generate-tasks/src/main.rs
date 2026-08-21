@@ -39,8 +39,7 @@ fn driver_tests() {
     for (top_name, topology) in TOPOLOGIES.iter() {
         for version in all_versions() {
             println!(
-                "
-  - name: test-{version}-{top_name}
+                "  - name: test-{version}-{top_name}
     tags: [{version}, {top_name}]
     depends_on:
       - name: build-nextest-archive
@@ -52,7 +51,8 @@ fn driver_tests() {
         vars:
           MONGODB_VERSION: {version}
           TOPOLOGY: {topology}
-      - func: run driver test suite"
+      - func: run driver test suite
+"
             );
         }
     }
@@ -62,8 +62,7 @@ fn in_use_encryption() {
     println!("{HEADER}");
     for version in all_versions() {
         println!(
-            "
-  - name: test-in-use-encryption-{version}
+            "  - name: test-in-use-encryption-{version}
     tags: [in-use-encryption]
     depends_on:
       - name: build-nextest-archive
@@ -76,7 +75,8 @@ fn in_use_encryption() {
           MONGODB_VERSION: {version}
           TOPOLOGY: {REPLICA_SET}
       - func: start csfle servers
-      - func: run csfle tests"
+      - func: run csfle tests
+"
         );
     }
 }
@@ -85,8 +85,7 @@ fn load_balancer() {
     println!("{HEADER}");
     for version in VERSIONS_5_0_PLUS {
         println!(
-            "
-  - name: test-load-balancer-{version}
+            "  - name: test-load-balancer-{version}
     tags: [load-balancer]
     depends_on:
       - name: build-nextest-archive
@@ -103,9 +102,9 @@ fn load_balancer() {
 "
         );
     }
-    println!("\nfunctions:");
     println!(
         "
+functions:
   start load balancer:
     - command: shell.exec
       params:
