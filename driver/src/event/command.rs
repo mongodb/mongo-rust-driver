@@ -29,8 +29,7 @@ pub struct CommandStartedEvent {
 
     /// The driver-generated identifier for the request. Applications can use this to identify the
     /// corresponding event triggered by the completion of this command (i.e. either
-    /// [`CommandSucceededEvent`](struct.CommandSucceededEvent.html) or
-    /// [`CommandFailedEvent`](struct.CommandFailedEvent.html)).
+    /// [`CommandSucceededEvent`] or [`CommandFailedEvent`]).
     pub request_id: i32,
 
     /// Information about the connect the command will be run on.
@@ -55,8 +54,7 @@ pub struct CommandSucceededEvent {
     pub command_name: String,
 
     /// The driver-generated identifier for the request. Applications can use this to identify the
-    /// corresponding [`CommandStartedEvent`](struct.CommandStartedEvent.html) that triggered
-    /// earlier.
+    /// corresponding [`CommandStartedEvent`] that triggered earlier.
     pub request_id: i32,
 
     /// Information about the connect the command will be run on.
@@ -82,8 +80,7 @@ pub struct CommandFailedEvent {
     pub failure: Error,
 
     /// The driver-generated identifier for the request. Applications can use this to identify the
-    /// corresponding [`CommandStartedEvent`](struct.CommandStartedEvent.html) that triggered
-    /// earlier.
+    /// corresponding [`CommandStartedEvent`] that triggered earlier.
     pub request_id: i32,
 
     /// Information about the connect the command will be run on.

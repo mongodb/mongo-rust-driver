@@ -72,8 +72,7 @@ pub const NO_WRITES_PERFORMED: &str = "NoWritesPerformed";
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// An error that can occur in the `mongodb` crate. The inner
-/// [`ErrorKind`](enum.ErrorKind.html) is wrapped in an `Box` to allow the errors to be
-/// cloned.
+/// [`ErrorKind`] is wrapped in an `Box` to allow the errors to be cloned.
 #[derive(Clone, Debug, Error)]
 #[cfg_attr(
     feature = "error-backtrace",
