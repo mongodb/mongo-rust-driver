@@ -29,6 +29,7 @@ use crate::{
         get_max_message_size_bytes,
         log_uncaptured,
         server_version_eq,
+        server_version_gte,
         server_version_lt,
         topology_is_replica_set,
         topology_is_standalone,
@@ -1347,4 +1348,19 @@ async fn find_and_modify_write_concern_error() {
         panic!("expected write concern error, got {error}");
     };
     assert_eq!(write_concern_error.code, 64);
+}
+
+#[tokio::test]
+async fn null_byte_in_coll_name() {
+    let client = Client::for_test().await;
+    let coll = client.database("db").collection("coll\0a");
+
+    let error = coll.insert_one(doc! { "x": 1 }).await.unwrap_err();
+    assert!(error.is_server_error());
+
+    if server_version_gte(8, 0).await {
+        let write_model = coll.insert_one_model(doc! { "x": 1 }).unwrap();
+        let error = client.bulk_write(vec![write_model]).await.unwrap_err();
+        assert!(error.is_server_error());
+    }
 }
