@@ -10,15 +10,16 @@ async fn plain_auth() {
     let password = get_var("SASL_PASS");
     let host = get_var("SASL_HOST");
     let uri = format!(
-        "mongodb://{username}:{password}@{host}/?authMechanism=PLAIN&authSource=%24external&\
-         serverSelectionTimeoutMS=2000"
+        "mongodb://{username}:{password}@{host}/?authMechanism=PLAIN&authSource=%24external"
     );
 
     let client = Client::with_uri_str(uri).await.unwrap();
-    client
-        .database("db")
-        .collection::<Document>("coll")
-        .find_one(doc! { "x": 1 })
+    let doc = client
+        .database("ldap")
+        .collection::<Document>("test")
+        .find_one(doc! {})
         .await
+        .unwrap()
         .unwrap();
+    assert!(doc.get_bool("ldap").unwrap());
 }
