@@ -319,6 +319,13 @@ where
         match self.cache.get(namespace) {
             Some(index) => Ok((*index, 0)),
             None => {
+                if namespace.db.contains(".") {
+                    return Err(Error::invalid_argument(format!(
+                        "invalid database name {}: name cannot contain period",
+                        namespace.db
+                    )));
+                }
+
                 let namespace_doc = rawdoc! { "ns": namespace.to_string() };
                 let next_index = self.cache.len();
                 let bytes_added = T::bytes_added(next_index, &namespace_doc)?;

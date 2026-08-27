@@ -1,6 +1,6 @@
 use std::cmp::Ord;
 
-use crate::{bson::RawDocumentBuf, bson_compat::cstr};
+use crate::{bson::RawDocumentBuf, bson_compat::cstr, error::ErrorKind, test::server_version_gte};
 use futures::{stream::TryStreamExt, StreamExt};
 use serde::Deserialize;
 
@@ -482,4 +482,34 @@ fn create_collection_options_deserialize() {
         "autoIndexId": false,
     };
     let _: CreateCollectionOptions = crate::bson_compat::deserialize_from_document(source).unwrap();
+}
+
+#[tokio::test]
+async fn period_in_db_name() {
+    let client = Client::for_test().await;
+    let coll = client.database("db.a").collection("coll");
+
+    let error = coll.insert_one(doc! { "x": 1 }).await.unwrap_err();
+    assert!(error.is_server_error());
+
+    if server_version_gte(8, 0).await {
+        let write_model = coll.insert_one_model(doc! { "x": 1 }).unwrap();
+        let error = client.bulk_write(vec![write_model]).await.unwrap_err();
+        assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
+    }
+}
+
+#[tokio::test]
+async fn null_byte_in_db_name() {
+    let client = Client::for_test().await;
+    let coll = client.database("db\0a").collection("coll");
+
+    let error = coll.insert_one(doc! { "x": 1 }).await.unwrap_err();
+    assert!(error.is_server_error());
+
+    if server_version_gte(8, 0).await {
+        let write_model = coll.insert_one_model(doc! { "x": 1 }).unwrap();
+        let error = client.bulk_write(vec![write_model]).await.unwrap_err();
+        assert!(error.is_server_error());
+    }
 }
