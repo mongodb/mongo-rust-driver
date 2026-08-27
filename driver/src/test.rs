@@ -383,3 +383,7 @@ fn set_compressor(options: &mut ClientOptions) {
         options.compressors = Some(vec![Compressor::Snappy]);
     }
 }
+
+pub(crate) fn get_var(var: &str) -> String {
+    std::env::var(var).expect(var)
+}

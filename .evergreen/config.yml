@@ -320,6 +320,16 @@ buildvariants:
     tasks:
       - name: test-x509-auth
 
+  - name: plain-auth
+    display_name: "PLAIN Authentication"
+    # patchable: false
+    run_on:
+      - rhel8-latest-small
+    expansions:
+      AUTH: auth
+      SSL: ssl
+    tasks: test-plain-auth
+
   - name: oidc-linux
     display_name: "OIDC Linux"
     patchable: true
@@ -996,6 +1006,25 @@ tasks:
           MONGODB_VERSION: rapid
           TOPOLOGY: server
       - func: "run x509 tests"
+
+  - name: test-plain-auth
+    commands:
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          working_dir: src
+          args:
+            - .evergreen/run-plain-auth-test.sh
+          include_expansions_in_env:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
 
   - name: test-tokio-sync
     tags: [sync]
