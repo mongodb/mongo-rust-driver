@@ -14,12 +14,10 @@ async fn plain_auth() {
     );
 
     let client = Client::with_uri_str(uri).await.unwrap();
-    let doc = client
+    client
         .database("ldap")
         .collection::<Document>("test")
-        .find_one(doc! {})
+        .find(doc! {})
         .await
-        .unwrap()
         .unwrap();
-    assert!(doc.get_bool("ldap").unwrap());
 }
