@@ -13,6 +13,7 @@ source "${DRIVERS_TOOLS}/.evergreen/secrets_handling/setup-secrets.sh" drivers/e
 
 set +o errexit
 
-cargo_test plain_auth_skip_local
+CARGO_OPTIONS+=("--ignore-default-filter")
+cargo_test plain_auth
 
 exit $CARGO_RESULT
