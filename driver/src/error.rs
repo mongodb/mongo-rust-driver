@@ -459,14 +459,9 @@ impl Error {
 
     /// If this error is resumable as per the change streams spec.
     pub(crate) fn is_resumable(&self) -> bool {
-        if !self.is_server_error() {
-            return true;
-        }
-        let code = self.sdam_code();
-        if code == Some(CURSOR_NOT_FOUND_CODE) {
-            return true;
-        }
-        self.contains_label(RESUMABLE_CHANGE_STREAM_ERROR)
+        !self.is_server_error()
+            || self.sdam_code() == Some(CURSOR_NOT_FOUND_CODE)
+            || self.contains_label(RESUMABLE_CHANGE_STREAM_ERROR)
     }
 
     pub(crate) fn is_incompatible_server(&self) -> bool {
