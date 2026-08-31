@@ -799,11 +799,8 @@ pub struct FindOptions {
     pub max_await_time: Option<Duration>,
 
     /// Maximum number of documents or index keys to scan when executing the query.
-    ///
-    /// This option is not supported by any MongoDB server versions compatible with the driver. Use
-    /// the `max_time` option instead.
-    #[deprecated = "This option is not supported by any MongoDB server versions compatible with \
-                    the driver. Use the max_time option instead."]
+    #[deprecated = "This option is not supported by any MongoDB server version compatible with \
+                    the driver. Use the `max_time` option instead."]
     #[serde(serialize_with = "serde_util::serialize_u64_option_as_i64")]
     pub max_scan: Option<u64>,
 
@@ -948,11 +945,8 @@ pub struct FindOneOptions {
     pub max: Option<Document>,
 
     /// Maximum number of documents or index keys to scan when executing the query.
-    ///
-    /// This option is not supported by any MongoDB server versions compatible with the driver. Use
-    /// the `max_time` option instead.
-    #[deprecated = "This option is not supported by any MongoDB server versions compatible with \
-                    the driver. Use the max_time option instead."]
+    #[deprecated = "This option is not supported by any MongoDB server version compatible with \
+                    the driver. Use the `max_time` option instead."]
     #[serde(serialize_with = "bson_util::serialize_u64_option_as_i64")]
     pub max_scan: Option<u64>,
 

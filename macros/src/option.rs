@@ -111,9 +111,14 @@ pub fn option_setters(
         } else {
             (quote! { #type_ }, quote! { value })
         };
+        let allow_deprecated = if attrs.iter().any(|attr| attr.path().is_ident("deprecated")) {
+            quote! { #[allow(deprecated)] }
+        } else {
+            quote! {}
+        };
         impl_in.items.push(parse_quote! {
             #(#attrs)*
-            #[allow(deprecated)]
+            #allow_deprecated
             pub fn #name(mut self, value: #accept) -> Self {
                 self.options().#name = Some(#value);
                 self

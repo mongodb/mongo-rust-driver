@@ -13,8 +13,7 @@ use typed_builder::TypedBuilder;
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct IndexOptions {
-    /// Tells the server to build the index in the background and not block other tasks. This
-    /// option is no longer supported and has no effect.
+    /// Tells the server to build the index in the background and not block other tasks.
     #[deprecated = "This option is no longer supported and has no effect."]
     pub background: Option<bool>,
 
