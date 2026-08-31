@@ -33,6 +33,7 @@ impl From<TestCredential> for Credential {
                 .and_then(|s| AuthMechanism::from_str(s.as_str()).ok()),
             mechanism_properties: test_credential.mechanism_properties,
             oidc_callback: crate::client::auth::oidc::Callback::new(),
+            aws_credential_provider: None,
         }
     }
 }

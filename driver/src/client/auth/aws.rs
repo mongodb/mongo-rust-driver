@@ -108,19 +108,15 @@ pub(super) const AWS_SESSION_TOKEN: &str = "AWS_SESSION_TOKEN";
 
 // Find credentials using MongoDB URI or AWS SDK
 pub(crate) async fn get_aws_credentials(credential: &Credential) -> Result<Credentials> {
-    if let (Some(access_key), Some(secret_key)) = (&credential.username, &credential.password) {
+    if let Some(provider) = &credential.aws_credential_provider {
+        // If a custom credential provider is given, always use that first
+        provider
+            .provide_credentials()
+            .await
+            .map_err(|e| Error::authentication_error(MECH_NAME, &format!("{e}")))
+    } else if let Some(creds) = get_aws_credentials_from_uri(credential) {
         // Look for credentials in the MongoDB URI
-        Ok(Credentials::new(
-            access_key.clone(),
-            secret_key.clone(),
-            credential
-                .mechanism_properties
-                .as_ref()
-                .and_then(|mp| mp.get_str(AWS_SESSION_TOKEN).ok())
-                .map(str::to_owned),
-            None,
-            "MongoDB URI",
-        ))
+        Ok(creds)
     } else {
         // If credentials are not provided in the URI, use the AWS SDK to load
         let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
@@ -136,6 +132,23 @@ pub(crate) async fn get_aws_credentials(credential: &Credential) -> Result<Crede
             })?;
         Ok(creds)
     }
+}
+
+pub(crate) fn get_aws_credentials_from_uri(credential: &Credential) -> Option<Credentials> {
+    let (Some(access_key), Some(secret_key)) = (&credential.username, &credential.password) else {
+        return None;
+    };
+    Some(Credentials::new(
+        access_key.clone(),
+        secret_key.clone(),
+        credential
+            .mechanism_properties
+            .as_ref()
+            .and_then(|mp| mp.get_str(AWS_SESSION_TOKEN).ok())
+            .map(str::to_owned),
+        None,
+        "MongoDB URI",
+    ))
 }
 
 pub fn compute_aws_sigv4_payload(
