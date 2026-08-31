@@ -64,6 +64,15 @@ buildvariants:
       - name: compile-on-latest
       - name: compile-on-msrv
 
+  - name: sanity
+    display_name: "Sanity"
+    run_on:
+      - rhel8-latest-small
+    expansions:
+      LIBMONGOCRYPT: true
+    tasks:
+      - name: .sanity
+
   - name: lint
     display_name: "Lint"
     run_on:
@@ -72,13 +81,6 @@ buildvariants:
       LIBMONGOCRYPT: true
     tasks:
       - name: .lint
-
-  - name: cargo-deny
-    display_name: "Cargo Deny"
-    run_on:
-      - rhel8-latest-small
-    tasks:
-      - name: check-cargo-deny
 
   - name: rhel-8
     display_name: "RHEL 8"

@@ -10,7 +10,54 @@ tasks:
           # Our minimum supported Rust version. This should be updated whenever the MSRV is bumped.
           RUST_VERSION: 1.88.0
 
+  - name: check-semgrep
+    tags: [sanity]
+    commands:
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          include_expansions_in_env:
+            - DRIVERS_TOOLS
+            - PROJECT_DIRECTORY
+            - MONGOCRYPT_LIB_DIR
+          binary: bash
+          args:
+            - .evergreen/check-semgrep.sh
+
+  - name: check-rustdoc
+    tags: [sanity]
+    commands:
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          include_expansions_in_env:
+            - PROJECT_DIRECTORY
+            - MONGOCRYPT_LIB_DIR
+            - LD_LIBRARY_PATH
+          binary: bash
+          args: [.evergreen/check-rustdoc.sh]
+
+  - name: test-rustdoc
+    tags: [sanity]
+    commands:
+      - func: "install libmongocrypt"
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          include_expansions_in_env:
+            - DRIVERS_TOOLS
+            - PROJECT_DIRECTORY
+            - MONGOCRYPT_LIB_DIR
+            - LD_LIBRARY_PATH
+          binary: bash
+          args:
+            - .evergreen/run-rustdoc-tests.sh
+
   - name: check-cargo-deny
+    tags: [lint]
     commands:
       - command: subprocess.exec
         type: test
@@ -41,52 +88,6 @@ tasks:
           include_expansions_in_env: [PROJECT_DIRECTORY]
           binary: bash
           script: [.evergreen/check-clippy.sh]
-
-  - name: check-semgrep
-    tags: [lint]
-    commands:
-      - command: subprocess.exec
-        type: test
-        params:
-          working_dir: src
-          include_expansions_in_env:
-            - DRIVERS_TOOLS
-            - PROJECT_DIRECTORY
-            - MONGOCRYPT_LIB_DIR
-          binary: bash
-          args:
-            - .evergreen/check-semgrep.sh
-
-  - name: check-rustdoc
-    tags: [lint]
-    commands:
-      - command: subprocess.exec
-        type: test
-        params:
-          working_dir: src
-          include_expansions_in_env:
-            - PROJECT_DIRECTORY
-            - MONGOCRYPT_LIB_DIR
-            - LD_LIBRARY_PATH
-          binary: bash
-          args: [.evergreen/check-rustdoc.sh]
-
-  - name: test-rustdoc
-    tags: [lint]
-    commands:
-      - func: "install libmongocrypt"
-      - command: subprocess.exec
-        type: test
-        params:
-          working_dir: src
-          include_expansions_in_env:
-            - DRIVERS_TOOLS
-            - PROJECT_DIRECTORY
-            - MONGOCRYPT_LIB_DIR
-            - LD_LIBRARY_PATH
-          binary: bash
-          args:
-            - .evergreen/run-rustdoc-tests.sh
 
 functions:
   "compile only":
