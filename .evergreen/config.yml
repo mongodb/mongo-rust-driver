@@ -324,7 +324,7 @@ buildvariants:
 
   - name: plain-auth
     display_name: "PLAIN Authentication"
-    # patchable: false
+    patchable: false
     run_on:
       - rhel8-latest-small
     expansions:
