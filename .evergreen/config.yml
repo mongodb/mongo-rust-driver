@@ -286,7 +286,8 @@ buildvariants:
 
   - name: gssapi-auth-linux
     display_name: "GSSAPI Authentication - Linux"
-    patchable: true
+    patchable: false
+    disable: true
     run_on:
       - rhel8-latest-small
     tasks:
@@ -294,7 +295,7 @@ buildvariants:
 
   - name: gssapi-auth-macos
     display_name: "GSSAPI Authentication - macOS"
-    patchable: true
+    patchable: false
     disable: true
     run_on:
       - macos-14
@@ -303,7 +304,8 @@ buildvariants:
 
   - name: gssapi-auth-windows
     display_name: "GSSAPI Authentication - Windows"
-    patchable: true
+    patchable: false
+    disable: true
     run_on:
       - windows-2022-latest-small
     tasks:
