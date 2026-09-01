@@ -1,0 +1,225 @@
+tasks:
+  - name: test-aws-auth-regular-credentials
+    tags: [aws-auth]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          ORCHESTRATION_FILE: "auth-aws.json"
+          MONGODB_VERSION: "latest"
+          TOPOLOGY: "server"
+      - func: "add aws auth variables to file"
+      - func: "run aws auth test with regular aws credentials"
+
+  - name: test-aws-auth-assume-role-credentials
+    tags: [aws-auth]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          ORCHESTRATION_FILE: auth-aws.json
+          MONGODB_VERSION: rapid
+          TOPOLOGY: server
+      - func: "add aws auth variables to file"
+      - func: "run aws auth test with assume role credentials"
+
+  - name: test-aws-auth-environment-variables
+    tags: [aws-auth]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          ORCHESTRATION_FILE: "auth-aws.json"
+          MONGODB_VERSION: "latest"
+          TOPOLOGY: "server"
+      - func: "add aws auth variables to file"
+      - func: "run aws auth test with aws credentials as environment variables"
+
+  - name: test-aws-auth-environment-variables-session-token
+    tags: [aws-auth]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          ORCHESTRATION_FILE: auth-aws.json
+          MONGODB_VERSION: rapid
+          TOPOLOGY: server
+      - func: "add aws auth variables to file"
+      - func: "run aws auth test with aws credentials and session token as environment variables"
+
+  - name: test-aws-auth-ec2
+    tags: [aws-auth]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          ORCHESTRATION_FILE: auth-aws.json
+          MONGODB_VERSION: rapid
+          TOPOLOGY: server
+      - func: "add aws auth variables to file"
+      - func: "run aws auth test with aws EC2 credentials"
+
+  - name: test-aws-auth-ecs
+    tags: [aws-auth]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          ORCHESTRATION_FILE: auth-aws.json
+          MONGODB_VERSION: rapid
+          TOPOLOGY: server
+      - func: "add aws auth variables to file"
+      - func: "run aws ecs auth test"
+
+  - name: test-aws-auth-assume-role-with-web-identity
+    tags: [aws-auth]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          ORCHESTRATION_FILE: auth-aws.json
+          MONGODB_VERSION: rapid
+          TOPOLOGY: server
+      - func: "add aws auth variables to file"
+      - func: "run aws assume role with web identity test"
+
+  - name: test-aws-auth-assume-role-with-web-identity-session-name
+    tags: [aws-auth]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          ORCHESTRATION_FILE: auth-aws.json
+          MONGODB_VERSION: rapid
+          TOPOLOGY: server
+      - func: "add aws auth variables to file"
+      - func: "run aws assume role with web identity test"
+        vars:
+          AWS_ROLE_SESSION_NAME: test
+
+functions:
+  "add aws auth variables to file":
+    - command: ec2.assume_role
+      params:
+        role_arn: ${aws_test_secrets_role}
+    - command: subprocess.exec
+      params:
+        binary: bash
+        working_dir: ${DRIVERS_TOOLS}/.evergreen/auth_aws
+        args:
+          - ./setup_secrets.sh
+          - drivers/aws_auth
+        include_expansions_in_env:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+
+  "run aws auth test with regular aws credentials":
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        working_dir: ${PROJECT_DIRECTORY}
+        args:
+          - .evergreen/run-aws-tests.sh
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+        env:
+          AWS_AUTH_TYPE: regular
+          SKIP_CREDENTIAL_CACHING_TESTS: "true"
+
+  "run aws auth test with assume role credentials":
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        working_dir: ${PROJECT_DIRECTORY}
+        args:
+          - .evergreen/run-aws-tests.sh
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+        env:
+          AWS_AUTH_TYPE: assume-role
+          SKIP_CREDENTIAL_CACHING_TESTS: "true"
+
+  "run aws auth test with aws EC2 credentials":
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        working_dir: ${PROJECT_DIRECTORY}
+        args:
+          - .evergreen/run-aws-tests.sh
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+        env:
+          AWS_AUTH_TYPE: ec2
+
+  "run aws auth test with aws credentials as environment variables":
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        working_dir: ${PROJECT_DIRECTORY}
+        args:
+          - .evergreen/run-aws-tests.sh
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+        env:
+          AWS_AUTH_TYPE: env-creds
+          SKIP_CREDENTIAL_CACHING_TESTS: "true"
+
+  "run aws auth test with aws credentials and session token as environment variables":
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        working_dir: ${PROJECT_DIRECTORY}
+        args:
+          - .evergreen/run-aws-tests.sh
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+        env:
+          AWS_AUTH_TYPE: session-creds
+          SKIP_CREDENTIAL_CACHING_TESTS: "true"
+
+  "run aws ecs auth test":
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          ${PREPARE_SHELL}
+
+          # The "upload test results" post-task function expects this file to be present.
+          touch results.xml
+
+          AUTH_AWS_DIR=${DRIVERS_TOOLS}/.evergreen/auth_aws
+          ECS_SRC_DIR=$AUTH_AWS_DIR/src
+
+          mkdir -p $ECS_SRC_DIR/.evergreen
+
+          # compile mini test project
+          cd $PROJECT_DIRECTORY/.evergreen/aws-ecs-test
+          . ${PROJECT_DIRECTORY}/.evergreen/env.sh
+          cargo build
+          cd -
+
+          # copy mini test binary
+          cp $PROJECT_DIRECTORY/.evergreen/run-mongodb-aws-ecs-test.sh $ECS_SRC_DIR/.evergreen
+          cp $PROJECT_DIRECTORY/.evergreen/aws-ecs-test/target/debug/aws-ecs-test $ECS_SRC_DIR
+
+          export PROJECT_DIRECTORY="$ECS_SRC_DIR"
+          $AUTH_AWS_DIR/aws_setup.sh ecs
+
+  "run aws assume role with web identity test":
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        working_dir: ${PROJECT_DIRECTORY}
+        args:
+          - .evergreen/run-aws-tests.sh
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+        env:
+          AWS_AUTH_TYPE: web-identity
