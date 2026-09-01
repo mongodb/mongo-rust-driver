@@ -154,7 +154,7 @@ buildvariants:
 
   - name: openssl-ubuntu
     display_name: "OpenSSL (Ubuntu)"
-    patchable: false
+    # patchable: false
     run_on:
       - ubuntu2204-arm64-small
     expansions:
@@ -167,7 +167,7 @@ buildvariants:
 
   - name: openssl-macos
     display_name: "OpenSSL (MacOS)"
-    patchable: false
+    # patchable: false
     run_on:
       - macos-14
     expansions:
@@ -180,7 +180,7 @@ buildvariants:
 
   - name: openssl-windows
     display_name: "OpenSSL (Windows)"
-    patchable: false
+    # patchable: false
     run_on:
       - windows-2022-latest-small
     expansions:
@@ -201,7 +201,7 @@ buildvariants:
 
   - name: compression
     display_name: "Compression"
-    patchable: false
+    # patchable: false
     run_on:
       - rhel8-latest-small
     expansions:
@@ -212,7 +212,7 @@ buildvariants:
 
   - name: stable-api
     display_name: "Stable API V1"
-    patchable: false
+    # patchable: false
     run_on:
       - rhel8-latest-small
     expansions:
@@ -239,7 +239,7 @@ buildvariants:
 
   - name: atlas-connectivity
     display_name: "Atlas Connectivity"
-    patchable: false
+    # patchable: false
     run_on:
       - rhel8-latest-small
     tasks:
@@ -247,7 +247,7 @@ buildvariants:
 
   - name: aws-auth
     display_name: "AWS Authentication"
-    patchable: false
+    # patchable: false
     run_on:
       - rhel8-latest-small
     expansions:
@@ -257,7 +257,7 @@ buildvariants:
 
   - name: aws-auth-ecs
     display_name: "AWS Authentication (ECS)"
-    patchable: false
+    # patchable: false
     run_on:
       - ubuntu2404-small
     expansions:
@@ -267,7 +267,7 @@ buildvariants:
 
   - name: azure-kms
     display_name: "Azure KMS"
-    patchable: false
+    # patchable: false
     run_on:
       # The Azure CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
@@ -280,7 +280,7 @@ buildvariants:
 
   - name: gcp-kms
     display_name: "GCP KMS"
-    patchable: false
+    # patchable: false
     run_on:
       # The GCP CLI is not available on RHEL/Ubuntu machines.
       - debian11-small
@@ -320,7 +320,7 @@ buildvariants:
 
   - name: x509-auth
     display_name: "x509 Authentication"
-    patchable: false
+    # patchable: false
     run_on:
       - rhel8-latest-small
     expansions:
@@ -392,7 +392,7 @@ buildvariants:
 
   - name: in-use-encryption-disable-crypt-shared
     display_name: "In-Use Encryption (disable crypt_shared)"
-    patchable: false
+    # patchable: false
     run_on:
       - rhel8-latest-small
     expansions:
@@ -427,7 +427,7 @@ buildvariants:
 
   - name: search-index
     display_name: "Search Index Helpers"
-    patchable: false
+    # patchable: false
     run_on:
       - rhel8-latest-small
     tasks:
@@ -435,7 +435,7 @@ buildvariants:
 
   - name: aws-lambda
     display_name: "AWS Lambda"
-    patchable: false
+    # patchable: false
     run_on:
       - rhel8-latest-small
     tasks:
@@ -443,7 +443,7 @@ buildvariants:
 
   - name: happy-eyeballs-macos
     display_name: "Happy Eyeballs (MacOS)"
-    patchable: false
+    # patchable: false
     run_on:
       - macos-14
     tasks:
@@ -451,7 +451,7 @@ buildvariants:
 
   - name: socks5-proxy-no-tls
     display_name: "SOCKS5 Proxy (No TLS)"
-    patchable: false
+    # patchable: false
     run_on:
       - rhel8-latest-small
     tasks:
@@ -459,7 +459,7 @@ buildvariants:
 
   - name: socks5-proxy-tls
     display_name: "SOCKS5 Proxy (TLS)"
-    patchable: false
+    # patchable: false
     run_on:
       - rhel8-latest-small
     expansions:
@@ -469,7 +469,7 @@ buildvariants:
 
   - name: socks5-proxy-openssl
     display_name: "SOCKS5 Proxy (OpenSSL)"
-    patchable: false
+    # patchable: false
     run_on:
       - rhel8-latest-small
     expansions:
@@ -500,7 +500,7 @@ buildvariants:
 
   - name: bevy
     display_name: "Bevy"
-    patchable: false
+    # patchable: false
     run_on: [rhel8-latest-small]
     tasks:
       - name: test-bevy-asset
