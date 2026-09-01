@@ -44,6 +44,7 @@ TMPDIR: "${TMPDIR}"
 PATH: "${PATH}"
 PROJECT: "${PROJECT}"
 AZURE_IMDS_MOCK_PORT: 8080
+RUSTFMT_VERSION: nightly-2026-08-27
 PREPARE_SHELL: |
     set -o errexit
     set -o xtrace

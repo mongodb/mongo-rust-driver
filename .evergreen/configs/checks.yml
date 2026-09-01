@@ -27,7 +27,9 @@ tasks:
         type: test
         params:
           working_dir: src
-          include_expansions_in_env: [PROJECT_DIRECTORY]
+          include_expansions_in_env:
+            - PROJECT_DIRECTORY
+            - RUSTFMT_VERSION
           binary: bash
           args: [.evergreen/check-rustfmt.sh]
 
