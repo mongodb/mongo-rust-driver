@@ -85,6 +85,7 @@ functions:
       working_dir: src
       include_expansions_in_env:
         - PROJECT_DIRECTORY
+        - RUSTFMT_VERSION
       binary: bash
       args:
         - .evergreen/install-dependencies.sh

@@ -36,7 +36,7 @@ for arg; do
     echo 'export PATH="$PATH:${CARGO_HOME}/bin"' >>${CARGO_HOME}/env
     
     source .evergreen/env.sh
-    rustup toolchain install nightly -c rustfmt
+    rustup toolchain install ${RUSTFMT_VERSION} -c rustfmt
   elif [ $arg == "junit-dependencies" ]; then
     source ${CARGO_HOME}/env
 
