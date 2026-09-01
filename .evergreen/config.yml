@@ -103,9 +103,9 @@ buildvariants:
     tasks:
       - name: build-nextest-archive
       # Ubuntu 22.04 does not support MongoDB versions below 6.0.
-      - name: .standalone !.4.2 !.4.4 !.5.0
-      - name: .replicaset !.4.2 !.4.4 !.5.0
-      - name: .sharded !.4.2 !.4.4 !.5.0
+      - name: .standalone !.4.4 !.5.0
+      - name: .replicaset !.4.4 !.5.0
+      - name: .sharded !.4.4 !.5.0
 
   - name: macos-14.00
     display_name: "MacOS 14.00"
@@ -217,8 +217,8 @@ buildvariants:
       - name: build-nextest-archive
       # The Stable API was introduced in MongoDB version 5.0. Drivers Evergreen Tools only supports
       # setting REQUIRE_API_VERSION on standalones and sharded clusters.
-      - .standalone !.4.2 !.4.4
-      - .sharded !.4.2 !.4.4
+      - .standalone !.4.4
+      - .sharded !.4.4
 
   - name: sync-api
     display_name: "Sync API"
@@ -286,7 +286,8 @@ buildvariants:
 
   - name: gssapi-auth-linux
     display_name: "GSSAPI Authentication - Linux"
-    patchable: true
+    patchable: false
+    disable: true
     run_on:
       - rhel8-latest-small
     tasks:
@@ -294,7 +295,7 @@ buildvariants:
 
   - name: gssapi-auth-macos
     display_name: "GSSAPI Authentication - macOS"
-    patchable: true
+    patchable: false
     disable: true
     run_on:
       - macos-14
@@ -303,7 +304,8 @@ buildvariants:
 
   - name: gssapi-auth-windows
     display_name: "GSSAPI Authentication - Windows"
-    patchable: true
+    patchable: false
+    disable: true
     run_on:
       - windows-2022-latest-small
     tasks:
@@ -319,6 +321,16 @@ buildvariants:
       SSL: ssl
     tasks:
       - name: test-x509-auth
+
+  - name: plain-auth
+    display_name: "PLAIN Authentication"
+    patchable: false
+    run_on:
+      - rhel8-latest-small
+    expansions:
+      AUTH: auth
+      SSL: ssl
+    tasks: test-plain-auth
 
   - name: oidc-linux
     display_name: "OIDC Linux"
@@ -468,7 +480,6 @@ buildvariants:
   #    - name: .5.0
   #    - name: .4.4
   #    - name: .4.4
-  #    - name: .4.2
 
   - name: graviton
     display_name: "Graviton"
@@ -997,6 +1008,25 @@ tasks:
           MONGODB_VERSION: rapid
           TOPOLOGY: server
       - func: "run x509 tests"
+
+  - name: test-plain-auth
+    commands:
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          working_dir: src
+          args:
+            - .evergreen/run-plain-auth-test.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+            - DRIVERS_TOOLS
+            - PROJECT_DIRECTORY
 
   - name: test-tokio-sync
     tags: [sync]

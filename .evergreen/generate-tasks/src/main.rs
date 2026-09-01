@@ -1,4 +1,4 @@
-static VERSIONS_PRE_5_0: &[&str] = &["4.2", "4.4"];
+static VERSIONS_PRE_5_0: &[&str] = &["4.4"];
 static VERSIONS_5_0_PLUS: &[&str] = &["5.0", "6.0", "7.0", "8.0", "9.0", "rapid", "latest"];
 fn all_versions() -> impl Iterator<Item = &'static &'static str> {
     VERSIONS_PRE_5_0.iter().chain(VERSIONS_5_0_PLUS)

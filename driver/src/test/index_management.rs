@@ -5,15 +5,12 @@ use futures::stream::TryStreamExt;
 
 use crate::{
     bson::doc,
-    error::ErrorKind,
-    options::{CommitQuorum, IndexOptions},
+    options::IndexOptions,
     test::{
-        log_uncaptured,
         server_version_lt,
         spec::unified_runner::run_unified_tests,
         topology_is_load_balanced,
         topology_is_sharded,
-        topology_is_standalone,
     },
     Client,
     IndexModel,
@@ -331,32 +328,4 @@ async fn index_management_executes_commands() {
             .len(),
         2
     );
-}
-
-#[tokio::test]
-#[function_name::named]
-async fn commit_quorum_error() {
-    if topology_is_standalone().await {
-        log_uncaptured("skipping commit_quorum_error due to standalone topology");
-        return;
-    }
-
-    let client = Client::for_test().await;
-
-    let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
-        .await;
-
-    let model = IndexModel::builder().keys(doc! { "x": 1 }).build();
-    let result = coll
-        .create_index(model)
-        .commit_quorum(CommitQuorum::Majority)
-        .await;
-
-    if server_version_lt(4, 4).await {
-        let err = result.unwrap_err();
-        assert!(matches!(*err.kind, ErrorKind::InvalidArgument { .. }));
-    } else {
-        assert!(result.is_ok());
-    }
 }

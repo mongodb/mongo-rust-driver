@@ -13,8 +13,8 @@ use typed_builder::TypedBuilder;
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct IndexOptions {
-    /// Tells the server to build the index in the background and not block other tasks. Starting
-    /// in MongoDB 4.2, this option is deprecated and ignored by the server.
+    /// Tells the server to build the index in the background and not block other tasks.
+    #[deprecated = "This option is no longer supported and has no effect."]
     pub background: Option<bool>,
 
     /// Specifies a TTL to control how long MongoDB retains

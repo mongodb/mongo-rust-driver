@@ -145,6 +145,7 @@ async fn get_test_client_metadata() -> &'static TestClientMetadata {
 // Utility functions to check server version requirements. All but server_version_matches ignore
 // the server's patch version; specify a requirement string to server_version_matches for a
 // patch-sensitive comparison.
+#[expect(dead_code)]
 pub(crate) async fn server_version_eq(major: u64, minor: u64) -> bool {
     let server_version = &get_test_client_metadata().await.server_version;
     server_version.major == major && server_version.minor == minor
@@ -162,6 +163,7 @@ pub(crate) async fn server_version_lt(major: u64, minor: u64) -> bool {
     let server_version = &get_test_client_metadata().await.server_version;
     server_version.major < major || server_version.major == major && server_version.minor < minor
 }
+#[expect(dead_code)]
 pub(crate) async fn server_version_lte(major: u64, minor: u64) -> bool {
     let server_version = &get_test_client_metadata().await.server_version;
     server_version.major < major || server_version.major == major && server_version.minor <= minor
@@ -248,7 +250,7 @@ pub(crate) async fn transactions_supported() -> bool {
     topology_is_replica_set().await || topology_is_sharded().await
 }
 pub(crate) async fn fail_command_appname_initial_handshake_supported() -> bool {
-    let requirements = [">= 4.2.15, < 4.3.0", ">= 4.4.7, < 4.5.0", ">= 4.9.0"];
+    let requirements = [">= 4.4.7, < 4.5.0", ">= 4.9.0"];
     for requirement in requirements {
         if server_version_matches(requirement).await {
             return true;
@@ -380,4 +382,8 @@ fn set_compressor(options: &mut ClientOptions) {
     {
         options.compressors = Some(vec![Compressor::Snappy]);
     }
+}
+
+pub(crate) fn get_var(var: &str) -> String {
+    std::env::var(var).expect(var)
 }

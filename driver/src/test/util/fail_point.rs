@@ -96,7 +96,7 @@ impl FailPoint {
 
     /// The error labels to include in the server's reply to an affected command. Note that the
     /// value passed to this method will completely override the labels that the server would
-    /// otherwise return. Only available on 4.4+ servers.
+    /// otherwise return.
     pub(crate) fn error_labels(
         mut self,
         error_labels: impl IntoIterator<Item = impl Into<String>>,

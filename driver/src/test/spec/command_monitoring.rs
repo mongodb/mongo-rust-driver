@@ -10,8 +10,8 @@ async fn command_monitoring_unified() {
             "unacknowledged-client-bulkWrite.json",
         ])
         .skip_tests(&[
-            // This test relies on old OP_QUERY behavior that many drivers still use for < 4.4, but
-            // we do not use, due to never implementing OP_QUERY.
+            // This test relies on old OP_QUERY behavior that many drivers still use for <= 4.4,
+            // but we do not use, due to never implementing OP_QUERY.
             "A successful find event with a getmore and the server kills the cursor (<= 4.4)",
         ])
         .await;

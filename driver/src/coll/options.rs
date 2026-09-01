@@ -121,8 +121,6 @@ pub struct InsertOneOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 }
 
@@ -150,8 +148,6 @@ pub struct InsertManyOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 }
 
@@ -239,8 +235,6 @@ pub struct UpdateOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 
     /// Specify which document the operation updates if the query matches multiple
@@ -307,8 +301,6 @@ pub struct ReplaceOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 
     /// Specify which document the operation replaces if the query matches multiple
@@ -339,7 +331,6 @@ pub struct DeleteOptions {
     pub write_concern: Option<WriteConcern>,
 
     /// The index to use for the operation.
-    /// Only available in MongoDB 4.4+.
     pub hint: Option<Hint>,
 
     /// Map of parameter names and values. Values must be constant or closed
@@ -352,8 +343,6 @@ pub struct DeleteOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 }
 
@@ -390,7 +379,6 @@ pub struct FindOneAndDeleteOptions {
     pub collation: Option<Collation>,
 
     /// The index to use for the operation.
-    /// Only available in MongoDB 4.4+.
     pub hint: Option<Hint>,
 
     /// Map of parameter names and values. Values must be constant or closed
@@ -403,8 +391,6 @@ pub struct FindOneAndDeleteOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 }
 
@@ -450,7 +436,6 @@ pub struct FindOneAndReplaceOptions {
     pub collation: Option<Collation>,
 
     /// The index to use for the operation.
-    /// Only available in MongoDB 4.4+.
     pub hint: Option<Hint>,
 
     /// Map of parameter names and values. Values must be constant or closed
@@ -463,8 +448,6 @@ pub struct FindOneAndReplaceOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 }
 
@@ -516,7 +499,6 @@ pub struct FindOneAndUpdateOptions {
     pub collation: Option<Collation>,
 
     /// The index to use for the operation.
-    /// Only available in MongoDB 4.4+.
     pub hint: Option<Hint>,
 
     /// Map of parameter names and values. Values must be constant or closed
@@ -529,8 +511,6 @@ pub struct FindOneAndUpdateOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 }
 
@@ -570,8 +550,6 @@ pub struct AggregateOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// For server versions less than 4.4, only a string value may be provided.
     pub comment: Option<Bson>,
 
     /// The index to use for the operation.
@@ -677,8 +655,6 @@ pub struct CountOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 }
 
@@ -721,9 +697,7 @@ pub struct EstimatedDocumentCountOptions {
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
     ///
-    /// This option is only supported on server versions 4.4+. The comment can be any [`Bson`]
-    /// value on server versions 4.4.14+. On server versions between 4.4.0 and 4.4.14, only
-    /// [`Bson::String`] values are supported.
+    /// On server versions between 4.4.0 and 4.4.14, only [`Bson::String`] values are supported.
     pub comment: Option<Bson>,
 }
 
@@ -766,8 +740,6 @@ pub struct DistinctOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 
     /// A document or string that specifies the index to use to support the query predicate.
@@ -785,8 +757,7 @@ pub struct DistinctOptions {
 #[export_tokens]
 pub struct FindOptions {
     /// Enables writing to temporary files by the server. When set to true, the find operation can
-    /// write data to the _tmp subdirectory in the dbPath directory. Only supported in server
-    /// versions 4.4+.
+    /// write data to the _tmp subdirectory in the dbPath directory.
     pub allow_disk_use: Option<bool>,
 
     /// If true, partial results will be returned from a mongos rather than an error being
@@ -804,8 +775,6 @@ pub struct FindOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// For server versions less than 4.4, only a string value may be provided.
     pub comment: Option<Bson>,
 
     /// The type of cursor to return.
@@ -830,9 +799,8 @@ pub struct FindOptions {
     pub max_await_time: Option<Duration>,
 
     /// Maximum number of documents or index keys to scan when executing the query.
-    ///
-    /// Note: this option is deprecated starting in MongoDB version 4.0 and removed in MongoDB 4.2.
-    /// Use the maxTimeMS option instead.
+    #[deprecated = "This option is not supported by any MongoDB server version compatible with \
+                    the driver. Use the `max_time` option instead."]
     #[serde(serialize_with = "serde_util::serialize_u64_option_as_i64")]
     pub max_scan: Option<u64>,
 
@@ -913,6 +881,7 @@ impl From<FindOneOptions> for FindOptions {
             comment: options.comment,
             hint: options.hint,
             max: options.max,
+            #[allow(deprecated)]
             max_scan: options.max_scan,
             max_time: options.max_time,
             min: options.min,
@@ -967,8 +936,6 @@ pub struct FindOneOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// For server versions less than 4.4, only a string value may be provided.
     pub comment: Option<Bson>,
 
     /// The index to use for the operation.
@@ -978,9 +945,8 @@ pub struct FindOneOptions {
     pub max: Option<Document>,
 
     /// Maximum number of documents or index keys to scan when executing the query.
-    ///
-    /// Note: this option is deprecated starting in MongoDB version 4.0 and removed in MongoDB 4.2.
-    /// Use the maxTimeMS option instead.
+    #[deprecated = "This option is not supported by any MongoDB server version compatible with \
+                    the driver. Use the `max_time` option instead."]
     #[serde(serialize_with = "bson_util::serialize_u64_option_as_i64")]
     pub max_scan: Option<u64>,
 
@@ -1066,8 +1032,6 @@ pub struct CreateIndexOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 }
 
@@ -1120,8 +1084,6 @@ pub struct DropIndexOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 }
 
@@ -1152,8 +1114,6 @@ pub struct ListIndexesOptions {
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
     /// database profiler, currentOp and logs.
-    ///
-    /// This option is only available on server versions 4.4+.
     pub comment: Option<Bson>,
 }
 
