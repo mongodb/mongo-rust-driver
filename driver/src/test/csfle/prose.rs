@@ -2824,7 +2824,7 @@ mod text_indexes_explicit_encryption {
                 .substring(
                     SubstringOptions::builder()
                         .max_string_length(10)
-                        .max_query_length(10)
+                        .max_query_length(6)
                         .min_query_length(2)
                         .build(),
                 )
@@ -2968,7 +2968,7 @@ mod text_indexes_explicit_encryption {
             .substring(
                 SubstringOptions::builder()
                     .max_string_length(10)
-                    .max_query_length(10)
+                    .max_query_length(6)
                     .min_query_length(2)
                     .build(),
             )

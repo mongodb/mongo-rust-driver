@@ -120,6 +120,7 @@ impl Database {
         }
         for ns in crate::client::csfle::aux_collections(base_ns, enc_fields)? {
             let mut sub_opts = opts.clone();
+            sub_opts.encrypted_fields = None;
             sub_opts.clustered_index = Some(crate::db::options::ClusteredIndex {
                 key: doc! { "_id": 1 },
                 unique: true,
