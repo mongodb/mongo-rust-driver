@@ -12,7 +12,7 @@ export CSFLE_TLS_CERT_DIR="${DRIVERS_TOOLS}/.evergreen/x509gen"
 
 CARGO_OPTIONS+=("--ignore-default-filter")
 
-FLE_AZURE_USE_CORPORATE="YES" ./${DRIVERS_TOOLS}/.evergreen/csfle/setup-secrets.sh
+FLE_AZURE_USE_CORPORATE="YES" bash ${DRIVERS_TOOLS}/.evergreen/csfle/setup-secrets.sh
 . ./secrets-export.sh
 
 # Add mongodb binaries to path for mongocryptd
