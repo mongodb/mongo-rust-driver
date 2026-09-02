@@ -51,16 +51,16 @@ for arg; do
     mkdir ${PROJECT_DIRECTORY}/libmongocrypt
     cd ${PROJECT_DIRECTORY}/libmongocrypt
 
-    #LIBMONGOCRYPT_TAG="1.20.0"
-    #git clone https://github.com/mongodb/libmongocrypt --depth=1 --branch $LIBMONGOCRYPT_TAG
+    LIBMONGOCRYPT_TAG="1.20.3"
+    git clone https://github.com/mongodb/libmongocrypt --depth=1 --branch $LIBMONGOCRYPT_TAG
 
-    mkdir libmongocrypt
-    pushd libmongocrypt
-    git init
-    git remote add origin https://github.com/mongodb/libmongocrypt
-    git fetch origin c2f80a7153da3537fe32916eef8ff1d4cc08bc67 --depth=1
-    git reset --hard FETCH_HEAD
-    popd
+    #mkdir libmongocrypt
+    #pushd libmongocrypt
+    #git init
+    #git remote add origin https://github.com/mongodb/libmongocrypt
+    #git fetch origin c2f80a7153da3537fe32916eef8ff1d4cc08bc67 --depth=1
+    #git reset --hard FETCH_HEAD
+    #popd
 
     ./libmongocrypt/.evergreen/compile.sh
   elif [ $arg == "cargo-lambda" ]; then

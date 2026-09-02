@@ -396,3 +396,8 @@ pub(crate) fn fill_kms_placeholders(
 
     kms_providers
 }
+
+#[test]
+fn version_is_nonzero() {
+    assert_ne!(mongocrypt::version(), "0.0.0");
+}
