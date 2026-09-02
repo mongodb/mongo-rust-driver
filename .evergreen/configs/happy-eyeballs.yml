@@ -1,0 +1,59 @@
+task_groups:
+    - name: happy-eyeballs-task-group
+      setup_group_can_fail_task: true
+      setup_group_timeout_secs: 1800
+      setup_group:
+        - func: "fetch source"
+        - func: "create expansions"
+        - func: "prepare resources"
+        - func: "windows fix"
+        - func: "fix absolute paths"
+        - func: "init test-results"
+        - func: "make files executable"
+        - func: "install rust"
+        - func: "install junit dependencies"
+        - func: "start happy eyeballs server"
+      tasks:
+        - test-happy-eyeballs
+      teardown_task:
+        - func: "stop happy eyeballs server"
+        - func: "upload test results"
+
+tasks:
+  - name: "test-happy-eyeballs"
+    commands:
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/run-happy-eyeballs-tests.sh
+        include_expansions_in_env:
+          - PROJECT_DIRECTORY
+
+functions:
+  "start happy eyeballs server":
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        background: true
+        binary: ${PYTHON3}
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/happy_eyeballs/server.py
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: ${PYTHON3}
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/happy_eyeballs/server.py
+          - --wait
+
+  "stop happy eyeballs server":
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: ${PYTHON3}
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/happy_eyeballs/server.py
+          - --stop

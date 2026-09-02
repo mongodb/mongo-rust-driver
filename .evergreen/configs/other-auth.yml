@@ -1,0 +1,38 @@
+tasks:
+  - name: test-gssapi-auth
+    commands:
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          working_dir: src
+          args:
+            - .evergreen/run-gssapi-tests.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+            - DRIVERS_TOOLS
+            - PROJECT_DIRECTORY
+
+  - name: test-x509-auth
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: rapid
+          TOPOLOGY: server
+      - command: shell.exec
+        type: test
+        params:
+          working_dir: src
+          shell: bash
+          script: |
+            ${PREPARE_SHELL}
+
+            export MONGODB_URI="${MONGODB_URI}"
+            export CERT_PATH=$DRIVERS_TOOLS/.evergreen/x509gen/client.pem
+
+            .evergreen/run-x509-tests.sh

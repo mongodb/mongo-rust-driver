@@ -1,0 +1,242 @@
+task_groups:
+  - name: test-oidc-task-group
+    setup_group:
+      - func: fetch source
+      - func: create expansions
+      - func: prepare resources
+      - func: fix absolute paths
+      - func: init test-results
+      - func: make files executable
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+      - func: install rust
+      - func: install junit dependencies
+      - command: shell.exec
+        params:
+          shell: bash
+          include_expansions_in_env: ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"]
+          script: |
+            ${PREPARE_SHELL}
+            ${DRIVERS_TOOLS}/.evergreen/auth_oidc/setup.sh
+    teardown_task:
+      - func: "upload test results"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/teardown.sh
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800
+    tasks:
+      - oidc-auth-test-latest
+
+  - name: test-azure-oidc-task-group
+    setup_group:
+      - func: fetch source
+      - func: create expansions
+      - func: prepare resources
+      - func: fix absolute paths
+      - func: init test-results
+      - func: make files executable
+      - func: install rust
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+          duration_seconds: 3600
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            AZUREOIDC_VMNAME_PREFIX: "RUST_DRIVER"
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/azure/create-and-setup-vm.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+    teardown_task:
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/azure/delete-vm.sh
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800
+    tasks:
+      - oidc-auth-test-azure-latest
+
+  - name: test-gcp-oidc-task-group
+    setup_group:
+      - func: fetch source
+      - func: create expansions
+      - func: prepare resources
+      - func: fix absolute paths
+      - func: init test-results
+      - func: make files executable
+      - func: install rust
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+          duration_seconds: 3600
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            GCPOIDC_VMNAME_PREFIX: "RUST_DRIVER"
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/gcp/setup.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+    teardown_task:
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/gcp/teardown.sh
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800
+    tasks:
+      - oidc-auth-test-gcp-latest
+
+  - name: test-k8s-oidc-task-group
+    setup_group:
+      - func: fetch source
+      - func: create expansions
+      - func: prepare resources
+      - func: fix absolute paths
+      - func: init test-results
+      - func: make files executable
+      - func: install rust
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+          duration_seconds: 3600
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/setup.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+    teardown_task:
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/teardown.sh
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800
+    tasks:
+      - oidc-auth-test-k8s-latest
+
+tasks:
+  - name: "oidc-auth-test-latest"
+    commands:
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          binary: bash
+          include_expansions_in_env:
+            - DRIVERS_TOOLS
+            - PROJECT_DIRECTORY
+          args:
+            - .evergreen/run-mongodb-oidc-test.sh
+
+  - name: "oidc-auth-test-azure-latest"
+    commands:
+    - func: "build static test tarball"
+      vars:
+        BUILD_FEATURES: "--features azure-oidc"
+        TEST_FILES: "${PROJECT_DIRECTORY}/spec/auth/unified"
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/azure/run-driver-test.sh
+        env:
+          AZUREOIDC_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
+          AZUREOIDC_TEST_CMD: "source ./env.sh && RUST_BACKTRACE=1 ./${STATIC_TEST_BINARY} test::spec::oidc_skip_ci::azure -- --no-capture"
+
+  - name: "oidc-auth-test-gcp-latest"
+    commands:
+    - func: "build static test tarball"
+      vars:
+        BUILD_FEATURES: "--features gcp-oidc"
+        TEST_FILES: "${PROJECT_DIRECTORY}/spec/auth/unified"
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/gcp/run-driver-test.sh
+        env:
+          GCPOIDC_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
+          GCPOIDC_TEST_CMD: "source ./secrets-export.sh && RUST_BACKTRACE=1 ./${STATIC_TEST_BINARY} test::spec::oidc_skip_ci::gcp -- --no-capture"
+
+  - name: "oidc-auth-test-k8s-latest"
+    commands:
+    - func: "build static test tarball"
+      vars:
+        TEST_FILES: "${PROJECT_DIRECTORY}/spec/auth/unified"
+    - command: ec2.assume_role
+      params:
+          role_arn: ${aws_test_secrets_role}
+          duration_seconds: 1800
+    - func: "run oidc k8s test"
+      vars:
+        VARIANT: eks
+    - func: "run oidc k8s test"
+      vars:
+        VARIANT: gke
+    - func: "run oidc k8s test"
+      vars:
+        VARIANT: aks
+
+functions:
+  "run oidc k8s test":
+  - command: subprocess.exec
+    params:
+      working_dir: src
+      binary: bash
+      args:
+        - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/setup-pod.sh
+      env:
+        K8S_VARIANT: ${VARIANT}
+      include_expansions_in_env:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - AWS_SESSION_TOKEN
+        - DRIVERS_TOOLS
+  - command: subprocess.exec
+    type: test
+    params:
+      working_dir: src
+      binary: bash
+      args:
+        - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/run-driver-test.sh
+      env:
+        K8S_DRIVERS_TAR_FILE: ${STATIC_TEST_TARBALL}
+        K8S_TEST_CMD: "RUST_BACKTRACE=1 ./${STATIC_TEST_BINARY} test::spec::oidc_skip_ci::k8s -- --no-capture"
+      include_expansions_in_env:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - AWS_SESSION_TOKEN
+  - command: subprocess.exec
+    params:
+      working_dir: src
+      binary: bash
+      args:
+        - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/k8s/teardown-pod.sh
+      include_expansions_in_env:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - AWS_SESSION_TOKEN

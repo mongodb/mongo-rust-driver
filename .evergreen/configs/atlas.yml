@@ -1,0 +1,106 @@
+task_groups:
+  - name: search-index-task-group
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800 # 30 minutes
+    setup_group:
+      - func: "fetch source"
+      - func: "create expansions"
+      - func: "prepare resources"
+      - func: "windows fix"
+      - func: "fix absolute paths"
+      - func: "init test-results"
+      - func: "make files executable"
+      - func: "install rust"
+      - func: "install junit dependencies"
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+      - command: subprocess.exec
+        params:
+          working_dir: src
+          binary: bash
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+            - DRIVERS_TOOLS
+            - LAMBDA_STACK_NAME
+            - MONGODB_VERSION
+          env:
+            MONGODB_VERSION: "7.0"
+          args:
+            - .evergreen/with-secrets.sh
+            - drivers/atlas-dev
+            - ${DRIVERS_TOOLS}/.evergreen/atlas/setup-atlas-cluster.sh
+      - command: expansions.update
+        params:
+          file: src/atlas-expansion.yml
+    teardown_group:
+      - command: subprocess.exec
+        params:
+          working_dir: src
+          binary: bash
+          include_expansions_in_env:
+            - CLUSTER_NAME
+          args:
+            - .evergreen/with-secrets.sh
+            - drivers/atlas-dev
+            - ${DRIVERS_TOOLS}/.evergreen/atlas/teardown-atlas-cluster.sh
+      - func: "upload test results"
+    tasks:
+      - test-search-index
+
+tasks:
+  - name: test-search-index
+    commands:
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          binary: bash
+          include_expansions_in_env:
+            - PROJECT_DIRECTORY
+            - MONGODB_URI
+            - PATH
+          args:
+            - .evergreen/run-search-index-test.sh
+
+  - name: test-atlas-connectivity
+    tags: [atlas]
+    commands:
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          binary: bash
+          args:
+            - .evergreen/run-atlas-tests.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+            - DRIVERS_TOOLS
+            - PROJECT_DIRECTORY
+
+  - name: test-atlas-sfp
+    tags: [atlas]
+    commands:
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          binary: bash
+          args:
+            - .evergreen/run-sfp-tests.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+            - DRIVERS_TOOLS
+            - PROJECT_DIRECTORY

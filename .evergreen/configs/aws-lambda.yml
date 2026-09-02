@@ -1,0 +1,87 @@
+task_groups:
+  - name: test-aws-lambda-task-group
+    setup_group:
+      - func: "fetch source"
+      - func: "create expansions"
+      - func: "prepare resources"
+      - func: "windows fix"
+      - func: "fix absolute paths"
+      - func: "make files executable"
+      - func: "install rust"
+      - command: subprocess.exec
+        params:
+          working_dir: src
+          include_expansions_in_env:
+            - PROJECT_DIRECTORY
+          binary: bash
+          args:
+            - .evergreen/install-dependencies.sh
+            - cargo-lambda
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
+      - command: subprocess.exec
+        params:
+          working_dir: src
+          binary: bash
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+            - DRIVERS_TOOLS
+            - LAMBDA_STACK_NAME
+            - MONGODB_VERSION
+          args:
+            - .evergreen/with-secrets.sh
+            - drivers/atlas-dev
+            - ${DRIVERS_TOOLS}/.evergreen/atlas/setup-atlas-cluster.sh
+      - command: expansions.update
+        params:
+          file: src/atlas-expansion.yml
+    teardown_group:
+      - command: subprocess.exec
+        params:
+          working_dir: src
+          binary: bash
+          include_expansions_in_env:
+            - CLUSTER_NAME
+          args:
+            - .evergreen/with-secrets.sh
+            - drivers/atlas-dev
+            - ${DRIVERS_TOOLS}/.evergreen/atlas/teardown-atlas-cluster.sh
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800
+    tasks:
+      - test-aws-lambda-deployed
+
+tasks:
+  - name: test-aws-lambda-deployed
+    commands:
+      - command: ec2.assume_role
+        params:
+          role_arn: ${LAMBDA_AWS_ROLE_ARN}
+          duration_seconds: 3600
+      - command: subprocess.exec
+        params:
+          working_dir: src
+          binary: bash
+          args:
+            - .evergreen/run-aws-lambda-test.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
+            - DRIVERS_ATLAS_PUBLIC_API_KEY
+            - DRIVERS_ATLAS_PRIVATE_API_KEY
+            - DRIVERS_ATLAS_LAMBDA_USER
+            - DRIVERS_ATLAS_LAMBDA_PASSWORD
+            - DRIVERS_ATLAS_GROUP_ID
+            - LAMBDA_STACK_NAME
+            - PROJECT_DIRECTORY
+            - DRIVERS_TOOLS
+            - CLUSTER_NAME
+            - MONGODB_URI
+          env:
+            TEST_LAMBDA_DIRECTORY: ${PROJECT_DIRECTORY}/.evergreen/aws-lambda-test
+            AWS_REGION: us-east-1
+            SAM_BUILD_ARGS: --beta-features --debug

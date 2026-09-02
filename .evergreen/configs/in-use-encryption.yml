@@ -14,7 +14,9 @@ tasks:
         vars:
           MONGODB_VERSION: 4.4
           TOPOLOGY: replica_set
-      - func: start csfle servers
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
       - func: run csfle tests
 
   - name: test-in-use-encryption-5.0
@@ -29,7 +31,9 @@ tasks:
         vars:
           MONGODB_VERSION: 5.0
           TOPOLOGY: replica_set
-      - func: start csfle servers
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
       - func: run csfle tests
 
   - name: test-in-use-encryption-6.0
@@ -44,7 +48,9 @@ tasks:
         vars:
           MONGODB_VERSION: 6.0
           TOPOLOGY: replica_set
-      - func: start csfle servers
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
       - func: run csfle tests
 
   - name: test-in-use-encryption-7.0
@@ -59,7 +65,9 @@ tasks:
         vars:
           MONGODB_VERSION: 7.0
           TOPOLOGY: replica_set
-      - func: start csfle servers
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
       - func: run csfle tests
 
   - name: test-in-use-encryption-8.0
@@ -74,7 +82,9 @@ tasks:
         vars:
           MONGODB_VERSION: 8.0
           TOPOLOGY: replica_set
-      - func: start csfle servers
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
       - func: run csfle tests
 
   - name: test-in-use-encryption-9.0
@@ -89,7 +99,9 @@ tasks:
         vars:
           MONGODB_VERSION: 9.0
           TOPOLOGY: replica_set
-      - func: start csfle servers
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
       - func: run csfle tests
 
   - name: test-in-use-encryption-rapid
@@ -104,7 +116,9 @@ tasks:
         vars:
           MONGODB_VERSION: rapid
           TOPOLOGY: replica_set
-      - func: start csfle servers
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
       - func: run csfle tests
 
   - name: test-in-use-encryption-latest
@@ -119,5 +133,33 @@ tasks:
         vars:
           MONGODB_VERSION: latest
           TOPOLOGY: replica_set
-      - func: start csfle servers
+      - command: ec2.assume_role
+        params:
+          role_arn: ${aws_test_secrets_role}
       - func: run csfle tests
+
+functions:
+
+  run csfle tests:
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/run-csfle-tests.sh
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+          - MONGODB_URI
+          - MONGOCRYPT_LIB_DIR
+          - OPENSSL
+          - OS
+          - LD_LIBRARY_PATH
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - CSFLE_LOCAL_KEY
+          - CRYPT_SHARED_LIB_PATH
+          - DISABLE_CRYPT_SHARED
+          - AZURE_IMDS_MOCK_PORT

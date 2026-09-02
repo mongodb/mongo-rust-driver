@@ -108,6 +108,7 @@ tasks:
       - func: run driver test suite
 
 functions:
+
   start load balancer:
     - command: shell.exec
       params:

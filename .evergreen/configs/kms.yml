@@ -1,0 +1,178 @@
+task_groups:
+  - name: azure-kms-task-group
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800 # 30 minutes
+    setup_group:
+      - func: "fetch source"
+      - func: "create expansions"
+      - func: "prepare resources"
+      - func: "windows fix"
+      - func: "fix absolute paths"
+      - func: "init test-results"
+      - func: "make files executable"
+      - func: "install rust"
+      - func: "install libmongocrypt"
+      - command: shell.exec
+        params:
+          shell: bash
+          script: |-
+            ${PREPARE_SHELL}
+            set +o xtrace
+            echo '${testazurekms_publickey}' > /tmp/testazurekms_publickey
+            echo '${testazurekms_privatekey}' > /tmp/testazurekms_privatekey
+            # Set 600 permissions on private key file. Otherwise ssh / scp may error with permissions "are too open".
+            chmod 600 /tmp/testazurekms_privatekey
+            export AZUREKMS_CLIENTID=${testazurekms_clientid}
+            export AZUREKMS_TENANTID=${testazurekms_tenantid}
+            export AZUREKMS_SECRET=${testazurekms_secret}
+            export AZUREKMS_DRIVERS_TOOLS=$DRIVERS_TOOLS
+            export AZUREKMS_RESOURCEGROUP=${testazurekms_resourcegroup}
+            export AZUREKMS_PUBLICKEYPATH=/tmp/testazurekms_publickey
+            export AZUREKMS_PRIVATEKEYPATH=/tmp/testazurekms_privatekey
+            export AZUREKMS_SCOPE=${testazurekms_scope}
+            export AZUREKMS_VMNAME_PREFIX=rustdriver
+            set -o xtrace
+            $DRIVERS_TOOLS/.evergreen/csfle/azurekms/create-and-setup-vm.sh
+      - command: expansions.update
+        params:
+          file: testazurekms-expansions.yml
+      - command: shell.exec
+        params:
+          shell: bash
+          script: |-
+            cat <<EOT > azure_shell.yml
+            AZURE_SHELL: |
+              export AZUREKMS_VMNAME=${AZUREKMS_VMNAME}
+              export AZUREKMS_RESOURCEGROUP=${testazurekms_resourcegroup}
+              export AZUREKMS_PRIVATEKEYPATH=/tmp/testazurekms_privatekey
+              export AZUREKMS_KEY_NAME='${testazurekms_keyname}'
+              export AZUREKMS_KEY_VAULT_ENDPOINT='${testazurekms_keyvaultendpoint}'
+            EOT
+      - command: expansions.update
+        params:
+          file: azure_shell.yml
+    teardown_group:
+      - command: expansions.update
+        params:
+          file: testazurekms-expansions.yml
+      - command: shell.exec
+        params:
+          shell: bash
+          script: |-
+            ${PREPARE_SHELL}
+            ${AZURE_SHELL}
+            set -o errexit
+            $DRIVERS_TOOLS/.evergreen/csfle/azurekms/delete-vm.sh
+    tasks:
+      - test-azure-kms
+
+  - name: gcp-kms-task-group
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800 # 30 minutes
+    setup_group:
+      - func: "fetch source"
+      - func: "create expansions"
+      - func: "prepare resources"
+      - func: "windows fix"
+      - func: "fix absolute paths"
+      - func: "init test-results"
+      - func: "make files executable"
+      - func: "install rust"
+      - func: "install libmongocrypt"
+      - command: shell.exec
+        params:
+          shell: "bash"
+          script: |
+            ${PREPARE_SHELL}
+            set +o xtrace
+            echo '${testgcpkms_key_file}' > /tmp/testgcpkms_key_file.json
+            export GCPKMS_KEYFILE=/tmp/testgcpkms_key_file.json
+            export GCPKMS_DRIVERS_TOOLS=$DRIVERS_TOOLS
+            export GCPKMS_SERVICEACCOUNT="${testgcpkms_service_account}"
+            set -o xtrace
+            $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/create-and-setup-instance.sh
+      - command: expansions.update
+        params:
+          file: testgcpkms-expansions.yml
+    teardown_group:
+      - command: shell.exec
+        params:
+          shell: "bash"
+          script: |
+            ${PREPARE_SHELL}
+            set +o xtrace
+            export GCPKMS_GCLOUD=${GCPKMS_GCLOUD}
+            export GCPKMS_PROJECT=${GCPKMS_PROJECT}
+            export GCPKMS_ZONE=${GCPKMS_ZONE}
+            export GCPKMS_INSTANCENAME=${GCPKMS_INSTANCENAME}
+            set -o xtrace
+            $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/delete-instance.sh
+    tasks:
+      - test-gcp-kms
+
+tasks:
+  - name: test-gcp-kms
+    commands:
+      - func: "build and upload gcp kms test"
+      - func: "run gcp kms test"
+
+  - name: test-azure-kms
+    commands:
+      - command: shell.exec
+        params:
+          working_dir: src
+          script: |
+            ${PREPARE_SHELL}
+            ${AZURE_SHELL}
+            .evergreen/run-azure-kms-test.sh
+
+functions:
+  "build and upload gcp kms test":
+    - command: shell.exec
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          ${PREPARE_SHELL}
+
+          set +o xtrace
+          export GCPKMS_GCLOUD=${GCPKMS_GCLOUD}
+          export GCPKMS_PROJECT=${GCPKMS_PROJECT}
+          export GCPKMS_ZONE=${GCPKMS_ZONE}
+          export GCPKMS_INSTANCENAME=${GCPKMS_INSTANCENAME}
+          set -o xtrace
+
+          mkdir test-contents
+          cp -r $MONGOCRYPT_LIB_DIR test-contents
+
+          echo "Building test ... begin"
+          . ${PROJECT_DIRECTORY}/.evergreen/env.sh
+          cargo test get_exe_name --features in-use-encryption,gcp-kms
+          cp $(cat exe_name.txt) test-contents/test-exe
+          echo "Building test ... end"
+
+          echo "Copying test contents ... begin"
+          tar czf test-contents.tgz test-contents
+          GCPKMS_SRC=test-contents.tgz GCPKMS_DST=$GCPKMS_INSTANCENAME: $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/copy-file.sh
+          echo "Copying test contents ... end"
+
+          echo "Untarring test contents ... begin"
+          GCPKMS_CMD="tar xf test-contents.tgz" $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/run-command.sh
+          echo "Untarring test contents ... end"
+
+  "run gcp kms test":
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: ${DRIVERS_TOOLS}
+        binary: bash
+        include_expansions_in_env:
+          - GCPKMS_GCLOUD
+          - GCPKMS_PROJECT
+          - GCPKMS_ZONE
+          - GCPKMS_INSTANCENAME
+          - DRIVERS_TOOLS
+        env:
+          GCPKMS_CMD: "RUST_BACKTRACE=1 LD_LIBRARY_PATH=./test-contents/lib ./test-contents/test-exe on_demand_gcp::success -- --no-capture"
+        args:
+          - .evergreen/csfle/gcpkms/run-command.sh
