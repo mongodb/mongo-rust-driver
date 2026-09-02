@@ -1,6 +1,12 @@
 use std::time::Duration;
 
-use crate::{bson::Document, error::Result, options::ClientOptions, Client};
+use crate::{
+    bson::Document,
+    client::csfle::options::CredentialProviders,
+    error::Result,
+    options::ClientOptions,
+    Client,
+};
 
 use super::{client_encryption::KmsConnectCallback, options::AutoEncryptionOptions};
 
@@ -112,6 +118,15 @@ impl EncryptedClientBuilder {
     /// [`KmsConnectCallback`] for more details.
     pub fn kms_connect_callback(mut self, callback: impl Into<Option<KmsConnectCallback>>) -> Self {
         self.enc_opts.kms_connect_callback = callback.into();
+        self
+    }
+
+    /// Specify custom credential providers.
+    pub fn credential_providers(
+        mut self,
+        providers: impl Into<Option<CredentialProviders>>,
+    ) -> Self {
+        self.enc_opts.credential_providers = providers.into();
         self
     }
 

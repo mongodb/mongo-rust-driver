@@ -26,13 +26,13 @@ PATH=${PATH}:${DRIVERS_TOOLS}/mongodb/bin
 set -o xtrace
 set +o errexit
 
-TEST_OPTIONS=("--skip" "on_demand_aws::failure")
+TEST_OPTIONS=("--skip" "on_demand_aws::failure" "--skip" "custom_aws_credentials")
 cargo_test test::csfle
 
-# Unset variables for on-demand credential failure tests.
+# Unset variables for credential failure tests.
 unset AWS_ACCESS_KEY_ID
 unset AWS_SECRET_ACCESS_KEY
 TEST_OPTIONS=()
-cargo_test on_demand_aws::failure
+cargo_test on_demand_aws::failure custom_aws_credentials
 
 exit ${CARGO_RESULT}

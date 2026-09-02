@@ -530,6 +530,7 @@ impl TestRunner {
                             disable_crypt_shared: None,
                             key_cache_expiration: opts.key_cache_expiration,
                             kms_connect_callback: None,
+                            credential_providers: None,
                         };
                         entity
                             .client()
