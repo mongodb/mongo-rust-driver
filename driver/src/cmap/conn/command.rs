@@ -18,7 +18,7 @@ use crate::{
         WriteFailure,
     },
     hello::{HelloCommandResponse, HelloReply},
-    operation::{CommandErrorBody, CommandResponse, Feature, Operation},
+    operation::{CommandErrorBody, CommandResponse, Operation},
     options::{ReadConcernInternal, ReadConcernLevel, ServerAddress, WriteConcern},
     selection_criteria::ReadPreference,
     ClientSession,
@@ -102,19 +102,8 @@ impl Command {
 
     pub(crate) fn from_operation<Op: Operation>(op: &Op, body: RawDocumentBuf) -> Self {
         let target = op.target();
-        let read_concern = match op.read_concern() {
-            Feature::Set(v) => Some(v),
-            Feature::NotSupported => None,
-            Feature::Inherit => target.read_concern(),
-        }
-        .cloned()
-        .map(ReadConcernInternal::from);
-        let write_concern = match op.write_concern() {
-            Feature::Set(v) => Some(v),
-            Feature::NotSupported => None,
-            Feature::Inherit => target.write_concern(),
-        }
-        .cloned();
+        let read_concern = op.read_concern().as_internal_option(&target);
+        let write_concern = op.write_concern().as_option(&target).cloned();
         Self {
             name: crate::bson_compat::cstr_to_str(op.name()).to_owned(),
             target_db: target.db_name().to_owned(),

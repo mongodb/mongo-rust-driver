@@ -43,7 +43,7 @@ use crate::{
         StreamDescription,
     },
     error::{CommandError, Error, ErrorKind, Result},
-    options::{ClientOptions, ReadConcern, WriteConcern},
+    options::{ClientOptions, ReadConcern, ReadConcernInternal, WriteConcern},
     selection_criteria::SelectionCriteria,
     BoxFuture,
     ClientSession,
@@ -154,8 +154,7 @@ pub(crate) trait Operation {
     /// The read concern to use for this operation, if any.
     fn read_concern(&self) -> Feature<&ReadConcern>;
 
-    /// The write concern to use for this operation, if any.  If this is implemented,
-    /// `set_write_concern` MUST also be.
+    /// The write concern to use for this operation, if any.
     fn write_concern(&self) -> Feature<&WriteConcern>;
 
     /// Whether this operation supports sessions or not.
@@ -218,6 +217,30 @@ impl<T> Feature<T> {
         match self {
             Self::NotSupported => false,
             _ => true,
+        }
+    }
+}
+
+impl Feature<&ReadConcern> {
+    pub(crate) fn as_internal_option<'a>(
+        self,
+        target: &OperationTarget,
+    ) -> Option<ReadConcernInternal> {
+        match self {
+            Self::Set(read_concern) => Some(read_concern.clone()),
+            Self::Inherit => target.read_concern().cloned(),
+            Self::NotSupported => None,
+        }
+        .map(ReadConcernInternal::from)
+    }
+}
+
+impl Feature<&WriteConcern> {
+    pub(crate) fn as_option<'a>(&'a self, target: &'a OperationTarget) -> Option<&'a WriteConcern> {
+        match self {
+            Self::Set(write_concern) => Some(write_concern),
+            Self::Inherit => target.write_concern(),
+            Self::NotSupported => None,
         }
     }
 }
