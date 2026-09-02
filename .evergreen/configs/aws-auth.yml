@@ -130,9 +130,8 @@ functions:
         include_expansions_in_env:
           - DRIVERS_TOOLS
           - PROJECT_DIRECTORY
-        env:
-          AWS_AUTH_TYPE: ${AWS_AUTH_TYPE}
-          AWS_ROLE_SESSION_NAME: ${AWS_ROLE_SESSION_NAME}
+          - AWS_AUTH_TYPE
+          - AWS_ROLE_SESSION_NAME
 
   "run aws ecs auth test":
     - command: shell.exec
