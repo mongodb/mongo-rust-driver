@@ -37,6 +37,7 @@ if [[ "$OSTYPE" == "cygwin" ]]; then
   openssl_lib_dir=""
   while IFS= read -r candidate; do
     case "${candidate}" in
+      # skip build variants that are definitely Rust-toolchain incompatible
       *static*|*MT*|*MTd*|*MDd*) continue ;;
     esac
     [ -f "${candidate}/libcrypto.lib" ] || continue
@@ -52,6 +53,7 @@ if [[ "$OSTYPE" == "cygwin" ]]; then
     find "${OPENSSL_ROOT}" \( -name 'libssl.lib' -o -name 'ssl.h' \) >&2
     exit 1
   fi
+  
   OPENSSL_LIB_DIR=$(cygpath --windows "${openssl_lib_dir}")
   export OPENSSL_LIB_DIR
   OPENSSL_INCLUDE_DIR=$(cygpath --windows "${openssl_include_dir}")
