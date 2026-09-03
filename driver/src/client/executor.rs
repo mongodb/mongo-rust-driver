@@ -347,7 +347,12 @@ impl Client {
 
         let op_target = op.target();
 
-        if let Some(write_concern) = op.write_concern().as_option(&op_target) {
+        let write_concern = match op.write_concern() {
+            Feature::Set(write_concern) => Some(write_concern),
+            Feature::Inherit if !session.in_transaction() => op_target.write_concern(),
+            _ => None,
+        };
+        if let Some(write_concern) = write_concern {
             if !write_concern.is_acknowledged() {
                 return Err(ErrorKind::InvalidArgument {
                     message: "Unacknowledged write concerns are not supported".to_string(),
