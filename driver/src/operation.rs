@@ -154,8 +154,7 @@ pub(crate) trait Operation {
     /// The read concern to use for this operation, if any.
     fn read_concern(&self) -> Feature<&ReadConcern>;
 
-    /// The write concern to use for this operation, if any.  If this is implemented,
-    /// `set_write_concern` MUST also be.
+    /// The write concern to use for this operation, if any.
     fn write_concern(&self) -> Feature<&WriteConcern>;
 
     /// Whether this operation supports sessions or not.

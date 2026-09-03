@@ -1,6 +1,12 @@
 use std::cmp::Ord;
 
-use crate::{bson::RawDocumentBuf, bson_compat::cstr, error::ErrorKind, test::server_version_gte};
+use crate::{
+    bson::RawDocumentBuf,
+    bson_compat::cstr,
+    error::ErrorKind,
+    options::{DatabaseOptions, WriteConcern},
+    test::server_version_gte,
+};
 use futures::{stream::TryStreamExt, StreamExt};
 use serde::Deserialize;
 
@@ -512,4 +518,21 @@ async fn null_byte_in_db_name() {
         let error = client.bulk_write(vec![write_model]).await.unwrap_err();
         assert!(error.is_server_error());
     }
+}
+
+#[tokio::test]
+async fn inherited_unacknowledged_write_concern_is_rejected() {
+    let client = Client::for_test().await;
+    let db = client.database_with_options(
+        "inherited_unacknowledged_write_concern_is_rejected",
+        DatabaseOptions::builder()
+            .write_concern(WriteConcern::nodes(0))
+            .build(),
+    );
+    let error = db
+        .collection("inherited_unacknowledged_write_concern_is_rejected")
+        .insert_one(doc! { "x": 1 })
+        .await
+        .unwrap_err();
+    assert!(error.is_invalid_argument());
 }
