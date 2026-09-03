@@ -1,0 +1,56 @@
+# Small, one-off tests not needing their own config file.
+
+tasks:
+  - name: test-bevy-asset
+    commands:
+    - func: bootstrap mongo-orchestration
+      vars:
+        MONGODB_VERSION: latest
+        TOPOLOGY: standalone
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: src
+        binary: bash
+        args: [.evergreen/run-bevy-asset-test.sh]
+        include_expansions_in_env:
+          - PROJECT_DIRECTORY
+          - MONGODB_URI
+
+  - name: test-socks5-proxy
+    commands:
+    - func: bootstrap mongo-orchestration
+      vars:
+        MONGODB_VERSION: rapid
+        TOPOLOGY: replica_set
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/run-socks5-proxy-test.sh
+        include_expansions_in_env:
+          - PROJECT_DIRECTORY
+          - MONGODB_URI
+          - DRIVERS_TOOLS
+          - PYTHON3
+          - OPENSSL
+
+  - name: test-sync
+    tags: [sync]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: rapid
+          TOPOLOGY: replica_set
+      - command: subprocess.exec
+        type: test
+        params:
+          working_dir: src
+          binary: bash
+          args:
+            - .evergreen/run-sync-tests.sh
+          include_expansions_in_env:
+            - PROJECT_DIRECTORY
+            - MONGODB_URI

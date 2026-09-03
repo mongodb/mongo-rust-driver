@@ -75,10 +75,40 @@ fn in_use_encryption() {
         vars:
           MONGODB_VERSION: {version}
           TOPOLOGY: {REPLICA_SET}
-      - func: start csfle servers
+      - command: ec2.assume_role
+        params:
+          role_arn: ${{aws_test_secrets_role}}
       - func: run csfle tests"
         );
     }
+    println!(
+        "
+functions:
+
+  run csfle tests:
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/run-csfle-tests.sh
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+          - MONGODB_URI
+          - MONGOCRYPT_LIB_DIR
+          - OPENSSL
+          - OS
+          - LD_LIBRARY_PATH
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - CSFLE_LOCAL_KEY
+          - CRYPT_SHARED_LIB_PATH
+          - DISABLE_CRYPT_SHARED
+          - AZURE_IMDS_MOCK_PORT"
+    );
 }
 
 fn load_balancer() {
@@ -103,7 +133,9 @@ fn load_balancer() {
         );
     }
     println!(
-        "\nfunctions:
+        "
+functions:
+
   start load balancer:
     - command: shell.exec
       params:

@@ -12,16 +12,15 @@ export CSFLE_TLS_CERT_DIR="${DRIVERS_TOOLS}/.evergreen/x509gen"
 
 CARGO_OPTIONS+=("--ignore-default-filter")
 
-if [ "$OS" = "Windows_NT" ]; then
-  export CSFLE_TLS_CERT_DIR=$(cygpath ${CSFLE_TLS_CERT_DIR} --windows)
-  export SSL_CERT_FILE=$(cygpath /etc/ssl/certs/ca-bundle.crt --windows)
-  export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
-fi
-
+FLE_AZURE_USE_CORPORATE="YES" bash ${DRIVERS_TOOLS}/.evergreen/csfle/setup-secrets.sh
 . ./secrets-export.sh
 
 # Add mongodb binaries to path for mongocryptd
 PATH=${PATH}:${DRIVERS_TOOLS}/mongodb/bin
+
+# Always stop the CSFLE servers when this script exits
+trap 'bash ${DRIVERS_TOOLS}/.evergreen/csfle/stop-servers.sh || true' EXIT
+bash ${DRIVERS_TOOLS}/.evergreen/csfle/start-servers.sh
 
 set -o xtrace
 set +o errexit

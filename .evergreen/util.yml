@@ -1,4 +1,4 @@
-# Shared utility functions for performing setup and teardown tasks.
+# Shared utility functions for performing setup and teardown tasks and running tests.
 
 tasks:
   - name: build-nextest-archive
@@ -90,6 +90,28 @@ functions:
       args:
         - .evergreen/install-dependencies.sh
         - rust
+
+  "install libmongocrypt":
+    command: subprocess.exec
+    params:
+      working_dir: src
+      include_expansions_in_env:
+        - PROJECT_DIRECTORY
+      binary: bash
+      args:
+        - .evergreen/install-dependencies.sh
+        - libmongocrypt
+
+  "install junit dependencies":
+    command: subprocess.exec
+    params:
+      working_dir: src
+      include_expansions_in_env:
+        - PROJECT_DIRECTORY
+      binary: bash
+      args:
+        - .evergreen/install-dependencies.sh
+        - junit-dependencies
 
   "upload-mo-artifacts":
     - command: shell.exec
@@ -218,3 +240,44 @@ functions:
         bucket: mciuploads
         local_file: src/nextest-archive.tar.zst
         optional: true
+
+  "upload test results":
+    - command: attach.xunit_results
+      params:
+        file: src/results.xml
+
+  "build static test tarball":
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/build-static-test-tarball.sh
+        include_expansions_in_env:
+          - PROJECT_DIRECTORY
+          - BUILD_FEATURES
+          - TEST_FILES
+    - command: expansions.update
+      params:
+        file: src/static-test-tarball-expansion.yml
+
+  "run driver test suite":
+    - command: subprocess.exec
+      type: test
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - .evergreen/run-tests.sh
+        include_expansions_in_env:
+          - DRIVERS_TOOLS
+          - PROJECT_DIRECTORY
+          - OPENSSL
+          - SINGLE_MONGOS_LB_URI
+          - MULTI_MONGOS_LB_URI
+          - MONGODB_URI
+          - MONGODB_API_VERSION
+          - PATH
+          - ZSTD
+          - ZLIB
+          - SNAPPY
