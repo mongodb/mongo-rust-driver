@@ -20,6 +20,8 @@ task_groups:
           binary: bash
           args:
             - ${DRIVERS_TOOLS}/.evergreen/csfle/azurekms/create-and-setup-vm.sh
+          env:
+            AZUREKMS_VMNAME_PREFIX: RUST
           include_expansions_in_env:
             - AWS_ACCESS_KEY_ID
             - AWS_SECRET_ACCESS_KEY
