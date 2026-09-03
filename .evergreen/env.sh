@@ -28,8 +28,35 @@ if [[ "$OSTYPE" == "cygwin" ]]; then
   export PATH
   echo "updated path on windows PATH=$PATH"
 
-  export OPENSSL_INCLUDE_DIR="C:\\Program Files\\OpenSSL-Win64\\include"
-  export OPENSSL_LIB_DIR="C:\\Program Files\\OpenSSL-Win64\\lib\\VC\\x64\\MD"
+  # Probe for the openssl install path rather than hardcoding one that keeps changing.
+  OPENSSL_ROOT="${OPENSSL_ROOT:-/cygdrive/c/Program Files/OpenSSL-Win64}"
+  if [ ! -d "${OPENSSL_ROOT}" ]; then
+    echo "OpenSSL install not found at ${OPENSSL_ROOT}" >&2
+    exit 1
+  fi
+  openssl_lib_dir=""
+  while IFS= read -r candidate; do
+    case "${candidate}" in
+      *static*|*MT*|*MTd*|*MDd*) continue ;;
+    esac
+    [ -f "${candidate}/libcrypto.lib" ] || continue
+    # Prefer an explicit MD directory if one exists (matching the Rust toolschain)
+    if [ -z "${openssl_lib_dir}" ] || [ "${candidate}" != "${candidate%MD}" ]; then
+      openssl_lib_dir="${candidate}"
+    fi
+  done < <(find "${OPENSSL_ROOT}" -name 'libssl.lib' -printf '%h\n' | sort)
+  openssl_header=$(find "${OPENSSL_ROOT}" -path '*/openssl/ssl.h' | head -n 1)
+  openssl_include_dir=$(dirname "$(dirname "${openssl_header}")")
+  if [ -z "${openssl_lib_dir}" ] || [ -z "${openssl_header}" ]; then
+    echo "Could not locate OpenSSL libraries/headers under ${OPENSSL_ROOT}:" >&2
+    find "${OPENSSL_ROOT}" \( -name 'libssl.lib' -o -name 'ssl.h' \) >&2
+    exit 1
+  fi
+  OPENSSL_LIB_DIR=$(cygpath --windows "${openssl_lib_dir}")
+  export OPENSSL_LIB_DIR
+  OPENSSL_INCLUDE_DIR=$(cygpath --windows "${openssl_include_dir}")
+  export OPENSSL_INCLUDE_DIR
+  echo "OPENSSL_LIB_DIR=${OPENSSL_LIB_DIR} OPENSSL_INCLUDE_DIR=${OPENSSL_INCLUDE_DIR}"
 else
   # Turn off tracing for the very-spammy nvm script.
   set +o xtrace
