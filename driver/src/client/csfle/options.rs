@@ -3,6 +3,7 @@ use std::{collections::HashMap, time::Duration};
 use crate::bson::Array;
 use mongocrypt::ctx::KmsProvider;
 use serde::Deserialize;
+use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{Bson, Document},
@@ -247,7 +248,7 @@ pub(crate) const EO_CRYPT_SHARED_LIB_PATH: ExtraOptionStr = ExtraOptionStr("cryp
 pub(crate) const EO_CRYPT_SHARED_REQUIRED: ExtraOptionBool = ExtraOptionBool("cryptSharedRequired");
 
 /// Custom credential providers.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, TypedBuilder)]
 #[non_exhaustive]
 pub struct CredentialProviders {
     /// Credential provider for MONGODB-AWS.
