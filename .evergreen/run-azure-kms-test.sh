@@ -9,6 +9,10 @@ set -o xtrace
 
 AZUREKMS_TOOLS=$DRIVERS_TOOLS/.evergreen/csfle/azurekms/
 
+set +o xtrace
+source ${AZUREKMS_TOOLS}/secrets-export.sh
+set -o xtrace
+
 mkdir azurekms_remote
 cp -r $MONGOCRYPT_LIB_DIR azurekms_remote
 

@@ -18,32 +18,19 @@ task_groups:
       - command: subprocess.exec
         params:
           binary: bash
-          working_dir: src
           args:
-            - .evergreen/set-up-azure-vm.sh
+            - ${DRIVERS_TOOLS}/.evergreen/csfle/azurekms/create-and-setup-vm.sh
           include_expansions_in_env:
-            - DRIVERS_TOOLS
             - AWS_ACCESS_KEY_ID
             - AWS_SECRET_ACCESS_KEY
             - AWS_SESSION_TOKEN
-      - command: expansions.update
-        params:
-          file: testazurekms-expansions.yml
-      - command: expansions.update
-        params:
-          file: src/azure-keys.yml
     teardown_group:
       - command: subprocess.exec
         params:
           binary: bash
           args:
             - ${DRIVERS_TOOLS}/.evergreen/csfle/azurekms/delete-vm.sh
-          include_expansions_in_env:
-            - AZUREKMS_VMNAME
-            - AZUREKMS_RESOURCEGROUP
-            - AZUREKMS_PRIVATEKEYPATH
-            - AZUREKMS_KEYNAME
-            - AZUREKMS_KEYVAULTENDPOINT
+
     tasks:
       - test-azure-kms
 
@@ -110,11 +97,6 @@ tasks:
             - PROJECT_DIRECTORY
             - DRIVERS_TOOLS
             - MONGOCRYPT_LIB_DIR
-            - AZUREKMS_KEYNAME
-            - AZUREKMS_KEYVAULTENDPOINT
-            - AZUREKMS_VMNAME
-            - AZUREKMS_RESOURCEGROUP
-            - AZUREKMS_PRIVATEKEYPATH
 
 functions:
   "build and upload gcp kms test":
