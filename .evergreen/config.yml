@@ -283,7 +283,7 @@ buildvariants:
     # patchable: false
     run_on:
       # The GCP CLI is not available on RHEL/Ubuntu machines.
-      - debian11-small
+      - debian12-small
     expansions:
       LIBMONGOCRYPT: true
     tasks:
