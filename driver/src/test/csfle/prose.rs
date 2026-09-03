@@ -2461,6 +2461,105 @@ mod lookup {
     }
 }
 
+// Prose test 26. Custom AWS Credentials
+mod custom_aws_credentials {
+    use aws_credential_types::{
+        provider::{
+            future::ProvideCredentials as ProvideCredentialsFuture,
+            ProvideCredentials,
+            SharedCredentialsProvider,
+        },
+        Credentials,
+    };
+    use mongocrypt::ctx::KmsProvider;
+
+    use crate::{
+        client::csfle::options::CredentialProviders,
+        test::csfle_skip_local::{FLE_AWS_KEY, FLE_AWS_SECRET},
+    };
+
+    use super::*;
+
+    // Case 1: ClientEncryption with credentialProviders and incorrect kmsProviders
+    #[tokio::test]
+    async fn case_1() {
+        let setup_client = Client::for_test().await;
+        let ce = ClientEncryption::builder(
+            setup_client.into_client(),
+            KV_NAMESPACE.clone(),
+            [AWS_KMS.clone()],
+        )
+        .credential_providers(CredentialProviders {
+            aws: Some(default_aws_provider().await),
+        })
+        .build();
+        assert!(ce.is_err());
+    }
+
+    static PROVIDER_CALLED: AtomicBool = AtomicBool::new(false);
+
+    // Case 2: ClientEncryption with credentialProviders works
+    #[tokio::test]
+    async fn case_2() {
+        let setup_client = Client::for_test().await;
+        let ce = ClientEncryption::builder(
+            setup_client.into_client(),
+            KV_NAMESPACE.clone(),
+            [(KmsProvider::aws(), doc! {}, None)],
+        )
+        .credential_providers(CredentialProviders {
+            aws: Some(SharedCredentialsProvider::new(ValidProvider)),
+        })
+        .build()
+        .unwrap();
+        ce.create_data_key(AWS_MASTER_KEY.clone()).await.unwrap();
+        assert!(PROVIDER_CALLED.load(Ordering::SeqCst));
+    }
+
+    // Case 3: AutoEncryptionOpts with credentialProviders and incorrect kmsProviders
+    #[tokio::test]
+    async fn case_3() {
+        let client = Client::encrypted_builder(
+            get_client_options().await.clone(),
+            KV_NAMESPACE.clone(),
+            [AWS_KMS.clone()],
+        )
+        .unwrap()
+        .credential_providers(CredentialProviders {
+            aws: Some(default_aws_provider().await),
+        })
+        .build()
+        .await;
+        assert!(client.is_err());
+    }
+
+    async fn default_aws_provider() -> SharedCredentialsProvider {
+        aws_config::load_defaults(aws_config::BehaviorVersion::latest())
+            .await
+            .credentials_provider()
+            .unwrap()
+    }
+
+    #[derive(Debug)]
+    struct ValidProvider;
+
+    impl ProvideCredentials for ValidProvider {
+        fn provide_credentials<'a>(&'a self) -> ProvideCredentialsFuture<'a>
+        where
+            Self: 'a,
+        {
+            PROVIDER_CALLED.store(true, Ordering::SeqCst);
+            ProvideCredentialsFuture::ready(Ok(Credentials::new(
+                FLE_AWS_KEY.clone(),
+                FLE_AWS_SECRET.clone(),
+                None,
+                None,
+                "MongoDB URI",
+            )))
+        }
+    }
+}
+
 // FLE 2.0 Documentation Example
 #[tokio::test]
 async fn fle2_example() -> Result<()> {

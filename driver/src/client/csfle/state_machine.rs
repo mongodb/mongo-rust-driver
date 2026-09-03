@@ -15,7 +15,7 @@ use tokio::{
 
 use crate::{
     bson::{rawdoc, Document, RawDocument, RawDocumentBuf},
-    client::{options::ServerAddress, WeakClient},
+    client::{csfle::options::CredentialProviders, options::ServerAddress, WeakClient},
     error::{Error, Result},
     operation::{raw_output::RawOutput, run_command::RunCommand},
     options::{ReadConcern, Socks5Proxy},
@@ -42,6 +42,7 @@ pub(crate) struct CryptExecutor {
     azure: azure::ExecutorState,
     proxy: Option<Socks5Proxy>,
     kms_connect_callback: Option<KmsConnectCallback>,
+    credential_providers: Option<CredentialProviders>,
 }
 
 impl CryptExecutor {
@@ -50,6 +51,7 @@ impl CryptExecutor {
         key_vault_namespace: Namespace,
         kms_providers: KmsProviders,
         kms_connect_callback: Option<KmsConnectCallback>,
+        credential_providers: Option<CredentialProviders>,
     ) -> Result<Self> {
         // TODO RUST-1492: Replace num_cpus with std::thread::available_parallelism.
         let crypto_threads = rayon::ThreadPoolBuilder::new()
@@ -68,6 +70,7 @@ impl CryptExecutor {
             azure: azure::ExecutorState::new()?,
             proxy: None,
             kms_connect_callback,
+            credential_providers,
         })
     }
 
@@ -81,6 +84,7 @@ impl CryptExecutor {
         metadata_client: Option<WeakClient>,
         proxy: Option<Socks5Proxy>,
         kms_connect_callback: Option<KmsConnectCallback>,
+        credential_providers: Option<CredentialProviders>,
     ) -> Result<Self> {
         let mongocryptd = match mongocryptd_opts {
             Some(opts) => Some(Mongocryptd::new(opts).await?),
@@ -91,6 +95,7 @@ impl CryptExecutor {
             key_vault_namespace,
             kms_providers,
             kms_connect_callback,
+            credential_providers,
         )?;
         exec.mongocryptd = mongocryptd;
         exec.mongocryptd_client = mongocryptd_client;
@@ -306,8 +311,16 @@ impl CryptExecutor {
                                         Credential,
                                     };
 
-                                    let aws_creds =
-                                        get_aws_credentials(&Credential::default()).await?;
+                                    let mut credential = Credential::default();
+                                    if let Some(custom) = self
+                                        .credential_providers
+                                        .as_ref()
+                                        .and_then(|p| p.aws.as_ref())
+                                    {
+                                        credential.aws_credential_provider = Some(custom.clone());
+                                    }
+
+                                    let aws_creds = get_aws_credentials(&credential).await?;
 
                                     let mut creds = rawdoc! {
                                         "accessKeyId": aws_creds.access_key_id().to_string(),

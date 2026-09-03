@@ -3,6 +3,7 @@ use std::{collections::HashMap, time::Duration};
 use crate::bson::Array;
 use mongocrypt::ctx::KmsProvider;
 use serde::Deserialize;
+use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{Bson, Document},
@@ -72,6 +73,8 @@ pub(crate) struct AutoEncryptionOptions {
     pub(crate) key_cache_expiration: Option<Duration>,
     #[serde(skip)]
     pub(crate) kms_connect_callback: Option<KmsConnectCallback>,
+    #[serde(skip)]
+    pub(crate) credential_providers: Option<CredentialProviders>,
 }
 
 fn default_key_vault_namespace() -> Namespace {
@@ -96,6 +99,7 @@ impl AutoEncryptionOptions {
             disable_crypt_shared: None,
             key_cache_expiration: None,
             kms_connect_callback: None,
+            credential_providers: None,
         }
     }
 }
@@ -145,6 +149,32 @@ impl KmsProviders {
 
     pub(crate) fn credentials(&self) -> &HashMap<KmsProvider, Document> {
         &self.credentials
+    }
+
+    pub(crate) fn validate_credential_providers(
+        &self,
+        credential_providers: &Option<CredentialProviders>,
+    ) -> Result<()> {
+        let Some(credential_providers) = credential_providers else {
+            return Ok(());
+        };
+        #[cfg(feature = "aws-auth")]
+        if credential_providers.aws.is_some() {
+            self.validate_on_demand(&KmsProvider::aws())?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "aws-auth")]
+    fn validate_on_demand(&self, provider: &KmsProvider) -> Result<()> {
+        if self.credentials.get(provider).is_none_or(|c| !c.is_empty()) {
+            return Err(Error::invalid_argument(format!(
+                "a custom {} credential provider requires the corresponding KMS provider to be \
+                 configured with an empty credentials document",
+                provider.as_string(),
+            )));
+        }
+        Ok(())
     }
 }
 
@@ -216,3 +246,12 @@ pub(crate) const EO_MONGOCRYPTD_SPAWN_ARGS: ExtraOptionArray =
     ExtraOptionArray("mongocryptdSpawnArgs");
 pub(crate) const EO_CRYPT_SHARED_LIB_PATH: ExtraOptionStr = ExtraOptionStr("cryptSharedLibPath");
 pub(crate) const EO_CRYPT_SHARED_REQUIRED: ExtraOptionBool = ExtraOptionBool("cryptSharedRequired");
+
+/// Custom credential providers.
+#[derive(Debug, Clone, Default, TypedBuilder)]
+#[non_exhaustive]
+pub struct CredentialProviders {
+    /// Credential provider for MONGODB-AWS.
+    #[cfg(feature = "aws-auth")]
+    pub aws: Option<aws_credential_types::provider::SharedCredentialsProvider>,
+}

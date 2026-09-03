@@ -21,14 +21,14 @@ cargo_test_options() {
     # Feature flags are set when the archive is built
     FEATURES=""
   fi
-  echo $1 ${CARGO_OPTIONS[@]} "${FEATURES}" -- ${TEST_OPTIONS[@]}
+  echo "$@" ${CARGO_OPTIONS[@]} "${FEATURES}" -- ${TEST_OPTIONS[@]}
 }
 
 cargo_test() {
   LOG_PATH=$(mktemp)
   tail -f ${LOG_PATH} &
   TAIL_PID=$!
-  LOG_UNCAPTURED=${LOG_PATH} RUST_BACKTRACE=1 cargo nextest run --profile ci $(cargo_test_options $1)
+  LOG_UNCAPTURED=${LOG_PATH} RUST_BACKTRACE=1 cargo nextest run --profile ci $(cargo_test_options "$@")
   ((CARGO_RESULT = ${CARGO_RESULT} || $?))
   if [[ -f "results.xml" ]]; then
     mv results.xml previous.xml

@@ -28,7 +28,7 @@ use crate::{
 
 use super::{options::KmsProviders, state_machine::CryptExecutor};
 
-pub use super::client_builder::EncryptedClientBuilder;
+pub use super::{client_builder::EncryptedClientBuilder, options::CredentialProviders};
 pub use crate::action::csfle::encrypt::{
     EncryptKey,
     PrefixOptions,
@@ -112,6 +112,7 @@ impl ClientEncryption {
             kms_providers: kms_providers.into_iter().collect(),
             key_cache_expiration: None,
             kms_connect_callback: None,
+            credential_providers: None,
         }
     }
 
@@ -223,6 +224,7 @@ pub struct ClientEncryptionBuilder {
     kms_providers: Vec<(KmsProvider, crate::bson::Document, Option<TlsOptions>)>,
     key_cache_expiration: Option<Duration>,
     kms_connect_callback: Option<KmsConnectCallback>,
+    credential_providers: Option<CredentialProviders>,
 }
 
 impl ClientEncryptionBuilder {
@@ -240,9 +242,19 @@ impl ClientEncryptionBuilder {
         self
     }
 
+    /// Specify custom credential providers.
+    pub fn credential_providers(
+        mut self,
+        providers: impl Into<Option<CredentialProviders>>,
+    ) -> Self {
+        self.credential_providers = providers.into();
+        self
+    }
+
     /// Build the [`ClientEncryption`].
     pub fn build(self) -> Result<ClientEncryption> {
         let kms_providers = KmsProviders::new(self.kms_providers)?;
+        kms_providers.validate_credential_providers(&self.credential_providers)?;
 
         let mut crypt_builder = Crypt::builder()
             .kms_providers(&kms_providers.credentials_doc()?)?
@@ -266,6 +278,7 @@ impl ClientEncryptionBuilder {
             self.key_vault_namespace.clone(),
             kms_providers,
             self.kms_connect_callback,
+            self.credential_providers,
         )?;
         let key_vault = self
             .key_vault_client

@@ -48,6 +48,8 @@ impl ClientState {
     const MONGOCRYPTD_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_millis(10_000);
 
     pub(super) async fn new(client: &Client, opts: AutoEncryptionOptions) -> Result<Self> {
+        opts.kms_providers
+            .validate_credential_providers(&opts.credential_providers)?;
         let crypt = Self::make_crypt(&opts)?;
         let mongocryptd_opts = Self::make_mongocryptd_opts(&opts, &crypt)?;
         let aux_clients = Self::make_aux_clients(client, &opts)?;
@@ -77,6 +79,7 @@ impl ClientState {
             #[cfg(not(feature = "socks5-proxy"))]
             None,
             opts.kms_connect_callback.clone(),
+            opts.credential_providers.clone(),
         )
         .await?;
 

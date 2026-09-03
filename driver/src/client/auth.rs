@@ -509,6 +509,13 @@ pub struct Credential {
     #[derive_where(skip)]
     #[builder(default)]
     pub oidc_callback: oidc::Callback,
+
+    /// A custom AWS credential provider.
+    #[cfg(feature = "aws-auth")]
+    #[serde(skip)]
+    #[derive_where(skip)]
+    #[builder(default)]
+    pub aws_credential_provider: Option<aws_credential_types::provider::SharedCredentialsProvider>,
 }
 
 impl Credential {
