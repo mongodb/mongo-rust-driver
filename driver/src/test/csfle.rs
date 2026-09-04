@@ -12,6 +12,9 @@ mod kms_retry; // requires mock HTTP server
 #[cfg(feature = "aws-auth")]
 #[path = "csfle/on_demand_aws.rs"]
 mod on_demand_aws; // requires AWS credentials to be set or unset
+#[cfg(feature = "azure-kms")]
+#[path = "csfle/on_demand_azure.rs"]
+mod on_demand_azure; // requires Azure
 #[cfg(feature = "gcp-kms")]
 #[path = "csfle/on_demand_gcp.rs"]
 mod on_demand_gcp; // requires GCP

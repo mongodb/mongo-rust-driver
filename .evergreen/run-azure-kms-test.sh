@@ -16,15 +16,15 @@ set -o xtrace
 mkdir azurekms_remote
 cp -r $MONGOCRYPT_LIB_DIR azurekms_remote
 
-pushd .evergreen/azure-kms-test
-cargo build
-popd
-cp .evergreen/azure-kms-test/target/debug/azure-kms-test azurekms_remote
+echo "Building test ... begin"
+cargo test get_exe_name --features in-use-encryption,azure-kms
+cp $(cat driver/exe_name.txt) azurekms_remote/test-exe
+echo "Building test ... end"
 
 tar czf azurekms_remote.tgz azurekms_remote
 AZUREKMS_SRC=azurekms_remote.tgz \
   AZUREKMS_DST="." \
   $AZUREKMS_TOOLS/copy-file.sh
 AZUREKMS_CMD="tar xvf azurekms_remote.tgz" $AZUREKMS_TOOLS/run-command.sh
-AZUREKMS_CMD="LD_LIBRARY_PATH=./azurekms_remote/lib KEY_NAME='${AZUREKMS_KEYNAME}' KEY_VAULT_ENDPOINT='${AZUREKMS_KEYVAULTENDPOINT}' ./azurekms_remote/azure-kms-test" \
+AZUREKMS_CMD="RUST_BACKTRACE=1 LD_LIBRARY_PATH=./azurekms_remote/lib ./azurekms_remote/test-exe on_demand_azure::success -- --no-capture" \
   $AZUREKMS_TOOLS/run-command.sh
