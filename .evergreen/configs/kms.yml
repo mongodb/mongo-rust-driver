@@ -99,6 +99,7 @@ tasks:
             - PROJECT_DIRECTORY
             - DRIVERS_TOOLS
             - MONGOCRYPT_LIB_DIR
+            - LD_LIBRARY_PATH
 
 functions:
   "build and upload gcp kms test":
