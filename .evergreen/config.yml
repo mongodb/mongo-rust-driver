@@ -269,8 +269,7 @@ buildvariants:
     display_name: "Azure KMS"
     # patchable: false
     run_on:
-      # The Azure CLI is not available on RHEL/Ubuntu machines.
-      - debian12-small
+      - ubuntu2204-small
     expansions:
       LIBMONGOCRYPT: true
     tasks:
