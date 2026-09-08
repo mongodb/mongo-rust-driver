@@ -1,0 +1,38 @@
+name: Check TODOs
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  ticket-todos:
+    name: Check for TODOs referencing the PR's ticket
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Find TODOs
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          TICKETS=$(echo "$PR_TITLE" | grep -oE '\b(RUST|DRIVERS)-[0-9]+\b')
+
+          if [ -z "$TICKETS" ]; then
+            echo "No tickets listed in PR title."
+            exit 0
+          fi
+
+          echo "Tickets referenced by this PR:\n$TICKETS"
+
+          FOUND=0
+          for TICKET in $TICKETS; do
+            if git grep -niIE "TODO.*${TICKET}|${TICKET}.*TODO" -- .; then
+              FOUND=1
+          done
+
+          if [ "$FOUND" -eq 1 ]; then
+            echo "Unresolved TODO comment(s) found."
+            exit 1
+          fi
