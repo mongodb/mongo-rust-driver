@@ -22,7 +22,6 @@ mod spec; // requires environment variables listed below
 
 use std::{env, path::PathBuf};
 
-// TODO RUST-1005: test
 use crate::{
     bson::{doc, Document, RawBson},
     client_encryption::AwsMasterKey,
