@@ -3,7 +3,7 @@ on: pull_request
 
 jobs:
   ticket-todos:
-    name: Check for TODOs referencing the PR's ticket(s
+    name: Check for TODOs referencing the PR's ticket(s)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

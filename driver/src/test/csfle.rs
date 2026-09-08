@@ -20,6 +20,7 @@ mod prose; // requires environment variables listed below
 #[path = "csfle/spec.rs"]
 mod spec; // requires environment variables listed below
 
+// RUST-12345: todo test
 use std::{env, path::PathBuf};
 
 use crate::{
