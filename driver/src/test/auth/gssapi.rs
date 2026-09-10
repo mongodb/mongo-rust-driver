@@ -9,7 +9,7 @@ use crate::{
 static SASL_HOST: LazyLock<String> = LazyLock::new(|| get_var("SASL_HOST"));
 static SASL_PORT: LazyLock<String> = LazyLock::new(|| get_var("SASL_PORT"));
 #[cfg(target_os = "windows")]
-static SASL_USER: LazyLock<String> = LazyLock::neW(|| get_var("SASL_USER"));
+static SASL_USER: LazyLock<String> = LazyLock::new(|| get_var("SASL_USER"));
 #[cfg(target_os = "windows")]
 static SASL_PASS: LazyLock<String> = LazyLock::new(|| get_var("SASL_PASS"));
 static PRINCIPAL: LazyLock<String> = LazyLock::new(|| get_var("PRINCIPAL"));
