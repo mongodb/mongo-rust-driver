@@ -49,21 +49,18 @@ task_groups:
       - func: "make files executable"
       - func: "install rust"
       - func: "install libmongocrypt"
-      - command: shell.exec
+      - command: ec2.assume_role
         params:
-          shell: "bash"
-          script: |
-            ${PREPARE_SHELL}
-            set +o xtrace
-            echo '${testgcpkms_key_file}' > /tmp/testgcpkms_key_file.json
-            export GCPKMS_KEYFILE=/tmp/testgcpkms_key_file.json
-            export GCPKMS_DRIVERS_TOOLS=$DRIVERS_TOOLS
-            export GCPKMS_SERVICEACCOUNT="${testgcpkms_service_account}"
-            set -o xtrace
-            $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/create-and-setup-instance.sh
-      - command: expansions.update
+          role_arn: ${aws_test_secrets_role}
+      - command: subprocess.exec
         params:
-          file: testgcpkms-expansions.yml
+          binary: bash
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/csfle/gcpkms/create-and-setup-instance.sh
+          include_expansions_in_env:
+            - AWS_ACCESS_KEY_ID
+            - AWS_SECRET_ACCESS_KEY
+            - AWS_SESSION_TOKEN
     teardown_group:
       - command: shell.exec
         params:
