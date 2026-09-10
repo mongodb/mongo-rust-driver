@@ -1,7 +1,5 @@
 use std::sync::LazyLock;
 
-use percent_encoding::{percent_encode, NON_ALPHANUMERIC};
-
 use crate::{
     bson::{doc, Document},
     test::get_var,
@@ -11,29 +9,35 @@ use crate::{
 static SASL_HOST: LazyLock<String> = LazyLock::new(|| get_var("SASL_HOST"));
 static SASL_PORT: LazyLock<String> = LazyLock::new(|| get_var("SASL_PORT"));
 #[cfg(target_os = "windows")]
+static SASL_USER: LazyLock<String> = LazyLock::neW(|| get_var("SASL_USER"));
+#[cfg(target_os = "windows")]
 static SASL_PASS: LazyLock<String> = LazyLock::new(|| get_var("SASL_PASS"));
 static PRINCIPAL: LazyLock<String> = LazyLock::new(|| get_var("PRINCIPAL"));
 static GSSAPI_DB: LazyLock<String> = LazyLock::new(|| get_var("GSSAPI_DB"));
 
 async fn run_test(canonicalize_host_name: Option<&str>) {
-    let user = percent_encode(PRINCIPAL.as_bytes(), NON_ALPHANUMERIC).collect::<String>();
-    #[cfg(target_os = "windows")]
-    let password = format!(
-        ":{}",
-        percent_encode(SASL_PASS.as_bytes(), NON_ALPHANUMERIC).collect::<String>()
-    );
+    fn percent_encode(s: &str) -> String {
+        percent_encoding::percent_encode(s.as_bytes(), percent_encoding::NON_ALPHANUMERIC).collect()
+    }
+
     #[cfg(not(target_os = "windows"))]
-    let password = "";
+    let auth = percent_encode(&*PRINCIPAL);
+    #[cfg(target_os = "windows")]
+    let auth = format!(
+        "{}:{}",
+        percent_encode(&*SASL_USER),
+        percent_encode(&*SASL_PASS)
+    );
     let mut uri = format!(
-        "mongodb://{user}{password}@{}:{}/{}?authMechanism=GSSAPI",
+        "mongodb://{auth}@{}:{}/{}?authMechanism=GSSAPI",
         *SASL_HOST, *SASL_PORT, *GSSAPI_DB
     );
     if let Some(canonicalize_host_name) = canonicalize_host_name {
         uri.push_str("&authMechanismProperties=CANONICALIZE_HOST_NAME:");
         uri.push_str(canonicalize_host_name);
     }
-    let client = Client::with_uri_str(uri).await.unwrap();
 
+    let client = Client::with_uri_str(uri).await.unwrap();
     client
         .database(&*GSSAPI_DB)
         .collection::<Document>("test")
