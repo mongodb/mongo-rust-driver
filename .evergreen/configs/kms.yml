@@ -32,7 +32,6 @@ task_groups:
           binary: bash
           args:
             - ${DRIVERS_TOOLS}/.evergreen/csfle/azurekms/delete-vm.sh
-
     tasks:
       - test-azure-kms
 
@@ -62,26 +61,29 @@ task_groups:
             - AWS_SECRET_ACCESS_KEY
             - AWS_SESSION_TOKEN
     teardown_group:
-      - command: shell.exec
+      - command: subprocess.exec
         params:
-          shell: "bash"
-          script: |
-            ${PREPARE_SHELL}
-            set +o xtrace
-            export GCPKMS_GCLOUD=${GCPKMS_GCLOUD}
-            export GCPKMS_PROJECT=${GCPKMS_PROJECT}
-            export GCPKMS_ZONE=${GCPKMS_ZONE}
-            export GCPKMS_INSTANCENAME=${GCPKMS_INSTANCENAME}
-            set -o xtrace
-            $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/delete-instance.sh
+          binary: bash
+          args:
+            - ${DRIVERS_TOOLS}/.evergreen/csfle/gcpkms/teardown.sh
     tasks:
       - test-gcp-kms
 
 tasks:
   - name: test-gcp-kms
     commands:
-      - func: "build and upload gcp kms test"
-      - func: "run gcp kms test"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          working_dir: src
+          args:
+            - .evergreen/run-gcp-kms-test.sh
+          include_expansions_in_env:
+            - PROJECT_DIRECTORY
+            - DRIVERS_TOOLS
+            - MONGOCRYPT_LIB_DIR
+            - LD_LIBRARY_PATH
 
   - name: test-azure-kms
     commands:
@@ -97,54 +99,3 @@ tasks:
             - DRIVERS_TOOLS
             - MONGOCRYPT_LIB_DIR
             - LD_LIBRARY_PATH
-
-functions:
-  "build and upload gcp kms test":
-    - command: shell.exec
-      params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${PREPARE_SHELL}
-
-          set +o xtrace
-          export GCPKMS_GCLOUD=${GCPKMS_GCLOUD}
-          export GCPKMS_PROJECT=${GCPKMS_PROJECT}
-          export GCPKMS_ZONE=${GCPKMS_ZONE}
-          export GCPKMS_INSTANCENAME=${GCPKMS_INSTANCENAME}
-          set -o xtrace
-
-          mkdir test-contents
-          cp -r $MONGOCRYPT_LIB_DIR test-contents
-
-          echo "Building test ... begin"
-          . ${PROJECT_DIRECTORY}/.evergreen/env.sh
-          cargo test get_exe_name --features in-use-encryption,gcp-kms
-          cp $(cat driver/exe_name.txt) test-contents/test-exe
-          echo "Building test ... end"
-
-          echo "Copying test contents ... begin"
-          tar czf test-contents.tgz test-contents
-          GCPKMS_SRC=test-contents.tgz GCPKMS_DST=$GCPKMS_INSTANCENAME: $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/copy-file.sh
-          echo "Copying test contents ... end"
-
-          echo "Untarring test contents ... begin"
-          GCPKMS_CMD="tar xf test-contents.tgz" $DRIVERS_TOOLS/.evergreen/csfle/gcpkms/run-command.sh
-          echo "Untarring test contents ... end"
-
-  "run gcp kms test":
-    - command: subprocess.exec
-      type: test
-      params:
-        working_dir: ${DRIVERS_TOOLS}
-        binary: bash
-        include_expansions_in_env:
-          - GCPKMS_GCLOUD
-          - GCPKMS_PROJECT
-          - GCPKMS_ZONE
-          - GCPKMS_INSTANCENAME
-          - DRIVERS_TOOLS
-        env:
-          GCPKMS_CMD: "RUST_BACKTRACE=1 LD_LIBRARY_PATH=./test-contents/lib ./test-contents/test-exe on_demand_gcp::success -- --no-capture"
-        args:
-          - .evergreen/csfle/gcpkms/run-command.sh
