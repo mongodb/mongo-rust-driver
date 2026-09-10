@@ -444,7 +444,7 @@ async fn clean_up_chunks(
     chunks: Collection<Chunk<'static>>,
     original_error: Option<Error>,
 ) -> Result<()> {
-    match chunks.delete_many(doc! { "files_id": id }).await {
+    match chunks.delete_many(doc! { "files_id": { "$eq": id } }).await {
         Ok(_) => match original_error {
             Some(error) => Err(error),
             None => Ok(()),
