@@ -293,7 +293,7 @@ buildvariants:
 
   - name: gssapi-auth-linux
     display_name: "GSSAPI Authentication - Linux"
-    # patchable: false
+    patchable: false
     run_on:
       - rhel8-latest-small
     tasks:
@@ -310,7 +310,7 @@ buildvariants:
 
   - name: gssapi-auth-windows
     display_name: "GSSAPI Authentication - Windows"
-    # patchable: false
+    patchable: false
     run_on:
       - windows-2022-latest-small
     tasks:
