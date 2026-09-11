@@ -76,7 +76,7 @@ impl<'a> Action for Rename<'a> {
             .bucket
             .files()
             .update_one(
-                doc! { "_id": self.id.clone() },
+                doc! { "_id": { "$eq": self.id.clone() } },
                 doc! { "$set": { "filename": self.new_filename } },
             )
             .await?
