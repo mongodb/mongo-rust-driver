@@ -2462,6 +2462,7 @@ mod lookup {
 }
 
 // Prose test 26. Custom AWS Credentials
+#[cfg(feature = "aws-auth")]
 mod custom_aws_credentials {
     use aws_credential_types::{
         provider::{

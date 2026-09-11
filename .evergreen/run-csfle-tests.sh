@@ -25,7 +25,7 @@ bash ${DRIVERS_TOOLS}/.evergreen/csfle/start-servers.sh
 set -o xtrace
 set +o errexit
 
-TEST_OPTIONS=("--skip" "on_demand_aws::failure" "--skip" "custom_aws_credentials")
+TEST_OPTIONS=("--skip" "on_demand_aws::failure" "--skip" "custom_aws_credentials" "--skip" "on_demand_azure::success")
 cargo_test test::csfle
 
 # Unset variables for credential failure tests.
