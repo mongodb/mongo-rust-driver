@@ -9,8 +9,6 @@ use crate::{
 static SASL_HOST: LazyLock<String> = LazyLock::new(|| get_var("SASL_HOST"));
 static SASL_PORT: LazyLock<String> = LazyLock::new(|| get_var("SASL_PORT"));
 #[cfg(target_os = "windows")]
-static SASL_USER: LazyLock<String> = LazyLock::new(|| get_var("SASL_USER"));
-#[cfg(target_os = "windows")]
 static SASL_PASS: LazyLock<String> = LazyLock::new(|| get_var("SASL_PASS"));
 static PRINCIPAL: LazyLock<String> = LazyLock::new(|| get_var("PRINCIPAL"));
 static GSSAPI_DB: LazyLock<String> = LazyLock::new(|| get_var("GSSAPI_DB"));
@@ -25,7 +23,7 @@ async fn run_test(canonicalize_host_name: Option<&str>) {
     #[cfg(target_os = "windows")]
     let auth = format!(
         "{}:{}",
-        percent_encode(&*SASL_USER),
+        percent_encode(&*PRINCIPAL),
         percent_encode(&*SASL_PASS)
     );
     let mut uri = format!(
