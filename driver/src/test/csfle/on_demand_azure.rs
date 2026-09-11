@@ -41,7 +41,7 @@ async fn failure() {
 }
 
 #[tokio::test]
-async fn success_skip_ci() {
+async fn success() {
     try_create_data_key(&get_var("KEY_NAME"), &get_var("KEY_VAULT_ENDPOINT"))
         .await
         .unwrap();
