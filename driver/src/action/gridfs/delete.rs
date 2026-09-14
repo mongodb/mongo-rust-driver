@@ -68,13 +68,13 @@ impl<'a> Action for Delete<'a> {
         let delete_result = self
             .bucket
             .files()
-            .delete_one(doc! { "_id": self.id.clone() })
+            .delete_one(doc! { "_id": { "$eq": self.id.clone() } })
             .await?;
         // Delete chunks regardless of whether a file was found. This will remove any possibly
         // orphaned chunks.
         self.bucket
             .chunks()
-            .delete_many(doc! { "files_id": self.id.clone() })
+            .delete_many(doc! { "files_id": { "$eq": self.id.clone() } })
             .await?;
 
         if delete_result.deleted_count == 0 {

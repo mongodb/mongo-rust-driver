@@ -375,3 +375,38 @@ fn test_gridfs_find_one_options_from() {
     assert_eq!(find_one_options.skip, Some(1));
     assert_eq!(find_one_options.sort, Some(doc! {"foo": -1}));
 }
+
+#[tokio::test]
+async fn upload_abort_with_injected_id_does_not_delete_chunks() {
+    let client = Client::for_test().await;
+    let bucket = client.database("injected_id").gridfs_bucket(None);
+    bucket.drop().await.unwrap();
+
+    let mut upload_stream = bucket.open_upload_stream("file1").await.unwrap();
+    let file1_bytes = vec![0; 8];
+    upload_stream.write_all(&file1_bytes).await.unwrap();
+    upload_stream.close().await.unwrap();
+
+    let mut upload_stream = bucket
+        .open_upload_stream("file2")
+        .id(doc! { "$gt": Bson::MinKey }.into())
+        .chunk_size_bytes(2)
+        .await
+        .unwrap();
+
+    upload_stream.write_all(&[0; 4]).await.unwrap();
+    upload_stream.abort().await.unwrap();
+
+    let mut download_stream = bucket.open_download_stream_by_name("file1").await.unwrap();
+    let mut buffer = Vec::new();
+    download_stream.read_to_end(&mut buffer).await.unwrap();
+    assert_eq!(buffer, file1_bytes);
+
+    let Err(error) = bucket.open_download_stream_by_name("file2").await else {
+        panic!("expected error");
+    };
+    assert!(matches!(
+        *error.kind,
+        ErrorKind::GridFs(GridFsErrorKind::FileNotFound { .. })
+    ));
+}

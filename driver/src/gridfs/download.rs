@@ -92,7 +92,7 @@ impl GridFsDownloadStream {
             State::Done
         } else {
             let cursor = chunks
-                .find(doc! { "files_id": &file.id })
+                .find(doc! { "files_id": { "$eq": &file.id } })
                 .sort(doc! { "n": 1 })
                 .batch()
                 .await?;
@@ -189,7 +189,7 @@ async fn get_bytes(
                     return Err(Error::invalid_response(format!(
                         "invalid cursor batch value, expected document, got {:?}",
                         doc.element_type(),
-                    )))
+                    )));
                 }
             };
 
