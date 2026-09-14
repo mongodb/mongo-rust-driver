@@ -269,8 +269,7 @@ buildvariants:
     display_name: "Azure KMS"
     patchable: false
     run_on:
-      # The Azure CLI is not available on RHEL/Ubuntu machines.
-      - debian11-small
+      - ubuntu2204-small
     expansions:
       LIBMONGOCRYPT: true
     tasks:
@@ -283,7 +282,7 @@ buildvariants:
     patchable: false
     run_on:
       # The GCP CLI is not available on RHEL/Ubuntu machines.
-      - debian11-small
+      - debian12-small
     expansions:
       LIBMONGOCRYPT: true
     tasks:
