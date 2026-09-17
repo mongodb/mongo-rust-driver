@@ -102,7 +102,6 @@ async fn metadata_sent_in_handshake() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn connection_drop_during_read() {
     let mut options = get_client_options().await.clone();
     options.max_pool_size = Some(1);
@@ -110,7 +109,7 @@ async fn connection_drop_during_read() {
     let client = Client::with_options(options.clone()).unwrap();
     let db = client.database("test");
 
-    db.collection(function_name!())
+    db.collection("connection_drop_during_read")
         .insert_one(doc! { "x": 1 })
         .await
         .unwrap();
@@ -118,7 +117,7 @@ async fn connection_drop_during_read() {
     let _: Result<_, _> = runtime::timeout(
         Duration::from_millis(50),
         db.run_command(doc! {
-            "count": function_name!(),
+            "count": "connection_drop_during_read",
             "query": {
                 "$where": "sleep(100) && true"
             }
@@ -173,12 +172,11 @@ async fn server_selection_timeout_message() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn list_databases() {
     let expected_dbs = &[
-        format!("{}1", function_name!()),
-        format!("{}2", function_name!()),
-        format!("{}3", function_name!()),
+        "list_databases1".to_string(),
+        "list_databases2".to_string(),
+        "list_databases3".to_string(),
     ];
 
     let client = Client::for_test().await;
@@ -218,14 +216,13 @@ async fn list_databases() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn list_database_names() {
     let client = Client::for_test().await;
 
     let expected_dbs = &[
-        format!("{}1", function_name!()),
-        format!("{}2", function_name!()),
-        format!("{}3", function_name!()),
+        "list_database_names1".to_string(),
+        "list_database_names2".to_string(),
+        "list_database_names3".to_string(),
     ];
 
     for name in expected_dbs {
@@ -253,7 +250,6 @@ async fn list_database_names() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn list_authorized_databases() {
     if !auth_enabled().await {
         log_uncaptured("skipping list_authorized_databases due to test configuration");
@@ -263,8 +259,8 @@ async fn list_authorized_databases() {
     let client = Client::for_test().await;
 
     let dbs = &[
-        format!("{}1", function_name!()),
-        format!("{}2", function_name!()),
+        "list_authorized_databases1".to_string(),
+        "list_authorized_databases2".to_string(),
     ];
 
     for name in dbs {
@@ -574,7 +570,6 @@ async fn saslprep() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn x509_auth_skip_ci() {
     let username = std::env::var("MONGO_X509_USER").expect("MONGO_X509_USER");
 
@@ -595,7 +590,7 @@ async fn x509_auth_skip_ci() {
         .create_user(
             &username,
             None,
-            &[doc! { "role": "readWrite", "db": function_name!() }.into()],
+            &[doc! { "role": "readWrite", "db": "x509_auth_skip_ci" }.into()],
             &[AuthMechanism::MongoDbX509],
             "$external",
         )
@@ -611,8 +606,8 @@ async fn x509_auth_skip_ci() {
 
     let client = Client::for_test().options(options).await;
     client
-        .database(function_name!())
-        .collection::<Document>(function_name!())
+        .database("x509_auth_skip_ci")
+        .collection::<Document>("x509_auth_skip_ci")
         .find_one(doc! {})
         .await
         .unwrap();

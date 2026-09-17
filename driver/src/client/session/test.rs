@@ -228,7 +228,6 @@ async fn pool_is_lifo() {
 
 /// Prose test 2 from sessions spec.
 #[tokio::test]
-#[function_name::named]
 async fn cluster_time_in_commands() {
     if topology_is_standalone().await {
         log_uncaptured("skipping cluster_time_in_commands test due to standalone topology");
@@ -330,7 +329,7 @@ async fn cluster_time_in_commands() {
 
     cluster_time_test("ping", &client, &buffer, |client| async move {
         client
-            .database(function_name!())
+            .database("cluster_time_in_commands")
             .run_command(doc! { "ping": 1 })
             .await
     })
@@ -338,8 +337,8 @@ async fn cluster_time_in_commands() {
 
     cluster_time_test("aggregate", &client, &buffer, |client| async move {
         client
-            .database(function_name!())
-            .collection::<Document>(function_name!())
+            .database("cluster_time_in_commands")
+            .collection::<Document>("cluster_time_in_commands")
             .aggregate(vec![doc! { "$match": { "x": 1 } }])
             .await
     })
@@ -347,8 +346,8 @@ async fn cluster_time_in_commands() {
 
     cluster_time_test("find", &client, &buffer, |client| async move {
         client
-            .database(function_name!())
-            .collection::<Document>(function_name!())
+            .database("cluster_time_in_commands")
+            .collection::<Document>("cluster_time_in_commands")
             .find(doc! {})
             .await
     })
@@ -356,8 +355,8 @@ async fn cluster_time_in_commands() {
 
     cluster_time_test("insert", &client, &buffer, |client| async move {
         client
-            .database(function_name!())
-            .collection::<Document>(function_name!())
+            .database("cluster_time_in_commands")
+            .collection::<Document>("cluster_time_in_commands")
             .insert_one(doc! {})
             .await
     })
@@ -366,7 +365,6 @@ async fn cluster_time_in_commands() {
 
 /// Prose test 3 from sessions spec.
 #[tokio::test]
-#[function_name::named]
 async fn session_usage() {
     if topology_is_standalone().await {
         return;
@@ -386,12 +384,11 @@ async fn session_usage() {
         );
     }
 
-    for_each_op!(function_name!(), session_usage_test)
+    for_each_op!("session_usage", session_usage_test)
 }
 
 /// Prose test 7 from sessions spec.
 #[tokio::test]
-#[function_name::named]
 async fn implicit_session_returned_after_immediate_exhaust() {
     if topology_is_standalone().await {
         return;
@@ -400,7 +397,10 @@ async fn implicit_session_returned_after_immediate_exhaust() {
     let client = Client::for_test().monitor_events().await;
 
     let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
+        .init_db_and_coll(
+            "implicit_session_returned_after_immediate_exhaust",
+            "implicit_session_returned_after_immediate_exhaust",
+        )
         .await;
     coll.insert_many(vec![doc! {}, doc! {}])
         .await
@@ -432,7 +432,6 @@ async fn implicit_session_returned_after_immediate_exhaust() {
 
 /// Prose test 8 from sessions spec.
 #[tokio::test]
-#[function_name::named]
 async fn implicit_session_returned_after_exhaust_by_get_more() {
     if topology_is_standalone().await {
         return;
@@ -440,7 +439,10 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
 
     let client = Client::for_test().monitor_events().await;
     let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
+        .init_db_and_coll(
+            "implicit_session_returned_after_exhaust_by_get_more",
+            "implicit_session_returned_after_exhaust_by_get_more",
+        )
         .await;
     for _ in 0..5 {
         coll.insert_one(doc! {})
@@ -482,7 +484,6 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
 
 /// Prose test 10 from sessions spec.
 #[tokio::test]
-#[function_name::named]
 async fn find_and_getmore_share_session() {
     if topology_is_standalone().await {
         log_uncaptured(
@@ -494,7 +495,10 @@ async fn find_and_getmore_share_session() {
     let client = Client::for_test().monitor_events().await;
 
     let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
+        .init_db_and_coll(
+            "find_and_getmore_share_session",
+            "find_and_getmore_share_session",
+        )
         .await;
 
     coll.insert_many(vec![doc! {}; 3])

@@ -57,7 +57,6 @@ async fn label_not_added_second_read_error() {
     label_not_added(true).await;
 }
 
-#[function_name::named]
 async fn label_not_added(retry_reads: bool) {
     let mut options = get_client_options().await.clone();
     options.retry_reads = Some(retry_reads);
@@ -67,7 +66,7 @@ async fn label_not_added(retry_reads: bool) {
         .await;
 
     let coll = client
-        .init_db_and_coll(&format!("{}{}", function_name!(), retry_reads), "coll")
+        .init_db_and_coll(&format!("{}{}", "label_not_added", retry_reads), "coll")
         .await;
 
     let failpoint = doc! {

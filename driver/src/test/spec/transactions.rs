@@ -42,7 +42,6 @@ async fn run_unified_convenient_api() {
 
 // This test checks that deserializing an operation correctly still retrieves the recovery token.
 #[tokio::test(flavor = "multi_thread")]
-#[function_name::named]
 async fn deserialize_recovery_token() {
     if !topology_is_sharded().await {
         log_uncaptured("skipping deserialize_recovery_token due to test topology");
@@ -65,25 +64,25 @@ async fn deserialize_recovery_token() {
 
     // Insert a document with schema A.
     client
-        .database(function_name!())
-        .collection::<Document>(function_name!())
+        .database("deserialize_recovery_token")
+        .collection::<Document>("deserialize_recovery_token")
         .drop()
         .await
         .unwrap();
     client
-        .database(function_name!())
-        .create_collection(function_name!())
+        .database("deserialize_recovery_token")
+        .create_collection("deserialize_recovery_token")
         .await
         .unwrap();
     let coll = client
-        .database(function_name!())
-        .collection(function_name!());
+        .database("deserialize_recovery_token")
+        .collection("deserialize_recovery_token");
     coll.insert_one(A { num: 4 }).await.unwrap();
 
     // Attempt to execute Find on a document with schema B.
     let coll: Collection<B> = client
-        .database(function_name!())
-        .collection(function_name!());
+        .database("deserialize_recovery_token")
+        .collection("deserialize_recovery_token");
     session.start_transaction().await.unwrap();
     assert!(session.transaction.recovery_token.is_none());
     let result = coll.find_one(doc! {}).session(&mut session).await;

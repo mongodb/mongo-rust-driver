@@ -42,7 +42,6 @@ use crate::{
 };
 
 #[tokio::test]
-#[function_name::named]
 async fn insert_err_details() {
     if !topology_is_replica_set().await {
         log_uncaptured("skipping insert_err_details due to test configuration");
@@ -51,7 +50,7 @@ async fn insert_err_details() {
 
     let client = Client::for_test().await;
     let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
+        .init_db_and_coll("insert_err_details", "insert_err_details")
         .await;
     client
         .database("admin")
@@ -98,12 +97,9 @@ async fn insert_err_details() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn count() {
     let client = Client::for_test().await;
-    let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
-        .await;
+    let coll = client.init_db_and_coll("count", "count").await;
 
     assert_eq!(coll.estimated_document_count().await.unwrap(), 0);
 
@@ -119,12 +115,9 @@ async fn count() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn find() {
     let client = Client::for_test().await;
-    let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
-        .await;
+    let coll = client.init_db_and_coll("find", "find").await;
 
     let result = coll
         .insert_many((0i32..5).map(|i| doc! { "x": i }).collect::<Vec<_>>())
@@ -144,12 +137,9 @@ async fn find() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn update() {
     let client = Client::for_test().await;
-    let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
-        .await;
+    let coll = client.init_db_and_coll("update", "update").await;
 
     let result = coll
         .insert_many((0i32..5).map(|_| doc! { "x": 3 }).collect::<Vec<_>>())
@@ -181,12 +171,9 @@ async fn update() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn delete() {
     let client = Client::for_test().await;
-    let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
-        .await;
+    let coll = client.init_db_and_coll("delete", "delete").await;
 
     let result = coll
         .insert_many((0i32..5).map(|_| doc! { "x": 3 }).collect::<Vec<_>>())
@@ -204,11 +191,10 @@ async fn delete() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn aggregate_out() {
     let client = Client::for_test().await;
-    let db = client.database(function_name!());
-    let coll = db.collection(function_name!());
+    let db = client.database("aggregate_out");
+    let coll = db.collection("aggregate_out");
 
     coll.drop().await.unwrap();
 
@@ -218,7 +204,7 @@ async fn aggregate_out() {
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
 
-    let out_coll = db.collection::<Document>(&format!("{}_1", function_name!()));
+    let out_coll = db.collection::<Document>("aggregate_out_1");
     let pipeline = vec![
         doc! {
             "$match": {
@@ -256,11 +242,10 @@ fn kill_cursors_sent(client: &EventClient) -> bool {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn kill_cursors_on_drop() {
     let client = Client::for_test().await;
-    let db = client.database(function_name!());
-    let coll = db.collection(function_name!());
+    let db = client.database("kill_cursors_on_drop");
+    let coll = db.collection("kill_cursors_on_drop");
 
     coll.drop().await.unwrap();
 
@@ -270,8 +255,8 @@ async fn kill_cursors_on_drop() {
 
     let event_client = Client::for_test().monitor_events().await;
     let coll = event_client
-        .database(function_name!())
-        .collection::<Document>(function_name!());
+        .database("kill_cursors_on_drop")
+        .collection::<Document>("kill_cursors_on_drop");
 
     let cursor = coll.find(doc! {}).batch_size(1).await.unwrap();
 
@@ -288,11 +273,10 @@ async fn kill_cursors_on_drop() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn no_kill_cursors_on_exhausted() {
     let client = Client::for_test().await;
-    let db = client.database(function_name!());
-    let coll = db.collection(function_name!());
+    let db = client.database("no_kill_cursors_on_exhausted");
+    let coll = db.collection("no_kill_cursors_on_exhausted");
 
     coll.drop().await.unwrap();
 
@@ -302,8 +286,8 @@ async fn no_kill_cursors_on_exhausted() {
 
     let event_client = Client::for_test().monitor_events().await;
     let coll = event_client
-        .database(function_name!())
-        .collection::<Document>(function_name!());
+        .database("no_kill_cursors_on_exhausted")
+        .collection::<Document>("no_kill_cursors_on_exhausted");
 
     let cursor = coll.find(doc! {}).await.unwrap();
 
@@ -370,7 +354,6 @@ static LARGE_DOC: LazyLock<Document> = LazyLock::new(|| {
 });
 
 #[tokio::test]
-#[function_name::named]
 async fn large_insert() {
     if std::env::consts::OS != "linux" {
         log_uncaptured("skipping large_insert due to unsupported OS");
@@ -381,7 +364,7 @@ async fn large_insert() {
 
     let client = Client::for_test().await;
     let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
+        .init_db_and_coll("large_insert", "large_insert")
         .await;
     assert_eq!(
         coll.insert_many(docs).await.unwrap().inserted_ids.len(),
@@ -413,7 +396,6 @@ fn multibatch_documents_with_duplicate_keys() -> Vec<Document> {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn large_insert_unordered_with_errors() {
     if std::env::consts::OS != "linux" {
         log_uncaptured("skipping large_insert_unordered_with_errors due to unsupported OS");
@@ -424,7 +406,10 @@ async fn large_insert_unordered_with_errors() {
 
     let client = Client::for_test().await;
     let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
+        .init_db_and_coll(
+            "large_insert_unordered_with_errors",
+            "large_insert_unordered_with_errors",
+        )
         .await;
 
     match *coll
@@ -451,7 +436,6 @@ async fn large_insert_unordered_with_errors() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn large_insert_ordered_with_errors() {
     if std::env::consts::OS != "linux" {
         log_uncaptured("skipping large_insert_ordered_with_errors due to unsupported OS");
@@ -462,7 +446,10 @@ async fn large_insert_ordered_with_errors() {
 
     let client = Client::for_test().await;
     let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
+        .init_db_and_coll(
+            "large_insert_ordered_with_errors",
+            "large_insert_ordered_with_errors",
+        )
         .await;
 
     match *coll
@@ -491,12 +478,11 @@ async fn large_insert_ordered_with_errors() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn empty_insert() {
     let client = Client::for_test().await;
     let coll = client
-        .database(function_name!())
-        .collection::<Document>(function_name!());
+        .database("empty_insert")
+        .collection::<Document>("empty_insert");
     match *coll
         .insert_many(Vec::<Document>::new())
         .await
@@ -526,12 +512,11 @@ async fn find_allow_disk_use_not_specified() {
     allow_disk_use_test(find_opts, None).await;
 }
 
-#[function_name::named]
 async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>) {
     let event_client = Client::for_test().monitor_events().await;
     let coll = event_client
-        .database(function_name!())
-        .collection::<Document>(function_name!());
+        .database("allow_disk_use_test")
+        .collection::<Document>("allow_disk_use_test");
     coll.find(doc! {}).with_options(options).await.unwrap();
 
     let events = event_client.events.get_command_started_events(&["find"]);
@@ -542,10 +527,9 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn ns_not_found_suppression() {
     let client = Client::for_test().await;
-    let coll = client.get_coll(function_name!(), function_name!());
+    let coll = client.get_coll("ns_not_found_suppression", "ns_not_found_suppression");
     coll.drop().await.expect("drop should not fail");
     coll.drop().await.expect("drop should not fail");
 }
@@ -572,25 +556,22 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn delete_hint_keys_specified() {
     let options = DeleteOptions::builder().hint(Hint::Keys(doc! {})).build();
-    delete_hint_test(Some(options), function_name!()).await;
+    delete_hint_test(Some(options), "delete_hint_keys_specified").await;
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn delete_hint_string_specified() {
     let options = DeleteOptions::builder()
         .hint(Hint::Name(String::new()))
         .build();
-    delete_hint_test(Some(options), function_name!()).await;
+    delete_hint_test(Some(options), "delete_hint_string_specified").await;
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn delete_hint_not_specified() {
-    delete_hint_test(None, function_name!()).await;
+    delete_hint_test(None, "delete_hint_not_specified").await;
 }
 
 async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>, name: &str) {
@@ -615,31 +596,27 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn find_one_and_delete_hint_keys_specified() {
     let options = FindOneAndDeleteOptions::builder()
         .hint(Hint::Keys(doc! {}))
         .build();
-    find_one_and_delete_hint_test(Some(options), function_name!()).await;
+    find_one_and_delete_hint_test(Some(options), "find_one_and_delete_hint_keys_specified").await;
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn find_one_and_delete_hint_string_specified() {
     let options = FindOneAndDeleteOptions::builder()
         .hint(Hint::Name(String::new()))
         .build();
-    find_one_and_delete_hint_test(Some(options), function_name!()).await;
+    find_one_and_delete_hint_test(Some(options), "find_one_and_delete_hint_string_specified").await;
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn find_one_and_delete_hint_not_specified() {
-    find_one_and_delete_hint_test(None, function_name!()).await;
+    find_one_and_delete_hint_test(None, "find_one_and_delete_hint_not_specified").await;
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn no_read_preference_to_standalone() {
     if !topology_is_standalone().await {
         log_uncaptured("skipping no_read_preference_to_standalone due to test topology");
@@ -649,8 +626,8 @@ async fn no_read_preference_to_standalone() {
     let client = Client::for_test().monitor_events().await;
 
     client
-        .database(function_name!())
-        .collection::<Document>(function_name!())
+        .database("no_read_preference_to_standalone")
+        .collection::<Document>("no_read_preference_to_standalone")
         .find_one(doc! {})
         .selection_criteria(SelectionCriteria::ReadPreference(
             ReadPreference::SecondaryPreferred {
@@ -672,12 +649,11 @@ struct UserType {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn typed_insert_one() {
     let client = Client::for_test().await;
 
     let coll = client
-        .init_db_and_typed_coll(function_name!(), function_name!())
+        .init_db_and_typed_coll("typed_insert_one", "typed_insert_one")
         .await;
     let insert_data = UserType {
         x: 1,
@@ -717,11 +693,10 @@ where
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn typed_insert_many() {
     let client = Client::for_test().await;
     let coll = client
-        .init_db_and_typed_coll(function_name!(), function_name!())
+        .init_db_and_typed_coll("typed_insert_many", "typed_insert_many")
         .await;
 
     let insert_data = vec![
@@ -748,11 +723,10 @@ async fn typed_insert_many() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn typed_find_one_and_replace() {
     let client = Client::for_test().await;
     let coll = client
-        .init_db_and_typed_coll(function_name!(), function_name!())
+        .init_db_and_typed_coll("typed_find_one_and_replace", "typed_find_one_and_replace")
         .await;
 
     let insert_data = UserType {
@@ -777,11 +751,10 @@ async fn typed_find_one_and_replace() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn typed_replace_one() {
     let client = Client::for_test().await;
     let coll = client
-        .init_db_and_typed_coll(function_name!(), function_name!())
+        .init_db_and_typed_coll("typed_replace_one", "typed_replace_one")
         .await;
 
     let insert_data = UserType {
@@ -802,11 +775,10 @@ async fn typed_replace_one() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn typed_returns() {
     let client = Client::for_test().await;
     let coll = client
-        .init_db_and_typed_coll(function_name!(), function_name!())
+        .init_db_and_typed_coll("typed_returns", "typed_returns")
         .await;
 
     let insert_data = UserType {
@@ -837,7 +809,6 @@ async fn typed_returns() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn count_documents_with_wc() {
     let mut options = get_client_options().await.clone();
     options.write_concern = WriteConcern::builder()
@@ -848,8 +819,8 @@ async fn count_documents_with_wc() {
 
     let client = Client::for_test().options(options).await;
     let coll = client
-        .database(function_name!())
-        .collection(function_name!());
+        .database("count_documents_with_wc")
+        .collection("count_documents_with_wc");
 
     coll.insert_one(doc! {}).await.unwrap();
 
@@ -859,7 +830,6 @@ async fn count_documents_with_wc() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn collection_options_inherited() {
     let client = Client::for_test().monitor_events().await;
 
@@ -873,8 +843,8 @@ async fn collection_options_inherited() {
         .selection_criteria(selection_criteria)
         .build();
     let coll = client
-        .database(function_name!())
-        .collection_with_options::<Document>(function_name!(), options);
+        .database("collection_options_inherited")
+        .collection_with_options::<Document>("collection_options_inherited", options);
 
     coll.find(doc! {}).await.unwrap();
     assert_options_inherited(&client, "find").await;
@@ -897,18 +867,16 @@ async fn assert_options_inherited(client: &EventClient, command_name: &str) {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn drop_skip_serializing_none() {
     let client = Client::for_test().await;
     let coll: Collection<Document> = client
-        .database(function_name!())
-        .collection(function_name!());
+        .database("drop_skip_serializing_none")
+        .collection("drop_skip_serializing_none");
     let options = DropCollectionOptions::builder().build();
     assert!(coll.drop().with_options(options).await.is_ok());
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn collection_generic_bounds() {
     #[derive(Deserialize)]
     struct Foo;
@@ -917,8 +885,8 @@ async fn collection_generic_bounds() {
 
     // ensure this code successfully compiles
     let coll: Collection<Foo> = client
-        .database(function_name!())
-        .collection(function_name!());
+        .database("collection_generic_bounds")
+        .collection("collection_generic_bounds");
     let _result: Result<Option<Foo>> = coll.find_one(doc! {}).await;
 
     #[derive(Serialize)]
@@ -926,8 +894,8 @@ async fn collection_generic_bounds() {
 
     // ensure this code successfully compiles
     let coll: Collection<Bar> = client
-        .database(function_name!())
-        .collection(function_name!());
+        .database("collection_generic_bounds")
+        .collection("collection_generic_bounds");
     let _result = coll.insert_one(Bar {}).await;
 }
 
