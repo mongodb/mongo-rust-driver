@@ -173,11 +173,7 @@ async fn server_selection_timeout_message() {
 
 #[tokio::test]
 async fn list_databases() {
-    let expected_dbs = &[
-        "list_databases1".to_string(),
-        "list_databases2".to_string(),
-        "list_databases3".to_string(),
-    ];
+    let expected_dbs = &["list_databases1", "list_databases2", "list_databases3"];
 
     let client = Client::for_test().await;
 
@@ -188,7 +184,7 @@ async fn list_databases() {
     let prev_dbs = client.list_databases().await.unwrap();
 
     for name in expected_dbs {
-        assert!(!prev_dbs.iter().any(|doc| doc.name.as_str() == name));
+        assert!(!prev_dbs.iter().any(|doc| &doc.name.as_str() == name));
 
         let db = client.database(name);
 
@@ -201,14 +197,14 @@ async fn list_databases() {
     let new_dbs = client.list_databases().await.unwrap();
     let new_dbs: Vec<_> = new_dbs
         .into_iter()
-        .filter(|db_spec| expected_dbs.contains(&db_spec.name))
+        .filter(|db_spec| expected_dbs.contains(&db_spec.name.as_str()))
         .collect();
     assert_eq!(new_dbs.len(), expected_dbs.len());
 
     for name in expected_dbs {
         let db_doc = new_dbs
             .iter()
-            .find(|db_spec| db_spec.name.as_str() == name)
+            .find(|db_spec| &db_spec.name.as_str() == name)
             .unwrap();
         assert!(db_doc.size_on_disk > 0);
         assert!(!db_doc.empty);
@@ -220,9 +216,9 @@ async fn list_database_names() {
     let client = Client::for_test().await;
 
     let expected_dbs = &[
-        "list_database_names1".to_string(),
-        "list_database_names2".to_string(),
-        "list_database_names3".to_string(),
+        "list_database_names1",
+        "list_database_names2",
+        "list_database_names3",
     ];
 
     for name in expected_dbs {
@@ -258,10 +254,7 @@ async fn list_authorized_databases() {
 
     let client = Client::for_test().await;
 
-    let dbs = &[
-        "list_authorized_databases1".to_string(),
-        "list_authorized_databases2".to_string(),
-    ];
+    let dbs = &["list_authorized_databases1", "list_authorized_databases2"];
 
     for name in dbs {
         client

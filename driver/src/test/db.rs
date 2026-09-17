@@ -53,9 +53,9 @@ async fn list_collections() {
     assert_eq!(colls.unwrap().len(), 0);
 
     let coll_names = &[
-        "list_collections1".to_string(),
-        "list_collections2".to_string(),
-        "list_collections3".to_string(),
+        "list_collections1",
+        "list_collections2",
+        "list_collections3",
     ];
 
     for coll_name in coll_names {
@@ -118,9 +118,9 @@ async fn list_collection_names() {
     assert!(db.list_collection_names().await.unwrap().is_empty());
 
     let expected_colls = &[
-        "list_collection_names1".to_string(),
-        "list_collection_names2".to_string(),
-        "list_collection_names3".to_string(),
+        "list_collection_names1",
+        "list_collection_names2",
+        "list_collection_names3",
     ];
 
     for coll in expected_colls {
