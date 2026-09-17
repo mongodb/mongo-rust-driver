@@ -1,4 +1,7 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+};
 
 use serde::Serialize;
 
@@ -11,10 +14,15 @@ use crate::{
 
 /// A description of the most up-to-date information known about a topology. Further details can
 /// be found in the [Server Discovery and Monitoring specification](https://specifications.readthedocs.io/en/latest/server-discovery-and-monitoring/server-discovery-and-monitoring/).
-#[derive(Clone, derive_more::Display)]
-#[display("{description}")]
+#[derive(Clone)]
 pub struct TopologyDescription {
     pub(crate) description: crate::sdam::TopologyDescription,
+}
+
+impl Display for TopologyDescription {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.description, f)
+    }
 }
 
 impl Serialize for TopologyDescription {
@@ -91,8 +99,8 @@ impl TopologyDescription {
     }
 }
 
-impl fmt::Debug for TopologyDescription {
-    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
+impl Debug for TopologyDescription {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
         f.debug_struct("Topology Description")
             .field("Type", &self.topology_type())
             .field("Set Name", &self.set_name())

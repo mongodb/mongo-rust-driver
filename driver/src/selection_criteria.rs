@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt::Display, sync::Arc, time::Duration};
 
 use derive_where::derive_where;
 use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// Describes which servers are suitable for a given operation.
-#[derive(Clone, derive_more::Display)]
+#[derive(Clone)]
 #[derive_where(Debug)]
 #[non_exhaustive]
 pub enum SelectionCriteria {
@@ -21,13 +21,23 @@ pub enum SelectionCriteria {
     /// staleness, and server tags.
     ///
     /// See the documentation [here](https://www.mongodb.com/docs/manual/core/read-preference/) for more details.
-    #[display("ReadPreference {_0}")]
     ReadPreference(ReadPreference),
 
     /// A predicate used to filter servers that are considered suitable. A `server` will be
     /// considered suitable by a `predicate` if `predicate(server)` returns true.
-    #[display("Custom predicate")]
     Predicate(#[derive_where(skip)] Predicate),
+}
+
+impl Display for SelectionCriteria {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ReadPreference(read_preference) => {
+                f.write_str("ReadPreference ")?;
+                Display::fmt(&read_preference, f)
+            }
+            Self::Predicate(_) => f.write_str("Custom predicate"),
+        }
+    }
 }
 
 impl PartialEq for SelectionCriteria {

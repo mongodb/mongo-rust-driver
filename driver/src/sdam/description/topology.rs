@@ -4,6 +4,7 @@ pub(crate) mod test;
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Display,
     time::Duration,
 };
 
@@ -25,9 +26,7 @@ use crate::{
 use self::server_selection::IDLE_WRITE_PERIOD;
 
 /// The possible types for a topology.
-#[derive(
-    Debug, Clone, Copy, Eq, PartialEq, Deserialize, Serialize, Default, derive_more::Display,
-)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, Serialize, Default)]
 #[non_exhaustive]
 pub enum TopologyType {
     /// A single mongod server.
@@ -50,7 +49,12 @@ pub enum TopologyType {
     Unknown,
 }
 
-#[cfg(test)]
+impl Display for TopologyType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 impl TopologyType {
     fn as_str(&self) -> &'static str {
         match self {

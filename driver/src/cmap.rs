@@ -138,10 +138,9 @@ impl ConnectionPool {
     pub(crate) async fn check_out(&self) -> Result<PooledConnection> {
         let time_started = Instant::now();
         self.event_emitter.emit_event(|| {
-            ConnectionCheckoutStartedEvent {
+            CmapEvent::ConnectionCheckoutStarted(ConnectionCheckoutStartedEvent {
                 address: self.address.clone(),
-            }
-            .into()
+            })
         });
 
         let response = self.connection_requester.request().await;
@@ -159,20 +158,20 @@ impl ConnectionPool {
 
         match conn {
             Ok(ref conn) => {
-                self.event_emitter
-                    .emit_event(|| conn.checked_out_event(time_started).into());
+                self.event_emitter.emit_event(|| {
+                    CmapEvent::ConnectionCheckedOut(conn.checked_out_event(time_started))
+                });
             }
 
             Err(ref _err) => {
                 self.event_emitter.emit_event(|| {
-                    ConnectionCheckoutFailedEvent {
+                    CmapEvent::ConnectionCheckoutFailed(ConnectionCheckoutFailedEvent {
                         address: self.address.clone(),
                         reason: ConnectionCheckoutFailedReason::ConnectionError,
                         #[cfg(feature = "tracing-unstable")]
                         error: Some(_err.clone()),
                         duration: Instant::now() - time_started,
-                    }
-                    .into()
+                    })
                 });
             }
         }
