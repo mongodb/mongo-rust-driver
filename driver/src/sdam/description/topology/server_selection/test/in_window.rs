@@ -4,7 +4,6 @@ use crate::{
     bson::{doc, Document},
     bson_util::round_clamp,
 };
-use approx::abs_diff_eq;
 use serde::Deserialize;
 
 use crate::{
@@ -98,8 +97,9 @@ async fn run_test(test_file: TestFile) {
             f64::EPSILON
         };
 
+        let difference = (actual_frequency - expected_frequency).abs();
         assert!(
-            abs_diff_eq!(actual_frequency, expected_frequency, epsilon = epsilon),
+            difference <= epsilon,
             "{}: for server {} expected frequency = {}, actual = {}",
             test_file.description,
             address,

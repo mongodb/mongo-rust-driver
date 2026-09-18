@@ -3,7 +3,6 @@
 
 use std::time::Duration;
 
-use derive_more::From;
 #[cfg(feature = "tracing-unstable")]
 use derive_where::derive_where;
 use serde::{Deserialize, Serialize};
@@ -403,7 +402,7 @@ pub trait CmapEventHandler: Send + Sync {
     fn handle_connection_checked_in_event(&self, _event: ConnectionCheckedInEvent) {}
 }
 
-#[derive(Clone, Debug, PartialEq, From)]
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 #[allow(missing_docs)]
 pub enum CmapEvent {

@@ -93,12 +93,11 @@ fn write_concern_deserialize() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn inconsistent_write_concern_rejected() {
     let client = Client::for_test().await;
-    let db = client.database(function_name!());
+    let db = client.database("inconsistent_write_concern_rejected");
 
-    let coll = db.collection(function_name!());
+    let coll = db.collection("inconsistent_write_concern_rejected");
     let wc = WriteConcern {
         w: Acknowledgment::Nodes(0).into(),
         journal: true.into(),
@@ -113,11 +112,10 @@ async fn inconsistent_write_concern_rejected() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn unacknowledged_write_concern_rejected() {
     let client = Client::for_test().await;
-    let db = client.database(function_name!());
-    let coll = db.collection(function_name!());
+    let db = client.database("unacknowledged_write_concern_rejected");
+    let coll = db.collection("unacknowledged_write_concern_rejected");
     let wc = WriteConcern {
         w: Acknowledgment::Nodes(0).into(),
         journal: false.into(),
@@ -132,13 +130,12 @@ async fn unacknowledged_write_concern_rejected() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn snapshot_read_concern() {
     let client = Client::for_test().monitor_events().await;
 
     let coll = client
-        .database(function_name!())
-        .collection::<Document>(function_name!());
+        .database("snapshot_read_concern")
+        .collection::<Document>("snapshot_read_concern");
 
     if transactions_supported().await {
         let mut session = client.start_session().await.unwrap();
@@ -183,10 +180,11 @@ async fn assert_event_contains_read_concern(client: &EventClient) {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn command_contains_write_concern_insert_one() {
     let client = Client::for_test().monitor_events().await;
-    let coll: Collection<Document> = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client
+        .database("test")
+        .collection("command_contains_write_concern_insert_one");
 
     coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" })
@@ -224,10 +222,11 @@ async fn command_contains_write_concern_insert_one() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn command_contains_write_concern_insert_many() {
     let client = Client::for_test().monitor_events().await;
-    let coll: Collection<Document> = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client
+        .database("test")
+        .collection("command_contains_write_concern_insert_many");
 
     coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }])
@@ -265,10 +264,11 @@ async fn command_contains_write_concern_insert_many() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn command_contains_write_concern_update_one() {
     let client = Client::for_test().monitor_events().await;
-    let coll: Collection<Document> = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client
+        .database("test")
+        .collection("command_contains_write_concern_update_one");
 
     coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
@@ -307,10 +307,11 @@ async fn command_contains_write_concern_update_one() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn command_contains_write_concern_update_many() {
     let client = Client::for_test().monitor_events().await;
-    let coll: Collection<Document> = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client
+        .database("test")
+        .collection("command_contains_write_concern_update_many");
 
     coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
@@ -351,10 +352,11 @@ async fn command_contains_write_concern_update_many() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn command_contains_write_concern_replace_one() {
     let client = Client::for_test().monitor_events().await;
-    let coll: Collection<Document> = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client
+        .database("test")
+        .collection("command_contains_write_concern_replace_one");
 
     coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
@@ -393,10 +395,11 @@ async fn command_contains_write_concern_replace_one() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn command_contains_write_concern_delete_one() {
     let client = Client::for_test().monitor_events().await;
-    let coll: Collection<Document> = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client
+        .database("test")
+        .collection("command_contains_write_concern_delete_one");
 
     coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
@@ -437,10 +440,11 @@ async fn command_contains_write_concern_delete_one() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn command_contains_write_concern_delete_many() {
     let client = Client::for_test().monitor_events().await;
-    let coll: Collection<Document> = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client
+        .database("test")
+        .collection("command_contains_write_concern_delete_many");
 
     coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
@@ -484,10 +488,11 @@ async fn command_contains_write_concern_delete_many() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn command_contains_write_concern_find_one_and_delete() {
     let client = Client::for_test().monitor_events().await;
-    let coll: Collection<Document> = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client
+        .database("test")
+        .collection("command_contains_write_concern_find_one_and_delete");
 
     coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
@@ -528,10 +533,11 @@ async fn command_contains_write_concern_find_one_and_delete() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn command_contains_write_concern_find_one_and_replace() {
     let client = Client::for_test().monitor_events().await;
-    let coll: Collection<Document> = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client
+        .database("test")
+        .collection("command_contains_write_concern_find_one_and_replace");
 
     coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
@@ -572,10 +578,11 @@ async fn command_contains_write_concern_find_one_and_replace() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn command_contains_write_concern_find_one_and_update() {
     let client = Client::for_test().monitor_events().await;
-    let coll: Collection<Document> = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client
+        .database("test")
+        .collection("command_contains_write_concern_find_one_and_update");
 
     coll.drop().await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }])
@@ -616,17 +623,18 @@ async fn command_contains_write_concern_find_one_and_update() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn command_contains_write_concern_aggregate() {
     let client = Client::for_test().monitor_events().await;
-    let coll: Collection<Document> = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client
+        .database("test")
+        .collection("command_contains_write_concern_aggregate");
 
     coll.drop().await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }).await.unwrap();
     coll.aggregate(vec![
         doc! { "$match": { "foo": "bar" } },
         doc! { "$addFields": { "foo": "baz" } },
-        doc! { "$out": format!("{}-out", function_name!()) },
+        doc! { "$out": "command_contains_write_concern_aggregate-out" },
     ])
     .write_concern(
         WriteConcern::builder()
@@ -639,7 +647,7 @@ async fn command_contains_write_concern_aggregate() {
     coll.aggregate(vec![
         doc! { "$match": { "foo": "bar" } },
         doc! { "$addFields": { "foo": "baz" } },
-        doc! { "$out": format!("{}-out", function_name!()) },
+        doc! { "$out": "command_contains_write_concern_aggregate-out" },
     ])
     .write_concern(
         WriteConcern::builder()
@@ -666,10 +674,11 @@ async fn command_contains_write_concern_aggregate() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn command_contains_write_concern_drop() {
     let client = Client::for_test().monitor_events().await;
-    let coll: Collection<Document> = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client
+        .database("test")
+        .collection("command_contains_write_concern_drop");
 
     coll.drop().await.unwrap();
 
@@ -712,14 +721,14 @@ async fn command_contains_write_concern_drop() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn command_contains_write_concern_create_collection() {
     let client = Client::for_test().monitor_events().await;
     let db = client.database("test");
-    let coll: Collection<Document> = db.collection(function_name!());
+    let coll: Collection<Document> =
+        db.collection("command_contains_write_concern_create_collection");
 
     coll.drop().await.unwrap();
-    db.create_collection(function_name!())
+    db.create_collection("command_contains_write_concern_create_collection")
         .write_concern(
             WriteConcern::builder()
                 .w(Acknowledgment::Nodes(1))
@@ -729,7 +738,7 @@ async fn command_contains_write_concern_create_collection() {
         .await
         .unwrap();
     coll.drop().await.unwrap();
-    db.create_collection(function_name!())
+    db.create_collection("command_contains_write_concern_create_collection")
         .write_concern(
             WriteConcern::builder()
                 .w(Acknowledgment::Nodes(1))

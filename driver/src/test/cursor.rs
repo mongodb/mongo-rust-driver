@@ -12,7 +12,6 @@ use crate::{
 };
 
 #[tokio::test]
-#[function_name::named]
 async fn tailable_cursor() {
     if cfg!(target_os = "macos") {
         log_uncaptured("skipping tailable_cursor: flaky on macos");
@@ -21,8 +20,8 @@ async fn tailable_cursor() {
     let client = Client::for_test().await;
     let coll = client
         .create_fresh_collection(
-            function_name!(),
-            function_name!(),
+            "tailable_cursor",
+            "tailable_cursor",
             CreateCollectionOptions::builder()
                 .capped(true)
                 .max(5)
@@ -77,13 +76,12 @@ async fn tailable_cursor() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn session_cursor_next() {
     let client = Client::for_test().await;
     let mut session = client.start_session().await.unwrap();
 
     let coll = client
-        .create_fresh_collection(function_name!(), function_name!(), None)
+        .create_fresh_collection("session_cursor_next", "session_cursor_next", None)
         .await;
 
     coll.insert_many((0..5).map(|i| doc! { "_id": i }))

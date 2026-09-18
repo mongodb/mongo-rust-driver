@@ -23,6 +23,7 @@ use crate::{
     cmap::{PoolGeneration, StreamDescription},
     error::{Error, Result},
     event::cmap::{
+        CmapEvent,
         ConnectionCheckedInEvent,
         ConnectionCheckedOutEvent,
         ConnectionClosedEvent,
@@ -277,7 +278,7 @@ impl PooledConnection {
     /// Emit a [`ConnectionClosedEvent`] for this connection with the supplied reason.
     pub(crate) fn emit_closed_event(&self, reason: ConnectionClosedReason) {
         self.event_emitter
-            .emit_event(|| self.closed_event(reason).into());
+            .emit_event(|| CmapEvent::ConnectionClosed(self.closed_event(reason)));
     }
 
     pub(crate) fn stream_description(&self) -> Result<&StreamDescription> {

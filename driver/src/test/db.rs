@@ -44,19 +44,18 @@ async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<Collectio
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn list_collections() {
     let client = Client::for_test().await;
-    let db = client.database(function_name!());
+    let db = client.database("list_collections");
     db.drop().await.unwrap();
 
     let colls: Result<Vec<_>> = db.list_collections().await.unwrap().try_collect().await;
     assert_eq!(colls.unwrap().len(), 0);
 
     let coll_names = &[
-        format!("{}1", function_name!()),
-        format!("{}2", function_name!()),
-        format!("{}3", function_name!()),
+        "list_collections1",
+        "list_collections2",
+        "list_collections3",
     ];
 
     for coll_name in coll_names {
@@ -77,10 +76,9 @@ async fn list_collections() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn list_collections_filter() {
     let client = Client::for_test().await;
-    let db = client.database(function_name!());
+    let db = client.database("list_collections_filter");
     db.drop().await.unwrap();
 
     let colls: Result<Vec<_>> = db.list_collections().await.unwrap().try_collect().await;
@@ -112,18 +110,17 @@ async fn list_collections_filter() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn list_collection_names() {
     let client = Client::for_test().await;
-    let db = client.database(function_name!());
+    let db = client.database("list_collection_names");
     db.drop().await.unwrap();
 
     assert!(db.list_collection_names().await.unwrap().is_empty());
 
     let expected_colls = &[
-        format!("{}1", function_name!()),
-        format!("{}2", function_name!()),
-        format!("{}3", function_name!()),
+        "list_collection_names1",
+        "list_collection_names2",
+        "list_collection_names3",
     ];
 
     for coll in expected_colls {
@@ -140,15 +137,14 @@ async fn list_collection_names() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn collection_management() {
     let client = Client::for_test().await;
-    let db = client.database(function_name!());
+    let db = client.database("collection_management");
     db.drop().await.unwrap();
 
     assert!(db.list_collection_names().await.unwrap().is_empty());
 
-    db.create_collection(format!("{}{}", function_name!(), 1))
+    db.create_collection("collection_management1")
         .await
         .unwrap();
 
@@ -169,16 +165,16 @@ async fn collection_management() {
         )
         .build();
 
-    db.create_collection(format!("{}{}", function_name!(), 2))
+    db.create_collection("collection_management2")
         .with_options(options.clone())
         .await
         .unwrap();
 
     let view_options = CreateCollectionOptions::builder()
-        .view_on(format!("{}{}", function_name!(), 2))
+        .view_on("collection_management2".to_string())
         .pipeline(vec![doc! { "$match": {} }])
         .build();
-    db.create_collection(format!("{}{}", function_name!(), 3))
+    db.create_collection("collection_management3")
         .with_options(view_options.clone())
         .await
         .unwrap();
@@ -190,7 +186,7 @@ async fn collection_management() {
     .await;
     assert_eq!(colls.len(), 3);
 
-    assert_eq!(colls[0].name, format!("{}1", function_name!()));
+    assert_eq!(colls[0].name, "collection_management1");
     assert_eq!(colls[0].collection_type, CollectionType::Collection);
     assert_eq!(
         crate::bson_compat::serialize_to_document(&colls[0].options)
@@ -200,7 +196,7 @@ async fn collection_management() {
     assert!(!colls[0].info.read_only);
 
     let coll2 = colls.remove(1);
-    assert_eq!(coll2.name, format!("{}2", function_name!()));
+    assert_eq!(coll2.name, "collection_management2");
     assert_eq!(coll2.collection_type, CollectionType::Collection);
     assert_eq!(coll2.options.capped, options.capped);
     assert_eq!(coll2.options.size, options.size);
@@ -217,7 +213,7 @@ async fn collection_management() {
     assert!(coll2.id_index.is_some());
 
     let coll3 = colls.remove(1);
-    assert_eq!(coll3.name, format!("{}3", function_name!()));
+    assert_eq!(coll3.name, "collection_management3");
     assert_eq!(coll3.collection_type, CollectionType::View);
     assert_eq!(coll3.options.view_on, view_options.view_on);
     assert_eq!(coll3.options.pipeline, view_options.pipeline);
@@ -299,18 +295,16 @@ async fn db_aggregate_disk_use() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn create_index_options_defaults() {
     let defaults = IndexOptionDefaults {
         storage_engine: doc! { "wiredTiger": doc! {} },
     };
-    index_option_defaults_test(Some(defaults), function_name!()).await;
+    index_option_defaults_test(Some(defaults), "create_index_options_defaults").await;
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn create_index_options_defaults_not_specified() {
-    index_option_defaults_test(None, function_name!()).await;
+    index_option_defaults_test(None, "create_index_options_defaults_not_specified").await;
 }
 
 async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name: &str) {

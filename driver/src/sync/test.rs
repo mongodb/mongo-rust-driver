@@ -64,14 +64,13 @@ fn client_options() {
 }
 
 #[test]
-#[function_name::named]
 fn client() {
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
 
     client
-        .database(function_name!())
-        .collection(function_name!())
+        .database("client")
+        .collection("client")
         .insert_one(Document::new())
         .run()
         .expect("insert should succeed");
@@ -80,7 +79,7 @@ fn client() {
         .list_database_names()
         .run()
         .expect("list_database_names should succeed");
-    assert!(db_names.contains(&function_name!().to_string()));
+    assert!(db_names.contains(&"client".to_string()));
 }
 
 #[test]
@@ -112,13 +111,12 @@ fn default_database() {
 }
 
 #[test]
-#[function_name::named]
 fn database() {
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
-    let db = client.database(function_name!());
+    let db = client.database("database");
 
-    let coll = init_db_and_coll(&client, function_name!(), function_name!());
+    let coll = init_db_and_coll(&client, "database", "database");
 
     coll.insert_one(doc! { "x": 1 })
         .run()
@@ -128,7 +126,7 @@ fn database() {
         .list_collection_names()
         .run()
         .expect("list_database_names should succeed");
-    assert!(coll_names.contains(&function_name!().to_string()));
+    assert!(coll_names.contains(&"database".to_string()));
 
     let admin_db = client.database("admin");
     let pipeline = vec![
@@ -152,17 +150,16 @@ fn database() {
         w_timeout: None,
     };
     let options = DatabaseOptions::builder().write_concern(wc.clone()).build();
-    let db = client.database_with_options(function_name!(), options);
+    let db = client.database_with_options("database", options);
     assert!(db.write_concern().is_some());
     assert_eq!(db.write_concern().unwrap(), &wc);
 }
 
 #[test]
-#[function_name::named]
 fn collection() {
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
-    let coll = init_db_and_coll(&client, function_name!(), function_name!());
+    let coll = init_db_and_coll(&client, "collection", "collection");
 
     coll.insert_one(doc! { "x": 1 })
         .run()
@@ -198,25 +195,24 @@ fn collection() {
     };
     let db_options = DatabaseOptions::builder().write_concern(wc.clone()).build();
     let coll = client
-        .database_with_options(function_name!(), db_options)
-        .collection::<Document>(function_name!());
+        .database_with_options("collection", db_options)
+        .collection::<Document>("collection");
     assert_eq!(coll.write_concern(), Some(&wc));
 
     let coll_options = CollectionOptions::builder()
         .write_concern(wc.clone())
         .build();
     let coll = client
-        .database(function_name!())
-        .collection_with_options::<Document>(function_name!(), coll_options);
+        .database("collection")
+        .collection_with_options::<Document>("collection", coll_options);
     assert_eq!(coll.write_concern(), Some(&wc));
 }
 
 #[test]
-#[function_name::named]
 fn typed_collection() {
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
-    let coll = init_db_and_typed_coll(&client, function_name!(), function_name!());
+    let coll = init_db_and_typed_coll(&client, "typed_collection", "typed_collection");
 
     #[derive(Serialize, Deserialize, Debug)]
     struct MyType {
@@ -232,7 +228,6 @@ fn typed_collection() {
 }
 
 #[test]
-#[function_name::named]
 fn transactions() {
     let should_skip = crate::sync::TOKIO_RUNTIME.block_on(async { transactions_supported().await });
     if should_skip {
@@ -266,11 +261,11 @@ fn transactions() {
         .start_session()
         .run()
         .expect("session creation should succeed");
-    let coll = init_db_and_typed_coll(&client, function_name!(), function_name!());
+    let coll = init_db_and_typed_coll(&client, "transactions", "transactions");
 
     client
-        .database(function_name!())
-        .create_collection(function_name!())
+        .database("transactions")
+        .create_collection("transactions")
         .run()
         .expect("create collection should succeed");
 
@@ -316,7 +311,6 @@ fn transactions() {
 }
 
 #[test]
-#[function_name::named]
 fn collection_generic_bounds() {
     #[derive(Deserialize)]
     struct Foo;
@@ -329,8 +323,8 @@ fn collection_generic_bounds() {
 
     // ensure this code successfully compiles
     let coll: Collection<Foo> = client
-        .database(function_name!())
-        .collection(function_name!());
+        .database("collection_generic_bounds")
+        .collection("collection_generic_bounds");
     let _result: Result<Option<Foo>> = coll.find_one(doc! {}).run();
 
     #[derive(Serialize)]
@@ -338,8 +332,8 @@ fn collection_generic_bounds() {
 
     // ensure this code successfully compiles
     let coll: Collection<Bar> = client
-        .database(function_name!())
-        .collection(function_name!());
+        .database("collection_generic_bounds")
+        .collection("collection_generic_bounds");
     let _result = coll.insert_one(Bar {});
 }
 

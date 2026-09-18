@@ -57,7 +57,6 @@ async fn snapshot_and_causal_consistency_are_mutually_exclusive() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[function_name::named]
 async fn explicit_session_created_on_same_client() {
     let client0 = Client::for_test().await;
     let client1 = Client::for_test().await;
@@ -65,7 +64,7 @@ async fn explicit_session_created_on_same_client() {
     let mut session0 = client0.start_session().await.unwrap();
     let mut session1 = client1.start_session().await.unwrap();
 
-    let db = client0.database(function_name!());
+    let db = client0.database("explicit_session_created_on_same_client");
     let err = db
         .list_collections()
         .session(&mut session1)
@@ -77,8 +76,8 @@ async fn explicit_session_created_on_same_client() {
     }
 
     let coll = client1
-        .database(function_name!())
-        .collection(function_name!());
+        .database("explicit_session_created_on_same_client")
+        .collection("explicit_session_created_on_same_client");
     let err = coll
         .insert_one(doc! {})
         .session(&mut session0)

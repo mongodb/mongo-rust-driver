@@ -1,6 +1,5 @@
 use std::future::IntoFuture;
 
-use derive_more::From;
 use futures::{future::BoxFuture, FutureExt};
 use serde::Serialize;
 
@@ -19,13 +18,31 @@ use crate::{
 #[cfg(feature = "in-use-encryption")]
 use crate::event::command::CommandStartedEvent;
 
-#[derive(Clone, Debug, From, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Event {
     Cmap(CmapEvent),
     Command(CommandEvent),
     Sdam(SdamEvent),
+}
+
+impl From<CmapEvent> for Event {
+    fn from(event: CmapEvent) -> Self {
+        Self::Cmap(event)
+    }
+}
+
+impl From<CommandEvent> for Event {
+    fn from(event: CommandEvent) -> Self {
+        Self::Command(event)
+    }
+}
+
+impl From<SdamEvent> for Event {
+    fn from(event: SdamEvent) -> Self {
+        Self::Sdam(event)
+    }
 }
 
 impl Event {

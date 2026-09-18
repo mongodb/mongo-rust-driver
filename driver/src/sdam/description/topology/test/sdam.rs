@@ -561,7 +561,6 @@ async fn load_balanced() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn topology_closed_event_last() {
     let client = Client::for_test()
         .use_single_mongos()
@@ -573,8 +572,8 @@ async fn topology_closed_event_last() {
     let mut subscriber = events.stream_all();
 
     client
-        .database(function_name!())
-        .collection(function_name!())
+        .database("topology_closed_event_last")
+        .collection("topology_closed_event_last")
         .insert_one(doc! { "x": 1 })
         .await
         .unwrap();
@@ -660,7 +659,6 @@ async fn heartbeat_events() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn direct_connection() {
     if !topology_is_replica_set().await {
         log_uncaptured("Skipping direct_connection test due to non-replica set topology");
@@ -685,8 +683,8 @@ async fn direct_connection() {
     let direct_false_client =
         Client::with_options(direct_false_options).expect("client construction should succeed");
     direct_false_client
-        .database(function_name!())
-        .collection(function_name!())
+        .database("direct_connection")
+        .collection("direct_connection")
         .insert_one(doc! {})
         .await
         .expect("write should succeed with directConnection=false on secondary");
@@ -696,8 +694,8 @@ async fn direct_connection() {
     let direct_true_client =
         Client::with_options(direct_true_options).expect("client construction should succeed");
     let error = direct_true_client
-        .database(function_name!())
-        .collection(function_name!())
+        .database("direct_connection")
+        .collection("direct_connection")
         .insert_one(doc! {})
         .await
         .expect_err("write should fail with directConnection=true on secondary");
@@ -706,8 +704,8 @@ async fn direct_connection() {
     let client =
         Client::with_options(secondary_options).expect("client construction should succeed");
     client
-        .database(function_name!())
-        .collection(function_name!())
+        .database("direct_connection")
+        .collection("direct_connection")
         .insert_one(doc! {})
         .await
         .expect("write should succeed with directConnection unspecified");

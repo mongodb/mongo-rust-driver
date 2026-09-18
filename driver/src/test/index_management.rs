@@ -36,11 +36,10 @@ async fn run_unified() {
 
 // Test that creating indexes works as expected.
 #[tokio::test]
-#[function_name::named]
 async fn index_management_creates() {
     let client = Client::for_test().await;
     let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
+        .init_db_and_coll("index_management_creates", "index_management_creates")
         .await;
 
     // Test creating a single index with driver-generated name.
@@ -96,11 +95,13 @@ async fn index_management_string_names() {
 
 // Test that creating a duplicate index works as expected.
 #[tokio::test]
-#[function_name::named]
 async fn index_management_handles_duplicates() {
     let client = Client::for_test().await;
     let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
+        .init_db_and_coll(
+            "index_management_handles_duplicates",
+            "index_management_handles_duplicates",
+        )
         .await;
 
     let result = coll
@@ -135,11 +136,10 @@ async fn index_management_handles_duplicates() {
 
 // Test that listing indexes works as expected.
 #[tokio::test]
-#[function_name::named]
 async fn index_management_lists() {
     let client = Client::for_test().await;
     let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
+        .init_db_and_coll("index_management_lists", "index_management_lists")
         .await;
 
     let insert_data = vec![
@@ -196,11 +196,10 @@ async fn index_management_lists() {
 
 // Test that dropping indexes works as expected.
 #[tokio::test]
-#[function_name::named]
 async fn index_management_drops() {
     let client = Client::for_test().await;
     let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
+        .init_db_and_coll("index_management_drops", "index_management_drops")
         .await;
 
     let result = coll
@@ -240,11 +239,13 @@ async fn index_management_drops() {
 
 // Test that index management commands execute the expected database commands.
 #[tokio::test]
-#[function_name::named]
 async fn index_management_executes_commands() {
     let client = Client::for_test().monitor_events().await;
     let coll = client
-        .init_db_and_coll(function_name!(), function_name!())
+        .init_db_and_coll(
+            "index_management_executes_commands",
+            "index_management_executes_commands",
+        )
         .await;
 
     // Collection::create_index and Collection::create_indexes execute createIndexes.
