@@ -747,10 +747,9 @@ impl Client {
                             .handle_response(&response, context)
                             .map_err(|e| e.with_server_response(&response)),
                         ResponseHandlingKind::Owned => op.handle_response_owned(response, context),
-                        ResponseHandlingKind::Async => op
-                            .handle_response_async(&response, context)
-                            .await
-                            .map_err(|e| e.with_server_response(&response)),
+                        ResponseHandlingKind::Async => {
+                            op.handle_response_async(response, context).await
+                        }
                     };
                     match handle_result {
                         Ok(op_out) => Ok(op_out),

@@ -191,7 +191,7 @@ pub(crate) trait Operation: Send + Sync {
     /// async code is required to handle the response.
     fn handle_response_async<'a>(
         &'a self,
-        _response: &'a RawCommandResponse,
+        _response: RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
