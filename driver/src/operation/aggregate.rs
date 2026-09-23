@@ -7,11 +7,22 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
-    operation::{append_options, Base, OperationImpl, OperationTarget, Retryability},
-    options::{AggregateOptions, ClientOptions, ReadPreference, SelectionCriteria, WriteConcern},
+    operation::{
+        append_options,
+        default_impl,
+        to_feature,
+        ExecutionContext,
+        Operation,
+        OperationDetails,
+        OperationTarget,
+        ResponseHandlingKind,
+        Retryability,
+        SERVER_5_0_0_WIRE_VERSION,
+    },
+    options::{AggregateOptions, ClientOptions, SelectionCriteria},
+    sdam::TopologyDescription,
+    TopologyType,
 };
-
-use super::{BaseOperation, ExecutionContext};
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {
@@ -44,16 +55,58 @@ impl Aggregate {
     }
 }
 
-// IMPORTANT: If new method implementations are added here, make sure `ChangeStreamAggregate` has
-// the equivalent delegations.
-impl BaseOperation for Aggregate {
+impl Operation for Aggregate {
     type O = CursorSpecification;
 
     const NAME: &'static CStr = cstr!("aggregate");
 
-    const ZERO_COPY: bool = true;
+    default_impl!(name, handle_error, update_for_retry, pinned_connection);
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        let override_criteria = |criteria: &SelectionCriteria, topology: &TopologyDescription| {
+            if criteria.is_primary() || topology.topology_type() == TopologyType::LoadBalanced {
+                return None;
+            }
+            if topology.servers.values().any(|server| {
+                server
+                    .max_wire_version()
+                    .ok()
+                    .flatten()
+                    .is_some_and(|mwv| mwv < SERVER_5_0_0_WIRE_VERSION)
+            }) {
+                return Some(SelectionCriteria::primary());
+            } else {
+                return None;
+            }
+        };
+
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Owned,
+            selection_criteria: to_feature!(self.options, selection_criteria),
+            read_concern: to_feature!(self.options, read_concern),
+            write_concern: to_feature!(self.options, write_concern),
+            supports_sessions: true,
+            retryability: if self.is_out_or_merge {
+                Retryability::None
+            } else {
+                Retryability::read(options)
+            },
+            is_backpressure_retryable: if self.is_out_or_merge {
+                options.retry_writes != Some(false)
+            } else {
+                options.retry_reads != Some(false)
+            },
+            override_criteria: self.is_out_or_merge.then_some(override_criteria),
+            target: self.target.clone(),
+            is_after_cluster_time_write: false,
+        }
+    }
+
+    fn build(
+        &mut self,
+        _description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         let mut body = doc! {
             crate::bson_compat::cstr_to_str(Self::NAME): target_bson(&self.target),
             "pipeline": bson_util::to_bson_array(&self.pipeline),
@@ -68,7 +121,11 @@ impl BaseOperation for Aggregate {
             }
         }
 
-        Ok(Command::from_operation(self, (&body).try_into()?))
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
+            (&body).try_into()?,
+        ))
     }
 
     fn extract_at_cluster_time(
@@ -78,16 +135,16 @@ impl BaseOperation for Aggregate {
         super::cursor_get_at_cluster_time(response)
     }
 
-    fn handle_response_cow<'a>(
+    fn handle_response_owned<'a>(
         &'a self,
-        response: std::borrow::Cow<'a, RawCommandResponse>,
+        response: RawCommandResponse,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         if self.is_out_or_merge {
             response.validate_single_write()?;
         };
         CursorSpecification::new(
-            response.into_owned(),
+            response,
             context
                 .connection
                 .stream_description()?
@@ -99,78 +156,8 @@ impl BaseOperation for Aggregate {
         )
     }
 
-    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
-        self.options
-            .as_ref()
-            .and_then(|opts| opts.selection_criteria.as_ref())
-            .into()
-    }
-
-    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
-        self.options
-            .as_ref()
-            .and_then(|opts| opts.read_concern.as_ref())
-            .into()
-    }
-
-    fn write_concern(&self) -> super::Feature<&WriteConcern> {
-        self.options
-            .as_ref()
-            .and_then(|o| o.write_concern.as_ref())
-            .into()
-    }
-
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        if self.is_out_or_merge {
-            Retryability::None
-        } else {
-            Retryability::read(options)
-        }
-    }
-
-    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
-        if self.is_out_or_merge {
-            options.retry_writes != Some(false)
-        } else {
-            options.retry_reads != Some(false)
-        }
-    }
-
-    fn override_criteria(&self) -> super::OverrideCriteriaFn {
-        if !self.is_out_or_merge {
-            return |_, _| None;
-        }
-        |criteria, topology| {
-            if criteria == &SelectionCriteria::ReadPreference(ReadPreference::Primary)
-                || topology.topology_type() == crate::TopologyType::LoadBalanced
-            {
-                return None;
-            }
-            for server in topology.servers.values() {
-                if let Ok(Some(v)) = server.max_wire_version() {
-                    if v < super::SERVER_5_0_0_WIRE_VERSION {
-                        return Some(SelectionCriteria::ReadPreference(ReadPreference::Primary));
-                    }
-                }
-            }
-            None
-        }
-    }
-
-    fn target(&self) -> OperationTarget {
-        self.target.clone()
-    }
-
-    fn is_after_cluster_time_write(&self) -> bool {
-        false
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for Aggregate {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

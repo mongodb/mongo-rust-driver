@@ -18,7 +18,7 @@ use crate::{
     bson::Bson,
     cmap::{conn::wire::Message, Command, ConnectionInfo, StreamDescription},
     error::{ErrorKind, Result},
-    operation::{Operation, OperationTarget},
+    operation::{Operation, OperationDetails, OperationTarget},
     options::{ClientOptions, ServerAddress, DEFAULT_PORT},
     Client,
     ClientSession,
@@ -111,6 +111,7 @@ impl Client {
     pub(crate) fn start_operation_span(
         &self,
         op: &impl Operation,
+        op_details: &OperationDetails,
         session: Option<&ClientSession>,
     ) -> OpSpan {
         let op = op.otel();
@@ -120,8 +121,8 @@ impl Client {
                 enabled: false,
             };
         }
-        let span_name = format!("{} {}", op.log_name(), op_target(op));
-        let mut attrs = common_attrs(op);
+        let span_name = format!("{} {}", op.log_name(), op_target(&op_details.target));
+        let mut attrs = common_attrs(&op_details.target);
         attrs.extend([
             KeyValue::new("db.operation.name", op.log_name().to_owned()),
             KeyValue::new("db.operation.summary", span_name.clone()),
@@ -147,6 +148,7 @@ impl Client {
     pub(crate) fn start_command_span(
         &self,
         op: &impl Operation,
+        op_details: &OperationDetails,
         conn_info: &ConnectionInfo,
         stream_desc: &StreamDescription,
         message: &Message,
@@ -160,12 +162,12 @@ impl Client {
             };
         }
         let otel_driver_conn_id: i64 = conn_info.id.into();
-        let mut attrs = common_attrs(op);
+        let mut attrs = common_attrs(&op_details.target);
         attrs.extend(cmd_attrs.attrs);
         attrs.extend([
             KeyValue::new(
                 "db.query.summary",
-                format!("{} {}", cmd_attrs.name, op_target(op)),
+                format!("{} {}", cmd_attrs.name, op_target(&op_details.target)),
             ),
             KeyValue::new("db.mongodb.driver_connection_id", otel_driver_conn_id),
             KeyValue::new("server.type", stream_desc.initial_server_type.to_string()),
@@ -294,8 +296,7 @@ fn record_error<T>(context: &Context, result: &Result<T>) {
     });
 }
 
-fn op_target(op: &impl OtelInfo) -> String {
-    let target = op.target();
+fn op_target(target: &OperationTarget) -> String {
     let name = target.name();
     if let Some(coll) = name.collection {
         format!("{}.{}", name.database, coll)
@@ -304,8 +305,7 @@ fn op_target(op: &impl OtelInfo) -> String {
     }
 }
 
-fn common_attrs(op: &impl OtelInfo) -> Vec<KeyValue> {
-    let target = op.target();
+fn common_attrs(target: &OperationTarget) -> Vec<KeyValue> {
     let name = target.name();
     let mut attrs = vec![
         KeyValue::new("db.system", "mongodb"),

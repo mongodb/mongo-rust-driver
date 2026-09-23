@@ -9,13 +9,14 @@ use crate::{
     error::Result,
     operation::{
         append_options,
+        default_impl,
+        forward_impl,
         ExecutionContext,
         Operation,
-        OperationImpl,
-        Wrapped,
-        WrappedOperation,
+        OperationDetails,
+        ResponseHandlingKind,
     },
-    options::ChangeStreamOptions,
+    options::{ChangeStreamOptions, ClientOptions},
 };
 
 use super::Aggregate;
@@ -49,20 +50,33 @@ impl ChangeStreamAggregate {
     }
 }
 
-impl WrappedOperation for ChangeStreamAggregate {
-    type Wrapped = Aggregate;
+impl Operation for ChangeStreamAggregate {
     type O = (CursorSpecification, ChangeStreamData);
-    const ZERO_COPY: bool = true;
 
-    fn wrapped(&self) -> &Self::Wrapped {
-        &self.inner
+    const NAME: &'static crate::bson_compat::CStr = Aggregate::NAME;
+
+    forward_impl!(
+        inner,
+        name,
+        extract_at_cluster_time,
+        update_for_retry,
+        pinned_connection
+    );
+
+    default_impl!(handle_error);
+
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Owned,
+            ..self.inner.details(options)
+        }
     }
 
-    fn wrapped_mut(&mut self) -> &mut Self::Wrapped {
-        &mut self.inner
-    }
-
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
+    fn build(
+        &mut self,
+        description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         if let Some(data) = &mut self.resume_data {
             let mut new_opts = self.args.options.clone().unwrap_or_default();
             if let Some(token) = data.resume_token.take() {
@@ -89,61 +103,48 @@ impl WrappedOperation for ChangeStreamAggregate {
                 ..self.args.clone()
             })?;
         }
-        self.inner.build(description)
+        self.inner.build(description, op_details)
     }
 
-    fn handle_response<'a>(
+    fn handle_response_owned<'a>(
         &'a self,
-        response: std::borrow::Cow<'a, RawCommandResponse>,
+        response: RawCommandResponse,
         mut context: ExecutionContext<'a>,
-    ) -> crate::BoxFuture<'a, Result<Self::O>> {
-        use futures_util::FutureExt;
-        async move {
-            let op_time = response
-                .raw_body()
-                .get("operationTime")?
-                .and_then(crate::bson::RawBsonRef::as_timestamp);
+    ) -> Result<Self::O> {
+        let op_time = response
+            .raw_body()
+            .get("operationTime")?
+            .and_then(crate::bson::RawBsonRef::as_timestamp);
 
-            let inner_context = ExecutionContext {
-                connection: context.connection,
-                session: context.session.as_deref_mut(),
-                effective_criteria: context.effective_criteria,
-            };
-            let spec = {
-                use crate::operation::BaseOperation;
-                self.inner.handle_response_cow(response, inner_context)?
-            };
+        let inner_context = ExecutionContext {
+            connection: context.connection,
+            session: context.session.as_deref_mut(),
+            effective_criteria: context.effective_criteria,
+        };
+        let spec = self.inner.handle_response_owned(response, inner_context)?;
 
-            let mut data = ChangeStreamData {
-                resume_token: ResumeToken::initial(self.args.options.as_ref(), &spec),
-                ..ChangeStreamData::default()
-            };
-            let has_no_time = |o: &ChangeStreamOptions| {
-                o.start_at_operation_time.is_none()
-                    && o.resume_after.is_none()
-                    && o.start_after.is_none()
-            };
+        let mut data = ChangeStreamData {
+            resume_token: ResumeToken::initial(self.args.options.as_ref(), &spec),
+            ..ChangeStreamData::default()
+        };
+        let has_no_time = |o: &ChangeStreamOptions| {
+            o.start_at_operation_time.is_none()
+                && o.resume_after.is_none()
+                && o.start_after.is_none()
+        };
 
-            let description = context.connection.stream_description()?;
-            if self.args.options.as_ref().is_none_or(has_no_time)
-                && description.max_wire_version.is_some_and(|v| v >= 7)
-                && spec.is_empty
-                && spec.post_batch_resume_token.is_none()
-            {
-                data.initial_operation_time = op_time;
-            }
-
-            Ok((spec, data))
+        if self.args.options.as_ref().is_none_or(has_no_time)
+            && spec.is_empty
+            && spec.post_batch_resume_token.is_none()
+        {
+            data.initial_operation_time = op_time;
         }
-        .boxed()
+
+        Ok((spec, data))
     }
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for ChangeStreamAggregate {
-    type Kind = Wrapped;
 }
 
 #[cfg(feature = "opentelemetry")]

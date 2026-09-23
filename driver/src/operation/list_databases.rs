@@ -1,17 +1,26 @@
-use crate::{bson::rawdoc, options::ClientOptions, Client};
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, RawDocumentBuf},
+    bson::{doc, rawdoc, RawDocumentBuf},
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     db::options::ListDatabasesOptions,
     error::Result,
-    operation::{Base, BaseOperation, OperationImpl, Retryability},
-    selection_criteria::{ReadPreference, SelectionCriteria},
+    operation::{
+        append_options_to_raw_document,
+        default_impl,
+        ExecutionContext,
+        Feature,
+        Operation,
+        OperationDetails,
+        OperationTarget,
+        ResponseHandlingKind,
+        Retryability,
+    },
+    options::ClientOptions,
+    selection_criteria::SelectionCriteria,
+    Client,
 };
-
-use super::{append_options_to_raw_document, ExecutionContext};
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
@@ -30,12 +39,39 @@ impl ListDatabases {
     }
 }
 
-impl BaseOperation for ListDatabases {
+impl Operation for ListDatabases {
     type O = Vec<RawDocumentBuf>;
 
     const NAME: &'static CStr = cstr!("listDatabases");
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        handle_error,
+        update_for_retry,
+        pinned_connection
+    );
+
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: Feature::Set(SelectionCriteria::primary()),
+            read_concern: Feature::NotSupported,
+            write_concern: Feature::NotSupported,
+            supports_sessions: true,
+            retryability: Retryability::read(options),
+            is_backpressure_retryable: options.retry_reads != Some(false),
+            override_criteria: None,
+            target: OperationTarget::admin(&self.client),
+            is_after_cluster_time_write: false,
+        }
+    }
+
+    fn build(
+        &mut self,
+        _description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: 1,
             "nameOnly": self.name_only
@@ -43,7 +79,11 @@ impl BaseOperation for ListDatabases {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::from_operation(self, body))
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
+            body,
+        ))
     }
 
     fn handle_response<'a>(
@@ -55,24 +95,8 @@ impl BaseOperation for ListDatabases {
         Ok(response.databases)
     }
 
-    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
-        super::Feature::Set(&SelectionCriteria::ReadPreference(ReadPreference::Primary))
-    }
-
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        Retryability::read(options)
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        super::OperationTarget::admin(&self.client)
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for ListDatabases {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

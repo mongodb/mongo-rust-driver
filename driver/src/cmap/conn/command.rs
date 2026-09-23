@@ -5,7 +5,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use super::wire::{message::DocumentSequence, Message};
 use crate::{
     bson::{Document, RawDocument, RawDocumentBuf},
-    bson_compat::{deserialize_from_slice, Utf8Lossy},
+    bson_compat::{deserialize_from_slice, CStr, Utf8Lossy},
     bson_util::get_u64_raw,
     client::{options::ServerApi, ClusterTime},
     error::{
@@ -18,7 +18,7 @@ use crate::{
         WriteFailure,
     },
     hello::{HelloCommandResponse, HelloReply},
-    operation::{CommandErrorBody, CommandResponse, Feature, Operation},
+    operation::{CommandErrorBody, CommandResponse, Feature, OperationDetails},
     options::{ReadConcernInternal, ReadConcernLevel, ServerAddress, WriteConcern},
     selection_criteria::ReadPreference,
     ClientSession,
@@ -100,23 +100,27 @@ impl Command {
         }
     }
 
-    pub(crate) fn from_operation<Op: Operation>(op: &Op, body: RawDocumentBuf) -> Self {
-        let target = op.target();
-        let read_concern = match op.read_concern() {
+    pub(crate) fn from_operation_details(
+        op_details: &OperationDetails,
+        op_name: &CStr,
+        body: RawDocumentBuf,
+    ) -> Self {
+        let target = &op_details.target;
+        let read_concern = match &op_details.read_concern {
             Feature::Set(v) => Some(v),
             Feature::NotSupported => None,
             Feature::Inherit => target.read_concern(),
         }
         .cloned()
         .map(ReadConcernInternal::from);
-        let write_concern = match op.write_concern() {
+        let write_concern = match &op_details.write_concern {
             Feature::Set(v) => Some(v),
             Feature::NotSupported => None,
             Feature::Inherit => target.write_concern(),
         }
         .cloned();
         Self {
-            name: crate::bson_compat::cstr_to_str(op.name()).to_owned(),
+            name: crate::bson_compat::cstr_to_str(&op_name).to_owned(),
             target_db: target.db_name().to_owned(),
             exhaust_allowed: false,
             body,

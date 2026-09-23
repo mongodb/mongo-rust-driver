@@ -1,15 +1,22 @@
-use crate::{bson::rawdoc, Collection};
-
 use crate::{
-    bson::Document,
+    bson::{rawdoc, Document},
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options_to_raw_document, Base, BaseOperation, OperationImpl},
-    options::{CreateCollectionOptions, WriteConcern},
+    operation::{
+        append_options_to_raw_document,
+        default_impl,
+        to_feature,
+        ExecutionContext,
+        Feature,
+        Operation,
+        OperationDetails,
+        ResponseHandlingKind,
+        Retryability,
+    },
+    options::{ClientOptions, CreateCollectionOptions},
+    Collection,
 };
-
-use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct Create {
@@ -26,19 +33,50 @@ impl Create {
     }
 }
 
-impl BaseOperation for Create {
+impl Operation for Create {
     type O = ();
 
     const NAME: &'static CStr = cstr!("create");
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        handle_error,
+        update_for_retry,
+        pinned_connection
+    );
+
+    fn details(&self, _options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: Feature::NotSupported,
+            read_concern: Feature::NotSupported,
+            write_concern: to_feature!(self.options, write_concern),
+            supports_sessions: true,
+            retryability: Retryability::None,
+            is_backpressure_retryable: false,
+            override_criteria: None,
+            target: (&self.target).into(),
+            is_after_cluster_time_write: true,
+        }
+    }
+
+    fn build(
+        &mut self,
+        _description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.target.name(),
         };
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::from_operation(self, body))
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
+            body,
+        ))
     }
 
     fn handle_response<'a>(
@@ -49,23 +87,8 @@ impl BaseOperation for Create {
         response.validate_single_write()
     }
 
-    fn write_concern(&self) -> super::Feature<&WriteConcern> {
-        self.options
-            .as_ref()
-            .and_then(|o| o.write_concern.as_ref())
-            .into()
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        (&self.target).into()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for Create {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

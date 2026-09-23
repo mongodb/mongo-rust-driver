@@ -1,15 +1,22 @@
-use crate::{bson::rawdoc, Collection};
-
 use crate::{
-    bson::Document,
+    bson::{rawdoc, Document},
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options_to_raw_document, Base, BaseOperation, OperationImpl},
-    options::{DropIndexOptions, WriteConcern},
+    operation::{
+        append_options_to_raw_document,
+        default_impl,
+        to_feature,
+        ExecutionContext,
+        Feature,
+        Operation,
+        OperationDetails,
+        ResponseHandlingKind,
+        Retryability,
+    },
+    options::{ClientOptions, DropIndexOptions},
+    Collection,
 };
-
-use super::ExecutionContext;
 
 pub(crate) struct DropIndexes {
     target: Collection<Document>,
@@ -31,11 +38,38 @@ impl DropIndexes {
     }
 }
 
-impl BaseOperation for DropIndexes {
+impl Operation for DropIndexes {
     type O = ();
     const NAME: &'static CStr = cstr!("dropIndexes");
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        handle_error,
+        update_for_retry,
+        pinned_connection
+    );
+
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: Feature::NotSupported,
+            read_concern: Feature::NotSupported,
+            write_concern: to_feature!(self.options, write_concern),
+            supports_sessions: true,
+            retryability: Retryability::None,
+            is_backpressure_retryable: options.retry_writes != Some(false),
+            override_criteria: None,
+            target: (&self.target).into(),
+            is_after_cluster_time_write: true,
+        }
+    }
+
+    fn build(
+        &mut self,
+        _description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.target.name(),
             "index": self.name.clone(),
@@ -43,7 +77,11 @@ impl BaseOperation for DropIndexes {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::from_operation(self, body))
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
+            body,
+        ))
     }
 
     fn handle_response<'a>(
@@ -54,27 +92,8 @@ impl BaseOperation for DropIndexes {
         Ok(())
     }
 
-    fn is_backpressure_retryable(&self, options: &crate::options::ClientOptions) -> bool {
-        options.retry_writes != Some(false)
-    }
-
-    fn write_concern(&self) -> super::Feature<&WriteConcern> {
-        self.options
-            .as_ref()
-            .and_then(|opts| opts.write_concern.as_ref())
-            .into()
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        (&self.target).into()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for DropIndexes {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]
