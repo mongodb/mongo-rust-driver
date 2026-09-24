@@ -1,21 +1,68 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use futures_util::TryStreamExt;
 
 use crate::{
     bson::{doc, oid::ObjectId, Document},
+    error::{Error, Result},
     search_index::SearchIndexType,
     Client,
     Collection,
     SearchIndexModel,
 };
 
+async fn wait_for_match<T>(
+    coll: &Collection<Document>,
+    filter: impl Fn(Vec<Document>) -> Option<T>,
+) -> Result<T> {
+    const ITERATIONS_ALLOWED: usize = 60;
+    let mut iterations = 0;
+    loop {
+        let result = async {
+            coll.list_search_indexes()
+                .await?
+                .try_collect::<Vec<_>>()
+                .await
+        }
+        .await;
+        let found = match result {
+            Ok(indexes) => filter(indexes),
+            Err(e) if e.code() == Some(125) => None,
+            Err(e) => return Err(e),
+        };
+        if let Some(found) = found {
+            return Ok(found);
+        } else if iterations > ITERATIONS_ALLOWED {
+            return Err(Error::internal("timed out waiting for list search indexes"));
+        } else {
+            iterations += 1;
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            continue;
+        }
+    }
+}
+
+async fn wait_for_search_index(
+    coll: &Collection<Document>,
+    filter: impl Fn(&Document) -> bool,
+) -> Result<Document> {
+    wait_for_match(coll, |indexes| indexes.into_iter().find(&filter)).await
+}
+
+async fn wait_for_search_indexes(
+    coll: &Collection<Document>,
+    condition: impl Fn(&Vec<Document>) -> bool,
+) -> Result<Vec<Document>> {
+    wait_for_match(coll, |indexes| condition(&indexes).then_some(indexes)).await
+}
+
+fn name_matches(index: &Document, name: &str) -> bool {
+    index.get_str("name").is_ok_and(|n| n == name) && index.get_bool("queryable").unwrap_or(false)
+}
+
 /// Search Index Case 1: Driver can successfully create and list search indexes
 #[tokio::test]
 async fn search_index_create_list() {
-    let start = Instant::now();
-    let deadline = start + Duration::from_secs(60 * 5);
-
     let client = Client::for_test().await;
     let db = client.database("search_index_test");
     let coll_name = ObjectId::new().to_hex();
@@ -33,21 +80,10 @@ async fn search_index_create_list() {
         .unwrap();
     assert_eq!(name, "test-search-index");
 
-    let found = 'outer: loop {
-        for d in list_search_indexes(&coll0).await.into_iter().flatten() {
-            if d.get_str("name").is_ok_and(|n| n == "test-search-index")
-                && d.get_bool("queryable").unwrap_or(false)
-            {
-                break 'outer d;
-            }
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        if Instant::now() > deadline {
-            panic!("timed out");
-        }
-    };
-
-    let dynamic = found["latestDefinition"]["mappings"]["dynamic"]
+    let index = wait_for_search_index(&coll0, |index| name_matches(index, &name))
+        .await
+        .unwrap();
+    let dynamic = index["latestDefinition"]["mappings"]["dynamic"]
         .as_bool()
         .unwrap();
     assert!(!dynamic);
@@ -56,152 +92,105 @@ async fn search_index_create_list() {
 /// Search Index Case 2: Driver can successfully create multiple indexes in batch
 #[tokio::test]
 async fn search_index_create_multiple() {
-    let start = Instant::now();
-    let deadline = start + Duration::from_secs(60 * 5);
-
     let client = Client::for_test().await;
     let db = client.database("search_index_test");
     let coll_name = ObjectId::new().to_hex();
     db.create_collection(&coll_name).await.unwrap();
     let coll0 = db.collection::<Document>(&coll_name);
 
-    let names = coll0
+    let names = ["test-search-index-1", "test-search-index-2"];
+
+    let created_names = coll0
         .create_search_indexes([
             SearchIndexModel::builder()
-                .name(String::from("test-search-index-1"))
+                .name(names[0].to_string())
                 .definition(doc! { "mappings": { "dynamic": false } })
                 .build(),
             SearchIndexModel::builder()
-                .name(String::from("test-search-index-2"))
+                .name(names[1].to_string())
                 .definition(doc! { "mappings": { "dynamic": false } })
                 .build(),
         ])
         .await
         .unwrap();
-    assert_eq!(names, ["test-search-index-1", "test-search-index-2"]);
+    assert_eq!(created_names, names);
 
-    let mut index1 = None;
-    let mut index2 = None;
-    loop {
-        for d in list_search_indexes(&coll0).await.into_iter().flatten() {
-            if d.get_str("name").is_ok_and(|n| n == "test-search-index-1")
-                && d.get_bool("queryable").unwrap_or(false)
-            {
-                index1 = Some(d);
-            } else if d.get_str("name").is_ok_and(|n| n == "test-search-index-2")
-                && d.get_bool("queryable").unwrap_or(false)
-            {
-                index2 = Some(d);
+    let indexes = wait_for_search_indexes(&coll0, |indexes| {
+        for name in names {
+            if !indexes.iter().any(|index| name_matches(&index, name)) {
+                return false;
             }
         }
-        if index1.is_some() && index2.is_some() {
-            break;
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        if Instant::now() > deadline {
-            panic!("timed out");
-        }
+        true
+    })
+    .await
+    .unwrap();
+    for index in indexes {
+        let dynamic = index["latestDefinition"]["mappings"]["dynamic"]
+            .as_bool()
+            .unwrap();
+        assert!(!dynamic);
     }
-
-    let dynamic = index1.unwrap()["latestDefinition"]["mappings"]["dynamic"]
-        .as_bool()
-        .unwrap();
-    assert!(!dynamic);
-    let dynamic = index2.unwrap()["latestDefinition"]["mappings"]["dynamic"]
-        .as_bool()
-        .unwrap();
-    assert!(!dynamic);
 }
 
 /// Search Index Case 3: Driver can successfully drop search indexes
 #[tokio::test]
 async fn search_index_drop() {
-    let start = Instant::now();
-    let deadline = start + Duration::from_secs(60 * 5);
-
     let client = Client::for_test().await;
     let db = client.database("search_index_test");
     let coll_name = ObjectId::new().to_hex();
     db.create_collection(&coll_name).await.unwrap();
     let coll0 = db.collection::<Document>(&coll_name);
 
-    let name = coll0
+    let name = "test-search-index";
+
+    let created_name = coll0
         .create_search_index(
             SearchIndexModel::builder()
-                .name(String::from("test-search-index"))
+                .name(name.to_string())
                 .definition(doc! { "mappings": { "dynamic": false } })
                 .build(),
         )
         .await
         .unwrap();
-    assert_eq!(name, "test-search-index");
+    assert_eq!(created_name, name);
 
-    'outer: loop {
-        for d in list_search_indexes(&coll0).await.into_iter().flatten() {
-            if d.get_str("name").is_ok_and(|n| n == "test-search-index")
-                && d.get_bool("queryable").unwrap_or(false)
-            {
-                break 'outer;
-            }
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        if Instant::now() > deadline {
-            panic!("search index creation timed out");
-        }
-    }
+    let _ = wait_for_search_index(&coll0, |index| name_matches(index, name))
+        .await
+        .unwrap();
 
     coll0.drop_search_index("test-search-index").await.unwrap();
 
-    loop {
-        if list_search_indexes(&coll0)
-            .await
-            .is_some_and(|indexes| indexes.is_empty())
-        {
-            break;
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        if Instant::now() > deadline {
-            panic!("search index drop timed out");
-        }
-    }
+    let _ = wait_for_search_indexes(&coll0, Vec::is_empty)
+        .await
+        .unwrap();
 }
 
 /// Search Index Case 4: Driver can update a search index
 #[tokio::test]
 async fn search_index_update() {
-    let start = Instant::now();
-    let deadline = start + Duration::from_secs(60 * 5);
-
     let client = Client::for_test().await;
     let db = client.database("search_index_test");
     let coll_name = ObjectId::new().to_hex();
     db.create_collection(&coll_name).await.unwrap();
     let coll0 = db.collection::<Document>(&coll_name);
 
-    let name = coll0
+    let name = "test-search-index";
+
+    let created_name = coll0
         .create_search_index(
             SearchIndexModel::builder()
-                .name(String::from("test-search-index"))
+                .name(name.to_string())
                 .definition(doc! { "mappings": { "dynamic": false } })
                 .build(),
         )
         .await
         .unwrap();
-    assert_eq!(name, "test-search-index");
+    assert_eq!(created_name, name);
 
-    'outer: loop {
-        for d in list_search_indexes(&coll0).await.into_iter().flatten() {
-            if d.get_str("name").is_ok_and(|n| n == "test-search-index")
-                && d.get_bool("queryable").unwrap_or(false)
-            {
-                break 'outer;
-            }
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        if Instant::now() > deadline {
-            panic!("search index creation timed out");
-        }
-    }
+    let _ = wait_for_search_index(&coll0, |index| name_matches(index, name))
+        .await
+        .unwrap();
 
     coll0
         .update_search_index(
@@ -211,22 +200,12 @@ async fn search_index_update() {
         .await
         .unwrap();
 
-    let found = 'find: loop {
-        for d in list_search_indexes(&coll0).await.into_iter().flatten() {
-            if d.get_str("name").is_ok_and(|n| n == "test-search-index")
-                && d.get_bool("queryable").unwrap_or(false)
-                && d.get_str("status").is_ok_and(|s| s == "READY")
-            {
-                break 'find d;
-            }
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        if Instant::now() > deadline {
-            panic!("search index update timed out");
-        }
-    };
-
-    let dynamic = found["latestDefinition"]["mappings"]["dynamic"]
+    let index = wait_for_search_index(&coll0, |index| {
+        name_matches(index, name) && index.get_str("status").is_ok_and(|s| s == "READY")
+    })
+    .await
+    .unwrap();
+    let dynamic = index["latestDefinition"]["mappings"]["dynamic"]
         .as_bool()
         .unwrap();
     assert!(dynamic);
@@ -244,58 +223,6 @@ async fn search_index_drop_not_found() {
     coll0.drop_search_index("test-search-index").await.unwrap();
 }
 
-async fn wait_for_search_indexes(
-    coll: &Collection<Document>,
-    condition: impl Fn(<Vec<Document>) -> bool,
-) -> Vec<Document> {
-    loop {
-        let result = async {
-            coll.list_search_indexes()
-                .await?
-                .try_collect::<Vec<_>>()
-                .await
-        }
-        .await;
-            Ok(indexes) => ,
-            Err(e)
-        };
-    }
-}
-
-/// Lists the search indexes on `coll`, returning `None` if the server could not reach the Search
-/// Index Management service. Atlas intermittently returns this error while an index is being
-/// built, so polling loops should retry rather than fail.
-async fn list_search_indexes(coll: &Collection<Document>) -> Option<Vec<Document>> {
-    let result = async { coll.list_search_indexes().await?.try_collect().await }.await;
-    match result {
-        Ok(indexes) => Some(indexes),
-        Err(e)
-            if e.code() == Some(125)
-                && e.to_string()
-                    .contains("Error connecting to Search Index Management service") =>
-        {
-            eprintln!("transient error listing search indexes, retrying: {e}");
-            None
-        }
-        Err(e) => panic!("listing search indexes failed: {e}"),
-    }
-}
-
-async fn wait_for_index(coll: &Collection<Document>, name: &str) -> Document {
-    let deadline = Instant::now() + Duration::from_secs(60 * 5);
-    while Instant::now() < deadline {
-        for def in list_search_indexes(coll).await.into_iter().flatten() {
-            if def.get_str("name").is_ok_and(|n| n == name)
-                && def.get_bool("queryable").unwrap_or(false)
-            {
-                return def;
-            }
-        }
-        tokio::time::sleep(Duration::from_secs(5)).await;
-    }
-    panic!("search index creation timed out");
-}
-
 // SearchIndex Case 7: Driver can successfully handle search index types when creating indexes
 #[tokio::test]
 async fn search_index_create_with_type() {
@@ -305,37 +232,47 @@ async fn search_index_create_with_type() {
     db.create_collection(&coll_name).await.unwrap();
     let coll0 = db.collection::<Document>(&coll_name);
 
-    let name = coll0
+    let name_implicit = "test-search-index-case7-implicit";
+    let name_explicit = "test-search-index-case7-explicit";
+    let name_vector = "test-search-index-case7-vector";
+
+    let created_name = coll0
         .create_search_index(
             SearchIndexModel::builder()
-                .name(String::from("test-search-index-case7-implicit"))
+                .name(name_implicit.to_string())
                 .definition(doc! { "mappings": { "dynamic": false } })
                 .build(),
         )
         .await
         .unwrap();
-    assert_eq!(name, "test-search-index-case7-implicit");
-    let index1 = wait_for_index(&coll0, &name).await;
-    assert_eq!(index1.get_str("type").unwrap(), "search");
+    assert_eq!(created_name, name_implicit);
 
-    let name = coll0
+    let index = wait_for_search_index(&coll0, |index| name_matches(index, name_implicit))
+        .await
+        .unwrap();
+    assert_eq!(index.get_str("type").unwrap(), "search");
+
+    let created_name = coll0
         .create_search_index(
             SearchIndexModel::builder()
-                .name(String::from("test-search-index-case7-explicit"))
+                .name(name_explicit.to_string())
                 .index_type(SearchIndexType::Search)
                 .definition(doc! { "mappings": { "dynamic": false } })
                 .build(),
         )
         .await
         .unwrap();
-    assert_eq!(name, "test-search-index-case7-explicit");
-    let index2 = wait_for_index(&coll0, &name).await;
-    assert_eq!(index2.get_str("type").unwrap(), "search");
+    assert_eq!(created_name, name_explicit);
 
-    let name = coll0
+    let index = wait_for_search_index(&coll0, |index| name_matches(index, name_explicit))
+        .await
+        .unwrap();
+    assert_eq!(index.get_str("type").unwrap(), "search");
+
+    let created_name = coll0
         .create_search_index(
             SearchIndexModel::builder()
-                .name(String::from("test-search-index-case7-vector"))
+                .name(name_vector.to_string())
                 .index_type(SearchIndexType::VectorSearch)
                 .definition(doc! {
                     "fields": [{
@@ -349,9 +286,12 @@ async fn search_index_create_with_type() {
         )
         .await
         .unwrap();
-    assert_eq!(name, "test-search-index-case7-vector");
-    let index3 = wait_for_index(&coll0, &name).await;
-    assert_eq!(index3.get_str("type").unwrap(), "vectorSearch");
+    assert_eq!(created_name, name_vector);
+
+    let index = wait_for_search_index(&coll0, |index| name_matches(index, name_vector))
+        .await
+        .unwrap();
+    assert_eq!(index.get_str("type").unwrap(), "vectorSearch");
 }
 
 // SearchIndex Case 8: Driver requires explicit type to create a vector search index
