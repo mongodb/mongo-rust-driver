@@ -27,12 +27,18 @@ async fn wait_for_match<T>(
         .await;
         let found = match result {
             Ok(indexes) => filter(indexes),
-            Err(e) if e.code() == Some(125) => None,
+            Err(e)
+                if e.message().is_some_and(|m| {
+                    m.contains("Error connecting to Search Index Management service")
+                }) =>
+            {
+                None
+            }
             Err(e) => return Err(e),
         };
         if let Some(found) = found {
             return Ok(found);
-        } else if iterations > ITERATIONS_ALLOWED {
+        } else if iterations >= ITERATIONS_ALLOWED {
             return Err(Error::internal("timed out waiting for list search indexes"));
         } else {
             iterations += 1;
