@@ -34,8 +34,7 @@ async fn search_index_create_list() {
     assert_eq!(name, "test-search-index");
 
     let found = 'outer: loop {
-        let mut cursor = coll0.list_search_indexes().await.unwrap();
-        while let Some(d) = cursor.try_next().await.unwrap() {
+        for d in list_search_indexes(&coll0).await.into_iter().flatten() {
             if d.get_str("name").is_ok_and(|n| n == "test-search-index")
                 && d.get_bool("queryable").unwrap_or(false)
             {
@@ -84,8 +83,7 @@ async fn search_index_create_multiple() {
     let mut index1 = None;
     let mut index2 = None;
     loop {
-        let mut cursor = coll0.list_search_indexes().await.unwrap();
-        while let Some(d) = cursor.try_next().await.unwrap() {
+        for d in list_search_indexes(&coll0).await.into_iter().flatten() {
             if d.get_str("name").is_ok_and(|n| n == "test-search-index-1")
                 && d.get_bool("queryable").unwrap_or(false)
             {
@@ -139,8 +137,7 @@ async fn search_index_drop() {
     assert_eq!(name, "test-search-index");
 
     'outer: loop {
-        let mut cursor = coll0.list_search_indexes().await.unwrap();
-        while let Some(d) = cursor.try_next().await.unwrap() {
+        for d in list_search_indexes(&coll0).await.into_iter().flatten() {
             if d.get_str("name").is_ok_and(|n| n == "test-search-index")
                 && d.get_bool("queryable").unwrap_or(false)
             {
@@ -156,8 +153,10 @@ async fn search_index_drop() {
     coll0.drop_search_index("test-search-index").await.unwrap();
 
     loop {
-        let cursor = coll0.list_search_indexes().await.unwrap();
-        if !cursor.has_next() {
+        if list_search_indexes(&coll0)
+            .await
+            .is_some_and(|indexes| indexes.is_empty())
+        {
             break;
         }
         tokio::time::sleep(Duration::from_secs(5)).await;
@@ -191,8 +190,7 @@ async fn search_index_update() {
     assert_eq!(name, "test-search-index");
 
     'outer: loop {
-        let mut cursor = coll0.list_search_indexes().await.unwrap();
-        while let Some(d) = cursor.try_next().await.unwrap() {
+        for d in list_search_indexes(&coll0).await.into_iter().flatten() {
             if d.get_str("name").is_ok_and(|n| n == "test-search-index")
                 && d.get_bool("queryable").unwrap_or(false)
             {
@@ -214,8 +212,7 @@ async fn search_index_update() {
         .unwrap();
 
     let found = 'find: loop {
-        let mut cursor = coll0.list_search_indexes().await.unwrap();
-        while let Some(d) = cursor.try_next().await.unwrap() {
+        for d in list_search_indexes(&coll0).await.into_iter().flatten() {
             if d.get_str("name").is_ok_and(|n| n == "test-search-index")
                 && d.get_bool("queryable").unwrap_or(false)
                 && d.get_str("status").is_ok_and(|s| s == "READY")
@@ -247,11 +244,47 @@ async fn search_index_drop_not_found() {
     coll0.drop_search_index("test-search-index").await.unwrap();
 }
 
+async fn wait_for_search_indexes(
+    coll: &Collection<Document>,
+    condition: impl Fn(<Vec<Document>) -> bool,
+) -> Vec<Document> {
+    loop {
+        let result = async {
+            coll.list_search_indexes()
+                .await?
+                .try_collect::<Vec<_>>()
+                .await
+        }
+        .await;
+            Ok(indexes) => ,
+            Err(e)
+        };
+    }
+}
+
+/// Lists the search indexes on `coll`, returning `None` if the server could not reach the Search
+/// Index Management service. Atlas intermittently returns this error while an index is being
+/// built, so polling loops should retry rather than fail.
+async fn list_search_indexes(coll: &Collection<Document>) -> Option<Vec<Document>> {
+    let result = async { coll.list_search_indexes().await?.try_collect().await }.await;
+    match result {
+        Ok(indexes) => Some(indexes),
+        Err(e)
+            if e.code() == Some(125)
+                && e.to_string()
+                    .contains("Error connecting to Search Index Management service") =>
+        {
+            eprintln!("transient error listing search indexes, retrying: {e}");
+            None
+        }
+        Err(e) => panic!("listing search indexes failed: {e}"),
+    }
+}
+
 async fn wait_for_index(coll: &Collection<Document>, name: &str) -> Document {
     let deadline = Instant::now() + Duration::from_secs(60 * 5);
     while Instant::now() < deadline {
-        let mut cursor = coll.list_search_indexes().name(name).await.unwrap();
-        while let Some(def) = cursor.try_next().await.unwrap() {
+        for def in list_search_indexes(coll).await.into_iter().flatten() {
             if def.get_str("name").is_ok_and(|n| n == name)
                 && def.get_bool("queryable").unwrap_or(false)
             {
