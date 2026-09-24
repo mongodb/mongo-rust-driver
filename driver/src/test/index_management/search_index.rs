@@ -57,9 +57,9 @@ async fn wait_for_search_index(
 
 async fn wait_for_search_indexes(
     coll: &Collection<Document>,
-    condition: impl Fn(&Vec<Document>) -> bool,
+    filter: impl Fn(&Vec<Document>) -> bool,
 ) -> Result<Vec<Document>> {
-    wait_for_match(coll, |indexes| condition(&indexes).then_some(indexes)).await
+    wait_for_match(coll, |indexes| filter(&indexes).then_some(indexes)).await
 }
 
 fn name_matches(index: &Document, name: &str) -> bool {
