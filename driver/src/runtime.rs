@@ -14,7 +14,6 @@ pub(crate) mod process;
 #[cfg(feature = "dns-resolver")]
 mod resolver;
 pub(crate) mod stream;
-mod sync_read_ext;
 #[cfg(feature = "openssl-tls")]
 mod tls_openssl;
 #[cfg(any(feature = "rustls-tls", feature = "rustls-tls-aws-lc"))]
@@ -30,7 +29,6 @@ pub(crate) use self::{
     acknowledged_message::{AcknowledgedMessage, AcknowledgmentReceiver, AcknowledgmentSender},
     join_handle::AsyncJoinHandle,
     stream::AsyncStream,
-    sync_read_ext::SyncLittleEndianRead,
     worker_handle::{WorkerHandle, WorkerHandleListener},
 };
 use crate::{error::Result, options::ServerAddress};
