@@ -1,10 +1,7 @@
-use std::{
-    collections::HashSet,
-    convert::TryFrom,
-    io::{Read, Write},
-};
+use std::{collections::HashSet, convert::TryFrom, io::Write};
 
 use serde::Serialize;
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 #[cfg(feature = "bson-3")]
 use crate::bson_compat::RawBsonRefExt as _;
@@ -23,7 +20,6 @@ use crate::{
     checked::Checked,
     cmap::Command,
     error::{Error, ErrorKind, Result},
-    runtime::SyncLittleEndianRead,
 };
 
 /// Coerce numeric types into an `i64` if it would be lossless to do so. If this Bson is not numeric
@@ -208,15 +204,16 @@ fn num_decimal_digits(mut n: usize) -> usize {
 }
 
 /// Read a document's raw BSON bytes from the provided reader.
-pub(crate) fn read_document_bytes<R: Read>(mut reader: R) -> Result<Vec<u8>> {
-    let length = Checked::new(reader.read_i32_sync()?);
+pub(crate) async fn read_document_bytes<R: AsyncRead + Unpin>(mut reader: R) -> Result<Vec<u8>> {
+    let length = Checked::new(reader.read_i32_le().await?);
 
     let mut bytes = Vec::with_capacity(length.try_into()?);
     bytes.write_all(&length.try_into::<u32>()?.to_le_bytes())?;
 
     reader
         .take((length - 4).try_into()?)
-        .read_to_end(&mut bytes)?;
+        .read_to_end(&mut bytes)
+        .await?;
 
     Ok(bytes)
 }
