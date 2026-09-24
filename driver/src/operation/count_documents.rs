@@ -4,13 +4,22 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Document},
+    bson_compat::CStr,
     cmap::RawCommandResponse,
     error::{Error, ErrorKind, Result},
-    operation::{aggregate::Aggregate, OperationImpl, Wrapped, WrappedOperation},
+    operation::{
+        aggregate::Aggregate,
+        default_impl,
+        forward_impl,
+        ExecutionContext,
+        Operation,
+        OperationDetails,
+        ResponseHandlingKind,
+        Retryability,
+        SingleCursorResult,
+    },
     options::{AggregateOptions, ClientOptions, CountOptions},
 };
-
-use super::{ExecutionContext, Retryability, SingleCursorResult};
 
 pub(crate) struct CountDocuments {
     aggregate: Aggregate,
@@ -72,46 +81,42 @@ impl CountDocuments {
     }
 }
 
-impl WrappedOperation for CountDocuments {
-    type Wrapped = Aggregate;
+impl Operation for CountDocuments {
     type O = u64;
-    const ZERO_COPY: bool = false;
 
-    fn wrapped(&self) -> &Self::Wrapped {
-        &self.aggregate
-    }
+    const NAME: &'static CStr = Aggregate::NAME;
 
-    fn wrapped_mut(&mut self) -> &mut Self::Wrapped {
-        &mut self.aggregate
+    forward_impl!(
+        aggregate,
+        name,
+        build,
+        extract_at_cluster_time,
+        update_for_retry,
+        pinned_connection
+    );
+
+    default_impl!(handle_error);
+
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            retryability: Retryability::read(options),
+            is_backpressure_retryable: options.retry_reads != Some(false),
+            ..self.aggregate.details(options)
+        }
     }
 
     fn handle_response<'a>(
         &'a self,
-        response: std::borrow::Cow<'a, RawCommandResponse>,
+        response: &'a RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> crate::BoxFuture<'a, Result<Self::O>> {
-        use futures_util::FutureExt;
-        async move {
-            let response: SingleCursorResult<Body> = response.body()?;
-            Ok(response.0.map(|r| r.n).unwrap_or(0))
-        }
-        .boxed()
-    }
-
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        Retryability::read(options)
-    }
-
-    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
-        options.retry_reads != Some(false)
+    ) -> Result<Self::O> {
+        let response: SingleCursorResult<Body> = response.body()?;
+        Ok(response.0.map(|r| r.n).unwrap_or(0))
     }
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for CountDocuments {
-    type Kind = Wrapped;
 }
 
 #[cfg(feature = "opentelemetry")]

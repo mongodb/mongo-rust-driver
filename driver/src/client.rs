@@ -471,7 +471,11 @@ impl Client {
         criteria: Option<&SelectionCriteria>,
     ) -> Result<ServerAddress> {
         let (server, _) = self
-            .select_server(criteria, None, OpSelectionInfo::new("Test select server"))
+            .select_server(
+                criteria,
+                None,
+                OpSelectionInfo::new("Test select server", None),
+            )
             .await?;
         Ok(server.address.clone())
     }
@@ -750,20 +754,11 @@ pub(crate) struct OpSelectionInfo<'a> {
     override_criteria: OverrideCriteriaFn,
 }
 
-impl<'a, T: crate::operation::Operation> From<&'a T> for OpSelectionInfo<'a> {
-    fn from(op: &'a T) -> Self {
-        Self {
-            name: crate::bson_compat::cstr_to_str(op.name()),
-            override_criteria: op.override_criteria(),
-        }
-    }
-}
-
 impl<'a> OpSelectionInfo<'a> {
-    fn new(name: &'a str) -> Self {
+    fn new(name: &'a str, override_criteria: Option<OverrideCriteriaFn>) -> Self {
         Self {
             name,
-            override_criteria: |_, _| None,
+            override_criteria: override_criteria.unwrap_or_else(|| |_, _| None),
         }
     }
 }

@@ -8,8 +8,16 @@ use crate::{
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{Base, BaseOperation, OperationImpl, Retryability},
-    options::{ClientOptions, UpdateModifications, UpdateOptions, WriteConcern},
+    operation::{
+        default_impl,
+        to_feature,
+        Feature,
+        Operation,
+        OperationDetails,
+        ResponseHandlingKind,
+        Retryability,
+    },
+    options::{ClientOptions, UpdateModifications, UpdateOptions},
     results::UpdateResult,
     Collection,
 };
@@ -94,12 +102,43 @@ impl Update {
     }
 }
 
-impl BaseOperation for Update {
+impl Operation for Update {
     type O = UpdateResult;
 
     const NAME: &'static CStr = cstr!("update");
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        handle_error,
+        update_for_retry,
+        pinned_connection
+    );
+
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: Feature::NotSupported,
+            read_concern: Feature::NotSupported,
+            write_concern: to_feature!(self.options, write_concern),
+            supports_sessions: true,
+            retryability: if self.multi != Some(true) {
+                Retryability::write(options)
+            } else {
+                Retryability::None
+            },
+            is_backpressure_retryable: options.retry_writes != Some(false),
+            override_criteria: None,
+            target: (&self.target).into(),
+            is_after_cluster_time_write: true,
+        }
+    }
+
+    fn build(
+        &mut self,
+        _description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.target.name(),
         };
@@ -158,7 +197,11 @@ impl BaseOperation for Update {
         body.append(cstr!("updates"), updates);
         body.append(cstr!("ordered"), true); // command monitoring tests expect this (SPEC-1130)
 
-        Ok(Command::from_operation(self, body))
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
+            body,
+        ))
     }
 
     fn handle_response<'a>(
@@ -186,35 +229,8 @@ impl BaseOperation for Update {
         })
     }
 
-    fn write_concern(&self) -> super::Feature<&WriteConcern> {
-        self.options
-            .as_ref()
-            .and_then(|opts| opts.write_concern.as_ref())
-            .into()
-    }
-
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        if self.multi != Some(true) {
-            Retryability::write(options)
-        } else {
-            Retryability::None
-        }
-    }
-
-    fn is_backpressure_retryable(&self, options: &crate::options::ClientOptions) -> bool {
-        options.retry_writes != Some(false)
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        (&self.target).into()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for Update {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

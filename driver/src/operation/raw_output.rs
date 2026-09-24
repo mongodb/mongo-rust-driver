@@ -1,50 +1,60 @@
-use futures_util::FutureExt;
-
 use crate::{
+    bson_compat::CStr,
     cmap::RawCommandResponse,
     error::Result,
-    operation::{OperationImpl, Wrapped, WrappedOperation},
-    BoxFuture,
+    operation::{
+        default_impl,
+        forward_impl,
+        ExecutionContext,
+        Operation,
+        OperationDetails,
+        ResponseHandlingKind,
+    },
+    options::ClientOptions,
 };
-
-use super::{ExecutionContext, Operation};
 
 /// Forwards all implementation to the wrapped `Operation`, but returns the response unparsed and
 /// unvalidated as a `RawCommandResponse`.
 #[derive(Clone)]
 pub(crate) struct RawOutput<Op>(pub(crate) Op);
 
-impl<Op: Operation + Sync + Send> WrappedOperation for RawOutput<Op> {
-    type Wrapped = Op;
+impl<Op: Operation> Operation for RawOutput<Op> {
     type O = RawCommandResponse;
-    const ZERO_COPY: bool = true;
 
-    fn wrapped(&self) -> &Self::Wrapped {
-        &self.0
+    const NAME: &'static CStr = Op::NAME;
+
+    forward_impl!(
+        0,
+        name,
+        build,
+        extract_at_cluster_time,
+        update_for_retry,
+        pinned_connection
+    );
+
+    default_impl!(handle_error);
+
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Owned,
+            ..self.0.details(options)
+        }
     }
 
-    fn wrapped_mut(&mut self) -> &mut Self::Wrapped {
-        &mut self.0
-    }
-
-    fn handle_response<'a>(
+    fn handle_response_owned<'a>(
         &'a self,
-        response: std::borrow::Cow<'a, RawCommandResponse>,
+        response: RawCommandResponse,
         _context: ExecutionContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>> {
-        async move { Ok(response.into_owned()) }.boxed()
+    ) -> Result<Self::O> {
+        Ok(response)
     }
 
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
 }
 
-impl<Op> OperationImpl for RawOutput<Op> {
-    type Kind = Wrapped;
-}
-
 #[cfg(feature = "opentelemetry")]
-impl<Op: Operation + Sync + Send> crate::otel::OtelInfo for RawOutput<Op> {
+impl<Op: Operation> crate::otel::OtelInfo for RawOutput<Op> {
     fn log_name(&self) -> &str {
         self.0.otel().log_name()
     }
