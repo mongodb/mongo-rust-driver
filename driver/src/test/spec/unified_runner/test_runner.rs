@@ -67,7 +67,7 @@ const SKIPPED_OPERATIONS: &[&str] = &[
 ];
 
 static MIN_SPEC_VERSION: Version = Version::new(1, 0, 0);
-static MAX_SPEC_VERSION: Version = Version::new(1, 28, 0);
+static MAX_SPEC_VERSION: Version = Version::new(1, 29, 0);
 
 pub(crate) type EntityMap = HashMap<String, Entity>;
 

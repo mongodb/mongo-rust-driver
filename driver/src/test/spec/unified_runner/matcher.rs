@@ -571,6 +571,18 @@ fn special_operator_matches(
             }
             Ok(())
         }
+        "$$gte" => {
+            let Some(expected) = get_double(value) else {
+                return Err(format!("expected number for comparison, got {value}"));
+            };
+            let Some(actual) = actual.and_then(get_double) else {
+                return Err(format!("expected actual to be a number, got {actual:?}"));
+            };
+            if actual < expected {
+                return Err(format!("expected actual to be >= {expected}, got {actual}"));
+            }
+            Ok(())
+        }
         other => panic!("unknown special operator: {other}"),
     }
 }
