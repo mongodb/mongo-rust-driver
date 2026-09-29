@@ -349,7 +349,7 @@ impl Client {
             .execute_operation_with_details_inner(op, context)
             .with_span(&span)
             .await;
-        span.record_error(&result);
+        span.record_operation_result::<T>(&result);
 
         result
     }
