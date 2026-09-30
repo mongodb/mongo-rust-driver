@@ -189,6 +189,10 @@ functions:
           - stop
 
   "bootstrap mongo-orchestration":
+    - command: ec2.assume_role
+      type: setup
+      params:
+        role_arn: ${aws_test_secrets_role}
     - command: subprocess.exec
       type: setup
       params:
@@ -205,6 +209,9 @@ functions:
           - MONGODB_VERSION
           - ORCHESTRATION_FILE
           - MONGODB_BINARIES
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
     - command: expansions.update
       params:
         file: mo-expansion.yml
