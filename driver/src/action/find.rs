@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use crate::{
+    action::ActionSession,
     bson::{Bson, Document},
-    client::executor::ExecutionContext,
 };
 use serde::de::DeserializeOwned;
 
@@ -113,6 +113,16 @@ impl<'a, T: Send + Sync, Session> Find<'a, T, Session> {
     }
 }
 
+impl<'a, T: Send + Sync, S: ActionSession<'a>> Find<'a, T, S> {
+    async fn exec_generic<C: crate::cursor::NewCursor>(self) -> Result<C> {
+        let mut find = Op::new(self.coll.clone_with_type(), self.filter, self.options);
+        self.coll
+            .client()
+            .execute_cursor_operation(&mut find, &mut self.session.into_exec_context())
+            .await
+    }
+}
+
 #[action_impl(sync = crate::sync::Cursor<T>)]
 impl<'a, T: Send + Sync> Action for Find<'a, T, ImplicitSession> {
     type Future = FindFuture;
@@ -123,14 +133,6 @@ impl<'a, T: Send + Sync> Action for Find<'a, T, ImplicitSession> {
 }
 
 impl<'a, T: Send + Sync> Find<'a, T, ImplicitSession> {
-    async fn exec_generic<C: crate::cursor::NewCursor>(self) -> Result<C> {
-        let mut find = Op::new(self.coll.clone_with_type(), self.filter, self.options);
-        self.coll
-            .client()
-            .execute_cursor_operation(&mut find, &mut ExecutionContext::none())
-            .await
-    }
-
     /// Execute the find command, returning a cursor that provides results in zero-copy raw batches.
     pub async fn batch(self) -> Result<crate::raw_batch_cursor::RawBatchCursor> {
         self.exec_generic().await
@@ -147,17 +149,6 @@ impl<'a, T: Send + Sync> Action for Find<'a, T, ExplicitSession<'a>> {
 }
 
 impl<'a, T: Send + Sync> Find<'a, T, ExplicitSession<'a>> {
-    async fn exec_generic<C: crate::cursor::NewCursor>(self) -> Result<C> {
-        let mut find = Op::new(self.coll.clone_with_type(), self.filter, self.options);
-        self.coll
-            .client()
-            .execute_cursor_operation(
-                &mut find,
-                &mut ExecutionContext::explicit(Some(self.session.0)),
-            )
-            .await
-    }
-
     /// Execute the find command, returning a cursor that provides results in zero-copy raw batches.
     pub async fn batch(self) -> Result<crate::raw_batch_cursor::SessionRawBatchCursor> {
         self.exec_generic().await

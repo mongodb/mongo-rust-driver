@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, time::Duration};
 
-use crate::{action::ActionSession, bson::Bson, client::executor::ExecutionContext};
+use crate::{action::ActionSession, bson::Bson};
 use futures_util::stream::TryStreamExt;
 
 use crate::{
@@ -104,10 +104,7 @@ impl<'a, Session: ActionSession<'a>> ListIndexes<'a, ListSpecifications, Session
         let mut op = Op::new(self.coll.clone(), self.options);
         self.coll
             .client()
-            .execute_cursor_operation(
-                &mut op,
-                &mut ExecutionContext::explicit(self.session.into_opt_session()),
-            )
+            .execute_cursor_operation(&mut op, &mut self.session.into_exec_context())
             .await
     }
 }
@@ -164,10 +161,7 @@ impl<'a> Action for ListIndexes<'a, ListSpecifications, ExplicitSession<'a>> {
         let mut op = Op::new(self.coll.clone(), self.options);
         self.coll
             .client()
-            .execute_cursor_operation(
-                &mut op,
-                &mut ExecutionContext::explicit(Some(self.session.0)),
-            )
+            .execute_cursor_operation(&mut op, &mut self.session.into_exec_context())
             .await
     }
 }
@@ -178,7 +172,7 @@ impl<'a> Action for ListIndexes<'a, ListNames, ImplicitSession> {
 
     async fn execute(self) -> Result<Vec<String>> {
         let mut op = Op::new(self.coll.clone(), self.options);
-        let mut context = ExecutionContext::none();
+        let mut context = self.session.into_exec_context();
         let cursor: Cursor<IndexModel> = self
             .coll
             .client()
@@ -197,9 +191,9 @@ impl<'a> Action for ListIndexes<'a, ListNames, ImplicitSession> {
 impl<'a> Action for ListIndexes<'a, ListNames, ExplicitSession<'a>> {
     type Future = ListIndexNamesSessionFuture;
 
-    async fn execute(self) -> Result<Vec<String>> {
+    async fn execute(mut self) -> Result<Vec<String>> {
         let mut op = Op::new(self.coll.clone(), self.options);
-        let mut context = ExecutionContext::explicit(Some(self.session.0));
+        let mut context = self.session.as_exec_context();
         let mut cursor: SessionCursor<IndexModel> = self
             .coll
             .client()

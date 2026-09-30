@@ -177,14 +177,6 @@ impl<'a> ExecutionContext<'a> {
         }
     }
 
-    pub(crate) fn none() -> Self {
-        Self {
-            session: ExecutionSession::None,
-            #[cfg(feature = "opentelemetry")]
-            span: None,
-        }
-    }
-
     fn take_implicit(&mut self) -> Option<ClientSession> {
         match std::mem::replace(&mut self.session, ExecutionSession::None) {
             ExecutionSession::Implicit(s) => Some(*s),
@@ -219,16 +211,14 @@ impl Client {
     pub(crate) async fn execute_cursor_operation<Op, C>(
         &self,
         op: &mut Op,
-        mut context: &mut ExecutionContext<'_>,
+        context: &mut ExecutionContext<'_>,
     ) -> Result<C>
     where
         Op: Operation<O = CursorSpecification>,
         C: crate::cursor::NewCursor,
     {
         Box::pin(async {
-            let mut details = self
-                .execute_operation_with_details(op, &mut context)
-                .await?;
+            let mut details = self.execute_operation_with_details(op, context).await?;
             let pinned = self.pin_connection_for_cursor(
                 &details.output.info,
                 &mut details.connection,

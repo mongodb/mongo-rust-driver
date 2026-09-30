@@ -3,7 +3,6 @@ use std::marker::PhantomData;
 use crate::{
     action::ActionSession,
     bson::{Bson, Document},
-    client::executor::ExecutionContext,
     cursor::NewCursor,
 };
 use futures_util::TryStreamExt;
@@ -119,10 +118,7 @@ impl<'a, S: ActionSession<'a>> ListCollections<'a, ListSpecifications, S> {
         let mut list_collections = op::ListCollections::new(self.db.clone(), false, self.options);
         self.db
             .client()
-            .execute_cursor_operation(
-                &mut list_collections,
-                &mut ExecutionContext::explicit(self.session.into_opt_session()),
-            )
+            .execute_cursor_operation(&mut list_collections, &mut self.session.into_exec_context())
             .await
     }
 }
@@ -183,10 +179,10 @@ async fn list_collection_names_common(
 impl<'a> Action for ListCollections<'a, ListNames, ImplicitSession> {
     type Future = ListCollectionNamesFuture;
 
-    async fn execute(self) -> Result<Vec<String>> {
+    async fn execute(mut self) -> Result<Vec<String>> {
         let client = self.db.client();
         let mut list_collections = op::ListCollections::new(self.db.clone(), true, self.options);
-        let mut context = ExecutionContext::none();
+        let mut context = self.session.into_exec_context();
         let cursor: Cursor<Document> = client
             .execute_cursor_operation(&mut list_collections, &mut context)
             .await?;
@@ -200,9 +196,9 @@ impl<'a> Action for ListCollections<'a, ListNames, ImplicitSession> {
 impl<'a> Action for ListCollections<'a, ListNames, ExplicitSession<'a>> {
     type Future = ListCollectionNamesSessionFuture;
 
-    async fn execute(self) -> Result<Vec<String>> {
+    async fn execute(mut self) -> Result<Vec<String>> {
         let mut list_collections = op::ListCollections::new(self.db.clone(), true, self.options);
-        let mut context = ExecutionContext::explicit(Some(&mut *self.session.0));
+        let mut context = self.session.as_exec_context();
         let mut cursor: SessionCursor<Document> = self
             .db
             .client()
