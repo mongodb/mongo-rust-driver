@@ -15,7 +15,7 @@ use crate::{
     test::spec::unified_runner::{results_match, EntityMap, TestRunner},
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ObserveTracingMessages {
     enable_command_payload: Option<bool>,
@@ -59,6 +59,16 @@ impl ClientTracing {
         }
         (Self { exporter, provider }, options)
     }
+
+    /// Parent ID -> [Span].  Root spans are parented by `SpanId::INVALID`.
+    pub(crate) fn get_spans(&self) -> HashMap<SpanId, Vec<SpanData>> {
+        self.provider.force_flush().unwrap();
+        let mut spans = HashMap::<SpanId, Vec<SpanData>>::new();
+        for span in self.exporter.get_finished_spans().unwrap() {
+            spans.entry(span.parent_span_id).or_default().push(span);
+        }
+        spans
+    }
 }
 
 impl TestRunner {
@@ -67,35 +77,22 @@ impl TestRunner {
         expected: &ExpectedTracingMessages,
     ) -> Result<(), String> {
         let client_tracing = self.get_client(&expected.client).await.tracing.unwrap();
-        client_tracing.provider.force_flush().unwrap();
-        let mut root_spans = vec![];
-        let mut nested_spans = HashMap::<SpanId, Vec<SpanData>>::new();
-        for span in client_tracing.exporter.get_finished_spans().unwrap() {
-            if span.parent_span_id == SpanId::INVALID {
-                root_spans.push(span);
-            } else {
-                nested_spans
-                    .entry(span.parent_span_id)
-                    .or_default()
-                    .push(span);
-            }
-        }
-        let (root_spans, nested_spans) = (root_spans, nested_spans);
+        let spans = client_tracing.get_spans();
 
         let entities = self.entities.read().await;
         Matcher {
-            nested: &nested_spans,
+            spans: &spans,
             entities: &entities,
             ignore_extra: expected.ignore_extra_spans.unwrap_or(false),
         }
-        .match_span_slice(&root_spans, &expected.spans)?;
+        .match_span_slice(spans.get(&SpanId::INVALID).unwrap(), &expected.spans)?;
 
         Ok(())
     }
 }
 
 struct Matcher<'a> {
-    nested: &'a HashMap<SpanId, Vec<SpanData>>,
+    spans: &'a HashMap<SpanId, Vec<SpanData>>,
     entities: &'a EntityMap,
     ignore_extra: bool,
 }
@@ -190,7 +187,7 @@ impl<'a> Matcher<'a> {
         }
 
         let actual_nested = self
-            .nested
+            .spans
             .get(&actual.span_context.span_id())
             .map(|v| v.as_slice())
             .unwrap_or(&[]);
