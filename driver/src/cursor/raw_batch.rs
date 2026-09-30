@@ -336,6 +336,11 @@ impl RawBatchCursor {
     pub(crate) fn set_span(&mut self, span: Option<crate::otel::OpSpan>) {
         self.state.span = span;
     }
+
+    #[cfg(all(test, feature = "opentelemetry"))]
+    pub(crate) fn id(&self) -> i64 {
+        self.state.info.id
+    }
 }
 
 impl Stream for RawBatchCursor {
