@@ -10,7 +10,7 @@ use crate::{
     SearchIndexModel,
 };
 
-use super::{Base, BaseOperation, ResponseContext, OperationImpl};
+use super::{Base, BaseOperation, OperationImpl, ResponseContext};
 
 #[derive(Debug)]
 pub(crate) struct CreateSearchIndexes {

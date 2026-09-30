@@ -7,7 +7,7 @@ use crate::{
     BoxFuture,
 };
 
-use super::{ResponseContext, Operation};
+use super::{Operation, ResponseContext};
 
 /// Forwards all implementation to the wrapped `Operation`, but returns the response unparsed and
 /// unvalidated as a `RawCommandResponse`.

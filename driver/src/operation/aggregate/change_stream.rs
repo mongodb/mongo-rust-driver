@@ -9,9 +9,9 @@ use crate::{
     error::Result,
     operation::{
         append_options,
-        ResponseContext,
         Operation,
         OperationImpl,
+        ResponseContext,
         Wrapped,
         WrappedOperation,
     },
