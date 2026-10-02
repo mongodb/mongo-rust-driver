@@ -93,7 +93,7 @@ impl Operation for ChangeStreamAggregate {
                     .start_at_operation_time
                     .as_ref()
                     .or(data.initial_operation_time.as_ref());
-                if saved_time.is_some() && description.max_wire_version.is_some_and(|v| v >= 7) {
+                if saved_time.is_some() {
                     new_opts.start_at_operation_time = saved_time.cloned();
                 }
             }

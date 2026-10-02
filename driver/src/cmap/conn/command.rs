@@ -120,7 +120,7 @@ impl Command {
         }
         .cloned();
         Self {
-            name: crate::bson_compat::cstr_to_str(&op_name).to_owned(),
+            name: crate::bson_compat::cstr_to_str(op_name).to_owned(),
             target_db: target.db_name().to_owned(),
             exhaust_allowed: false,
             body,

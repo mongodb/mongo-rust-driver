@@ -424,7 +424,7 @@ impl Client {
     async fn execute_operation_with_retry<T: Operation>(
         &self,
         op: &mut T,
-        op_details: OperationDetails,
+        mut op_details: OperationDetails,
         selection_criteria: Option<SelectionCriteria>,
         session: &mut ExecutionSession<'_>,
     ) -> Result<ExecutionDetails<T>> {
@@ -439,6 +439,7 @@ impl Client {
                 }
                 Some(ref retry) => {
                     op.update_for_retry(Some(retry));
+                    op_details = op.details(self.options());
                     if retry.overloaded {
                         let backoff = retry.calculate_backoff(
                             #[cfg(test)]
@@ -460,7 +461,7 @@ impl Client {
                     selection_criteria,
                     retry.as_ref().map(|r| &r.deprioritized_servers),
                     OpSelectionInfo::new(
-                        crate::bson_compat::cstr_to_str(&op.name()),
+                        crate::bson_compat::cstr_to_str(op.name()),
                         op_details.override_criteria,
                     ),
                 )
@@ -590,6 +591,7 @@ impl Client {
     }
 
     /// Executes an operation on a given connection, optionally using a provided session.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn execute_operation_on_connection<Op: Operation>(
         &self,
         op: &mut Op,

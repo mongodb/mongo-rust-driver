@@ -150,11 +150,12 @@ where
                             None,
                             None,
                         );
+                        let run_command_details = run_command.details(self.client.options());
                         let _ = self
                             .client
                             .execute_operation_on_connection(
                                 &mut run_command,
-                                &get_more_details,
+                                &run_command_details,
                                 context.connection,
                                 &mut context.session,
                                 txn_number,

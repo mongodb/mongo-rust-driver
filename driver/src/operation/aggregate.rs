@@ -74,9 +74,9 @@ impl Operation for Aggregate {
                     .flatten()
                     .is_some_and(|mwv| mwv < SERVER_5_0_0_WIRE_VERSION)
             }) {
-                return Some(SelectionCriteria::primary());
+                Some(SelectionCriteria::primary())
             } else {
-                return None;
+                None
             }
         };
 

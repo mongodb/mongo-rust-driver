@@ -758,7 +758,7 @@ impl<'a> OpSelectionInfo<'a> {
     fn new(name: &'a str, override_criteria: Option<OverrideCriteriaFn>) -> Self {
         Self {
             name,
-            override_criteria: override_criteria.unwrap_or_else(|| |_, _| None),
+            override_criteria: override_criteria.unwrap_or(|_, _| None),
         }
     }
 }
