@@ -9,7 +9,7 @@ use crate::{
     Collection,
 };
 
-use super::{append_options_to_raw_document, ExecutionContext};
+use super::{append_options_to_raw_document, ResponseContext};
 
 #[derive(Debug)]
 pub(crate) struct Find {
@@ -91,7 +91,7 @@ impl BaseOperation for Find {
     fn handle_response_cow<'a>(
         &'a self,
         response: std::borrow::Cow<'a, RawCommandResponse>,
-        context: ExecutionContext<'a>,
+        context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         CursorSpecification::new(
             response.into_owned(),

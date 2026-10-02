@@ -12,7 +12,7 @@ use crate::{
     Database,
 };
 
-use super::{BaseOperation, ExecutionContext};
+use super::{BaseOperation, ResponseContext};
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCommand<'conn> {
@@ -77,7 +77,7 @@ impl BaseOperation for RunCommand<'_> {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         Ok(response.raw_body().try_into()?)
     }

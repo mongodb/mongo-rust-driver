@@ -23,6 +23,7 @@ use super::{
     export_doc,
     option_setters,
     options_doc,
+    ActionSession,
     CollRef,
     ExplicitSession,
     ImplicitSession,
@@ -116,7 +117,7 @@ pub struct Aggregate<'a, Session = ImplicitSession, T = Document> {
     pipeline: Vec<Document>,
     options: Option<AggregateOptions>,
     session: Session,
-    _phantom: PhantomData<fn() -> T>,
+    _phantom: PhantomData<fn() -> &'a T>,
 }
 
 impl<'a> Aggregate<'a> {
@@ -167,16 +168,19 @@ impl<'a, Session, T> Aggregate<'a, Session, T> {
     }
 }
 
-macro_rules! agg_exec_generic {
-    ($agg:expr) => {{
+impl<'a, T, S: ActionSession<'a>> Aggregate<'a, S, T> {
+    async fn exec_generic<C: crate::cursor::NewCursor>(self) -> Result<C> {
         let mut aggregate = crate::operation::aggregate::Aggregate::new(
-            (&$agg.target).into(),
-            $agg.pipeline,
-            $agg.options,
+            (&self.target).into(),
+            self.pipeline,
+            self.options,
         );
-        let client = $agg.target.client();
-        client.execute_cursor_operation(&mut aggregate, None).await
-    }};
+        let client = self.target.client();
+        let session = self.session;
+        client
+            .execute_cursor_operation(&mut aggregate, &mut session.into_exec_context())
+            .await
+    }
 }
 
 impl<'a, T> Aggregate<'a, ImplicitSession, T> {
@@ -197,7 +201,7 @@ impl<'a, T> Aggregate<'a, ImplicitSession, T> {
     /// Execute the aggregate command, returning a cursor that provides results in zero-copy raw
     /// batches.
     pub async fn batch(self) -> Result<crate::raw_batch_cursor::RawBatchCursor> {
-        agg_exec_generic!(self)
+        self.exec_generic().await
     }
 }
 
@@ -206,30 +210,15 @@ impl<'a, T> Action for Aggregate<'a, ImplicitSession, T> {
     type Future = AggregateFuture;
 
     async fn execute(self) -> Result<Cursor<T>> {
-        agg_exec_generic!(self)
+        self.exec_generic().await
     }
-}
-
-macro_rules! agg_exec_generic_session {
-    ($agg:expr) => {{
-        let mut aggregate = crate::operation::aggregate::Aggregate::new(
-            (&$agg.target).into(),
-            $agg.pipeline,
-            $agg.options,
-        );
-        let client = $agg.target.client();
-        let session = $agg.session;
-        client
-            .execute_cursor_operation(&mut aggregate, Some(session.0))
-            .await
-    }};
 }
 
 impl<'a, T> Aggregate<'a, ExplicitSession<'a>, T> {
     /// Execute the aggregate command, returning a cursor that provides results in zero-copy raw
     /// batches.
     pub async fn batch(self) -> Result<crate::raw_batch_cursor::SessionRawBatchCursor> {
-        agg_exec_generic_session!(self)
+        self.exec_generic().await
     }
 }
 
@@ -238,7 +227,7 @@ impl<'a, T> Action for Aggregate<'a, ExplicitSession<'a>, T> {
     type Future = AggregateSessionFuture;
 
     async fn execute(self) -> Result<SessionCursor<T>> {
-        agg_exec_generic_session!(self)
+        self.exec_generic().await
     }
 }
 

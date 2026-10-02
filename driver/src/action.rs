@@ -32,7 +32,7 @@ mod watch;
 
 use std::{future::IntoFuture, marker::PhantomData, ops::Deref};
 
-use crate::bson::Document;
+use crate::{bson::Document, client::executor::ExecutionContext};
 
 pub use aggregate::Aggregate;
 pub use bulk_write::BulkWrite;
@@ -72,19 +72,35 @@ pub struct ImplicitSession;
 pub struct ExplicitSession<'a>(&'a mut crate::ClientSession);
 
 #[doc(hidden)]
-pub trait ActionSession<'a> {
+pub trait ActionSession<'a>: 'a {
     fn into_opt_session(self) -> Option<&'a mut crate::ClientSession>;
+    #[allow(private_interfaces)]
+    fn into_exec_context(self) -> ExecutionContext<'a>;
 }
 
 impl<'a> ActionSession<'a> for ImplicitSession {
     fn into_opt_session(self) -> Option<&'a mut crate::ClientSession> {
         None
     }
+    #[allow(private_interfaces)]
+    fn into_exec_context(self) -> ExecutionContext<'a> {
+        ExecutionContext::implicit(None)
+    }
 }
 
 impl<'a> ActionSession<'a> for ExplicitSession<'a> {
     fn into_opt_session(self) -> Option<&'a mut crate::ClientSession> {
         Some(self.0)
+    }
+    #[allow(private_interfaces)]
+    fn into_exec_context(self) -> ExecutionContext<'a> {
+        ExecutionContext::explicit(Some(self.0))
+    }
+}
+
+impl<'a> ExplicitSession<'a> {
+    fn as_exec_context<'b>(&'b mut self) -> ExecutionContext<'b> {
+        ExecutionContext::explicit(Some(self.0))
     }
 }
 

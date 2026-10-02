@@ -11,7 +11,7 @@ use crate::{
     Collection,
 };
 
-use super::{append_options_to_raw_document, ExecutionContext};
+use super::{append_options_to_raw_document, ResponseContext};
 
 pub(crate) struct Distinct {
     target: Collection<Document>,
@@ -65,7 +65,7 @@ impl BaseOperation for Distinct {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         let response: Response = response.body()?;
         Ok(response.values)

@@ -14,7 +14,7 @@ use crate::{
     Collection,
 };
 
-use super::ExecutionContext;
+use super::ResponseContext;
 
 #[derive(Clone, Debug)]
 pub(crate) enum UpdateOrReplace {
@@ -164,7 +164,7 @@ impl BaseOperation for Update {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         response.validate_single_write()?;
         let response: UpdateBody = response.body()?;

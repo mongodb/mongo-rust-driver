@@ -7,7 +7,7 @@ use crate::{
     BoxFuture,
 };
 
-use super::{ExecutionContext, Operation};
+use super::{Operation, ResponseContext};
 
 /// Forwards all implementation to the wrapped `Operation`, but returns the response unparsed and
 /// unvalidated as a `RawCommandResponse`.
@@ -30,7 +30,7 @@ impl<Op: Operation + Sync + Send> WrappedOperation for RawOutput<Op> {
     fn handle_response<'a>(
         &'a self,
         response: std::borrow::Cow<'a, RawCommandResponse>,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move { Ok(response.into_owned()) }.boxed()
     }

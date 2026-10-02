@@ -44,22 +44,18 @@ use std::{
     task::{ready, Context, Poll},
 };
 
-use crate::{
-    bson::{RawArray, RawDocument},
-    cursor::common::CursorSpecification,
-    operation::GetMore,
-};
 use futures_core::{future::BoxFuture, Future, Stream};
 #[cfg(test)]
 use tokio::sync::oneshot;
 
 use crate::{
-    bson::RawDocumentBuf,
+    bson::{RawArray, RawDocument, RawDocumentBuf},
     change_stream::event::ResumeToken,
-    client::{options::ServerAddress, AsyncDropToken},
+    client::{executor::ExecutionContext, options::ServerAddress, AsyncDropToken},
     cmap::conn::PinnedConnectionHandle,
-    cursor::common::{kill_cursor, PinnedConnection},
+    cursor::common::{kill_cursor, CursorSpecification, PinnedConnection},
     error::{Error, ErrorKind, Result},
+    operation::GetMore,
     Client,
     ClientSession,
 };
@@ -121,6 +117,8 @@ pub struct RawBatchCursor {
     state: CursorState,
     provider: GetMoreRawProvider<'static, ImplicitClientSessionHandle>,
     drop_address: Option<ServerAddress>,
+    #[cfg(feature = "opentelemetry")]
+    disable_drop_op_span: bool,
     #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
 }
@@ -141,6 +139,8 @@ struct CursorState {
     pinned_connection: PinnedConnection,
     post_batch_resume_token: Option<ResumeToken>,
     buffered_reply: Option<BufferedReply>,
+    #[cfg(feature = "opentelemetry")]
+    span: Option<crate::otel::OpSpan>,
 }
 
 impl CursorState {
@@ -151,6 +151,8 @@ impl CursorState {
             pinned_connection: PinnedConnection::new(pin),
             post_batch_resume_token: spec.post_batch_resume_token,
             buffered_reply: Some(BufferedReply::new(spec.initial_reply)),
+            #[cfg(feature = "opentelemetry")]
+            span: None,
         }
     }
 
@@ -215,11 +217,13 @@ impl CursorState {
             }
 
             // If not exhausted and the connection is valid, start a getMore and iterate.
-            if !self.exhausted && !matches!(self.pinned_connection, PinnedConnection::Invalid(_)) {
+            if !self.exhausted && !self.pinned_connection.is_invalid() {
                 provider.start_execution(
                     self.info.clone(),
                     client.clone(),
                     self.pinned_connection.handle(),
+                    #[cfg(feature = "opentelemetry")]
+                    self.span.clone(),
                 );
                 continue;
             }
@@ -276,6 +280,8 @@ impl RawBatchCursor {
             client: client.clone(),
             drop_token: client.register_async_drop(),
             drop_address: None,
+            #[cfg(feature = "opentelemetry")]
+            disable_drop_op_span: false,
             #[cfg(test)]
             kill_watcher: None,
             state: CursorState::new(spec, pin),
@@ -307,6 +313,11 @@ impl RawBatchCursor {
         self.drop_address = Some(address);
     }
 
+    #[cfg(feature = "opentelemetry")]
+    pub(crate) fn disable_drop_op_span(&mut self) {
+        self.disable_drop_op_span = true;
+    }
+
     pub(crate) fn client(&self) -> &Client {
         &self.client
     }
@@ -324,6 +335,16 @@ impl RawBatchCursor {
     pub(crate) fn take_implicit_session(&mut self) -> Option<ClientSession> {
         self.provider.take_implicit_session()
     }
+
+    #[cfg(feature = "opentelemetry")]
+    pub(crate) fn set_span(&mut self, span: Option<crate::otel::OpSpan>) {
+        self.state.span = span;
+    }
+
+    #[cfg(all(test, feature = "opentelemetry"))]
+    pub(crate) fn id(&self) -> i64 {
+        self.state.info.id
+    }
 }
 
 impl Stream for RawBatchCursor {
@@ -338,19 +359,20 @@ impl Stream for RawBatchCursor {
 
 impl Drop for RawBatchCursor {
     fn drop(&mut self) {
-        if self.is_exhausted() {
+        if self.is_exhausted() || self.state.pinned_connection.is_invalid() {
             return;
         }
-        kill_cursor(
-            self.client.clone(),
-            &mut self.drop_token,
-            &self.state.info.ns,
+        self.drop_token.spawn(kill_cursor(
+            self.client.collection(&self.state.info.ns),
             self.state.info.id,
-            self.state.pinned_connection.replicate(),
+            self.state.pinned_connection.handle().map(|h| h.replicate()),
             self.drop_address.take(),
+            #[cfg(feature = "opentelemetry")]
+            self.disable_drop_op_span
+                .then(crate::otel::OpSpan::disabled),
             #[cfg(test)]
             self.kill_watcher.take(),
-        );
+        ));
     }
 }
 
@@ -361,6 +383,8 @@ pub struct SessionRawBatchCursor {
     drop_token: AsyncDropToken,
     state: CursorState,
     drop_address: Option<ServerAddress>,
+    #[cfg(feature = "opentelemetry")]
+    disable_drop_op_span: bool,
     #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
 }
@@ -387,6 +411,8 @@ impl SessionRawBatchCursor {
             client,
             state: CursorState::new(spec, pinned),
             drop_address: None,
+            #[cfg(feature = "opentelemetry")]
+            disable_drop_op_span: false,
             #[cfg(test)]
             kill_watcher: None,
         }
@@ -412,6 +438,11 @@ impl SessionRawBatchCursor {
         self.drop_address = Some(address);
     }
 
+    #[cfg(feature = "opentelemetry")]
+    pub(crate) fn disable_drop_op_span(&mut self) {
+        self.disable_drop_op_span = true;
+    }
+
     pub(crate) fn is_exhausted(&self) -> bool {
         self.state.exhausted
     }
@@ -432,23 +463,29 @@ impl SessionRawBatchCursor {
     pub(crate) fn client(&self) -> &Client {
         &self.client
     }
+
+    #[cfg(feature = "opentelemetry")]
+    pub(crate) fn set_span(&mut self, span: Option<crate::otel::OpSpan>) {
+        self.state.span = span;
+    }
 }
 
 impl Drop for SessionRawBatchCursor {
     fn drop(&mut self) {
-        if self.is_exhausted() {
+        if self.is_exhausted() || self.state.pinned_connection.is_invalid() {
             return;
         }
-        kill_cursor(
-            self.client.clone(),
-            &mut self.drop_token,
-            &self.state.info.ns,
+        self.drop_token.spawn(kill_cursor(
+            self.client.collection(&self.state.info.ns),
             self.state.info.id,
-            self.state.pinned_connection.replicate(),
+            self.state.pinned_connection.handle().map(|h| h.replicate()),
             self.drop_address.take(),
+            #[cfg(feature = "opentelemetry")]
+            self.disable_drop_op_span
+                .then(crate::otel::OpSpan::disabled),
             #[cfg(test)]
             self.kill_watcher.take(),
-        );
+        ));
     }
 }
 
@@ -515,17 +552,23 @@ impl<'s, S: ClientSessionHandle<'s>> GetMoreRawProvider<'s, S> {
         info: CursorInformation,
         client: Client,
         pinned_connection: Option<&PinnedConnectionHandle>,
+        #[cfg(feature = "opentelemetry")] span: Option<crate::otel::OpSpan>,
     ) {
         take_mut::take(self, |this| {
             if let Self::Idle(mut session) = this {
                 let pinned = pinned_connection.map(|c| c.replicate());
                 let fut = Box::pin(async move {
-                    let get_more = GetMore::new(info, pinned.as_ref());
+                    let mut get_more = GetMore::new(info, pinned.as_ref());
+                    let mut context = ExecutionContext::explicit(session.borrow_mut());
+                    #[cfg(feature = "opentelemetry")]
+                    {
+                        context.span = span;
+                    }
                     let res = client
-                        .execute_operation(get_more, session.borrow_mut())
+                        .execute_operation_with_details(&mut get_more, &mut context)
                         .await;
                     GetMoreRawResultAndSession {
-                        result: res,
+                        result: res.map(|d| d.output),
                         session: *session,
                     }
                 });

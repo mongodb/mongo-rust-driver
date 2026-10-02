@@ -1,8 +1,8 @@
-use std::fmt::Debug;
+use std::{cmp::Ordering, fmt::Debug};
 
 use crate::{
     bson::{doc, spec::ElementType, Bson, Document},
-    bson_util::{get_double, get_int},
+    bson_util::get_int,
     event::{
         cmap::CmapEvent,
         command::CommandEvent,
@@ -560,19 +560,50 @@ fn special_operator_matches(
         }
         "$$matchAsRoot" => results_match_inner(actual, value, false, true, entities),
         "$$lte" => {
-            let Some(expected) = get_double(value) else {
-                return Err(format!("expected number for comparison, got {value}"));
-            };
-            let Some(actual) = actual.and_then(get_double) else {
-                return Err(format!("expected actual to be a number, got {actual:?}"));
-            };
-            if actual > expected {
-                return Err(format!("expected actual to be <= {expected}, got {actual}"));
+            if compare(actual, value)? == Ordering::Greater {
+                return Err(format!(
+                    "expected actual to be <= {value:?}, got {actual:?}"
+                ));
+            }
+            Ok(())
+        }
+        "$$gte" => {
+            if compare(actual, value)? == Ordering::Less {
+                return Err(format!(
+                    "expected actual to be >= {value:?}, got {actual:?}"
+                ));
             }
             Ok(())
         }
         other => panic!("unknown special operator: {other}"),
     }
+}
+
+fn compare(actual: Option<&Bson>, expected: &Bson) -> Result<Ordering, String> {
+    let expected = match expected {
+        Bson::Int32(i) => Bson::Int64(*i as i64),
+        Bson::Int64(i) => Bson::Int64(*i),
+        Bson::Double(f) => Bson::Double(*f),
+        _ => return Err(format!("expected number for comparison, got {expected}")),
+    };
+    let actual = match actual {
+        Some(Bson::Int32(i)) => Bson::Int64(*i as i64),
+        Some(Bson::Int64(i)) => Bson::Int64(*i),
+        Some(Bson::Double(f)) => Bson::Double(*f),
+        _ => return Err(format!("expected actual to be a number, got {actual:?}")),
+    };
+    match (&actual, &expected) {
+        (Bson::Int64(a), Bson::Int64(e)) => Some(a.cmp(e)),
+        (Bson::Double(a), Bson::Double(e)) => a.partial_cmp(e),
+        (Bson::Int64(a), Bson::Double(e)) => (*a as f64).partial_cmp(e),
+        (Bson::Double(a), Bson::Int64(e)) => a.partial_cmp(&(*e as f64)),
+        _ => {
+            return Err(format!(
+                "broken matcher: invalid types ({expected:?}, {actual:?})"
+            ))
+        }
+    }
+    .ok_or_else(|| format!("cannot compare {expected:?} and {actual:?}"))
 }
 
 fn entity_matches(id: &str, actual: Option<&Bson>, entities: &EntityMap) -> Result<(), String> {

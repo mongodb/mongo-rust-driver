@@ -9,9 +9,9 @@ use crate::{
     error::Result,
     operation::{
         append_options,
-        ExecutionContext,
         Operation,
         OperationImpl,
+        ResponseContext,
         Wrapped,
         WrappedOperation,
     },
@@ -95,7 +95,7 @@ impl WrappedOperation for ChangeStreamAggregate {
     fn handle_response<'a>(
         &'a self,
         response: std::borrow::Cow<'a, RawCommandResponse>,
-        mut context: ExecutionContext<'a>,
+        mut context: ResponseContext<'a>,
     ) -> crate::BoxFuture<'a, Result<Self::O>> {
         use futures_util::FutureExt;
         async move {
@@ -104,7 +104,7 @@ impl WrappedOperation for ChangeStreamAggregate {
                 .get("operationTime")?
                 .and_then(crate::bson::RawBsonRef::as_timestamp);
 
-            let inner_context = ExecutionContext {
+            let inner_context = ResponseContext {
                 connection: context.connection,
                 session: context.session.as_deref_mut(),
                 effective_criteria: context.effective_criteria,

@@ -13,7 +13,7 @@ use crate::{
     Namespace,
 };
 
-use super::ExecutionContext;
+use super::ResponseContext;
 
 #[derive(Debug)]
 pub(crate) struct GetMore<'conn> {
@@ -81,7 +81,7 @@ impl BaseOperation for GetMore<'_> {
     fn handle_response_cow<'a>(
         &'a self,
         response: std::borrow::Cow<'a, RawCommandResponse>,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         // Extract minimal fields directly from the raw reply to avoid walking the batch via serde.
         let root = response.raw_body();

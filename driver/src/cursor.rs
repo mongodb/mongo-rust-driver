@@ -217,6 +217,12 @@ impl<T> Cursor<T> {
     pub(crate) fn batch(&self) -> Result<&std::collections::VecDeque<crate::bson::RawDocumentBuf>> {
         Ok(self.stream.buffer()?.batch())
     }
+
+    #[cfg(feature = "opentelemetry")]
+    pub(crate) fn with_span(mut self, span: Option<crate::otel::OpSpan>) -> Result<Self> {
+        self.raw_mut()?.set_span(span);
+        Ok(self)
+    }
 }
 
 pub(crate) trait NewCursor: Sized {

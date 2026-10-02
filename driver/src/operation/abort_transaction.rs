@@ -9,7 +9,7 @@ use crate::{
     Client,
 };
 
-use super::{BaseOperation, ExecutionContext};
+use super::{BaseOperation, ResponseContext};
 
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
@@ -47,7 +47,7 @@ impl BaseOperation for AbortTransaction {
     fn handle_response<'a>(
         &'a self,
         response: &RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         response.validate_single_write()
     }

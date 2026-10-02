@@ -18,7 +18,7 @@ use crate::{
     Collection,
 };
 
-use super::{ExecutionContext, MAX_ENCRYPTED_WRITE_SIZE, OP_MSG_OVERHEAD_BYTES};
+use super::{ResponseContext, MAX_ENCRYPTED_WRITE_SIZE, OP_MSG_OVERHEAD_BYTES};
 
 #[derive(Debug)]
 pub(crate) struct Insert<'a> {
@@ -131,7 +131,7 @@ impl BaseOperation for Insert<'_> {
     fn handle_response<'b>(
         &'b self,
         response: &'b RawCommandResponse,
-        _context: ExecutionContext<'b>,
+        _context: ResponseContext<'b>,
     ) -> Result<Self::O> {
         let n: usize = Checked::new(response.extract_n()?).try_into()?;
         let inserted_ids = || {

@@ -9,7 +9,7 @@ use crate::{
     cmap::conn::PinnedConnectionHandle,
     error::{Error, Result},
     options::ServerAddress,
-    Client,
+    Collection,
     Namespace,
 };
 
@@ -113,17 +113,6 @@ impl PinnedConnection {
         }
     }
 
-    /// Make a new `PinnedConnection` that refers to the same connection as this one.
-    /// Use with care and only when "lending" a handle in a way that can't be expressed as a
-    /// normal borrow.
-    pub(crate) fn replicate(&self) -> Self {
-        match self {
-            Self::Valid(h) => Self::Valid(h.replicate()),
-            Self::Invalid(h) => Self::Invalid(h.replicate()),
-            Self::Unpinned => Self::Unpinned,
-        }
-    }
-
     pub(crate) fn handle(&self) -> Option<&PinnedConnectionHandle> {
         match self {
             Self::Valid(h) | Self::Invalid(h) => Some(h),
@@ -131,7 +120,7 @@ impl PinnedConnection {
         }
     }
 
-    fn is_invalid(&self) -> bool {
+    pub(crate) fn is_invalid(&self) -> bool {
         matches!(self, Self::Invalid(_))
     }
 
@@ -146,29 +135,27 @@ impl PinnedConnection {
     }
 }
 
-pub(super) fn kill_cursor(
-    client: Client,
-    drop_token: &mut crate::client::AsyncDropToken,
-    ns: &Namespace,
+pub(super) async fn kill_cursor(
+    coll: Collection<Document>,
     cursor_id: i64,
-    pinned_conn: PinnedConnection,
+    pinned_handle: Option<PinnedConnectionHandle>,
     drop_address: Option<ServerAddress>,
+    #[cfg(feature = "opentelemetry")] span: Option<crate::otel::OpSpan>,
     #[cfg(test)] kill_watcher: Option<oneshot::Sender<()>>,
 ) {
-    let coll = client
-        .database(ns.db.as_str())
-        .collection::<Document>(ns.coll.as_str());
-    drop_token.spawn(async move {
-        if !pinned_conn.is_invalid() {
-            let _ = coll
-                .kill_cursor(cursor_id, pinned_conn.handle(), drop_address)
-                .await;
-            #[cfg(test)]
-            if let Some(tx) = kill_watcher {
-                let _ = tx.send(());
-            }
-        }
-    });
+    let _ = coll
+        .kill_cursor(
+            cursor_id,
+            pinned_handle,
+            drop_address,
+            #[cfg(feature = "opentelemetry")]
+            span,
+        )
+        .await;
+    #[cfg(test)]
+    if let Some(tx) = kill_watcher {
+        let _ = tx.send(());
+    }
 }
 
 pub(crate) fn reply_batch(
