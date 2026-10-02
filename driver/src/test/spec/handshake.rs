@@ -7,7 +7,7 @@ use crate::{
     bson::{doc, Bson, Document},
     cmap::{
         conn::PendingConnection,
-        establish::{ConnectionEstablisher, EstablisherOptions},
+        establish::{handshake::BASE_CLIENT_METADATA, ConnectionEstablisher, EstablisherOptions},
         Command,
     },
     event::{cmap::CmapEventEmitter, EventHandler},
@@ -92,11 +92,15 @@ impl Client {
 }
 
 impl DriverInfo {
-    fn new(name: &str, version: Option<&str>, platform: Option<&str>) -> Self {
+    fn new<'a>(
+        name: &str,
+        version: impl Into<Option<&'a str>>,
+        platform: impl Into<Option<&'a str>>,
+    ) -> Self {
         Self {
             name: name.to_owned(),
-            version: version.map(|v| v.to_owned()),
-            platform: platform.map(|v| v.to_owned()),
+            version: version.into().map(|v| v.to_owned()),
+            platform: platform.into().map(|v| v.to_owned()),
         }
     }
 }
@@ -139,19 +143,15 @@ fn extract_driver_info(metadata: &Document) -> (&str, &str, &str) {
 #[tokio::test]
 async fn append_metadata_driver_update() {
     let test_info = [
-        DriverInfo::new("framework", Some("2.0"), Some("Framework Platform")),
-        DriverInfo::new("framework", Some("2.0"), None),
-        DriverInfo::new("framework", None, Some("Framework Platform")),
+        DriverInfo::new("framework", "2.0", "Framework Platform"),
+        DriverInfo::new("framework", "2.0", None),
+        DriverInfo::new("framework", None, "Framework Platform"),
         DriverInfo::new("framework", None, None),
     ];
     for addl_info in test_info {
         let mut options = get_client_options().await.clone();
         options.max_idle_time = Some(Duration::from_millis(1));
-        options.driver_info = Some(DriverInfo::new(
-            "library",
-            Some("1.2"),
-            Some("Library Platform"),
-        ));
+        options.driver_info = Some(DriverInfo::new("library", "1.2", "Library Platform"));
         let hello = watch_hello(&mut options);
         let client = Client::with_options(options).unwrap();
 
@@ -171,7 +171,7 @@ async fn append_metadata_driver_update() {
         if let Some(addl_version) = &addl_info.version {
             assert_eq!(test_version, format!("{initial_version}|{addl_version}"));
         } else {
-            assert_eq!(test_version, initial_version);
+            assert_eq!(test_version, format!("{initial_version}|"));
         }
         if let Some(addl_platform) = &addl_info.platform {
             assert_eq!(test_platform, format!("{initial_platform}|{addl_platform}"));
@@ -187,9 +187,9 @@ async fn append_metadata_driver_update() {
 #[tokio::test]
 async fn append_metadata_successive_updates() {
     let test_info = [
-        DriverInfo::new("framework", Some("2.0"), Some("Framework Platform")),
-        DriverInfo::new("framework", Some("2.0"), None),
-        DriverInfo::new("framework", None, Some("Framework Platform")),
+        DriverInfo::new("framework", "2.0", "Framework Platform"),
+        DriverInfo::new("framework", "2.0", None),
+        DriverInfo::new("framework", None, "Framework Platform"),
         DriverInfo::new("framework", None, None),
     ];
     for addl_info in test_info {
@@ -199,11 +199,7 @@ async fn append_metadata_successive_updates() {
         let client = Client::with_options(options).unwrap();
 
         client
-            .append_metadata(DriverInfo::new(
-                "library",
-                Some("1.2"),
-                Some("Library Platform"),
-            ))
+            .append_metadata(DriverInfo::new("library", "1.2", "Library Platform"))
             .unwrap();
         client.ping().await;
         let initial_client_metadata = hello.lock().unwrap().client_metadata();
@@ -221,7 +217,7 @@ async fn append_metadata_successive_updates() {
         if let Some(addl_version) = &addl_info.version {
             assert_eq!(test_version, format!("{initial_version}|{addl_version}"));
         } else {
-            assert_eq!(test_version, initial_version);
+            assert_eq!(test_version, format!("{initial_version}|"));
         }
         if let Some(addl_platform) = &addl_info.platform {
             assert_eq!(test_platform, format!("{initial_platform}|{addl_platform}"));
@@ -237,13 +233,13 @@ async fn append_metadata_successive_updates() {
 #[tokio::test]
 async fn append_metadata_duplicate_successive() {
     let test_info = [
-        DriverInfo::new("library", Some("1.2"), Some("Library Platform")),
-        DriverInfo::new("framework", Some("1.2"), Some("Library Platform")),
-        DriverInfo::new("library", Some("2.0"), Some("Library Platform")),
-        DriverInfo::new("library", Some("1.2"), Some("Framework Platform")),
-        DriverInfo::new("framework", Some("2.0"), Some("Library Platform")),
-        DriverInfo::new("framework", Some("1.2"), Some("Framework Platform")),
-        DriverInfo::new("library", Some("2.0"), Some("Framework Platform")),
+        DriverInfo::new("library", "1.2", "Library Platform"),
+        DriverInfo::new("framework", "1.2", "Library Platform"),
+        DriverInfo::new("library", "2.0", "Library Platform"),
+        DriverInfo::new("library", "1.2", "Framework Platform"),
+        DriverInfo::new("framework", "2.0", "Library Platform"),
+        DriverInfo::new("framework", "1.2", "Framework Platform"),
+        DriverInfo::new("library", "2.0", "Framework Platform"),
     ];
     for info in test_info {
         let mut options = get_client_options().await.clone();
@@ -251,7 +247,7 @@ async fn append_metadata_duplicate_successive() {
         let hello = watch_hello(&mut options);
         let client = Client::with_options(options).unwrap();
 
-        let setup_info = DriverInfo::new("library", Some("1.2"), Some("Library Platform"));
+        let setup_info = DriverInfo::new("library", "1.2", "Library Platform");
         client.append_metadata(setup_info.clone()).unwrap();
         client.ping().await;
         let updated_client_metadata = hello.lock().unwrap().client_metadata();
@@ -300,32 +296,20 @@ async fn append_metadata_duplicate_multiple() {
     let client = Client::with_options(options).unwrap();
 
     client
-        .append_metadata(DriverInfo::new(
-            "library",
-            Some("1.2"),
-            Some("Library Platform"),
-        ))
+        .append_metadata(DriverInfo::new("library", "1.2", "Library Platform"))
         .unwrap();
     client.ping().await;
     tokio::time::sleep(Duration::from_millis(5)).await;
 
     client
-        .append_metadata(DriverInfo::new(
-            "framework",
-            Some("2.0"),
-            Some("Framework Platform"),
-        ))
+        .append_metadata(DriverInfo::new("framework", "2.0", "Framework Platform"))
         .unwrap();
     client.ping().await;
     let client_metadata = hello.lock().unwrap().client_metadata();
     tokio::time::sleep(Duration::from_millis(5)).await;
 
     client
-        .append_metadata(DriverInfo::new(
-            "library",
-            Some("1.2"),
-            Some("Library Platform"),
-        ))
+        .append_metadata(DriverInfo::new("library", "1.2", "Library Platform"))
         .unwrap();
     client.ping().await;
     let updated_client_metadata = hello.lock().unwrap().client_metadata();
@@ -338,11 +322,7 @@ async fn append_metadata_duplicate_multiple() {
 async fn append_metadata_duplicate_of_initial() {
     let mut options = get_client_options().await.clone();
     options.max_idle_time = Some(Duration::from_millis(1));
-    options.driver_info = Some(DriverInfo::new(
-        "library",
-        Some("1.2"),
-        Some("Library Platform"),
-    ));
+    options.driver_info = Some(DriverInfo::new("library", "1.2", "Library Platform"));
     let hello = watch_hello(&mut options);
     let client = Client::with_options(options).unwrap();
 
@@ -351,11 +331,7 @@ async fn append_metadata_duplicate_of_initial() {
     tokio::time::sleep(Duration::from_millis(5)).await;
 
     client
-        .append_metadata(DriverInfo::new(
-            "library",
-            Some("1.2"),
-            Some("Library Platform"),
-        ))
+        .append_metadata(DriverInfo::new("library", "1.2", "Library Platform"))
         .unwrap();
     client.ping().await;
     let updated_client_metadata = hello.lock().unwrap().client_metadata();
@@ -369,11 +345,7 @@ async fn append_metadata_duplicate_of_initial() {
 async fn append_metadata_duplicate_of_initial_separated() {
     let mut options = get_client_options().await.clone();
     options.max_idle_time = Some(Duration::from_millis(1));
-    options.driver_info = Some(DriverInfo::new(
-        "library",
-        Some("1.2"),
-        Some("Library Platform"),
-    ));
+    options.driver_info = Some(DriverInfo::new("library", "1.2", "Library Platform"));
     let hello = watch_hello(&mut options);
     let client = Client::with_options(options).unwrap();
 
@@ -381,22 +353,14 @@ async fn append_metadata_duplicate_of_initial_separated() {
     tokio::time::sleep(Duration::from_millis(5)).await;
 
     client
-        .append_metadata(DriverInfo::new(
-            "framework",
-            Some("2.0"),
-            Some("Framework Platform"),
-        ))
+        .append_metadata(DriverInfo::new("framework", "2.0", "Framework Platform"))
         .unwrap();
     client.ping().await;
     let client_metadata = hello.lock().unwrap().client_metadata();
     tokio::time::sleep(Duration::from_millis(5)).await;
 
     client
-        .append_metadata(DriverInfo::new(
-            "library",
-            Some("1.2"),
-            Some("Library Platform"),
-        ))
+        .append_metadata(DriverInfo::new("library", "1.2", "Library Platform"))
         .unwrap();
     client.ping().await;
     let updated_client_metadata = hello.lock().unwrap().client_metadata();
@@ -410,12 +374,12 @@ async fn append_metadata_duplicate_of_initial_separated() {
 async fn append_metadata_duplicate_empty_strings() {
     let test_info = [
         (
-            DriverInfo::new("library", None, Some("Library Platform")),
-            DriverInfo::new("library", Some(""), Some("Library Platform")),
+            DriverInfo::new("library", None, "Library Platform"),
+            DriverInfo::new("library", "", "Library Platform"),
         ),
         (
-            DriverInfo::new("library", Some("1.2"), None),
-            DriverInfo::new("library", Some("1.2"), Some("")),
+            DriverInfo::new("library", "1.2", None),
+            DriverInfo::new("library", "1.2", ""),
         ),
     ];
     for (initial_info, appended_info) in test_info {
@@ -443,12 +407,12 @@ async fn append_metadata_duplicate_empty_strings() {
 async fn append_metadata_duplicate_empty_strings_initial() {
     let test_info = [
         (
-            DriverInfo::new("library", None, Some("Library Platform")),
-            DriverInfo::new("library", Some(""), Some("Library Platform")),
+            DriverInfo::new("library", None, "Library Platform"),
+            DriverInfo::new("library", "", "Library Platform"),
         ),
         (
-            DriverInfo::new("library", Some("1.2"), None),
-            DriverInfo::new("library", Some("1.2"), Some("")),
+            DriverInfo::new("library", "1.2", None),
+            DriverInfo::new("library", "1.2", ""),
         ),
     ];
     for (initial_info, appended_info) in test_info {
@@ -467,6 +431,203 @@ async fn append_metadata_duplicate_empty_strings_initial() {
         let updated_client_metadata = hello.lock().unwrap().client_metadata();
 
         assert_eq!(initial_client_metadata, updated_client_metadata);
+    }
+}
+
+// Client Metadata Update Prose Test 10: Entries in driver.name and driver.version correspond by
+// index
+#[tokio::test]
+async fn append_metadata_name_version_correspond() {
+    let base = BASE_CLIENT_METADATA.clone();
+    let driver_name = base.driver.name;
+    let driver_version = base.driver.version;
+    let test_info = [
+        (
+            "Gap in middle (name)",
+            vec![
+                DriverInfo::new("", None, None),
+                DriverInfo::new("F2", None, None),
+            ],
+            format!("{driver_name}||F2"),
+            format!("{driver_version}||"),
+        ),
+        (
+            "Gap in middle (version)",
+            vec![
+                DriverInfo::new("F1", None, None),
+                DriverInfo::new("F2", "2.0", None),
+            ],
+            format!("{driver_name}|F1|F2"),
+            format!("{driver_version}||2.0"),
+        ),
+        (
+            "Trailing delimiter retained",
+            vec![DriverInfo::new("F1", None, None)],
+            format!("{driver_name}|F1"),
+            format!("{driver_version}|"),
+        ),
+        (
+            "Equal versions do not collapse",
+            vec![DriverInfo::new("F1", driver_version.as_str(), None)],
+            format!("{driver_name}|F1"),
+            format!("{driver_version}|{driver_version}"),
+        ),
+        (
+            "Equal names do not collapse",
+            vec![DriverInfo::new(driver_name.as_str(), "1.0", None)],
+            format!("{driver_name}|{driver_name}"),
+            format!("{driver_version}|1.0"),
+        ),
+        (
+            "Duplicates deduplicate",
+            vec![
+                DriverInfo::new("F1", "1.0", None),
+                DriverInfo::new("F1", "1.0", None),
+            ],
+            format!("{driver_name}|F1"),
+            format!("{driver_version}|1.0"),
+        ),
+        (
+            "All versions absent",
+            vec![
+                DriverInfo::new("F1", None, None),
+                DriverInfo::new("F2", None, None),
+            ],
+            format!("{driver_name}|F1|F2"),
+            format!("{driver_version}||"),
+        ),
+        (
+            "All names absent",
+            vec![
+                DriverInfo::new("", "1.0", None),
+                DriverInfo::new("", "2.0", None),
+            ],
+            format!("{driver_name}||"),
+            format!("{driver_version}|1.0|2.0"),
+        ),
+        (
+            "Non-adjacent duplicate",
+            vec![
+                DriverInfo::new("F1", "1.0", None),
+                DriverInfo::new("F2", "2.0", None),
+                DriverInfo::new("F1", "1.0", None),
+            ],
+            format!("{driver_name}|F1|F2"),
+            format!("{driver_version}|1.0|2.0"),
+        ),
+        (
+            "Platform-only difference is not a duplicate",
+            vec![
+                DriverInfo::new("F1", "1.0", "P1"),
+                DriverInfo::new("F1", "1.0", "P2"),
+            ],
+            format!("{driver_name}|F1|F1"),
+            format!("{driver_version}|1.0|1.0"),
+        ),
+        (
+            "Wrapper matching the driver's own identity",
+            vec![DriverInfo::new(
+                driver_name.as_str(),
+                driver_version.as_str(),
+                None,
+            )],
+            format!("{driver_name}|{driver_name}"),
+            format!("{driver_version}|{driver_version}"),
+        ),
+        (
+            "Duplicates with an unset field deduplicate",
+            vec![
+                DriverInfo::new("F1", None, None),
+                DriverInfo::new("F1", None, None),
+            ],
+            format!("{driver_name}|F1"),
+            format!("{driver_version}|"),
+        ),
+    ];
+    for (desc, infos, exp_name, exp_version) in test_info {
+        // 1. Create a MongoClient instance with a maxIdleTimeMS set to 1ms
+        let mut options = get_client_options().await.clone();
+        options.max_idle_time = Some(Duration::from_millis(1));
+        let hello = watch_hello(&mut options);
+        let client = Client::with_options(options).unwrap();
+
+        // append info
+        for info in infos {
+            client.append_metadata(info).unwrap();
+        }
+
+        // 2. Send a ping command to the server and verify that the command succeeds.
+        client.ping().await;
+
+        // 3. Wait 5ms for the connection to become idle.
+        tokio::time::sleep(Duration::from_millis(5)).await;
+
+        // validate expectations
+        let metadata = hello.lock().unwrap().client_metadata();
+        let actual_name = metadata["driver"]["name"].as_str().unwrap();
+        let actual_version = metadata["driver"]["version"].as_str().unwrap();
+        assert_eq!(
+            exp_name, actual_name,
+            "[{desc}]: expected name {exp_name:?}, got {actual_name:?}"
+        );
+        assert_eq!(
+            exp_version, actual_version,
+            "[{desc}]: expected version {exp_version:?}, got {actual_version:?}"
+        );
+    }
+}
+
+// Client Metadata Update Prose Test 11: Appending metadata containing the delimiter raises an error
+#[tokio::test]
+async fn metadata_delimiter_error() {
+    let base = BASE_CLIENT_METADATA.clone();
+    let driver_name = base.driver.name;
+    let driver_version = base.driver.version;
+    let driver_platform = base.platform;
+    let test_info = [
+        DriverInfo::new("frame|work", "2.0", "Framework Platform"),
+        DriverInfo::new("framework", "2|0", "Framework Platform"),
+        DriverInfo::new("framework", "2.0", "Framework|Platform"),
+    ];
+    for info in test_info {
+        // 1. Create a MongoClient instance
+        let mut options = get_client_options().await.clone();
+        options.max_idle_time = Some(Duration::from_millis(1));
+        options.driver_info = Some(DriverInfo::new("library", "1.2", "Library Platform"));
+        let hello = watch_hello(&mut options);
+        let client = Client::with_options(options).unwrap();
+
+        // 2. Send a ping command to the server and verify that the command succeeds.
+        client.ping().await;
+
+        // 3. Wait 5ms for the connection to become idle.
+        tokio::time::sleep(Duration::from_millis(5)).await;
+
+        // 4. Append the DriverInfoOptions from the selected test case and assert that an error is
+        //    raised.
+        assert!(
+            client.append_metadata(info.clone()).is_err(),
+            "expected error from appending {info:?}"
+        );
+
+        // 5. Wait 5ms for the connection to become idle so that the next operation establishes a
+        //    new connection and handshakes again.
+        tokio::time::sleep(Duration::from_millis(5)).await;
+
+        // 6. Assert that the intercepted client document is unchanged by the failed append
+        let metadata = hello.lock().unwrap().client_metadata();
+        assert_eq!(
+            metadata["driver"]["name"],
+            Bson::String(format!("{driver_name}|library"))
+        );
+        assert_eq!(
+            metadata["driver"]["version"],
+            Bson::String(format!("{driver_version}|1.2"))
+        );
+        assert_eq!(
+            metadata["platform"],
+            Bson::String(format!("{driver_platform}|Library Platform"))
+        );
     }
 }
 

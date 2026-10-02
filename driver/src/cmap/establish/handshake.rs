@@ -48,16 +48,17 @@ impl ClientMetadata {
             return Ok(());
         }
 
+        exclude_delimiter(&driver_info.name)?;
         let version = driver_info.spec_version();
+        exclude_delimiter(version)?;
         let platform = driver_info.spec_platform();
+        exclude_delimiter(platform)?;
 
         self.driver.name.push('|');
         self.driver.name.push_str(&driver_info.name);
 
-        if !version.is_empty() {
-            self.driver.version.push('|');
-            self.driver.version.push_str(version);
-        }
+        self.driver.version.push('|');
+        self.driver.version.push_str(version);
 
         if !platform.is_empty() {
             self.platform.push('|');
@@ -68,6 +69,15 @@ impl ClientMetadata {
 
         Ok(())
     }
+}
+
+fn exclude_delimiter(input: &str) -> Result<()> {
+    if input.contains('|') {
+        return Err(Error::invalid_argument(
+            "client metadata must not contain '|'",
+        ));
+    }
+    Ok(())
 }
 
 impl TryFrom<&ClientOptions> for ClientMetadata {

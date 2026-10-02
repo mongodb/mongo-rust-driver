@@ -423,7 +423,8 @@ impl Client {
             .map(|db_name| self.database(db_name))
     }
 
-    /// Append new information to the metadata of the handshake with the server.
+    /// Append new information to the metadata of the handshake with the server.  The '|' character
+    /// is not allowed in any field.
     pub fn append_metadata(&self, driver_info: DriverInfo) -> Result<()> {
         self.inner
             .topology
