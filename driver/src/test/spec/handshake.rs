@@ -171,7 +171,7 @@ async fn append_metadata_driver_update() {
         if let Some(addl_version) = &addl_info.version {
             assert_eq!(test_version, format!("{initial_version}|{addl_version}"));
         } else {
-            assert_eq!(test_version, initial_version);
+            assert_eq!(test_version, format!("{initial_version}|"));
         }
         if let Some(addl_platform) = &addl_info.platform {
             assert_eq!(test_platform, format!("{initial_platform}|{addl_platform}"));
@@ -217,7 +217,7 @@ async fn append_metadata_successive_updates() {
         if let Some(addl_version) = &addl_info.version {
             assert_eq!(test_version, format!("{initial_version}|{addl_version}"));
         } else {
-            assert_eq!(test_version, initial_version);
+            assert_eq!(test_version, format!("{initial_version}|"));
         }
         if let Some(addl_platform) = &addl_info.platform {
             assert_eq!(test_platform, format!("{initial_platform}|{addl_platform}"));
