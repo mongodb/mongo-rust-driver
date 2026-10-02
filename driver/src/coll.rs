@@ -196,7 +196,7 @@ where
     pub(super) async fn kill_cursor(
         &self,
         cursor_id: i64,
-        pinned_connection: Option<&PinnedConnectionHandle>,
+        pinned_handle: Option<PinnedConnectionHandle>,
         drop_address: Option<ServerAddress>,
         #[cfg(feature = "opentelemetry")] span: Option<crate::otel::OpSpan>,
     ) -> Result<()> {
@@ -209,7 +209,7 @@ where
                 "cursors": [cursor_id]
             },
             drop_address.map(SelectionCriteria::from_address),
-            pinned_connection,
+            pinned_handle.as_ref(),
         );
         let mut context = ExecutionContext::explicit(None);
         #[cfg(feature = "opentelemetry")]

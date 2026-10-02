@@ -44,23 +44,18 @@ use std::{
     task::{ready, Context, Poll},
 };
 
-use crate::{
-    bson::{RawArray, RawDocument},
-    client::executor::ExecutionContext,
-    cursor::common::CursorSpecification,
-    operation::GetMore,
-};
 use futures_core::{future::BoxFuture, Future, Stream};
 #[cfg(test)]
 use tokio::sync::oneshot;
 
 use crate::{
-    bson::RawDocumentBuf,
+    bson::{RawArray, RawDocument, RawDocumentBuf},
     change_stream::event::ResumeToken,
-    client::{options::ServerAddress, AsyncDropToken},
+    client::{executor::ExecutionContext, options::ServerAddress, AsyncDropToken},
     cmap::conn::PinnedConnectionHandle,
-    cursor::common::{kill_cursor, PinnedConnection},
+    cursor::common::{kill_cursor, CursorSpecification, PinnedConnection},
     error::{Error, ErrorKind, Result},
+    operation::GetMore,
     Client,
     ClientSession,
 };
@@ -222,7 +217,7 @@ impl CursorState {
             }
 
             // If not exhausted and the connection is valid, start a getMore and iterate.
-            if !self.exhausted && !matches!(self.pinned_connection, PinnedConnection::Invalid(_)) {
+            if !self.exhausted && !self.pinned_connection.is_invalid() {
                 provider.start_execution(
                     self.info.clone(),
                     client.clone(),
@@ -364,22 +359,20 @@ impl Stream for RawBatchCursor {
 
 impl Drop for RawBatchCursor {
     fn drop(&mut self) {
-        if self.is_exhausted() {
+        if self.is_exhausted() || self.state.pinned_connection.is_invalid() {
             return;
         }
-        kill_cursor(
-            self.client.clone(),
-            &mut self.drop_token,
-            &self.state.info.ns,
+        self.drop_token.spawn(kill_cursor(
+            self.client.collection(&self.state.info.ns),
             self.state.info.id,
-            self.state.pinned_connection.replicate(),
+            self.state.pinned_connection.handle().map(|h| h.replicate()),
             self.drop_address.take(),
             #[cfg(feature = "opentelemetry")]
             self.disable_drop_op_span
                 .then(crate::otel::OpSpan::disabled),
             #[cfg(test)]
             self.kill_watcher.take(),
-        );
+        ));
     }
 }
 
@@ -479,22 +472,20 @@ impl SessionRawBatchCursor {
 
 impl Drop for SessionRawBatchCursor {
     fn drop(&mut self) {
-        if self.is_exhausted() {
+        if self.is_exhausted() || self.state.pinned_connection.is_invalid() {
             return;
         }
-        kill_cursor(
-            self.client.clone(),
-            &mut self.drop_token,
-            &self.state.info.ns,
+        self.drop_token.spawn(kill_cursor(
+            self.client.collection(&self.state.info.ns),
             self.state.info.id,
-            self.state.pinned_connection.replicate(),
+            self.state.pinned_connection.handle().map(|h| h.replicate()),
             self.drop_address.take(),
             #[cfg(feature = "opentelemetry")]
             self.disable_drop_op_span
                 .then(crate::otel::OpSpan::disabled),
             #[cfg(test)]
             self.kill_watcher.take(),
-        );
+        ));
     }
 }
 
