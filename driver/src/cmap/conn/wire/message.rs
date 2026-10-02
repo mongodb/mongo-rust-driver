@@ -1,6 +1,5 @@
-use std::io::Read;
+use std::mem::size_of;
 
-use crate::bson::doc;
 use bitflags::bitflags;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -11,19 +10,21 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 ))]
 use crate::options::Compressor;
 use crate::{
-    bson::{RawArrayBuf, RawDocumentBuf},
+    bson::{doc, RawArrayBuf, RawDocumentBuf},
     bson_util,
     checked::Checked,
-    cmap::{conn::wire::util::SyncCountReader, Command},
+    cmap::{conn::wire::util::CountReader, Command},
     compression::decompress::decompress_message,
     error::{Error, ErrorKind, Result},
-    runtime::SyncLittleEndianRead,
 };
 
 use super::{
     header::{Header, OpCode},
     next_request_id,
 };
+
+const DOCUMENT_PAYLOAD_TYPE: u8 = 0;
+const DOCUMENT_SEQUENCE_PAYLOAD_TYPE: u8 = 1;
 
 /// Represents an OP_MSG wire protocol operation.
 #[derive(Debug)]
@@ -127,11 +128,15 @@ impl Message {
             .into());
         }
 
+        let length = Checked::<usize>::try_from(header.length)?;
+        let length_remaining = length - Header::LENGTH;
+        let reader = reader.take((length_remaining).try_into()?);
+
         if header.op_code == OpCode::Message {
-            return Self::read_from_op_msg(reader, &header).await;
+            return Self::read_op_msg(reader, &header, length_remaining.get()?).await;
         }
         if header.op_code == OpCode::Compressed {
-            return Self::read_op_compressed_from(reader, &header).await;
+            return Self::read_op_compressed(reader, &header, length_remaining.get()?).await;
         }
 
         Err(Error::new(
@@ -147,30 +152,14 @@ impl Message {
         ))
     }
 
-    async fn read_from_op_msg<T: AsyncRead + Unpin + Send>(
-        mut reader: T,
+    async fn read_op_compressed<T: AsyncRead + Unpin + Send>(
+        reader: T,
         header: &Header,
+        length_remaining: usize,
     ) -> Result<Self> {
-        let length = Checked::<usize>::try_from(header.length)?;
-        let length_remaining = length - Header::LENGTH;
-        let mut buf = vec![0u8; length_remaining.get()?];
-        reader.read_exact(&mut buf).await?;
-        let reader = buf.as_slice();
+        let mut reader = CountReader::new(reader);
 
-        Self::read_op_common(reader, length_remaining.get()?, header)
-    }
-
-    async fn read_op_compressed_from<T: AsyncRead + Unpin + Send>(
-        mut reader: T,
-        header: &Header,
-    ) -> Result<Self> {
-        let length = Checked::<usize>::try_from(header.length)?;
-        let length_remaining = length - Header::LENGTH;
-        let mut buffer = vec![0u8; length_remaining.get()?];
-        reader.read_exact(&mut buffer).await?;
-        let mut compressed = buffer.as_slice();
-
-        let original_opcode = compressed.read_i32_sync()?;
+        let original_opcode = reader.read_i32_le().await?;
         if original_opcode != OpCode::Message as i32 {
             return Err(ErrorKind::InvalidResponse {
                 message: format!(
@@ -182,9 +171,13 @@ impl Message {
             .into());
         }
 
-        let uncompressed_size = Checked::<usize>::try_from(compressed.read_i32_sync()?)?;
-        let compressor_id: u8 = compressed.read_u8_sync()?;
-        let decompressed = decompress_message(compressed, compressor_id)?;
+        let uncompressed_size = Checked::<usize>::try_from(reader.read_i32_le().await?)?;
+        let compressor_id = reader.read_u8().await?;
+
+        let mut compressed = vec![0u8; (length_remaining - reader.bytes_read()).get()?];
+        reader.read_exact(&mut compressed).await?;
+
+        let decompressed = decompress_message(&compressed, compressor_id)?;
 
         if decompressed.len() != uncompressed_size.get()? {
             return Err(ErrorKind::InvalidResponse {
@@ -202,19 +195,23 @@ impl Message {
         let reader = decompressed.as_slice();
         let length_remaining = decompressed.len();
 
-        Self::read_op_common(reader, length_remaining, header)
+        Self::read_op_msg(reader, header, length_remaining).await
     }
 
-    fn read_op_common(mut reader: &[u8], length_remaining: usize, header: &Header) -> Result<Self> {
+    async fn read_op_msg<T: AsyncRead + Unpin>(
+        mut reader: T,
+        header: &Header,
+        length_remaining: usize,
+    ) -> Result<Self> {
         let mut length_remaining = Checked::new(length_remaining);
-        let flags = MessageFlags::from_bits_truncate(reader.read_u32_sync()?);
+        let flags = MessageFlags::from_bits_truncate(reader.read_u32_le().await?);
         length_remaining -= std::mem::size_of::<u32>();
 
-        let mut count_reader = SyncCountReader::new(&mut reader);
+        let mut count_reader = CountReader::new(&mut reader);
         let mut document_payload = None;
         let mut document_sequences = Vec::new();
         while (length_remaining - count_reader.bytes_read()).get()? > 4 {
-            let next_section = MessageSection::read(&mut count_reader)?;
+            let next_section = MessageSection::read(&mut count_reader).await?;
             match next_section {
                 MessageSection::Document(document) => {
                     if document_payload.is_some() {
@@ -238,8 +235,10 @@ impl Message {
 
         let mut checksum = None;
 
-        if length_remaining.get()? == 4 && flags.contains(MessageFlags::CHECKSUM_PRESENT) {
-            checksum = Some(reader.read_u32_sync()?);
+        if length_remaining.get()? == size_of::<u32>()
+            && flags.contains(MessageFlags::CHECKSUM_PRESENT)
+        {
+            checksum = Some(reader.read_u32_le().await?);
         } else if length_remaining.get()? != 0 {
             let header_len = Checked::<usize>::try_from(header.length)?;
             return Err(Error::invalid_response(format!(
@@ -368,13 +367,11 @@ impl Message {
     fn get_sections_bytes(&self) -> Result<Vec<u8>> {
         let mut sections = Vec::new();
 
-        // Payload type 0
-        sections.push(0);
+        sections.push(DOCUMENT_PAYLOAD_TYPE);
         sections.extend(self.document_payload.as_bytes());
 
         for document_sequence in &self.document_sequences {
-            // Payload type 1
-            sections.push(1);
+            sections.push(DOCUMENT_SEQUENCE_PAYLOAD_TYPE);
 
             let identifier_bytes = document_sequence.identifier.as_bytes();
 
@@ -417,50 +414,26 @@ bitflags! {
 #[derive(Debug)]
 enum MessageSection {
     Document(RawDocumentBuf),
+    #[expect(unused)] // the server never returns document sequences, so parsing is unsupported
     Sequence(DocumentSequence),
 }
 
 impl MessageSection {
     /// Reads bytes from `reader` and deserializes them into a MessageSection.
-    fn read<R: Read>(reader: &mut R) -> Result<Self> {
-        let payload_type = reader.read_u8_sync()?;
-
-        if payload_type == 0 {
-            let bytes = bson_util::read_document_bytes(reader)?;
-            let document = RawDocumentBuf::from_bytes(bytes)?;
-            return Ok(MessageSection::Document(document));
-        }
-
-        let size = Checked::<usize>::try_from(reader.read_i32_sync()?)?;
-        let mut length_remaining = size - std::mem::size_of::<i32>();
-
-        let mut identifier = String::new();
-        length_remaining -= reader.read_to_string(&mut identifier)?;
-
-        let mut documents = Vec::new();
-        let mut count_reader = SyncCountReader::new(reader);
-
-        while length_remaining.get()? > count_reader.bytes_read() {
-            let bytes = bson_util::read_document_bytes(&mut count_reader)?;
-            let document = RawDocumentBuf::from_bytes(bytes)?;
-            documents.push(document);
-        }
-
-        if length_remaining.get()? != count_reader.bytes_read() {
-            return Err(ErrorKind::InvalidResponse {
-                message: format!(
-                    "The server indicated that the reply would be {} bytes long, but it instead \
-                     was {}",
-                    size,
-                    length_remaining + count_reader.bytes_read(),
-                ),
+    async fn read<R: AsyncRead + Unpin>(reader: &mut R) -> Result<Self> {
+        let payload_type = reader.read_u8().await?;
+        match payload_type {
+            DOCUMENT_PAYLOAD_TYPE => {
+                let bytes = bson_util::read_document_bytes(reader).await?;
+                let document = RawDocumentBuf::from_bytes(bytes)?;
+                Ok(MessageSection::Document(document))
             }
-            .into());
+            DOCUMENT_SEQUENCE_PAYLOAD_TYPE => Err(Error::invalid_response(
+                "Unexpected document sequence included in OP_MSG reply",
+            )),
+            other => Err(Error::invalid_response(format!(
+                "Unexpected payload type included in OP_MSG reply: {other}"
+            ))),
         }
-
-        Ok(MessageSection::Sequence(DocumentSequence {
-            identifier,
-            documents,
-        }))
     }
 }
