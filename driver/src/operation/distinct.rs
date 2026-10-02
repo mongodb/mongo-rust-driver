@@ -6,12 +6,13 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::options::DistinctOptions,
     error::Result,
-    operation::{Base, BaseOperation, OperationImpl, Retryability},
-    options::{ClientOptions, SelectionCriteria},
+    operation::{to_feature, ResponseHandlingKind},
+    options::ClientOptions,
     Collection,
 };
 
 use super::{append_options_to_raw_document, ExecutionContext};
+use crate::operation::{default_impl, Feature, Operation, OperationDetails, Retryability};
 
 pub(crate) struct Distinct {
     target: Collection<Document>,
@@ -36,12 +37,33 @@ impl Distinct {
     }
 }
 
-impl BaseOperation for Distinct {
+impl Operation for Distinct {
     type O = Vec<Bson>;
 
     const NAME: &'static CStr = cstr!("distinct");
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    default_impl!(name, handle_error, update_for_retry, pinned_connection);
+
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: to_feature!(self.options, selection_criteria),
+            read_concern: to_feature!(self.options, read_concern),
+            write_concern: Feature::NotSupported,
+            supports_sessions: true,
+            retryability: Retryability::read(options),
+            is_backpressure_retryable: options.retry_reads != Some(false),
+            override_criteria: None,
+            target: (&self.target).into(),
+            is_after_cluster_time_write: false,
+        }
+    }
+
+    fn build(
+        &mut self,
+        _description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.target.name(),
             "key": self.field_name.clone(),
@@ -50,7 +72,11 @@ impl BaseOperation for Distinct {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::from_operation(self, body))
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
+            body,
+        ))
     }
 
     fn extract_at_cluster_time(
@@ -71,34 +97,8 @@ impl BaseOperation for Distinct {
         Ok(response.values)
     }
 
-    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
-        self.options
-            .as_ref()
-            .and_then(|o| o.selection_criteria.as_ref())
-            .into()
-    }
-
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        Retryability::read(options)
-    }
-
-    fn read_concern(&self) -> super::Feature<&crate::options::ReadConcern> {
-        self.options
-            .as_ref()
-            .and_then(|o| o.read_concern.as_ref())
-            .into()
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        (&self.target).into()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for Distinct {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

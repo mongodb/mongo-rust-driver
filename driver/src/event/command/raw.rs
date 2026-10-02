@@ -37,9 +37,9 @@ pub(crate) struct RawCommandSucceededEvent {
     pub(crate) service_id: Option<ObjectId>,
 }
 
-impl Into<CommandEvent> for RawCommandEvent {
-    fn into(self) -> CommandEvent {
-        match self {
+impl From<RawCommandEvent> for CommandEvent {
+    fn from(event: RawCommandEvent) -> Self {
+        match event {
             RawCommandEvent::Started(ev) => CommandEvent::Started(CommandStartedEvent {
                 command: ev.command.try_into().unwrap_or_else(
                     |e: RawError| doc! { "invalid command document": e.to_string() },

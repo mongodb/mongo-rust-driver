@@ -4,13 +4,21 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     collation::Collation,
     error::Result,
-    operation::{append_options, Base, BaseOperation, OperationImpl, Retryability},
-    options::{ClientOptions, DeleteOptions, Hint, WriteConcern},
+    operation::{
+        append_options,
+        default_impl,
+        to_feature,
+        ExecutionContext,
+        Feature,
+        Operation,
+        OperationDetails,
+        ResponseHandlingKind,
+        Retryability,
+    },
+    options::{ClientOptions, DeleteOptions, Hint},
     results::DeleteResult,
     Collection,
 };
-
-use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct Delete {
@@ -40,12 +48,43 @@ impl Delete {
     }
 }
 
-impl BaseOperation for Delete {
+impl Operation for Delete {
     type O = DeleteResult;
 
     const NAME: &'static CStr = cstr!("delete");
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        handle_error,
+        update_for_retry,
+        pinned_connection
+    );
+
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: Feature::NotSupported,
+            read_concern: Feature::NotSupported,
+            write_concern: to_feature!(self.options, write_concern),
+            supports_sessions: true,
+            retryability: if self.limit == 1 {
+                Retryability::write(options)
+            } else {
+                Retryability::None
+            },
+            is_backpressure_retryable: options.retry_writes != Some(false),
+            override_criteria: None,
+            target: (&self.target).into(),
+            is_after_cluster_time_write: true,
+        }
+    }
+
+    fn build(
+        &mut self,
+        _description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         let mut delete = doc! {
             "q": self.filter.clone(),
             "limit": self.limit,
@@ -70,7 +109,11 @@ impl BaseOperation for Delete {
 
         append_options(&mut body, self.options.as_ref())?;
 
-        Ok(Command::from_operation(self, (&body).try_into()?))
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
+            (&body).try_into()?,
+        ))
     }
 
     fn handle_response<'a>(
@@ -84,35 +127,8 @@ impl BaseOperation for Delete {
         })
     }
 
-    fn write_concern(&self) -> super::Feature<&WriteConcern> {
-        self.options
-            .as_ref()
-            .and_then(|opts| opts.write_concern.as_ref())
-            .into()
-    }
-
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        if self.limit == 1 {
-            Retryability::write(options)
-        } else {
-            Retryability::None
-        }
-    }
-
-    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
-        options.retry_writes != Some(false)
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        (&self.target).into()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for Delete {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

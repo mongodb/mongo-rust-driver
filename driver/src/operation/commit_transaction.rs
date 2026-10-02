@@ -6,12 +6,21 @@ use crate::{
     client::Retry,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options_to_raw_document, Base, BaseOperation, OperationImpl, Retryability},
+    operation::{
+        append_options_to_raw_document,
+        default_impl,
+        to_feature,
+        ExecutionContext,
+        Feature,
+        Operation,
+        OperationDetails,
+        OperationTarget,
+        ResponseHandlingKind,
+        Retryability,
+    },
     options::{Acknowledgment, ClientOptions, TransactionOptions, WriteConcern},
     Client,
 };
-
-use super::ExecutionContext;
 
 pub(crate) struct CommitTransaction {
     options: Option<TransactionOptions>,
@@ -27,19 +36,50 @@ impl CommitTransaction {
     }
 }
 
-impl BaseOperation for CommitTransaction {
+impl Operation for CommitTransaction {
     type O = ();
 
     const NAME: &'static CStr = cstr!("commitTransaction");
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        handle_error,
+        pinned_connection
+    );
+
+    fn details(&self, _options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: Feature::NotSupported,
+            read_concern: Feature::NotSupported,
+            write_concern: to_feature!(self.options, write_concern),
+            supports_sessions: true,
+            // commitTransaction is retryable regardless of the value of retryWrites
+            retryability: Retryability::Write,
+            is_backpressure_retryable: true,
+            override_criteria: None,
+            target: OperationTarget::admin(&self.target),
+            is_after_cluster_time_write: false,
+        }
+    }
+
+    fn build(
+        &mut self,
+        _description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: 1,
         };
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::from_operation(self, body))
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
+            body,
+        ))
     }
 
     fn handle_response<'a>(
@@ -48,18 +88,6 @@ impl BaseOperation for CommitTransaction {
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         response.validate_single_write()
-    }
-
-    fn write_concern(&self) -> super::Feature<&WriteConcern> {
-        self.options
-            .as_ref()
-            .and_then(|o| o.write_concern.as_ref())
-            .into()
-    }
-
-    fn retryability(&self, _options: &ClientOptions) -> Retryability {
-        // commitTransaction is retryable regardless of the value of retryWrites
-        Retryability::Write
     }
 
     // Updates the write concern to use w: majority and a w_timeout of 10000 if w_timeout is not
@@ -87,20 +115,8 @@ impl BaseOperation for CommitTransaction {
         }
     }
 
-    fn target(&self) -> super::OperationTarget {
-        super::OperationTarget::admin(&self.target)
-    }
-
-    fn is_after_cluster_time_write(&self) -> bool {
-        false
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for CommitTransaction {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

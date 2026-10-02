@@ -14,17 +14,20 @@ use crate::{
     error::{Error, Result},
     operation::{
         append_options_to_raw_document,
+        default_impl,
         find_and_modify::options::Modification,
-        Base,
-        BaseOperation,
-        OperationImpl,
+        to_feature,
+        ExecutionContext,
+        Feature,
+        Operation,
+        OperationDetails,
+        ResponseHandlingKind,
         Retryability,
+        UpdateOrReplace,
     },
-    options::{ClientOptions, WriteConcern},
+    options::ClientOptions,
     Collection,
 };
-
-use super::{ExecutionContext, UpdateOrReplace};
 
 pub(crate) struct FindAndModify<T: DeserializeOwned> {
     target: Collection<Document>,
@@ -57,11 +60,38 @@ impl<T: DeserializeOwned> FindAndModify<T> {
     }
 }
 
-impl<T: DeserializeOwned> BaseOperation for FindAndModify<T> {
+impl<T: DeserializeOwned> Operation for FindAndModify<T> {
     type O = Option<T>;
     const NAME: &'static CStr = cstr!("findAndModify");
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        handle_error,
+        update_for_retry,
+        pinned_connection
+    );
+
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: Feature::NotSupported,
+            read_concern: Feature::NotSupported,
+            write_concern: to_feature!(self.options, write_concern),
+            supports_sessions: true,
+            retryability: Retryability::write(options),
+            is_backpressure_retryable: options.retry_writes != Some(false),
+            override_criteria: None,
+            target: (&self.target).into(),
+            is_after_cluster_time_write: true,
+        }
+    }
+
+    fn build(
+        &mut self,
+        _description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.target.name(),
             "query": RawDocumentBuf::try_from(&self.query)?,
@@ -76,7 +106,11 @@ impl<T: DeserializeOwned> BaseOperation for FindAndModify<T> {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::from_operation(self, body))
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
+            body,
+        ))
     }
 
     fn handle_response<'a>(
@@ -101,27 +135,8 @@ impl<T: DeserializeOwned> BaseOperation for FindAndModify<T> {
         }
     }
 
-    fn write_concern(&self) -> super::Feature<&WriteConcern> {
-        self.options
-            .as_ref()
-            .and_then(|o| o.write_concern.as_ref())
-            .into()
-    }
-
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        Retryability::write(options)
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        (&self.target).into()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl<T: DeserializeOwned> OperationImpl for FindAndModify<T> {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

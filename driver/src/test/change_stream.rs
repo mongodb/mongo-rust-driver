@@ -615,7 +615,7 @@ async fn drop_infinite_loop() -> Result<()> {
     coll.drop().await?;
 
     for _ in 1..=10 {
-        if let None = stream.try_next().await? {
+        if stream.try_next().await?.is_none() {
             break;
         }
     }

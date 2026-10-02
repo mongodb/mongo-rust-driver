@@ -4,12 +4,19 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
-    operation::{Base, BaseOperation, OperationImpl, Retryability},
-    options::{ClientOptions, ListCollectionsOptions, ReadPreference, SelectionCriteria},
+    operation::{
+        append_options_to_raw_document,
+        default_impl,
+        ExecutionContext,
+        Feature,
+        Operation,
+        OperationDetails,
+        ResponseHandlingKind,
+        Retryability,
+    },
+    options::{ClientOptions, ListCollectionsOptions, SelectionCriteria},
     Database,
 };
-
-use super::{append_options_to_raw_document, ExecutionContext};
 
 #[derive(Debug)]
 pub(crate) struct ListCollections {
@@ -32,14 +39,39 @@ impl ListCollections {
     }
 }
 
-impl BaseOperation for ListCollections {
+impl Operation for ListCollections {
     type O = CursorSpecification;
 
     const NAME: &'static CStr = cstr!("listCollections");
 
-    const ZERO_COPY: bool = true;
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        handle_error,
+        update_for_retry,
+        pinned_connection
+    );
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Owned,
+            selection_criteria: Feature::Set(SelectionCriteria::primary()),
+            read_concern: Feature::NotSupported,
+            write_concern: Feature::NotSupported,
+            supports_sessions: true,
+            retryability: Retryability::read(options),
+            is_backpressure_retryable: options.retry_reads != Some(false),
+            override_criteria: None,
+            target: (&self.db).into(),
+            is_after_cluster_time_write: false,
+        }
+    }
+
+    fn build(
+        &mut self,
+        _description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: 1,
         };
@@ -54,16 +86,20 @@ impl BaseOperation for ListCollections {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::from_operation(self, body))
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
+            body,
+        ))
     }
 
-    fn handle_response_cow<'a>(
+    fn handle_response_owned<'a>(
         &'a self,
-        response: std::borrow::Cow<'a, RawCommandResponse>,
+        response: RawCommandResponse,
         context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         CursorSpecification::new(
-            response.into_owned(),
+            response,
             context
                 .connection
                 .stream_description()?
@@ -75,24 +111,8 @@ impl BaseOperation for ListCollections {
         )
     }
 
-    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
-        super::Feature::Set(&SelectionCriteria::ReadPreference(ReadPreference::Primary))
-    }
-
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        Retryability::read(options)
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        (&self.db).into()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for ListCollections {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

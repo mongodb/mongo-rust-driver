@@ -12,13 +12,21 @@ use crate::{
     checked::Checked,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
-    operation::{Base, BaseOperation, OperationImpl, Retryability},
-    options::{ClientOptions, InsertManyOptions, WriteConcern},
+    operation::{
+        default_impl,
+        ExecutionContext,
+        Feature,
+        Operation,
+        OperationDetails,
+        ResponseHandlingKind,
+        Retryability,
+        MAX_ENCRYPTED_WRITE_SIZE,
+        OP_MSG_OVERHEAD_BYTES,
+    },
+    options::{ClientOptions, InsertManyOptions},
     results::InsertManyResult,
     Collection,
 };
-
-use super::{ExecutionContext, MAX_ENCRYPTED_WRITE_SIZE, OP_MSG_OVERHEAD_BYTES};
 
 #[derive(Debug)]
 pub(crate) struct Insert<'a> {
@@ -51,12 +59,39 @@ impl<'a> Insert<'a> {
     }
 }
 
-impl BaseOperation for Insert<'_> {
+impl Operation for Insert<'_> {
     type O = InsertManyResult;
 
     const NAME: &'static CStr = cstr!("insert");
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        handle_error,
+        update_for_retry,
+        pinned_connection
+    );
+
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: Feature::NotSupported,
+            read_concern: Feature::NotSupported,
+            write_concern: self.options.write_concern.clone().into(),
+            supports_sessions: true,
+            retryability: Retryability::write(options),
+            is_backpressure_retryable: options.retry_writes != Some(false),
+            override_criteria: None,
+            target: (&self.target).into(),
+            is_after_cluster_time_write: true,
+        }
+    }
+
+    fn build(
+        &mut self,
+        description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         self.inserted_ids.clear();
 
         let max_doc_size: usize = Checked::new(description.max_bson_object_size).try_into()?;
@@ -120,9 +155,13 @@ impl BaseOperation for Insert<'_> {
         if self.encrypted {
             // Auto-encryption does not support document sequences
             body.append(cstr!("documents"), vec_to_raw_array_buf(docs));
-            Ok(Command::from_operation(self, body))
+            Ok(Command::from_operation_details(
+                op_details,
+                self.name(),
+                body,
+            ))
         } else {
-            let mut command = Command::from_operation(self, body);
+            let mut command = Command::from_operation_details(op_details, self.name(), body);
             command.add_document_sequence("documents", docs);
             Ok(command)
         }
@@ -168,24 +207,8 @@ impl BaseOperation for Insert<'_> {
         }
     }
 
-    fn write_concern(&self) -> super::Feature<&WriteConcern> {
-        self.options.write_concern.as_ref().into()
-    }
-
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        Retryability::write(options)
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        (&self.target).into()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for Insert<'_> {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

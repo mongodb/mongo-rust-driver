@@ -7,13 +7,20 @@ use crate::{
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     cursor::common::{CursorInformation, CursorReply},
     error::Result,
-    operation::{Base, BaseOperation, OperationImpl},
-    options::SelectionCriteria,
+    operation::{
+        default_impl,
+        ExecutionContext,
+        Feature,
+        Operation,
+        OperationDetails,
+        OperationTarget,
+        ResponseHandlingKind,
+        Retryability,
+    },
+    options::{ClientOptions, SelectionCriteria},
     results::GetMoreResult,
     Namespace,
 };
-
-use super::ExecutionContext;
 
 #[derive(Debug)]
 pub(crate) struct GetMore<'conn> {
@@ -43,14 +50,38 @@ impl<'conn> GetMore<'conn> {
     }
 }
 
-impl BaseOperation for GetMore<'_> {
+impl Operation for GetMore<'_> {
     type O = GetMoreResult;
 
     const NAME: &'static CStr = cstr!("getMore");
 
-    const ZERO_COPY: bool = true;
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        handle_error,
+        update_for_retry
+    );
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Owned,
+            selection_criteria: Feature::Set(self.selection_criteria.clone()),
+            read_concern: Feature::NotSupported,
+            write_concern: Feature::NotSupported,
+            supports_sessions: true,
+            retryability: Retryability::None,
+            is_backpressure_retryable: options.retry_reads != Some(false),
+            override_criteria: None,
+            target: OperationTarget::Namespace(self.ns.clone()),
+            is_after_cluster_time_write: false,
+        }
+    }
+
+    fn build(
+        &mut self,
+        _description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         let mut body = rawdoc! {
             Self::NAME: self.cursor_id,
             "collection": self.ns.coll.clone(),
@@ -75,12 +106,16 @@ impl BaseOperation for GetMore<'_> {
             body.append(cstr!("comment"), raw_comment);
         }
 
-        Ok(Command::from_operation(self, body))
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
+            body,
+        ))
     }
 
-    fn handle_response_cow<'a>(
+    fn handle_response_owned<'a>(
         &'a self,
-        response: std::borrow::Cow<'a, RawCommandResponse>,
+        response: RawCommandResponse,
         _context: ExecutionContext<'a>,
     ) -> Result<Self::O> {
         // Extract minimal fields directly from the raw reply to avoid walking the batch via serde.
@@ -93,7 +128,7 @@ impl BaseOperation for GetMore<'_> {
         } = CursorReply::parse(cursor)?;
 
         // Take ownership of the raw bytes without copying.
-        let raw = response.into_owned().into_raw_document_buf();
+        let raw = response.into_raw_document_buf();
 
         Ok(GetMoreResult {
             raw_reply: raw,
@@ -104,28 +139,12 @@ impl BaseOperation for GetMore<'_> {
         })
     }
 
-    fn is_backpressure_retryable(&self, options: &crate::options::ClientOptions) -> bool {
-        options.retry_reads != Some(false)
-    }
-
-    fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
-        super::Feature::Set(&self.selection_criteria)
-    }
-
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.pinned_connection
     }
 
-    fn target(&self) -> super::OperationTarget {
-        super::OperationTarget::Namespace(self.ns.clone())
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for GetMore<'_> {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

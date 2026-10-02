@@ -6,11 +6,19 @@ use crate::{
     bson_util::to_raw_bson_array_ser,
     cmap::{Command, RawCommandResponse},
     error::Result,
+    operation::{
+        default_impl,
+        ExecutionContext,
+        Feature,
+        Operation,
+        OperationDetails,
+        ResponseHandlingKind,
+        Retryability,
+    },
+    options::ClientOptions,
     Collection,
     SearchIndexModel,
 };
-
-use super::{Base, BaseOperation, ExecutionContext, OperationImpl};
 
 #[derive(Debug)]
 pub(crate) struct CreateSearchIndexes {
@@ -24,13 +32,41 @@ impl CreateSearchIndexes {
     }
 }
 
-impl BaseOperation for CreateSearchIndexes {
+impl Operation for CreateSearchIndexes {
     type O = Vec<String>;
     const NAME: &'static CStr = cstr!("createSearchIndexes");
 
-    fn build(&mut self, _description: &crate::cmap::StreamDescription) -> Result<Command> {
-        Ok(Command::from_operation(
-            self,
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        handle_error,
+        update_for_retry,
+        pinned_connection
+    );
+
+    fn details(&self, _options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: Feature::NotSupported,
+            read_concern: Feature::NotSupported,
+            write_concern: Feature::NotSupported,
+            supports_sessions: false,
+            retryability: Retryability::None,
+            is_backpressure_retryable: false,
+            override_criteria: None,
+            target: (&self.target).into(),
+            is_after_cluster_time_write: false,
+        }
+    }
+
+    fn build(
+        &mut self,
+        _description: &crate::cmap::StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
             rawdoc! {
                 Self::NAME: self.target.name(),
                 "indexes": to_raw_bson_array_ser(&self.indexes)?,
@@ -64,20 +100,8 @@ impl BaseOperation for CreateSearchIndexes {
             .collect())
     }
 
-    fn supports_sessions(&self) -> bool {
-        false
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        (&self.target).into()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for CreateSearchIndexes {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]
@@ -100,17 +124,42 @@ impl UpdateSearchIndex {
     }
 }
 
-impl BaseOperation for UpdateSearchIndex {
+impl Operation for UpdateSearchIndex {
     type O = ();
     const NAME: &'static CStr = cstr!("updateSearchIndex");
+
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        handle_error,
+        update_for_retry,
+        pinned_connection
+    );
+
+    fn details(&self, _options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: Feature::NotSupported,
+            read_concern: Feature::NotSupported,
+            write_concern: Feature::NotSupported,
+            supports_sessions: false,
+            retryability: Retryability::None,
+            is_backpressure_retryable: false,
+            override_criteria: None,
+            target: (&self.target).into(),
+            is_after_cluster_time_write: false,
+        }
+    }
 
     fn build(
         &mut self,
         _description: &crate::cmap::StreamDescription,
+        op_details: &OperationDetails,
     ) -> crate::error::Result<crate::cmap::Command> {
         let raw_def: RawDocumentBuf = (&self.definition).try_into()?;
-        Ok(Command::from_operation(
-            self,
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
             rawdoc! {
                 Self::NAME: self.target.name(),
                 "name": self.name.as_str(),
@@ -127,20 +176,8 @@ impl BaseOperation for UpdateSearchIndex {
         Ok(())
     }
 
-    fn supports_sessions(&self) -> bool {
-        false
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        (&self.target).into()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for UpdateSearchIndex {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]
@@ -158,13 +195,40 @@ impl DropSearchIndex {
     }
 }
 
-impl BaseOperation for DropSearchIndex {
+impl Operation for DropSearchIndex {
     type O = ();
     const NAME: &'static CStr = cstr!("dropSearchIndex");
 
-    fn build(&mut self, _description: &crate::cmap::StreamDescription) -> Result<Command> {
-        Ok(Command::from_operation(
-            self,
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        update_for_retry,
+        pinned_connection
+    );
+
+    fn details(&self, _options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: Feature::NotSupported,
+            read_concern: Feature::NotSupported,
+            write_concern: Feature::NotSupported,
+            supports_sessions: false,
+            retryability: Retryability::None,
+            is_backpressure_retryable: false,
+            override_criteria: None,
+            target: (&self.target).into(),
+            is_after_cluster_time_write: false,
+        }
+    }
+
+    fn build(
+        &mut self,
+        _description: &crate::cmap::StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
+        Ok(Command::from_operation_details(
+            op_details,
+            self.name(),
             rawdoc! {
                 Self::NAME: self.target.name(),
                 "name": self.name.as_str(),
@@ -188,20 +252,8 @@ impl BaseOperation for DropSearchIndex {
         }
     }
 
-    fn supports_sessions(&self) -> bool {
-        false
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        (&self.target).into()
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl OperationImpl for DropSearchIndex {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]
