@@ -577,6 +577,60 @@ async fn append_metadata_name_version_correspond() {
     }
 }
 
+// Client Metadata Update Prose Test 11: Appending metadata containing the delimiter raises an error
+#[tokio::test]
+async fn metadata_delimiter_error() {
+    let base = BASE_CLIENT_METADATA.clone();
+    let driver_name = base.driver.name;
+    let driver_version = base.driver.version;
+    let driver_platform = base.platform;
+    let test_info = [
+        DriverInfo::new("frame|work", "2.0", "Framework Platform"),
+        DriverInfo::new("framework", "2|0", "Framework Platform"),
+        DriverInfo::new("framework", "2.0", "Framework|Platform"),
+    ];
+    for info in test_info {
+        // 1. Create a MongoClient instance
+        let mut options = get_client_options().await.clone();
+        options.max_idle_time = Some(Duration::from_millis(1));
+        options.driver_info = Some(DriverInfo::new("library", "1.2", "Library Platform"));
+        let hello = watch_hello(&mut options);
+        let client = Client::with_options(options).unwrap();
+
+        // 2. Send a ping command to the server and verify that the command succeeds.
+        client.ping().await;
+
+        // 3. Wait 5ms for the connection to become idle.
+        tokio::time::sleep(Duration::from_millis(5)).await;
+
+        // 4. Append the DriverInfoOptions from the selected test case and assert that an error is
+        //    raised.
+        assert!(
+            client.append_metadata(info.clone()).is_err(),
+            "expected error from appending {info:?}"
+        );
+
+        // 5. Wait 5ms for the connection to become idle so that the next operation establishes a
+        //    new connection and handshakes again.
+        tokio::time::sleep(Duration::from_millis(5)).await;
+
+        // 6. Assert that the intercepted client document is unchanged by the failed append
+        let metadata = hello.lock().unwrap().client_metadata();
+        assert_eq!(
+            metadata["driver"]["name"],
+            Bson::String(format!("{driver_name}|library"))
+        );
+        assert_eq!(
+            metadata["driver"]["version"],
+            Bson::String(format!("{driver_version}|1.2"))
+        );
+        assert_eq!(
+            metadata["platform"],
+            Bson::String(format!("{driver_platform}|Library Platform"))
+        );
+    }
+}
+
 #[tokio::test]
 async fn handshake_includes_backpressure() {
     let mut options = get_client_options().await.clone();
