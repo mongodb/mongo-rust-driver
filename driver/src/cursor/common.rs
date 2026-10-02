@@ -153,6 +153,7 @@ pub(super) fn kill_cursor(
     cursor_id: i64,
     pinned_conn: PinnedConnection,
     drop_address: Option<ServerAddress>,
+    #[cfg(feature = "opentelemetry")] span: Option<crate::otel::OpSpan>,
     #[cfg(test)] kill_watcher: Option<oneshot::Sender<()>>,
 ) {
     let coll = client
@@ -161,7 +162,13 @@ pub(super) fn kill_cursor(
     drop_token.spawn(async move {
         if !pinned_conn.is_invalid() {
             let _ = coll
-                .kill_cursor(cursor_id, pinned_conn.handle(), drop_address)
+                .kill_cursor(
+                    cursor_id,
+                    pinned_conn.handle(),
+                    drop_address,
+                    #[cfg(feature = "opentelemetry")]
+                    span,
+                )
                 .await;
             #[cfg(test)]
             if let Some(tx) = kill_watcher {

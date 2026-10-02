@@ -116,10 +116,7 @@ impl Client {
     ) -> OpSpan {
         let op = op.otel();
         if !self.options().otel_enabled() {
-            return OpSpan {
-                context: Context::current(),
-                enabled: false,
-            };
+            return OpSpan::disabled();
         }
         let span_name = format!("{} {}", op.log_name(), op_target(op));
         let mut attrs = common_attrs(op);
@@ -237,6 +234,13 @@ pub(crate) struct OpSpan {
 }
 
 impl OpSpan {
+    pub(crate) fn disabled() -> Self {
+        Self {
+            context: Context::current(),
+            enabled: false,
+        }
+    }
+
     pub(crate) fn record_operation_result<Op: Operation>(
         &self,
         result: &Result<ExecutionDetails<Op>>,

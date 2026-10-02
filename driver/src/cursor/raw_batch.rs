@@ -122,6 +122,8 @@ pub struct RawBatchCursor {
     state: CursorState,
     provider: GetMoreRawProvider<'static, ImplicitClientSessionHandle>,
     drop_address: Option<ServerAddress>,
+    #[cfg(feature = "opentelemetry")]
+    disable_drop_op_span: bool,
     #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
 }
@@ -283,6 +285,8 @@ impl RawBatchCursor {
             client: client.clone(),
             drop_token: client.register_async_drop(),
             drop_address: None,
+            #[cfg(feature = "opentelemetry")]
+            disable_drop_op_span: false,
             #[cfg(test)]
             kill_watcher: None,
             state: CursorState::new(spec, pin),
@@ -312,6 +316,11 @@ impl RawBatchCursor {
 
     pub(crate) fn set_drop_address(&mut self, address: ServerAddress) {
         self.drop_address = Some(address);
+    }
+
+    #[cfg(feature = "opentelemetry")]
+    pub(crate) fn disable_drop_op_span(&mut self) {
+        self.disable_drop_op_span = true;
     }
 
     pub(crate) fn client(&self) -> &Client {
@@ -365,6 +374,9 @@ impl Drop for RawBatchCursor {
             self.state.info.id,
             self.state.pinned_connection.replicate(),
             self.drop_address.take(),
+            #[cfg(feature = "opentelemetry")]
+            self.disable_drop_op_span
+                .then(crate::otel::OpSpan::disabled),
             #[cfg(test)]
             self.kill_watcher.take(),
         );
@@ -378,6 +390,8 @@ pub struct SessionRawBatchCursor {
     drop_token: AsyncDropToken,
     state: CursorState,
     drop_address: Option<ServerAddress>,
+    #[cfg(feature = "opentelemetry")]
+    disable_drop_op_span: bool,
     #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
 }
@@ -404,6 +418,8 @@ impl SessionRawBatchCursor {
             client,
             state: CursorState::new(spec, pinned),
             drop_address: None,
+            #[cfg(feature = "opentelemetry")]
+            disable_drop_op_span: false,
             #[cfg(test)]
             kill_watcher: None,
         }
@@ -427,6 +443,11 @@ impl SessionRawBatchCursor {
 
     pub(crate) fn set_drop_address(&mut self, address: ServerAddress) {
         self.drop_address = Some(address);
+    }
+
+    #[cfg(feature = "opentelemetry")]
+    pub(crate) fn disable_drop_op_span(&mut self) {
+        self.disable_drop_op_span = true;
     }
 
     pub(crate) fn is_exhausted(&self) -> bool {
@@ -468,6 +489,9 @@ impl Drop for SessionRawBatchCursor {
             self.state.info.id,
             self.state.pinned_connection.replicate(),
             self.drop_address.take(),
+            #[cfg(feature = "opentelemetry")]
+            self.disable_drop_op_span
+                .then(crate::otel::OpSpan::disabled),
             #[cfg(test)]
             self.kill_watcher.take(),
         );
