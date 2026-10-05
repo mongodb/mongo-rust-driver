@@ -11,7 +11,7 @@ use crate::{
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
 
-use super::{append_options_to_raw_document, ExecutionContext};
+use super::{append_options_to_raw_document, ResponseContext};
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
@@ -49,7 +49,7 @@ impl BaseOperation for ListDatabases {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         let response: Response = response.body()?;
         Ok(response.databases)

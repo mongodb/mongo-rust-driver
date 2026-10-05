@@ -11,7 +11,7 @@ use crate::{
     options::{AggregateOptions, ClientOptions, ReadPreference, SelectionCriteria, WriteConcern},
 };
 
-use super::{BaseOperation, ExecutionContext};
+use super::{BaseOperation, ResponseContext};
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {
@@ -81,7 +81,7 @@ impl BaseOperation for Aggregate {
     fn handle_response_cow<'a>(
         &'a self,
         response: std::borrow::Cow<'a, RawCommandResponse>,
-        context: ExecutionContext<'a>,
+        context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         if self.is_out_or_merge {
             response.validate_single_write()?;

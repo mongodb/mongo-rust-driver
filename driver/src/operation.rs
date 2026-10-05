@@ -75,8 +75,8 @@ const MAX_ENCRYPTED_WRITE_SIZE: usize = 2_097_152;
 // building a multi-write operation using document sequences.
 const OP_MSG_OVERHEAD_BYTES: usize = 1_000;
 
-/// Context about the execution of the operation.
-pub(crate) struct ExecutionContext<'a> {
+/// Context for handling the response to an operation.
+pub(crate) struct ResponseContext<'a> {
     pub(crate) connection: &'a mut PooledConnection,
     pub(crate) session: Option<&'a mut ClientSession>,
     pub(crate) effective_criteria: SelectionCriteria,
@@ -141,7 +141,7 @@ pub(crate) trait Operation {
     fn handle_response<'a>(
         &'a self,
         response: Cow<'a, RawCommandResponse>,
-        context: ExecutionContext<'a>,
+        context: ResponseContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>>;
 
     /// Interpret an error encountered while sending the built command to the server, potentially
@@ -308,7 +308,7 @@ pub(crate) trait BaseOperation: Send + Sync {
     fn handle_response<'a>(
         &'a self,
         _response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         Err(ErrorKind::Internal {
             message: format!("response handling not implemented for {}", Self::NAME),
@@ -323,7 +323,7 @@ pub(crate) trait BaseOperation: Send + Sync {
     fn handle_response_cow<'a>(
         &'a self,
         response: Cow<'a, RawCommandResponse>,
-        context: ExecutionContext<'a>,
+        context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         self.handle_response(&response, context)
     }
@@ -333,7 +333,7 @@ pub(crate) trait BaseOperation: Send + Sync {
     fn handle_response_async<'a>(
         &'a self,
         response: Cow<'a, RawCommandResponse>,
-        context: ExecutionContext<'a>,
+        context: ResponseContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move { self.handle_response_cow(response, context) }.boxed()
     }
@@ -424,7 +424,7 @@ pub(crate) trait OperationDispatch<Kind> {
     fn handle_response<'a>(
         &'a self,
         response: Cow<'a, RawCommandResponse>,
-        context: ExecutionContext<'a>,
+        context: ResponseContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>>;
     fn handle_error(&self, error: Error) -> Result<Self::O>;
     fn selection_criteria(&self) -> Feature<&SelectionCriteria>;
@@ -465,7 +465,7 @@ macro_rules! operation_dispatch_body {
         fn handle_response<'a>(
             &'a self,
             response: Cow<'a, RawCommandResponse>,
-            context: ExecutionContext<'a>,
+            context: ResponseContext<'a>,
         ) -> BoxFuture<'a, Result<Self::O>> {
             <T as $trait>::$handle_response(self, response, context)
         }
@@ -542,7 +542,7 @@ pub(crate) trait WrappedOperation {
     fn handle_response<'a>(
         &'a self,
         response: Cow<'a, RawCommandResponse>,
-        context: ExecutionContext<'a>,
+        context: ResponseContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>>;
 
     // Delegated to wrapped

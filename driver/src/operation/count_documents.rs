@@ -10,7 +10,7 @@ use crate::{
     options::{AggregateOptions, ClientOptions, CountOptions},
 };
 
-use super::{ExecutionContext, Retryability, SingleCursorResult};
+use super::{ResponseContext, Retryability, SingleCursorResult};
 
 pub(crate) struct CountDocuments {
     aggregate: Aggregate,
@@ -88,7 +88,7 @@ impl WrappedOperation for CountDocuments {
     fn handle_response<'a>(
         &'a self,
         response: std::borrow::Cow<'a, RawCommandResponse>,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> crate::BoxFuture<'a, Result<Self::O>> {
         use futures_util::FutureExt;
         async move {

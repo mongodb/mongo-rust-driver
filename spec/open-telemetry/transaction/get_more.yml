@@ -1,0 +1,119 @@
+description: transaction getMore spans
+schemaVersion: '1.29'
+runOnRequirements:
+  - minServerVersion: '4.0'
+    topologies:
+      - replicaset
+  - minServerVersion: '4.1.8'
+    topologies:
+      - sharded
+      - load-balanced
+createEntities:
+  - client:
+      id: &client0 client0
+      useMultipleMongoses: false
+      observeTracingMessages: {}
+  - database:
+      id: &database0 database0
+      client: *client0
+      databaseName: &database0Name transaction-get-more
+  - collection:
+      id: &collection0 collection0
+      database: *database0
+      collectionName: &collection0Name test
+  - session:
+      id: &session0 session0
+      client: *client0
+initialData:
+  - collectionName: *collection0Name
+    databaseName: *database0Name
+    documents:
+      - { _id: 1 }
+      - { _id: 2 }
+      - { _id: 3 }
+tests:
+  - description: getMore inside a transaction nests under the transaction span
+    operations:
+      - name: startTransaction
+        object: *session0
+      # Three documents with a batchSize of two sends exactly one getMore, which
+      # exhausts the cursor inside the transaction.
+      - name: createFindCursor
+        object: *collection0
+        arguments:
+          filter: {}
+          batchSize: 2
+          session: *session0
+        saveResultAsEntity: &cursor0 cursor0
+      - name: iterateUntilDocumentOrError
+        object: *cursor0
+        expectResult: { _id: 1 }
+      - name: iterateUntilDocumentOrError
+        object: *cursor0
+        expectResult: { _id: 2 }
+      - name: iterateUntilDocumentOrError
+        object: *cursor0
+        expectResult: { _id: 3 }
+      - name: commitTransaction
+        object: *session0
+
+    expectTracingMessages:
+      - client: *client0
+        ignoreExtraSpans: false
+        spans:
+          - name: transaction
+            attributes:
+              db.system.name: mongodb
+            # The getMore operation span is a sibling of the find operation span
+            # that created the cursor, not nested under it, even though both
+            # belong to the transaction.
+            nested:
+              - name: find transaction-get-more.test
+                attributes:
+                  db.system.name: mongodb
+                  db.namespace: *database0Name
+                  db.collection.name: *collection0Name
+                  db.operation.name: find
+                  db.operation.summary: find transaction-get-more.test
+                  db.mongodb.cursor_id: { $$gte: 1 }
+                nested:
+                  - name: find
+                    attributes:
+                      db.system.name: mongodb
+                      db.namespace: *database0Name
+                      db.collection.name: *collection0Name
+                      db.command.name: find
+                      db.query.summary: find transaction-get-more.test
+                      db.mongodb.cursor_id: { $$gte: 1 }
+              - name: getMore transaction-get-more.test
+                attributes:
+                  db.system.name: mongodb
+                  db.namespace: *database0Name
+                  db.collection.name: *collection0Name
+                  db.operation.name: getMore
+                  db.operation.summary: getMore transaction-get-more.test
+                  db.mongodb.cursor_id: { $$gte: 1 }
+                nested:
+                  - name: getMore
+                    attributes:
+                      db.system.name: mongodb
+                      db.namespace: *database0Name
+                      db.collection.name: *collection0Name
+                      db.command.name: getMore
+                      db.query.summary: getMore transaction-get-more.test
+                      db.mongodb.cursor_id: { $$gte: 1 }
+              - name: commitTransaction admin
+                attributes:
+                  db.system.name: mongodb
+                  db.namespace: admin
+                  db.collection.name: { $$exists: false }
+                  db.operation.name: commitTransaction
+                  db.operation.summary: commitTransaction admin
+                nested:
+                  - name: commitTransaction
+                    attributes:
+                      db.system.name: mongodb
+                      db.namespace: admin
+                      db.collection.name: { $$exists: false }
+                      db.command.name: commitTransaction
+                      db.query.summary: commitTransaction admin

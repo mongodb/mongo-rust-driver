@@ -24,7 +24,7 @@ use crate::{
     Collection,
 };
 
-use super::{ExecutionContext, UpdateOrReplace};
+use super::{ResponseContext, UpdateOrReplace};
 
 pub(crate) struct FindAndModify<T: DeserializeOwned> {
     target: Collection<Document>,
@@ -82,7 +82,7 @@ impl<T: DeserializeOwned> BaseOperation for FindAndModify<T> {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         response.validate_single_write()?;
         #[derive(Debug, Deserialize)]

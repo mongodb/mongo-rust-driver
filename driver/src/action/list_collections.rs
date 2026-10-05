@@ -118,7 +118,7 @@ impl<'a, S: ActionSession<'a>> ListCollections<'a, ListSpecifications, S> {
         let mut list_collections = op::ListCollections::new(self.db.clone(), false, self.options);
         self.db
             .client()
-            .execute_cursor_operation(&mut list_collections, self.session.into_opt_session())
+            .execute_cursor_operation(&mut list_collections, &mut self.session.into_exec_context())
             .await
     }
 }
@@ -179,13 +179,15 @@ async fn list_collection_names_common(
 impl<'a> Action for ListCollections<'a, ListNames, ImplicitSession> {
     type Future = ListCollectionNamesFuture;
 
-    async fn execute(self) -> Result<Vec<String>> {
+    async fn execute(mut self) -> Result<Vec<String>> {
+        let client = self.db.client();
         let mut list_collections = op::ListCollections::new(self.db.clone(), true, self.options);
-        let cursor: Cursor<Document> = self
-            .db
-            .client()
-            .execute_cursor_operation(&mut list_collections, None)
+        let mut context = self.session.into_exec_context();
+        let cursor: Cursor<Document> = client
+            .execute_cursor_operation(&mut list_collections, &mut context)
             .await?;
+        #[cfg(feature = "opentelemetry")]
+        let cursor = cursor.with_span(context.span)?;
         return list_collection_names_common(cursor).await;
     }
 }
@@ -194,13 +196,16 @@ impl<'a> Action for ListCollections<'a, ListNames, ImplicitSession> {
 impl<'a> Action for ListCollections<'a, ListNames, ExplicitSession<'a>> {
     type Future = ListCollectionNamesSessionFuture;
 
-    async fn execute(self) -> Result<Vec<String>> {
+    async fn execute(mut self) -> Result<Vec<String>> {
         let mut list_collections = op::ListCollections::new(self.db.clone(), true, self.options);
+        let mut context = self.session.as_exec_context();
         let mut cursor: SessionCursor<Document> = self
             .db
             .client()
-            .execute_cursor_operation(&mut list_collections, Some(&mut *self.session.0))
+            .execute_cursor_operation(&mut list_collections, &mut context)
             .await?;
+        #[cfg(feature = "opentelemetry")]
+        cursor.raw_mut().set_span(context.span);
 
         list_collection_names_common(cursor.stream(self.session.0)).await
     }

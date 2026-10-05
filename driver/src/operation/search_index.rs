@@ -10,7 +10,7 @@ use crate::{
     SearchIndexModel,
 };
 
-use super::{Base, BaseOperation, ExecutionContext, OperationImpl};
+use super::{Base, BaseOperation, OperationImpl, ResponseContext};
 
 #[derive(Debug)]
 pub(crate) struct CreateSearchIndexes {
@@ -41,7 +41,7 @@ impl BaseOperation for CreateSearchIndexes {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         #[derive(Debug, Deserialize)]
         #[serde(rename_all = "camelCase")]
@@ -122,7 +122,7 @@ impl BaseOperation for UpdateSearchIndex {
     fn handle_response<'a>(
         &'a self,
         _response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         Ok(())
     }
@@ -175,7 +175,7 @@ impl BaseOperation for DropSearchIndex {
     fn handle_response<'a>(
         &'a self,
         _response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         Ok(())
     }

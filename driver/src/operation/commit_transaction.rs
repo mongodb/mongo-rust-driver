@@ -11,7 +11,7 @@ use crate::{
     Client,
 };
 
-use super::ExecutionContext;
+use super::ResponseContext;
 
 pub(crate) struct CommitTransaction {
     options: Option<TransactionOptions>,
@@ -45,7 +45,7 @@ impl BaseOperation for CommitTransaction {
     fn handle_response<'a>(
         &'a self,
         response: &RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         response.validate_single_write()
     }

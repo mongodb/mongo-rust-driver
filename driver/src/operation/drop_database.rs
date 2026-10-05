@@ -9,7 +9,7 @@ use crate::{
     options::WriteConcern,
 };
 
-use super::ExecutionContext;
+use super::ResponseContext;
 
 #[derive(Debug)]
 pub(crate) struct DropDatabase {
@@ -41,7 +41,7 @@ impl BaseOperation for DropDatabase {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         response.validate_single_write()
     }

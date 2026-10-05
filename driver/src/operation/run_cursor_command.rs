@@ -12,7 +12,7 @@ use crate::{
     BoxFuture,
 };
 
-use super::ExecutionContext;
+use super::ResponseContext;
 
 #[derive(Debug, Clone)]
 pub(crate) struct RunCursorCommand<'conn> {
@@ -49,7 +49,7 @@ impl<'conn> WrappedOperation for RunCursorCommand<'conn> {
     fn handle_response<'a>(
         &'a self,
         response: std::borrow::Cow<'a, RawCommandResponse>,
-        context: ExecutionContext<'a>,
+        context: ResponseContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             CursorSpecification::new(
