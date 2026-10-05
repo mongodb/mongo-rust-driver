@@ -5,9 +5,9 @@ use crate::{
     operation::{
         default_impl,
         forward_impl,
-        ExecutionContext,
         Operation,
         OperationDetails,
+        ResponseContext,
         ResponseHandlingKind,
     },
     options::ClientOptions,
@@ -44,7 +44,7 @@ impl<Op: Operation> Operation for RawOutput<Op> {
     fn handle_response_owned<'a>(
         &'a self,
         response: RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         Ok(response)
     }

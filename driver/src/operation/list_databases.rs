@@ -9,11 +9,11 @@ use crate::{
     operation::{
         append_options_to_raw_document,
         default_impl,
-        ExecutionContext,
         Feature,
         Operation,
         OperationDetails,
         OperationTarget,
+        ResponseContext,
         ResponseHandlingKind,
         Retryability,
     },
@@ -89,7 +89,7 @@ impl Operation for ListDatabases {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         let response: Response = response.body()?;
         Ok(response.databases)

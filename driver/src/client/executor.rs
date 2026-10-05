@@ -55,11 +55,11 @@ use crate::{
         op_is_abort,
         op_is_commit,
         CommandErrorBody,
-        ExecutionContext,
         Feature,
         Operation,
         OperationDetails,
         OperationTarget,
+        ResponseContext,
         ResponseHandlingKind,
         Retryability,
     },
@@ -94,9 +94,9 @@ pub(crate) static HELLO_COMMAND_NAMES: LazyLock<HashSet<&'static str>> = LazyLoc
 });
 
 /// Details regarding the execution of an operation.
-struct ExecutionDetails<T: Operation> {
-    output: T::O,
-    connection: PooledConnection,
+pub(crate) struct ExecutionDetails<T: Operation> {
+    pub(crate) output: T::O,
+    pub(crate) connection: PooledConnection,
 }
 
 /// The session used in the execution of an operation.
@@ -107,29 +107,8 @@ enum ExecutionSession<'a> {
 }
 
 impl<'a> ExecutionSession<'a> {
-    fn explicit(session: impl Into<Option<&'a mut ClientSession>>) -> Self {
-        match session.into() {
-            Some(session) => Self::Explicit(session),
-            None => Self::None,
-        }
-    }
-
-    fn implicit(session: impl Into<Option<ClientSession>>) -> Self {
-        match session.into() {
-            Some(session) => Self::Implicit(Box::new(session)),
-            None => Self::None,
-        }
-    }
-
     fn set_implicit(&mut self, implicit_session: ClientSession) {
         *self = Self::Implicit(Box::new(implicit_session))
-    }
-
-    fn into_implicit(self) -> Option<ClientSession> {
-        match self {
-            Self::Implicit(implicit) => Some(*implicit),
-            _ => None,
-        }
     }
 
     fn as_ref_option(&self) -> Option<&ClientSession> {
@@ -171,6 +150,46 @@ impl<'a> ExecutionSession<'a> {
     }
 }
 
+pub(crate) struct ExecutionContext<'a> {
+    session: ExecutionSession<'a>,
+    #[cfg(feature = "opentelemetry")]
+    pub(crate) span: Option<crate::otel::OpSpan>,
+}
+
+impl<'a> ExecutionContext<'a> {
+    pub(crate) fn explicit(session: Option<&'a mut ClientSession>) -> Self {
+        Self {
+            session: match session {
+                Some(session) => ExecutionSession::Explicit(session),
+                None => ExecutionSession::None,
+            },
+            #[cfg(feature = "opentelemetry")]
+            span: None,
+        }
+    }
+
+    pub(crate) fn implicit(session: Option<ClientSession>) -> Self {
+        Self {
+            session: match session {
+                Some(session) => ExecutionSession::Implicit(Box::new(session)),
+                None => ExecutionSession::None,
+            },
+            #[cfg(feature = "opentelemetry")]
+            span: None,
+        }
+    }
+
+    fn take_implicit(&mut self) -> Option<ClientSession> {
+        match std::mem::replace(&mut self.session, ExecutionSession::None) {
+            ExecutionSession::Implicit(s) => Some(*s),
+            other => {
+                self.session = other;
+                None
+            }
+        }
+    }
+}
+
 impl Client {
     /// Execute the given operation.
     ///
@@ -182,8 +201,8 @@ impl Client {
         mut op: impl BorrowMut<T>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<T::O> {
-        let mut session = ExecutionSession::explicit(session.into());
-        self.execute_operation_with_details(op.borrow_mut(), &mut session)
+        let mut context = ExecutionContext::explicit(session.into());
+        self.execute_operation_with_details(op.borrow_mut(), &mut context)
             .await
             .map(|details| details.output)
     }
@@ -194,26 +213,23 @@ impl Client {
     pub(crate) async fn execute_cursor_operation<Op, C>(
         &self,
         op: &mut Op,
-        session: Option<&mut ClientSession>,
+        context: &mut ExecutionContext<'_>,
     ) -> Result<C>
     where
         Op: Operation<O = CursorSpecification>,
         C: crate::cursor::NewCursor,
     {
         Box::pin(async {
-            let mut session = ExecutionSession::explicit(session);
-            let mut details = self
-                .execute_operation_with_details(op, &mut session)
-                .await?;
+            let mut details = self.execute_operation_with_details(op, context).await?;
             let pinned = self.pin_connection_for_cursor(
                 &details.output.info,
                 &mut details.connection,
-                session.as_ref_mut_option(),
+                context.session.as_ref_mut_option(),
             )?;
             C::generic_new(
                 self.clone(),
                 details.output,
-                session.into_implicit(),
+                context.take_implicit(),
                 pinned,
             )
         })
@@ -241,18 +257,18 @@ impl Client {
             let implicit_session = resume_data
                 .as_mut()
                 .and_then(|rd| rd.implicit_session.take());
-            let mut session = ExecutionSession::implicit(implicit_session);
+            let mut context = ExecutionContext::implicit(implicit_session);
 
             let mut op = ChangeStreamAggregate::new(&args, resume_data)?;
 
             let mut details = self
-                .execute_operation_with_details(&mut op, &mut session)
+                .execute_operation_with_details(&mut op, &mut context)
                 .await?;
             let (cursor_spec, cs_data) = details.output;
             let pinned =
                 self.pin_connection_for_cursor(&cursor_spec.info, &mut details.connection, None)?;
             let cursor =
-                Cursor::generic_new(self.clone(), cursor_spec, session.into_implicit(), pinned)?;
+                Cursor::generic_new(self.clone(), cursor_spec, context.take_implicit(), pinned)?;
 
             Ok(ChangeStream::new(cursor, args, cs_data))
         })
@@ -277,18 +293,18 @@ impl Client {
                 target,
                 options,
             };
-            let mut session = ExecutionSession::explicit(session);
+            let mut context = ExecutionContext::explicit(Some(session));
 
             let mut op = ChangeStreamAggregate::new(&args, resume_data)?;
             let mut details = self
-                .execute_operation_with_details(&mut op, &mut session)
+                .execute_operation_with_details(&mut op, &mut context)
                 .await?;
 
             let (cursor_spec, cs_data) = details.output;
             let pinned = self.pin_connection_for_cursor(
                 &cursor_spec.info,
                 &mut details.connection,
-                session.as_ref_mut_option(),
+                context.session.as_ref_mut_option(),
             )?;
             let cursor = SessionCursor::generic_new(self.clone(), cursor_spec, None, pinned)?;
             Ok(SessionChangeStream::new(cursor, args, cs_data))
@@ -297,31 +313,38 @@ impl Client {
     }
 
     #[cfg(not(feature = "opentelemetry"))]
-    async fn execute_operation_with_details<T: Operation>(
+    pub(crate) async fn execute_operation_with_details<T: Operation>(
         &self,
         op: &mut T,
-        session: &mut ExecutionSession<'_>,
+        context: &mut ExecutionContext<'_>,
     ) -> Result<ExecutionDetails<T>> {
         let op_details = op.details(self.options());
-        self.execute_operation_with_details_inner(op, op_details, session)
+        self.execute_operation_with_details_inner(op, op_details, context)
             .await
     }
 
     #[cfg(feature = "opentelemetry")]
-    async fn execute_operation_with_details<T: Operation>(
+    pub(crate) async fn execute_operation_with_details<T: Operation>(
         &self,
         op: &mut T,
-        session: &mut ExecutionSession<'_>,
+        context: &mut ExecutionContext<'_>,
     ) -> Result<ExecutionDetails<T>> {
         use crate::otel::FutureExt as _;
 
         let op_details = op.details(self.options());
-        let span = self.start_operation_span(op, &op_details, session.as_ref_option());
+        let span = match context.span.clone() {
+            Some(s) => s,
+            None => {
+                let s = self.start_operation_span(op, &op_details, context.session.as_ref_option());
+                context.span = Some(s.clone());
+                s
+            }
+        };
         let result = self
-            .execute_operation_with_details_inner(op, op_details, session)
+            .execute_operation_with_details_inner(op, op_details, context)
             .with_span(&span)
             .await;
-        span.record_error(&result);
+        span.record_operation_result::<T>(&result);
 
         result
     }
@@ -330,7 +353,7 @@ impl Client {
         &self,
         op: &mut T,
         op_details: OperationDetails,
-        session: &mut ExecutionSession<'_>,
+        context: &mut ExecutionContext<'_>,
     ) -> Result<ExecutionDetails<T>> {
         // Validate inputs that can be checked before server selection and connection
         // checkout.
@@ -338,7 +361,7 @@ impl Client {
             return Err(ErrorKind::Shutdown.into());
         }
 
-        if session.in_transaction() {
+        if context.session.in_transaction() {
             if op_details.read_concern.is_set() {
                 return Err(Error::invalid_argument(
                     "Cannot set read concern after starting a transaction",
@@ -353,7 +376,9 @@ impl Client {
 
         let write_concern = match op_details.write_concern {
             Feature::Set(ref write_concern) => Some(write_concern),
-            Feature::Inherit if !session.in_transaction() => op_details.target.write_concern(),
+            Feature::Inherit if !context.session.in_transaction() => {
+                op_details.target.write_concern()
+            }
             _ => None,
         };
         if let Some(write_concern) = write_concern {
@@ -369,14 +394,15 @@ impl Client {
         let selection_criteria = match op_details.selection_criteria {
             Feature::Set(ref s) => Some(s),
             Feature::NotSupported => None,
-            Feature::Inherit => session
+            Feature::Inherit => context
+                .session
                 .transaction_selection_criteria()
                 .or_else(|| op_details.target.selection_criteria()),
         }
         .cloned();
 
         // Validate the session and update its transaction status if needed.
-        if let Some(session) = session.as_ref_mut_option() {
+        if let Some(session) = context.session.as_ref_mut_option() {
             if !TrackingArc::ptr_eq(&self.inner, &session.client().inner) {
                 return Err(Error::invalid_argument(
                     "the session provided to an operation must be created from the same client as \
@@ -407,12 +433,12 @@ impl Client {
         }
 
         let result = Box::pin(async {
-            self.execute_operation_with_retry(op, op_details, selection_criteria, session)
+            self.execute_operation_with_retry(op, op_details, context, selection_criteria)
                 .await
         })
         .await;
 
-        if let Some(session) = session.as_ref_mut_option() {
+        if let Some(session) = context.session.as_ref_mut_option() {
             if session.transaction.state == TransactionState::Starting {
                 session.transaction.state = TransactionState::InProgress;
             }
@@ -425,8 +451,8 @@ impl Client {
         &self,
         op: &mut T,
         mut op_details: OperationDetails,
+        context: &mut ExecutionContext<'_>,
         selection_criteria: Option<SelectionCriteria>,
-        session: &mut ExecutionSession<'_>,
     ) -> Result<ExecutionDetails<T>> {
         let mut retry: Option<Retry> = None;
         loop {
@@ -451,7 +477,8 @@ impl Client {
                 None => {}
             }
 
-            let selection_criteria = session
+            let selection_criteria = context
+                .session
                 .as_ref_option()
                 .and_then(|s| s.transaction.pinned_mongos())
                 .or(selection_criteria.as_ref());
@@ -470,22 +497,24 @@ impl Client {
                 Ok(selected) => selected,
                 Err(mut error) => {
                     retry::return_last_error(&mut retry)?;
-                    error
-                        .add_labels_and_update_pin(Retryability::None, session.as_ref_mut_option());
+                    error.add_labels_and_update_pin(
+                        Retryability::None,
+                        context.session.as_ref_mut_option(),
+                    );
                     return Err(error);
                 }
             };
 
             let is_transaction_op =
-                session.in_transaction() && !op_is_commit(op) && !op_is_abort(op);
+                context.session.in_transaction() && !op_is_commit(op) && !op_is_abort(op);
 
             let mut connection =
-                match get_connection(session.as_ref_option(), op, &server.pool).await {
+                match get_connection(context.session.as_ref_option(), op, &server.pool).await {
                     Ok(connection) => connection,
                     Err(mut error) => {
                         error.add_labels_and_update_pin(
                             op_details.retryability,
-                            session.as_ref_mut_option(),
+                            context.session.as_ref_mut_option(),
                         );
                         retry = Some(Retry::for_connection_establishment_failure(
                             retry,
@@ -499,17 +528,22 @@ impl Client {
                     }
                 };
 
-            if !connection.supports_sessions() && session.is_set() {
+            if !connection.supports_sessions() && context.session.is_set() {
                 return Err(ErrorKind::SessionsNotSupported.into());
             }
 
-            if connection.supports_sessions() && !session.is_set() && op_details.supports_sessions {
-                session.set_implicit(ClientSession::new(self.clone(), None, true).await);
+            if connection.supports_sessions()
+                && !context.session.is_set()
+                && op_details.supports_sessions
+            {
+                context
+                    .session
+                    .set_implicit(ClientSession::new(self.clone(), None, true).await);
             }
 
             let retryability = self.get_retryability(
                 &op_details,
-                &session.as_ref_mut_option(),
+                &context.session.as_ref_mut_option(),
                 connection.stream_description()?,
             );
             let overloaded = retry.as_ref().map(|r| r.overloaded).unwrap_or(false);
@@ -520,7 +554,8 @@ impl Client {
             }
 
             let txn_number = retry::txn_number(&retry).or_else(|| {
-                session
+                context
+                    .session
                     .as_ref_mut_option()
                     .and_then(|s| s.get_txn_number_for_operation(retryability))
             });
@@ -529,8 +564,8 @@ impl Client {
                 .execute_operation_on_connection(
                     op,
                     &op_details,
+                    context,
                     &mut connection,
-                    &mut session.as_ref_mut_option(),
                     txn_number,
                     retryability,
                     effective_criteria,
@@ -596,8 +631,8 @@ impl Client {
         &self,
         op: &mut Op,
         op_details: &OperationDetails,
+        context: &mut ExecutionContext<'_>,
         connection: &mut PooledConnection,
-        session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
         retryability: Retryability,
         effective_criteria: SelectionCriteria,
@@ -607,7 +642,7 @@ impl Client {
                 op,
                 op_details,
                 connection,
-                session,
+                context.session.as_ref_mut_option(),
                 txn_number,
                 effective_criteria.clone(),
             )?;
@@ -668,7 +703,12 @@ impl Client {
             let command_result = match connection.send_message(message).await {
                 Ok(response) => {
                     match self
-                        .parse_response(op, session, connection.is_sharded()?, &response)
+                        .parse_response(
+                            op,
+                            context.session.as_ref_mut_option(),
+                            connection.is_sharded()?,
+                            &response,
+                        )
                         .await
                     {
                         Ok(()) => Ok(response),
@@ -699,13 +739,16 @@ impl Client {
                     })
                     .await;
 
-                    if let Some(ref mut session) = session {
+                    if let Some(session) = context.session.as_ref_mut_option() {
                         if err.is_network_error() {
                             session.mark_dirty();
                         }
                     }
 
-                    err.add_labels_and_update_pin(retryability, session.as_deref_mut());
+                    err.add_labels_and_update_pin(
+                        retryability,
+                        context.session.as_ref_mut_option(),
+                    );
                     op.handle_error(err)
                 }
                 Ok(response) => {
@@ -738,25 +781,30 @@ impl Client {
                         }
                     };
 
-                    let context = ExecutionContext {
+                    let resp_context = ResponseContext {
                         connection,
-                        session: session.as_deref_mut(),
+                        session: context.session.as_ref_mut_option(),
                         effective_criteria: effective_criteria.clone(),
                     };
 
                     let handle_result = match op_details.response_handling_kind {
                         ResponseHandlingKind::Borrowed => op
-                            .handle_response(&response, context)
+                            .handle_response(&response, resp_context)
                             .map_err(|e| e.with_server_response(&response)),
-                        ResponseHandlingKind::Owned => op.handle_response_owned(response, context),
+                        ResponseHandlingKind::Owned => {
+                            op.handle_response_owned(response, resp_context)
+                        }
                         ResponseHandlingKind::Async => {
-                            op.handle_response_async(response, context).await
+                            op.handle_response_async(response, resp_context).await
                         }
                     };
                     match handle_result {
                         Ok(op_out) => Ok(op_out),
                         Err(mut err) => {
-                            err.add_labels_and_update_pin(retryability, session.as_deref_mut());
+                            err.add_labels_and_update_pin(
+                                retryability,
+                                context.session.as_ref_mut_option(),
+                            );
                             Err(err)
                         }
                     }
@@ -785,7 +833,7 @@ impl Client {
         op: &mut T,
         op_details: &OperationDetails,
         connection: &mut PooledConnection,
-        session: &mut Option<&mut ClientSession>,
+        mut session: Option<&mut ClientSession>,
         txn_number: Option<i64>,
         effective_criteria: SelectionCriteria,
     ) -> Result<crate::cmap::Command> {
@@ -957,7 +1005,7 @@ impl Client {
     async fn parse_response<T: Operation>(
         &self,
         op: &T,
-        session: &mut Option<&mut ClientSession>,
+        mut session: Option<&mut ClientSession>,
         is_sharded: bool,
         response: &RawCommandResponse,
     ) -> Result<()> {
@@ -985,11 +1033,11 @@ impl Client {
 
         let at_cluster_time = op.extract_at_cluster_time(raw_doc)?;
 
-        self.update_cluster_time(cluster_time, at_cluster_time, session)
+        self.update_cluster_time(cluster_time, at_cluster_time, session.as_deref_mut())
             .await;
 
         if let (Some(session), Some(ts)) = (
-            session.as_mut(),
+            &mut session,
             raw_doc
                 .get("operationTime")?
                 .and_then(RawBsonRef::as_timestamp),
@@ -998,7 +1046,7 @@ impl Client {
         }
 
         if ok == 1 {
-            if let Some(ref mut session) = session {
+            if let Some(session) = &mut session {
                 if is_sharded && session.in_transaction() {
                     let recovery_token = raw_doc
                         .get("recoveryToken")?
@@ -1107,7 +1155,7 @@ impl Client {
         &self,
         cluster_time: Option<ClusterTime>,
         at_cluster_time: Option<Timestamp>,
-        session: &mut Option<&mut ClientSession>,
+        mut session: Option<&mut ClientSession>,
     ) {
         if let Some(ref cluster_time) = cluster_time {
             self.inner
@@ -1115,13 +1163,13 @@ impl Client {
                 .updater()
                 .advance_cluster_time(cluster_time.clone())
                 .await;
-            if let Some(ref mut session) = session {
+            if let Some(session) = &mut session {
                 session.advance_cluster_time(cluster_time)
             }
         }
 
         if let Some(timestamp) = at_cluster_time {
-            if let Some(ref mut session) = session {
+            if let Some(session) = &mut session {
                 session.snapshot_time = Some(timestamp);
             }
         }

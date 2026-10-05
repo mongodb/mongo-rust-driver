@@ -541,7 +541,8 @@ pub struct ClientOptions {
     pub direct_connection: Option<bool>,
 
     /// Extra information to append to the driver version in the metadata of the handshake with the
-    /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
+    /// server. This should be used by libraries wrapping the driver, e.g. ODMs.  The '|' character
+    /// is not allowed in any field.
     pub driver_info: Option<DriverInfo>,
 
     /// The amount of time each monitoring thread should wait between performing server checks.

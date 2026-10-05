@@ -9,10 +9,10 @@ use crate::{
         append_options_to_raw_document,
         default_impl,
         to_feature,
-        ExecutionContext,
         Feature,
         Operation,
         OperationDetails,
+        ResponseContext,
         ResponseHandlingKind,
         Retryability,
     },
@@ -93,7 +93,7 @@ impl Operation for CreateIndexes {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         response.validate_single_write()?;
         let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();

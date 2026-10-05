@@ -17,10 +17,10 @@ use crate::{
         default_impl,
         find_and_modify::options::Modification,
         to_feature,
-        ExecutionContext,
         Feature,
         Operation,
         OperationDetails,
+        ResponseContext,
         ResponseHandlingKind,
         Retryability,
         UpdateOrReplace,
@@ -116,7 +116,7 @@ impl<T: DeserializeOwned> Operation for FindAndModify<T> {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         response.validate_single_write()?;
         #[derive(Debug, Deserialize)]

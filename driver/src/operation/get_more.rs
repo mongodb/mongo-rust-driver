@@ -9,11 +9,11 @@ use crate::{
     error::Result,
     operation::{
         default_impl,
-        ExecutionContext,
         Feature,
         Operation,
         OperationDetails,
         OperationTarget,
+        ResponseContext,
         ResponseHandlingKind,
         Retryability,
     },
@@ -116,7 +116,7 @@ impl Operation for GetMore<'_> {
     fn handle_response_owned<'a>(
         &'a self,
         response: RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         // Extract minimal fields directly from the raw reply to avoid walking the batch via serde.
         let root = response.raw_body();

@@ -3,7 +3,7 @@ pub mod options;
 
 use std::{fmt, fmt::Debug, str::FromStr, sync::Arc};
 
-use crate::bson::rawdoc;
+use crate::{bson::rawdoc, client::executor::ExecutionContext};
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize};
 
 use self::options::*;
@@ -196,21 +196,29 @@ where
     pub(super) async fn kill_cursor(
         &self,
         cursor_id: i64,
-        pinned_connection: Option<&PinnedConnectionHandle>,
+        pinned_handle: Option<PinnedConnectionHandle>,
         drop_address: Option<ServerAddress>,
+        #[cfg(feature = "opentelemetry")] span: Option<crate::otel::OpSpan>,
     ) -> Result<()> {
         let ns = self.namespace();
 
-        let op = crate::operation::run_command::RunCommand::new(
+        let mut op = crate::operation::run_command::RunCommand::new(
             self.inner.db.clone(),
             rawdoc! {
                 "killCursors": ns.coll.as_str(),
                 "cursors": [cursor_id]
             },
             drop_address.map(SelectionCriteria::from_address),
-            pinned_connection,
+            pinned_handle.as_ref(),
         );
-        self.client().execute_operation(op, None).await?;
+        let mut context = ExecutionContext::explicit(None);
+        #[cfg(feature = "opentelemetry")]
+        {
+            context.span = span;
+        }
+        self.client()
+            .execute_operation_with_details(&mut op, &mut context)
+            .await?;
         Ok(())
     }
 }

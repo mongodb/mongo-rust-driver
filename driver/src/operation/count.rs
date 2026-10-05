@@ -10,10 +10,10 @@ use crate::{
         append_options_to_raw_document,
         default_impl,
         to_feature,
-        ExecutionContext,
         Feature,
         Operation,
         OperationDetails,
+        ResponseContext,
         ResponseHandlingKind,
         Retryability,
     },
@@ -83,7 +83,7 @@ impl Operation for Count {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         let response_body: ResponseBody = response.body()?;
         Ok(response_body.n)

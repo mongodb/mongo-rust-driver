@@ -7,9 +7,9 @@ use crate::{
         default_impl,
         forward_impl,
         run_command::RunCommand,
-        ExecutionContext,
         Operation,
         OperationDetails,
+        ResponseContext,
         ResponseHandlingKind,
     },
     options::{ClientOptions, RunCursorCommandOptions},
@@ -58,7 +58,7 @@ impl Operation for RunCursorCommand<'_> {
     fn handle_response_owned<'a>(
         &'a self,
         response: RawCommandResponse,
-        context: ExecutionContext<'a>,
+        context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         CursorSpecification::new(
             response,

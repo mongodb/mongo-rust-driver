@@ -14,10 +14,10 @@ use crate::{
     error::{ErrorKind, Result},
     operation::{
         default_impl,
-        ExecutionContext,
         Feature,
         Operation,
         OperationDetails,
+        ResponseContext,
         ResponseHandlingKind,
         Retryability,
         MAX_ENCRYPTED_WRITE_SIZE,
@@ -170,7 +170,7 @@ impl Operation for Insert<'_> {
     fn handle_response<'b>(
         &'b self,
         response: &'b RawCommandResponse,
-        _context: ExecutionContext<'b>,
+        _context: ResponseContext<'b>,
     ) -> Result<Self::O> {
         let n: usize = Checked::new(response.extract_n()?).try_into()?;
         let inserted_ids = || {

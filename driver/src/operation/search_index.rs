@@ -8,10 +8,10 @@ use crate::{
     error::Result,
     operation::{
         default_impl,
-        ExecutionContext,
         Feature,
         Operation,
         OperationDetails,
+        ResponseContext,
         ResponseHandlingKind,
         Retryability,
     },
@@ -77,7 +77,7 @@ impl Operation for CreateSearchIndexes {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         #[derive(Debug, Deserialize)]
         #[serde(rename_all = "camelCase")]
@@ -171,7 +171,7 @@ impl Operation for UpdateSearchIndex {
     fn handle_response<'a>(
         &'a self,
         _response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         Ok(())
     }
@@ -239,7 +239,7 @@ impl Operation for DropSearchIndex {
     fn handle_response<'a>(
         &'a self,
         _response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         Ok(())
     }

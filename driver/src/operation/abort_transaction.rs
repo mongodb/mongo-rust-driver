@@ -6,11 +6,11 @@ use crate::{
     error::Result,
     operation::{
         default_impl,
-        ExecutionContext,
         Feature,
         Operation,
         OperationDetails,
         OperationTarget,
+        ResponseContext,
         ResponseHandlingKind,
         Retryability,
     },
@@ -83,7 +83,7 @@ impl Operation for AbortTransaction {
     fn handle_response<'a>(
         &'a self,
         response: &RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         response.validate_single_write()
     }

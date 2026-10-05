@@ -2,7 +2,7 @@ pub mod action;
 pub mod auth;
 #[cfg(feature = "in-use-encryption")]
 pub(crate) mod csfle;
-mod executor;
+pub(crate) mod executor;
 pub mod options;
 pub mod session;
 
@@ -51,6 +51,8 @@ use crate::{
     tracking_arc::TrackingArc,
     BoxFuture,
     ClientSession,
+    Collection,
+    Namespace,
     TopologyType,
 };
 
@@ -423,7 +425,8 @@ impl Client {
             .map(|db_name| self.database(db_name))
     }
 
-    /// Append new information to the metadata of the handshake with the server.
+    /// Append new information to the metadata of the handshake with the server.  The '|' character
+    /// is not allowed in any field.
     pub fn append_metadata(&self, driver_info: DriverInfo) -> Result<()> {
         self.inner
             .topology
@@ -684,6 +687,10 @@ impl Client {
                 .selection_criteria(selection_criteria.clone())
                 .await;
         }
+    }
+
+    pub(crate) fn collection(&self, ns: &Namespace) -> Collection<crate::bson::Document> {
+        self.database(&ns.db).collection(&ns.coll)
     }
 
     #[cfg(feature = "opentelemetry")]

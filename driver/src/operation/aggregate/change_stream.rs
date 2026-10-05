@@ -11,9 +11,9 @@ use crate::{
         append_options,
         default_impl,
         forward_impl,
-        ExecutionContext,
         Operation,
         OperationDetails,
+        ResponseContext,
         ResponseHandlingKind,
     },
     options::{ChangeStreamOptions, ClientOptions},
@@ -109,14 +109,14 @@ impl Operation for ChangeStreamAggregate {
     fn handle_response_owned<'a>(
         &'a self,
         response: RawCommandResponse,
-        mut context: ExecutionContext<'a>,
+        mut context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         let op_time = response
             .raw_body()
             .get("operationTime")?
             .and_then(crate::bson::RawBsonRef::as_timestamp);
 
-        let inner_context = ExecutionContext {
+        let inner_context = ResponseContext {
             connection: context.connection,
             session: context.session.as_deref_mut(),
             effective_criteria: context.effective_criteria,

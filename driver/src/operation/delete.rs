@@ -8,10 +8,10 @@ use crate::{
         append_options,
         default_impl,
         to_feature,
-        ExecutionContext,
         Feature,
         Operation,
         OperationDetails,
+        ResponseContext,
         ResponseHandlingKind,
         Retryability,
     },
@@ -119,7 +119,7 @@ impl Operation for Delete {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         response.validate_single_write()?;
         Ok(DeleteResult {

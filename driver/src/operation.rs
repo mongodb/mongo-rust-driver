@@ -75,8 +75,8 @@ const MAX_ENCRYPTED_WRITE_SIZE: usize = 2_097_152;
 // building a multi-write operation using document sequences.
 const OP_MSG_OVERHEAD_BYTES: usize = 1_000;
 
-/// Context about the execution of the operation.
-pub(crate) struct ExecutionContext<'a> {
+/// Context for handling the response to an operation.
+pub(crate) struct ResponseContext<'a> {
     pub(crate) connection: &'a mut PooledConnection,
     pub(crate) session: Option<&'a mut ClientSession>,
     pub(crate) effective_criteria: SelectionCriteria,
@@ -166,7 +166,7 @@ pub(crate) trait Operation: Send + Sync {
     fn handle_response<'a>(
         &'a self,
         _response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         Err(Error::internal(format!(
             "response handling not implemented for {}",
@@ -179,7 +179,7 @@ pub(crate) trait Operation: Send + Sync {
     fn handle_response_owned<'a>(
         &'a self,
         _response: RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         Err(Error::internal(format!(
             "response handling not implemented for {}",
@@ -192,7 +192,7 @@ pub(crate) trait Operation: Send + Sync {
     fn handle_response_async<'a>(
         &'a self,
         _response: RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> BoxFuture<'a, Result<Self::O>> {
         async move {
             Err(Error::internal(format!(

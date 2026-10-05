@@ -223,9 +223,14 @@ impl common::InnerCursor for Cursor<()> {
         Ok((new_wrapper.cursor, new_wrapper.args))
     }
 
-    fn set_drop_address(&mut self, from: &Self) -> Result<()> {
-        self.raw_mut()?
-            .set_drop_address(from.raw()?.address().clone());
+    fn prep_drop(&mut self, from: &Self) -> Result<()> {
+        let raw = self.raw_mut()?;
+        raw.set_drop_address(from.raw()?.address().clone());
+        #[cfg(feature = "opentelemetry")]
+        {
+            raw.disable_drop_op_span();
+        }
+
         Ok(())
     }
 }

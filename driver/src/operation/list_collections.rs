@@ -7,10 +7,10 @@ use crate::{
     operation::{
         append_options_to_raw_document,
         default_impl,
-        ExecutionContext,
         Feature,
         Operation,
         OperationDetails,
+        ResponseContext,
         ResponseHandlingKind,
         Retryability,
     },
@@ -96,7 +96,7 @@ impl Operation for ListCollections {
     fn handle_response_owned<'a>(
         &'a self,
         response: RawCommandResponse,
-        context: ExecutionContext<'a>,
+        context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         CursorSpecification::new(
             response,

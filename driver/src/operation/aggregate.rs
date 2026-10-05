@@ -11,10 +11,10 @@ use crate::{
         append_options,
         default_impl,
         to_feature,
-        ExecutionContext,
         Operation,
         OperationDetails,
         OperationTarget,
+        ResponseContext,
         ResponseHandlingKind,
         Retryability,
         SERVER_5_0_0_WIRE_VERSION,
@@ -138,7 +138,7 @@ impl Operation for Aggregate {
     fn handle_response_owned<'a>(
         &'a self,
         response: RawCommandResponse,
-        context: ExecutionContext<'a>,
+        context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         if self.is_out_or_merge {
             response.validate_single_write()?;

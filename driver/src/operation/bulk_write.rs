@@ -10,7 +10,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     bson_util::{self, RawDocumentCollection},
     checked::Checked,
-    client::session::TransactionState,
+    client::{executor::ExecutionContext, session::TransactionState},
     cmap::{conn::WriteErrorBody, Command, RawCommandResponse, StreamDescription},
     cursor::{common::CursorSpecification, NewCursor},
     error::{BulkWriteError, Error, ErrorKind, Result},
@@ -18,12 +18,12 @@ use crate::{
         default_impl,
         run_command::RunCommand,
         to_feature,
-        ExecutionContext,
         Feature,
         GetMore,
         Operation,
         OperationDetails,
         OperationTarget,
+        ResponseContext,
         ResponseHandlingKind,
         Retryability,
         MAX_ENCRYPTED_WRITE_SIZE,
@@ -97,7 +97,7 @@ where
 
     async fn do_get_mores(
         &self,
-        context: &mut ExecutionContext<'_>,
+        context: &mut ResponseContext<'_>,
         cursor_specification: CursorSpecification,
         result: &mut impl BulkWriteResult,
         error: &mut BulkWriteError,
@@ -123,13 +123,14 @@ where
                 .as_mut()
                 .and_then(|s| s.get_txn_number_for_operation(Retryability::None));
             let get_more_details = get_more.details(self.client.options());
+            let mut exec_context = ExecutionContext::explicit(context.session.as_deref_mut());
             let get_more_result = self
                 .client
                 .execute_operation_on_connection(
                     &mut get_more,
                     &get_more_details,
+                    &mut exec_context,
                     context.connection,
-                    &mut context.session,
                     txn_number,
                     Retryability::None,
                     context.effective_criteria.clone(),
@@ -151,13 +152,15 @@ where
                             None,
                         );
                         let run_command_details = run_command.details(self.client.options());
+                        let mut exec_context =
+                            ExecutionContext::explicit(context.session.as_deref_mut());
                         let _ = self
                             .client
                             .execute_operation_on_connection(
                                 &mut run_command,
                                 &run_command_details,
+                                &mut exec_context,
                                 context.connection,
-                                &mut context.session,
                                 txn_number,
                                 Retryability::None,
                                 context.effective_criteria.clone(),
@@ -445,7 +448,7 @@ where
     fn handle_response_async<'b>(
         &'b self,
         raw_response: RawCommandResponse,
-        mut context: ExecutionContext<'b>,
+        mut context: ResponseContext<'b>,
     ) -> BoxFuture<'b, Result<Self::O>> {
         async move {
             let write_error: WriteErrorBody = raw_response.body()?;

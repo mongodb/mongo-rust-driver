@@ -6,13 +6,20 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::options::DistinctOptions,
     error::Result,
-    operation::{to_feature, ResponseHandlingKind},
+    operation::{
+        append_options_to_raw_document,
+        default_impl,
+        to_feature,
+        Feature,
+        Operation,
+        OperationDetails,
+        ResponseContext,
+        ResponseHandlingKind,
+        Retryability,
+    },
     options::ClientOptions,
     Collection,
 };
-
-use super::{append_options_to_raw_document, ExecutionContext};
-use crate::operation::{default_impl, Feature, Operation, OperationDetails, Retryability};
 
 pub(crate) struct Distinct {
     target: Collection<Document>,
@@ -91,7 +98,7 @@ impl Operation for Distinct {
     fn handle_response<'a>(
         &'a self,
         response: &'a RawCommandResponse,
-        _context: ExecutionContext<'a>,
+        _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         let response: Response = response.body()?;
         Ok(response.values)
