@@ -25,10 +25,5 @@ if [[ "${DRY_RUN}" == "yes" ]]; then
   EXTRA="--dry-run"
 fi
 
-if [[ "${PACKAGE_ONLY}" == "yes" ]]; then
-  cargo package --package mongodb-internal-macros --no-verify --allow-dirty
-  cargo package --package mongodb --no-verify --allow-dirty
-else
-  cargo publish --package mongodb-internal-macros ${EXTRA}
-  cargo publish --package mongodb ${EXTRA}
-fi
+cargo publish --package mongodb-internal-macros ${EXTRA}
+cargo publish --package mongodb ${EXTRA}
