@@ -250,6 +250,11 @@ impl OpSpan {
             return;
         }
         record_result::<Op>(&self.context, result.as_ref().map(|d| &d.output));
+        if let Err(error) = result {
+            self.context
+                .span()
+                .set_attribute(KeyValue::new("error.type", error.kind.name()));
+        }
     }
 }
 
@@ -264,6 +269,17 @@ impl CmdSpan {
             return;
         }
         record_result::<Op>(&self.context, result.as_ref());
+        if let Err(error) = result {
+            let span = self.context.span();
+            let error_type = if let ErrorKind::Command(cmd_err) = &*error.kind {
+                let err_code = cmd_err.code.to_string();
+                span.set_attribute(KeyValue::new("db.response.status_code", err_code.clone()));
+                Cow::Owned(err_code)
+            } else {
+                Cow::Borrowed(error.kind.name())
+            };
+            span.set_attribute(KeyValue::new("error.type", error_type));
+        }
     }
 }
 
@@ -288,22 +304,12 @@ fn record_output<Op: Operation>(context: &Context, output: &Op::O) {
 
 fn record_error(context: &Context, error: &Error) {
     let span = context.span();
-    let exception_type = error.kind.name();
-    let error_type = if let ErrorKind::Command(cmd_err) = &*error.kind {
-        let err_code = cmd_err.code.to_string();
-        span.set_attribute(KeyValue::new("db.response.status_code", err_code.clone()));
-        Cow::Owned(err_code)
-    } else {
-        Cow::Borrowed(exception_type)
-    };
     span.set_attributes([
         KeyValue::new("exception.message", error.to_string()),
-        KeyValue::new("exception.type", exception_type),
+        KeyValue::new("exception.type", error.kind.name()),
         #[cfg(feature = "error-backtrace")]
         KeyValue::new("exception.stacktrace", error.backtrace.to_string()),
-        KeyValue::new("error.type", error_type),
     ]);
-
     span.record_error(error);
     span.set_status(opentelemetry::trace::Status::Error {
         description: error.to_string().into(),
