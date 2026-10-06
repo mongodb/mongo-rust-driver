@@ -12,7 +12,7 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          TICKETS=$(echo "$PR_TITLE" | grep -oE '\b(RUST|DRIVERS)-[0-9]+\b')
+          TICKETS=$(echo "$PR_TITLE" | grep -oE '\b(RUST|DRIVERS)-[0-9]+\b' || true)
 
           if [ -z "$TICKETS" ]; then
             echo "No tickets listed in PR title."
