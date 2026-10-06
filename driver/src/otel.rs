@@ -1,6 +1,7 @@
 //! Support for OpenTelemetry.
 
 use std::{
+    borrow::Cow,
     future::Future,
     sync::{Arc, LazyLock},
 };
@@ -287,18 +288,22 @@ fn record_output<Op: Operation>(context: &Context, output: &Op::O) {
 
 fn record_error(context: &Context, error: &Error) {
     let span = context.span();
+    let exception_type = error.kind.name();
+    let error_type = if let ErrorKind::Command(cmd_err) = &*error.kind {
+        let err_code = cmd_err.code.to_string();
+        span.set_attribute(KeyValue::new("db.response.status_code", err_code.clone()));
+        Cow::Owned(err_code)
+    } else {
+        Cow::Borrowed(exception_type)
+    };
     span.set_attributes([
         KeyValue::new("exception.message", error.to_string()),
-        KeyValue::new("exception.type", error.kind.name()),
+        KeyValue::new("exception.type", exception_type),
         #[cfg(feature = "error-backtrace")]
         KeyValue::new("exception.stacktrace", error.backtrace.to_string()),
+        KeyValue::new("error.type", error_type),
     ]);
-    if let ErrorKind::Command(cmd_err) = &*error.kind {
-        span.set_attribute(KeyValue::new(
-            "db.response.status_code",
-            cmd_err.code.to_string(),
-        ));
-    }
+
     span.record_error(error);
     span.set_status(opentelemetry::trace::Status::Error {
         description: error.to_string().into(),
