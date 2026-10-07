@@ -8,6 +8,7 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
+        topology_is_standalone,
         transactions_supported,
         util::fail_point::{FailPoint, FailPointMode},
     },
@@ -152,6 +153,14 @@ async fn get_more_cursor_id() {
 // Prose Test 5: error.type is the exception class name for a non-server error
 #[tokio::test(flavor = "multi_thread")]
 async fn error_type_is_exception_type_non_server_err() {
+    // Fail points can misdirect on replicated topologies.
+    if !topology_is_standalone().await {
+        log_uncaptured(
+            "skipping error_type_is_exception_type_non_server_err: non-standalone topology",
+        );
+        return;
+    }
+
     // 1. Create a MongoClient with tracing enabled and retryReads disabled.
     let mut options = get_client_options().await.clone();
     let (tracing, tracing_opts) = ClientTracing::new(&ObserveTracingMessages::default());
@@ -213,6 +222,12 @@ async fn error_type_is_exception_type_non_server_err() {
 // Prose Test 6: error.type on the operation span is the exception class name for a server error
 #[tokio::test(flavor = "multi_thread")]
 async fn error_type_is_exception_type_server_err() {
+    // Fail points can misdirect on replicated topologies.
+    if !topology_is_standalone().await {
+        log_uncaptured("skipping error_type_is_exception_type_server_err: non-standalone topology");
+        return;
+    }
+
     // 1. Create a MongoClient with tracing enabled.
     let mut options = get_client_options().await.clone();
     let (tracing, tracing_opts) = ClientTracing::new(&ObserveTracingMessages::default());
