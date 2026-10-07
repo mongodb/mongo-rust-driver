@@ -52,7 +52,7 @@ use super::{
 #[cfg(feature = "tracing-unstable")]
 use crate::test::{
     spec::unified_runner::matcher::tracing_events_match,
-    util::max_verbosity_levels_for_test_case,
+    util::{max_verbosity_levels_for_test_case, TracingEvent},
     DEFAULT_GLOBAL_TRACING_HANDLER,
 };
 
@@ -261,7 +261,9 @@ impl TestRunner {
                         let Some(actual_event) =
                             stream.next_match(Duration::from_millis(500), filter).await
                         else {
-                            panic!("{description}: timed out waiting for event {expected_event:?}");
+                            panic!(
+                                "{description}: timed out waiting for event: {expected_event:?}"
+                            );
                         };
 
                         if let Err(error) =
@@ -286,48 +288,52 @@ impl TestRunner {
 
             #[cfg(feature = "tracing-unstable")]
             if let Some(ref expected_messages) = test_case.expect_log_messages {
-                self.sync_workers().await;
-
-                let all_tracing_events = tracing_stream
-                    .collect(Duration::from_millis(1000), |_| true)
-                    .await;
-
                 for expectation in expected_messages {
-                    let client_topology_id = self.get_client(&expectation.client).await.topology_id;
-
-                    let client_actual_events: Vec<_> = all_tracing_events
-                        .iter()
-                        .filter(|e| {
-                            if e.topology_id() != client_topology_id.to_hex() {
+                    let client_topology_id = self
+                        .get_client(&expectation.client)
+                        .await
+                        .topology_id
+                        .to_hex();
+                    let filter = |event: &TracingEvent| {
+                        if event.topology_id() != client_topology_id {
+                            return false;
+                        }
+                        if let Some(ref ignored_messages) = expectation.ignore_messages {
+                            if ignored_messages
+                                .iter()
+                                .any(|ignored| tracing_events_match(event, ignored).is_ok())
+                            {
                                 return false;
                             }
-                            if let Some(ref ignored_messages) = expectation.ignore_messages {
-                                for ignored_message in ignored_messages {
-                                    if tracing_events_match(e, ignored_message).is_ok() {
-                                        return false;
-                                    }
-                                }
-                            }
-                            true
-                        })
-                        .collect();
-                    let expected_events = &expectation.messages;
+                        }
+                        true
+                    };
 
-                    if expectation.ignore_extra_messages != Some(true) {
-                        assert_eq!(
-                            client_actual_events.len(),
-                            expected_events.len(),
-                            "Actual tracing event count should match expected. Expected events = \
-                             {expected_events:#?}, actual events = {client_actual_events:#?}",
-                        );
+                    for expected_message in &expectation.messages {
+                        let Some(actual_message) = tracing_stream
+                            .next_match(Duration::from_millis(500), filter)
+                            .await
+                        else {
+                            panic!(
+                                "{description}: timed out waiting for message: \
+                                 {expected_message:?}"
+                            );
+                        };
+                        if let Err(error) = tracing_events_match(&actual_message, expected_message)
+                        {
+                            panic!(
+                                "{description}: message mismatch: {error}\nactual: \
+                                 {actual_message:?}\nexpected: {expected_message:?}"
+                            );
+                        }
                     }
 
-                    for (actual, expected) in client_actual_events.iter().zip(expected_events) {
-                        if let Err(e) = tracing_events_match(actual, expected) {
-                            panic!(
-                                "tracing event mismatch: expected = {expected:#?}, actual = \
-                                 {actual:#?}\nmismatch detail: {e}",
-                            );
+                    if expectation.ignore_extra_messages != Some(true) {
+                        if let Some(next) = tracing_stream
+                            .next_match(Duration::from_millis(100), filter)
+                            .await
+                        {
+                            panic!("{description}: observed extra message: {next:?}");
                         }
                     }
                 }
