@@ -15,12 +15,20 @@ use crate::{
     cursor::{common::CursorSpecification, NewCursor},
     error::{BulkWriteError, Error, ErrorKind, Result},
     operation::{
+        default_impl,
         run_command::RunCommand,
-        Base,
-        BaseOperation,
+        to_feature,
+        Feature,
         GetMore,
-        OperationImpl,
+        Operation,
+        OperationDetails,
+        OperationTarget,
+        ResponseContext,
+        ResponseHandlingKind,
+        Retryability,
         MAX_ENCRYPTED_WRITE_SIZE,
+        OP_MSG_OVERHEAD_BYTES,
+        SERVER_8_0_0_WIRE_VERSION,
     },
     options::{BulkWriteOptions, ClientOptions, OperationType, WriteModel},
     results::{BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult},
@@ -30,8 +38,6 @@ use crate::{
     Namespace,
     SessionCursor,
 };
-
-use super::{ResponseContext, Retryability, OP_MSG_OVERHEAD_BYTES, SERVER_8_0_0_WIRE_VERSION};
 
 use server_responses::*;
 
@@ -116,11 +122,13 @@ where
                 .session
                 .as_mut()
                 .and_then(|s| s.get_txn_number_for_operation(Retryability::None));
+            let get_more_details = get_more.details(self.client.options());
             let mut exec_context = ExecutionContext::explicit(context.session.as_deref_mut());
             let get_more_result = self
                 .client
                 .execute_operation_on_connection(
                     &mut get_more,
+                    &get_more_details,
                     &mut exec_context,
                     context.connection,
                     txn_number,
@@ -143,12 +151,14 @@ where
                             None,
                             None,
                         );
+                        let run_command_details = run_command.details(self.client.options());
                         let mut exec_context =
                             ExecutionContext::explicit(context.session.as_deref_mut());
                         let _ = self
                             .client
                             .execute_operation_on_connection(
                                 &mut run_command,
+                                &run_command_details,
                                 &mut exec_context,
                                 context.connection,
                                 txn_number,
@@ -243,6 +253,7 @@ where
 
     fn batch_split_models<T: RawDocumentCollection>(
         &mut self,
+        op_details: &OperationDetails,
         command_body: RawDocumentBuf,
         max_size: usize,
         max_operations: usize,
@@ -286,7 +297,7 @@ where
             )));
         }
 
-        let mut command = Command::from_operation(self, command_body);
+        let mut command = Command::from_operation_details(op_details, self.name(), command_body);
         namespace_info
             .namespaces
             .add_to_command(NS_INFO, &mut command);
@@ -347,7 +358,7 @@ where
     }
 }
 
-impl<R> BaseOperation for BulkWrite<'_, R>
+impl<R> Operation for BulkWrite<'_, R>
 where
     R: BulkWriteResult,
 {
@@ -355,9 +366,38 @@ where
 
     const NAME: &'static CStr = cstr!("bulkWrite");
 
-    const ZERO_COPY: bool = true;
+    default_impl!(
+        name,
+        extract_at_cluster_time,
+        handle_error,
+        update_for_retry,
+        pinned_connection
+    );
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
+    fn details(&self, options: &ClientOptions) -> OperationDetails {
+        OperationDetails {
+            response_handling_kind: ResponseHandlingKind::Async,
+            selection_criteria: Feature::NotSupported,
+            read_concern: Feature::NotSupported,
+            write_concern: to_feature!(self.options, write_concern),
+            supports_sessions: true,
+            retryability: if self.models.iter().any(|model| model.multi() == Some(true)) {
+                Retryability::None
+            } else {
+                Retryability::write(options)
+            },
+            is_backpressure_retryable: options.retry_writes != Some(false),
+            override_criteria: None,
+            target: OperationTarget::admin(&self.client),
+            is_after_cluster_time_write: true,
+        }
+    }
+
+    fn build(
+        &mut self,
+        description: &StreamDescription,
+        op_details: &OperationDetails,
+    ) -> Result<Command> {
         if description.max_wire_version.unwrap_or(0) < SERVER_8_0_0_WIRE_VERSION {
             return Err(ErrorKind::IncompatibleServer {
                 message: "the bulk write feature is only supported on MongoDB 8.0+".to_string(),
@@ -382,6 +422,7 @@ where
             let max_size =
                 (Checked::new(MAX_ENCRYPTED_WRITE_SIZE) - command_body.as_bytes().len()).get()?;
             self.batch_split_models::<RawArrayBuf>(
+                op_details,
                 command_body,
                 max_size,
                 max_operations,
@@ -395,6 +436,7 @@ where
                 - command_body.as_bytes().len())
             .get()?;
             self.batch_split_models::<Vec<RawDocumentBuf>>(
+                op_details,
                 command_body,
                 max_size,
                 max_operations,
@@ -405,7 +447,7 @@ where
 
     fn handle_response_async<'b>(
         &'b self,
-        raw_response: std::borrow::Cow<'b, RawCommandResponse>,
+        raw_response: RawCommandResponse,
         mut context: ResponseContext<'b>,
     ) -> BoxFuture<'b, Result<Self::O>> {
         async move {
@@ -429,7 +471,7 @@ where
             }
 
             let specification = CursorSpecification::new(
-                raw_response.into_owned(),
+                raw_response.clone(),
                 context
                     .connection
                     .stream_description()?
@@ -508,35 +550,8 @@ where
         .boxed()
     }
 
-    fn retryability(&self, options: &ClientOptions) -> Retryability {
-        if self.models.iter().any(|model| model.multi() == Some(true)) {
-            Retryability::None
-        } else {
-            Retryability::write(options)
-        }
-    }
-
-    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
-        options.retry_writes != Some(false)
-    }
-
-    fn write_concern(&self) -> super::Feature<&crate::options::WriteConcern> {
-        self.options
-            .as_ref()
-            .and_then(|o| o.write_concern.as_ref())
-            .into()
-    }
-
-    fn target(&self) -> super::OperationTarget {
-        super::OperationTarget::admin(&self.client)
-    }
-
     #[cfg(feature = "opentelemetry")]
     type Otel = crate::otel::Witness<Self>;
-}
-
-impl<R: BulkWriteResult> OperationImpl for BulkWrite<'_, R> {
-    type Kind = Base;
 }
 
 #[cfg(feature = "opentelemetry")]

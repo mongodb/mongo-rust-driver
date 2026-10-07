@@ -1,7 +1,7 @@
 pub(super) mod retry;
 
 use std::{
-    borrow::{BorrowMut, Cow},
+    borrow::BorrowMut,
     collections::HashSet,
     sync::{atomic::Ordering, Arc, LazyLock},
     time::Instant,
@@ -19,6 +19,7 @@ use crate::{
         session::SessionChangeStream,
         ChangeStream,
     },
+    client::OpSelectionInfo,
     cmap::{
         conn::{
             pooled::PooledConnection,
@@ -51,14 +52,15 @@ use crate::{
     hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
         aggregate::change_stream::ChangeStreamAggregate,
-        is_commit_or_abort,
-        AbortTransaction,
+        op_is_abort,
+        op_is_commit,
         CommandErrorBody,
-        CommitTransaction,
         Feature,
         Operation,
+        OperationDetails,
         OperationTarget,
         ResponseContext,
+        ResponseHandlingKind,
         Retryability,
     },
     options::{ChangeStreamOptions, SelectionCriteria},
@@ -316,7 +318,9 @@ impl Client {
         op: &mut T,
         context: &mut ExecutionContext<'_>,
     ) -> Result<ExecutionDetails<T>> {
-        self.execute_operation_with_details_inner(op, context).await
+        let op_details = op.details(self.options());
+        self.execute_operation_with_details_inner(op, op_details, context)
+            .await
     }
 
     #[cfg(feature = "opentelemetry")]
@@ -327,16 +331,17 @@ impl Client {
     ) -> Result<ExecutionDetails<T>> {
         use crate::otel::FutureExt as _;
 
+        let op_details = op.details(self.options());
         let span = match context.span.clone() {
             Some(s) => s,
             None => {
-                let s = self.start_operation_span(op, context.session.as_ref_option());
+                let s = self.start_operation_span(op, &op_details, context.session.as_ref_option());
                 context.span = Some(s.clone());
                 s
             }
         };
         let result = self
-            .execute_operation_with_details_inner(op, context)
+            .execute_operation_with_details_inner(op, op_details, context)
             .with_span(&span)
             .await;
         span.record_operation_result::<T>(&result);
@@ -347,6 +352,7 @@ impl Client {
     async fn execute_operation_with_details_inner<T: Operation>(
         &self,
         op: &mut T,
+        op_details: OperationDetails,
         context: &mut ExecutionContext<'_>,
     ) -> Result<ExecutionDetails<T>> {
         // Validate inputs that can be checked before server selection and connection
@@ -356,23 +362,23 @@ impl Client {
         }
 
         if context.session.in_transaction() {
-            if op.read_concern().is_set() {
+            if op_details.read_concern.is_set() {
                 return Err(Error::invalid_argument(
                     "Cannot set read concern after starting a transaction",
                 ));
             }
-            if op.write_concern().is_set() {
+            if op_details.write_concern.is_set() {
                 return Err(Error::invalid_argument(
                     "Cannot set write concern after starting a transaction",
                 ));
             }
         }
 
-        let op_target = op.target();
-
-        let write_concern = match op.write_concern() {
-            Feature::Set(write_concern) => Some(write_concern),
-            Feature::Inherit if !context.session.in_transaction() => op_target.write_concern(),
+        let write_concern = match op_details.write_concern {
+            Feature::Set(ref write_concern) => Some(write_concern),
+            Feature::Inherit if !context.session.in_transaction() => {
+                op_details.target.write_concern()
+            }
             _ => None,
         };
         if let Some(write_concern) = write_concern {
@@ -385,13 +391,13 @@ impl Client {
             write_concern.validate()?;
         }
 
-        let selection_criteria = match op.selection_criteria() {
-            Feature::Set(s) => Some(s),
+        let selection_criteria = match op_details.selection_criteria {
+            Feature::Set(ref s) => Some(s),
             Feature::NotSupported => None,
             Feature::Inherit => context
                 .session
                 .transaction_selection_criteria()
-                .or_else(|| op_target.selection_criteria()),
+                .or_else(|| op_details.target.selection_criteria()),
         }
         .cloned();
 
@@ -419,16 +425,15 @@ impl Client {
             if matches!(
                 session.transaction.state,
                 TransactionState::Committed { .. }
-            ) && op.name() != CommitTransaction::NAME
-                || session.transaction.state == TransactionState::Aborted
-                    && op.name() != AbortTransaction::NAME
+            ) && !op_is_commit(op)
+                || session.transaction.state == TransactionState::Aborted && !op_is_abort(op)
             {
                 session.transaction.reset();
             }
         }
 
         let result = Box::pin(async {
-            self.execute_operation_with_retry(op, context, selection_criteria)
+            self.execute_operation_with_retry(op, op_details, context, selection_criteria)
                 .await
         })
         .await;
@@ -445,6 +450,7 @@ impl Client {
     async fn execute_operation_with_retry<T: Operation>(
         &self,
         op: &mut T,
+        mut op_details: OperationDetails,
         context: &mut ExecutionContext<'_>,
         selection_criteria: Option<SelectionCriteria>,
     ) -> Result<ExecutionDetails<T>> {
@@ -459,6 +465,7 @@ impl Client {
                 }
                 Some(ref retry) => {
                     op.update_for_retry(Some(retry));
+                    op_details = op.details(self.options());
                     if retry.overloaded {
                         let backoff = retry.calculate_backoff(
                             #[cfg(test)]
@@ -480,7 +487,10 @@ impl Client {
                 .select_server(
                     selection_criteria,
                     retry.as_ref().map(|r| &r.deprioritized_servers),
-                    (&*op).into(),
+                    OpSelectionInfo::new(
+                        crate::bson_compat::cstr_to_str(op.name()),
+                        op_details.override_criteria,
+                    ),
                 )
                 .await
             {
@@ -495,20 +505,21 @@ impl Client {
                 }
             };
 
-            let is_transaction_op = context.session.in_transaction() && !is_commit_or_abort(op);
+            let is_transaction_op =
+                context.session.in_transaction() && !op_is_commit(op) && !op_is_abort(op);
 
             let mut connection =
                 match get_connection(context.session.as_ref_option(), op, &server.pool).await {
                     Ok(connection) => connection,
                     Err(mut error) => {
                         error.add_labels_and_update_pin(
-                            op.retryability(self.options()),
+                            op_details.retryability,
                             context.session.as_ref_mut_option(),
                         );
                         retry = Some(Retry::for_connection_establishment_failure(
                             retry,
                             error,
-                            op,
+                            &op_details,
                             self,
                             server.address.clone(),
                             is_transaction_op,
@@ -521,7 +532,9 @@ impl Client {
                 return Err(ErrorKind::SessionsNotSupported.into());
             }
 
-            if connection.supports_sessions() && !context.session.is_set() && op.supports_sessions()
+            if connection.supports_sessions()
+                && !context.session.is_set()
+                && op_details.supports_sessions
             {
                 context
                     .session
@@ -529,12 +542,12 @@ impl Client {
             }
 
             let retryability = self.get_retryability(
-                op,
+                &op_details,
                 &context.session.as_ref_mut_option(),
                 connection.stream_description()?,
             );
             let overloaded = retry.as_ref().map(|r| r.overloaded).unwrap_or(false);
-            if overloaded && !op.is_backpressure_retryable(self.options())
+            if overloaded && !op_details.is_backpressure_retryable
                 || !overloaded && retryability == Retryability::None
             {
                 retry::return_last_error(&mut retry)?;
@@ -550,6 +563,7 @@ impl Client {
             let execution_result = self
                 .execute_operation_on_connection(
                     op,
+                    &op_details,
                     context,
                     &mut connection,
                     txn_number,
@@ -599,7 +613,7 @@ impl Client {
                     retry = Some(Retry::for_execution_failure(
                         retry,
                         error,
-                        op,
+                        &op_details,
                         self,
                         server_address,
                         is_transaction_op,
@@ -612,9 +626,11 @@ impl Client {
     }
 
     /// Executes an operation on a given connection, optionally using a provided session.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn execute_operation_on_connection<Op: Operation>(
         &self,
         op: &mut Op,
+        op_details: &OperationDetails,
         context: &mut ExecutionContext<'_>,
         connection: &mut PooledConnection,
         txn_number: Option<i64>,
@@ -624,6 +640,7 @@ impl Client {
         loop {
             let cmd = self.build_command(
                 op,
+                op_details,
                 connection,
                 context.session.as_ref_mut_option(),
                 txn_number,
@@ -645,6 +662,7 @@ impl Client {
             #[cfg(feature = "opentelemetry")]
             let span = self.start_command_span(
                 op,
+                op_details,
                 &connection_info,
                 connection.stream_description()?,
                 &message,
@@ -769,12 +787,16 @@ impl Client {
                         effective_criteria: effective_criteria.clone(),
                     };
 
-                    let handle_result = match Op::ZERO_COPY {
-                        true => op.handle_response(Cow::Owned(response), resp_context).await,
-                        false => op
-                            .handle_response(Cow::Borrowed(&response), resp_context)
-                            .await
+                    let handle_result = match op_details.response_handling_kind {
+                        ResponseHandlingKind::Borrowed => op
+                            .handle_response(&response, resp_context)
                             .map_err(|e| e.with_server_response(&response)),
+                        ResponseHandlingKind::Owned => {
+                            op.handle_response_owned(response, resp_context)
+                        }
+                        ResponseHandlingKind::Async => {
+                            op.handle_response_async(response, resp_context).await
+                        }
                     };
                     match handle_result {
                         Ok(op_out) => Ok(op_out),
@@ -809,6 +831,7 @@ impl Client {
     fn build_command<T: Operation>(
         &self,
         op: &mut T,
+        op_details: &OperationDetails,
         connection: &mut PooledConnection,
         mut session: Option<&mut ClientSession>,
         txn_number: Option<i64>,
@@ -816,7 +839,7 @@ impl Client {
     ) -> Result<crate::cmap::Command> {
         let stream_description = connection.stream_description()?;
         let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
-        let mut cmd = op.build(stream_description)?;
+        let mut cmd = op.build(stream_description, op_details)?;
         // Clear inherited read/writeconcern when in a transaction
         if session.as_ref().is_some_and(|s| s.in_transaction()) {
             cmd.clear_concerns();
@@ -827,8 +850,8 @@ impl Client {
             &effective_criteria,
         );
 
-        match &mut session {
-            Some(session) if op.supports_sessions() => {
+        match session {
+            Some(ref mut session) if op_details.supports_sessions => {
                 cmd.set_session(session);
                 if let Some(txn_number) = txn_number {
                     cmd.set_txn_number(txn_number);
@@ -861,7 +884,8 @@ impl Client {
                         session.transaction.state,
                         TransactionState::None | TransactionState::Starting
                     )
-                    && (op.read_concern().supported() || op.is_after_cluster_time_write())
+                    && (op_details.read_concern.supported()
+                        || op_details.is_after_cluster_time_write)
                 {
                     cmd.set_after_cluster_time(session);
                 }
@@ -903,7 +927,7 @@ impl Client {
                 }
                 session.update_last_use();
             }
-            Some(ref session) if !op.supports_sessions() && !session.is_implicit() => {
+            Some(ref session) if !op_details.supports_sessions && !session.is_implicit() => {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!("{} does not support sessions", cmd.name),
                 }
@@ -1078,7 +1102,7 @@ impl Client {
             .select_server(
                 Some(&criteria),
                 None,
-                crate::client::OpSelectionInfo::new(operation_name),
+                crate::client::OpSelectionInfo::new(operation_name, None),
             )
             .await?;
         Ok(())
@@ -1104,9 +1128,9 @@ impl Client {
 
     /// Returns the retryability level for the execution of this operation with the given session
     /// and connection stream description.
-    fn get_retryability<T: Operation>(
+    fn get_retryability(
         &self,
-        op: &T,
+        op_details: &OperationDetails,
         session: &Option<&mut ClientSession>,
         stream_description: &StreamDescription,
     ) -> Retryability {
@@ -1117,7 +1141,7 @@ impl Client {
             return Retryability::None;
         }
 
-        match op.retryability(self.options()) {
+        match op_details.retryability {
             Retryability::Write if stream_description.supports_retryable_writes() => {
                 Retryability::Write
             }
