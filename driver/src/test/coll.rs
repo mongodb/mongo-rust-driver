@@ -1296,3 +1296,28 @@ async fn null_byte_in_coll_name() {
         assert!(error.is_server_error());
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn drop_index_write_concern_error() {
+    let client = Client::for_test().use_single_mongos().await;
+
+    let coll = client
+        .database("db")
+        .collection::<Document>("drop_index_write_concern_error");
+    let name = coll
+        .create_index(IndexModel::builder().keys(doc! { "x": 1 }).build())
+        .await
+        .unwrap()
+        .index_name;
+
+    let fail_point = FailPoint::fail_command(&["dropIndexes"], FailPointMode::Times(2))
+        .write_concern_error(doc! { "code": 64 })
+        .error_labels(vec![RETRYABLE_WRITE_ERROR]);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let error = coll.drop_index(&name).await.unwrap_err();
+    let ErrorKind::Write(WriteFailure::WriteConcernError(write_concern_error)) = *error.kind else {
+        panic!("expected write concern error, got {error}");
+    };
+    assert_eq!(write_concern_error.code, 64);
+}
