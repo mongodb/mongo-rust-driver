@@ -186,6 +186,25 @@ impl TestRunner {
 
             log_uncaptured(format!("Executing {description}"));
 
+            // Kill any leftover sessions from the previous test. This will release the write lock
+            // on the server for any collection used in a transaction that wasn't successfully
+            // committed/aborted.
+            let entities = self.entities.read().await;
+            let lsids = entities
+                .iter()
+                .filter_map(|(_, entity)| match entity {
+                    Entity::Session(session) => Some(&session.lsid),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            if !lsids.is_empty() {
+                self.internal_client
+                    .database("admin")
+                    .run_command(doc! { "killSessions": lsids })
+                    .await
+                    .unwrap();
+            }
+
             if let Some(ref initial_data) = test_file.initial_data {
                 // If a test:
                 // * set `useMultipleMongoses: false`
