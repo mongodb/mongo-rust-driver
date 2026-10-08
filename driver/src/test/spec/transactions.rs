@@ -90,6 +90,8 @@ async fn deserialize_recovery_token() {
 
     // Nevertheless, the recovery token should have been retrieved from the ok: 1 response.
     assert!(session.transaction.recovery_token.is_some());
+
+    session.abort_transaction().await.unwrap();
 }
 
 #[tokio::test]
