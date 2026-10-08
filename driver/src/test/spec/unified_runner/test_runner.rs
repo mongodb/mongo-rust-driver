@@ -233,6 +233,25 @@ impl TestRunner {
                 }
             }
 
+            // Kill any sessions created for the test. This will release the write lock on the
+            // server for any collection used in a transaction that wasn't successfully
+            // committed/aborted.
+            let entities = self.entities.read().await;
+            let lsids = entities
+                .iter()
+                .filter_map(|(_, entity)| match entity {
+                    Entity::Session(session) => Some(&session.lsid),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            if !lsids.is_empty() {
+                self.internal_client
+                    .database("admin")
+                    .run_command(doc! { "killSessions": lsids })
+                    .await
+                    .unwrap();
+            }
+
             if let Some(ref events) = test_case.expect_events {
                 for expected in events {
                     let entities = self.entities.read().await;
