@@ -19,7 +19,7 @@ use crate::{
     bson::Bson,
     client::executor::ExecutionDetails,
     cmap::{conn::wire::Message, Command, ConnectionInfo, StreamDescription},
-    error::{Error, ErrorKind, Result},
+    error::{Error, Result},
     operation::{Operation, OperationTarget},
     options::{ClientOptions, ServerAddress, DEFAULT_PORT},
     Client,
@@ -271,8 +271,8 @@ impl CmdSpan {
         record_result::<Op>(&self.context, result.as_ref());
         if let Err(error) = result {
             let span = self.context.span();
-            let error_type = if let ErrorKind::Command(cmd_err) = &*error.kind {
-                let err_code = cmd_err.code.to_string();
+            let error_type = if let Some(err_code) = error.code() {
+                let err_code = err_code.to_string();
                 span.set_attribute(KeyValue::new("db.response.status_code", err_code.clone()));
                 Cow::Owned(err_code)
             } else {
