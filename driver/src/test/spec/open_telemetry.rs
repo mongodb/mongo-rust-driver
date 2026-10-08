@@ -8,7 +8,9 @@ use crate::{
         get_client_options,
         log_uncaptured,
         spec::unified_runner::run_unified_tests,
+        topology_is_standalone,
         transactions_supported,
+        util::fail_point::{FailPoint, FailPointMode},
     },
     Client,
 };
@@ -146,4 +148,133 @@ async fn get_more_cursor_id() {
         .iter()
         .any(|a| a.key.as_str() == "db.mongodb.cursor_id"
             && a.value == opentelemetry::Value::I64(cursor_id)));
+}
+
+// Prose Test 5: error.type is the exception class name for a non-server error
+#[tokio::test(flavor = "multi_thread")]
+async fn error_type_is_exception_type_non_server_err() {
+    // Fail points can misdirect on replicated topologies.
+    if !topology_is_standalone().await {
+        log_uncaptured(
+            "skipping error_type_is_exception_type_non_server_err: non-standalone topology",
+        );
+        return;
+    }
+
+    // 1. Create a MongoClient with tracing enabled and retryReads disabled.
+    let mut options = get_client_options().await.clone();
+    let (tracing, tracing_opts) = ClientTracing::new(&ObserveTracingMessages::default());
+    options.tracing = Some(tracing_opts);
+    options.retry_reads = Some(false);
+    let client = Client::for_test().options(options).await;
+
+    // 2. Configure a failCommand fail point on find with closeConnection: true.
+    let fail_point =
+        FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn).close_connection(true);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    // 3. Call find on a test collection and let it fail.
+    let result = client
+        .database("error_type_is_exception_type_non_server_err")
+        .collection::<Document>("test")
+        .find(doc! {})
+        .await;
+    assert!(result.is_err());
+
+    // 4. Assert that the command span's error.type attribute equals its exception.type attribute.
+    let spans = tracing.get_spans();
+    let cmd_span = spans
+        .values()
+        .flat_map(|v| v.iter())
+        .find(|s| s.name == "find")
+        .expect("command span");
+    let error_type = cmd_span
+        .attributes
+        .iter()
+        .find(|a| a.key.as_str() == "error.type")
+        .expect("error.type");
+    let exception_type = cmd_span
+        .attributes
+        .iter()
+        .find(|a| a.key.as_str() == "exception.type")
+        .expect("exception.type");
+    assert_eq!(error_type.value, exception_type.value);
+
+    // 5. Assert that the operation span's error.type attribute equals its exception.type attribute.
+    let op_span = spans
+        .values()
+        .flat_map(|v| v.iter())
+        .find(|s| s.name == "find error_type_is_exception_type_non_server_err.test")
+        .expect("operation span");
+    let error_type = op_span
+        .attributes
+        .iter()
+        .find(|a| a.key.as_str() == "error.type")
+        .expect("error.type");
+    let exception_type = op_span
+        .attributes
+        .iter()
+        .find(|a| a.key.as_str() == "exception.type")
+        .expect("exception.type");
+    assert_eq!(error_type.value, exception_type.value);
+}
+
+// Prose Test 6: error.type on the operation span is the exception class name for a server error
+#[tokio::test(flavor = "multi_thread")]
+async fn error_type_is_exception_type_server_err() {
+    // Fail points can misdirect on replicated topologies.
+    if !topology_is_standalone().await {
+        log_uncaptured("skipping error_type_is_exception_type_server_err: non-standalone topology");
+        return;
+    }
+
+    // 1. Create a MongoClient with tracing enabled.
+    let mut options = get_client_options().await.clone();
+    let (tracing, tracing_opts) = ClientTracing::new(&ObserveTracingMessages::default());
+    options.tracing = Some(tracing_opts);
+    let client = Client::for_test().options(options).await;
+
+    // 2. Configure a failCommand fail point on find with a non-retryable errorCode.
+    let fail_point = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn).error_code(1234);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    // 3. Call find on a test collection and let it fail.
+    let result = client
+        .database("error_type_is_exception_type_non_server_err")
+        .collection::<Document>("test")
+        .find(doc! {})
+        .await;
+    assert!(result.is_err());
+
+    // 4. Assert that the operation span's error.type attribute equals its exception.type attribute,
+    // and that both differ from the db.response.status_code attribute on the find command span.
+    let spans = tracing.get_spans();
+    let cmd_span = spans
+        .values()
+        .flat_map(|v| v.iter())
+        .find(|s| s.name == "find")
+        .expect("command span");
+    let status_code = cmd_span
+        .attributes
+        .iter()
+        .find(|a| a.key.as_str() == "db.response.status_code")
+        .expect("db.response.status_code");
+    let op_span = spans
+        .values()
+        .flat_map(|v| v.iter())
+        .find(|s| s.name == "find error_type_is_exception_type_non_server_err.test")
+        .expect("operation span");
+    let error_type = op_span
+        .attributes
+        .iter()
+        .find(|a| a.key.as_str() == "error.type")
+        .expect("error.type");
+    let exception_type = op_span
+        .attributes
+        .iter()
+        .find(|a| a.key.as_str() == "exception.type")
+        .expect("exception.type");
+    assert_eq!(error_type.value, exception_type.value);
+    assert_ne!(error_type.value, status_code.value);
+    assert_ne!(exception_type.value, status_code.value);
 }

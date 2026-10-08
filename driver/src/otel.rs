@@ -1,6 +1,7 @@
 //! Support for OpenTelemetry.
 
 use std::{
+    borrow::Cow,
     future::Future,
     sync::{Arc, LazyLock},
 };
@@ -18,7 +19,7 @@ use crate::{
     bson::Bson,
     client::executor::ExecutionDetails,
     cmap::{conn::wire::Message, Command, ConnectionInfo, StreamDescription},
-    error::{Error, ErrorKind, Result},
+    error::{Error, Result},
     operation::{Operation, OperationTarget},
     options::{ClientOptions, ServerAddress, DEFAULT_PORT},
     Client,
@@ -249,6 +250,11 @@ impl OpSpan {
             return;
         }
         record_result::<Op>(&self.context, result.as_ref().map(|d| &d.output));
+        if let Err(error) = result {
+            self.context
+                .span()
+                .set_attribute(KeyValue::new("error.type", error.kind.name()));
+        }
     }
 }
 
@@ -263,6 +269,17 @@ impl CmdSpan {
             return;
         }
         record_result::<Op>(&self.context, result.as_ref());
+        if let Err(error) = result {
+            let span = self.context.span();
+            let error_type = if let Some(err_code) = error.code() {
+                let err_code = err_code.to_string();
+                span.set_attribute(KeyValue::new("db.response.status_code", err_code.clone()));
+                Cow::Owned(err_code)
+            } else {
+                Cow::Borrowed(error.kind.name())
+            };
+            span.set_attribute(KeyValue::new("error.type", error_type));
+        }
     }
 }
 
@@ -293,12 +310,6 @@ fn record_error(context: &Context, error: &Error) {
         #[cfg(feature = "error-backtrace")]
         KeyValue::new("exception.stacktrace", error.backtrace.to_string()),
     ]);
-    if let ErrorKind::Command(cmd_err) = &*error.kind {
-        span.set_attribute(KeyValue::new(
-            "db.response.status_code",
-            cmd_err.code.to_string(),
-        ));
-    }
     span.record_error(error);
     span.set_status(opentelemetry::trace::Status::Error {
         description: error.to_string().into(),
