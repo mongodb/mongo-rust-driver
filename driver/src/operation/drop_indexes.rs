@@ -48,10 +48,10 @@ impl BaseOperation for DropIndexes {
 
     fn handle_response<'a>(
         &'a self,
-        _response: &'a RawCommandResponse,
+        response: &'a RawCommandResponse,
         _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
-        Ok(())
+        response.validate_single_write()
     }
 
     fn is_backpressure_retryable(&self, options: &crate::options::ClientOptions) -> bool {
