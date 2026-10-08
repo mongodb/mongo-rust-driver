@@ -31,8 +31,8 @@ bson-3 = ["dep:bson3", "mongocrypt?/bson-3"]
 sync = []
 redact-errors = []
 
-rustls-tls = ["dep:rustls", "rustls/ring", "dep:tokio-rustls", "tokio-rustls/ring", "dep:webpki-roots"]
-rustls-tls-aws-lc = ["dep:rustls", "rustls/aws_lc_rs", "dep:tokio-rustls", "tokio-rustls/aws_lc_rs", "dep:webpki-roots"]
+rustls-tls = ["dep:rustls", "rustls/ring", "dep:tokio-rustls", "tokio-rustls/ring", "dep:webpki-roots", "dep:x509-cert"]
+rustls-tls-aws-lc = ["dep:rustls", "rustls/aws_lc_rs", "dep:tokio-rustls", "tokio-rustls/aws_lc_rs", "dep:webpki-roots", "dep:x509-cert"]
 openssl-tls = ["dep:openssl", "dep:openssl-probe", "dep:tokio-openssl"]
 dns-resolver = ["dep:hickory-net", "dep:hickory-resolver", "dep:hickory-proto"]
 cert-key-password = ["dep:pem", "dep:pkcs8"]
@@ -212,6 +212,11 @@ features = ["logging", "tls12"]
 [dependencies.uuid]
 version = "1.1.2"
 features = ["v4"]
+
+[dependencies.x509-cert]
+version = "0.3.0"
+optional = true
+default-features = false
 
 [dev-dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
