@@ -135,7 +135,7 @@ impl SrvPollingMonitor {
 
         let resolver = SrvResolver::new(
             self.client_options.resolver_config().cloned(),
-            self.client_options.srv_service_name.clone(),
+            (&self.client_options).into(),
         )
         .await?;
 

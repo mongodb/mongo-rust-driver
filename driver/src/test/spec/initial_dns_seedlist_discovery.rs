@@ -1,12 +1,17 @@
-use std::time::{Duration, Instant};
+use std::{
+    cell::OnceCell,
+    str::FromStr,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use serde::Deserialize;
 
 use crate::{
     bson::doc,
     client::Client,
-    options::{ClientOptions, ResolverConfig, ServerAddress},
-    srv::{DomainMismatch, LookupHosts},
+    options::{ClientOptions, ResolverConfig},
+    srv::{DomainMismatch, LookupHosts, RawLookupHosts},
     test::{
         get_client_options,
         log_uncaptured,
@@ -243,44 +248,121 @@ async fn sharded() {
     run_spec_test(&["initial-dns-seedlist-discovery", "sharded"], run_test).await;
 }
 
-fn validate_srv(original: &str, resolved: &str) -> crate::error::Result<()> {
-    LookupHosts {
-        hosts: vec![ServerAddress::Tcp {
-            host: resolved.to_string(),
-            port: Some(42),
-        }],
+fn validate_srv(
+    original: &str,
+    resolved: &str,
+    validator: Option<&dyn Fn(&str) -> bool>,
+) -> crate::error::Result<LookupHosts> {
+    RawLookupHosts {
+        hosts: vec![(
+            dbg!(hickory_proto::rr::Name::from_str(resolved).unwrap()),
+            42,
+        )],
         min_ttl: Duration::from_secs(1),
     }
-    .validate(original, DomainMismatch::Error)
-    .map(|_| ())
+    .normalize()?
+    .validate(original, validator, DomainMismatch::Error)
 }
 
 // Prose test 1. Allow SRVs with fewer than 3 `.` separated parts
 #[test]
 fn short_srv_domains_valid() {
-    validate_srv("localhost", "test.localhost").unwrap();
-    validate_srv("mongo.local", "test.mongo.local").unwrap();
+    validate_srv("localhost", "test.localhost", None).unwrap();
+    validate_srv("mongo.local", "test.mongo.local", None).unwrap();
 }
 
 // Prose test 2. Throw when return address does not end with SRV domain
 #[test]
 fn short_srv_domains_invalid_end() {
-    assert!(validate_srv("localhost", "localhost.mongodb").is_err());
-    assert!(validate_srv("mongo.local", "test_1.evil.local").is_err());
-    assert!(validate_srv("blogs.mongodb.com", "blogs.evil.com").is_err());
+    assert!(validate_srv("localhost", "localhost.mongodb", None).is_err());
+    assert!(validate_srv("mongo.local", "test_1.evil.local", None).is_err());
+    assert!(validate_srv("blogs.mongodb.com", "blogs.evil.com", None).is_err());
 }
 
 // Prose test 3. Throw when return address is identical to SRV hostname
 #[test]
 fn short_srv_domains_invalid_identical() {
-    assert!(validate_srv("localhost", "localhost").is_err());
-    assert!(validate_srv("mongo.local", "mongo.local").is_err());
+    assert!(validate_srv("localhost", "localhost", None).is_err());
+    assert!(validate_srv("mongo.local", "mongo.local", None).is_err());
 }
 
 // Prose test 4. Throw when return address does not contain `.` separating shared part of domain
 #[test]
 fn short_srv_domains_invalid_no_dot() {
-    assert!(validate_srv("localhost", "test_1.cluster_1localhost").is_err());
-    assert!(validate_srv("mongo.local", "test_1.my_hostmongo.local").is_err());
-    assert!(validate_srv("blogs.mongodb.com", "cluster.testmongodb.com").is_err());
+    assert!(validate_srv("localhost", "test_1.cluster_1localhost", None).is_err());
+    assert!(validate_srv("mongo.local", "test_1.my_hostmongo.local", None).is_err());
+    assert!(validate_srv("blogs.mongodb.com", "cluster.testmongodb.com", None).is_err());
 }
+
+// Prose test 5. srvHostValidator accepts a host the default verification would reject
+#[test]
+fn validator_allows_rejected() {
+    // Configure a validator that returns true for every host name
+    let validator: Option<&dyn Fn(&str) -> bool> = Some(&|_| true);
+    // * the SRV mongodb+srv://blogs.mongodb.com resolving to blogs.evil.com, which does not share
+    //   the SRV's domain name, produces a seedlist containing blogs.evil.com
+    let validated = validate_srv("blogs.mongodb.com", "blogs.evil.com", validator).unwrap();
+    assert!(validated.hosts.iter().any(|h| h.host() == "blogs.evil.com"));
+    // * the SRV mongodb+srv://mongo.local resolving to mongo.local, which does not add a domain
+    //   level to an SRV hostname with fewer than three . separated parts, produces a seedlist
+    //   containing mongo.local
+    let validated = validate_srv("mongo.local", "mongo.local", validator).unwrap();
+    assert!(validated.hosts.iter().any(|h| h.host() == "mongo.local"));
+}
+
+// Prose test 6. Reject a host the default verification would accept
+#[test]
+fn validator_rejects_allowed() {
+    // Configure a validator that returns false for every host name
+    let validator: Option<&dyn Fn(&str) -> bool> = Some(&|_| false);
+    // assert that the SRV mongodb+srv://blogs.mongodb.com resolving to cluster.mongodb.com throws
+    // an error, even though the returned address shares the SRV's domain name
+    assert!(validate_srv("blogs.mongodb.com", "cluster.mongodb.com", validator).is_err());
+}
+
+// Prose test 7. The validator receives the normalized host name
+#[test]
+fn validator_receives_normalized_host() {
+    // Configure a validator that records the host names it is passed and returns true
+    let received = OnceCell::<String>::new();
+    let validator: Option<&dyn Fn(&str) -> bool> = Some(&|h| {
+        received.set(h.to_owned()).unwrap();
+        true
+    });
+    // run the SRV mongodb+srv://blogs.mongodb.com resolving to CLUSTER.MONGODB.COM. and assert that
+    // the validator was passed cluster.mongodb.com
+    assert!(validate_srv("blogs.mongodb.com", "CLUSTER.MONGODB.COM.", validator).is_ok());
+    assert_eq!(
+        received.get().map(|s| s.as_str()),
+        Some("cluster.mongodb.com")
+    );
+}
+
+// Prose test 8. Wrap an error raised by the validator
+// omitted: the validator type signature does not allow an error return.
+
+// Prose test 9. Throw when both srvAllowedHostsSuffix and srvHostValidator are configured
+// omitted: the Rust driver does not support srvAllowedHostsSuffix
+
+// Prose test 10. Accept a mixed case returned address with srvAllowedHostsSuffix
+// omitted: the Rust driver does not support srvAllowedHostsSuffix
+
+// Prose test 11. Throw when srvHostValidator is not callable
+// omitted: Rust is strongly typed
+
+// Prose test 12. Accept a reserved single label as srvAllowedHostsSuffix
+// omitted: the Rust driver does not support srvAllowedHostsSuffix
+
+// Prose test 13. Throw when srvHostValidator is used with a non-SRV URI
+#[test]
+fn validator_non_srv_uri() {
+    let mut options = ClientOptions::new_srv();
+    options.srv_host_validator = Some(Arc::new(|_| true));
+    assert!(options.validate().is_err());
+}
+
+// Prose test 14. Throw when srvHostValidator returns a non-boolean value
+// omitted: Rust is strongly typed
+
+// Prose test 15. Accept an underscore in srvAllowedHostsSuffix
+// omitted: the Rust driver does not support srvAllowedHostsSuffix

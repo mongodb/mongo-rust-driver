@@ -31,7 +31,7 @@ impl Action for ParseConnectionString {
         }
 
         let resolved = host_info
-            .resolve(self.resolver_config, options.srv_service_name.clone())
+            .resolve(self.resolver_config, (&options).into())
             .await?;
         options.hosts = match resolved {
             ResolvedHostInfo::HostIdentifiers(hosts) => hosts,
@@ -167,6 +167,7 @@ impl ClientOptions {
             tracing_max_document_length_bytes: None,
             srv_max_hosts: conn_str.srv_max_hosts,
             srv_service_name: conn_str.srv_service_name,
+            srv_host_validator: None,
             #[cfg(feature = "opentelemetry")]
             tracing: None,
             #[cfg(feature = "socks5-proxy")]
