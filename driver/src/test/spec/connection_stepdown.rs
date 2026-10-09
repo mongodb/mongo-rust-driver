@@ -4,10 +4,14 @@ use futures::stream::StreamExt;
 
 use crate::{
     bson::{doc, Document},
-    error::{CommandError, ErrorKind},
-    options::{Acknowledgment, WriteConcern},
-    selection_criteria::SelectionCriteria,
-    test::{get_client_options, log_uncaptured, topology_is_replica_set, EventClient},
+    options::{ReadPreference, WriteConcern},
+    test::{
+        get_client_options,
+        log_uncaptured,
+        topology_is_replica_set,
+        util::fail_point::{FailPoint, FailPointMode},
+        EventClient,
+    },
     Collection,
     Database,
 };
@@ -25,6 +29,7 @@ async fn run_test<F: Future>(
 
     let mut options = get_client_options().await.clone();
     options.retry_writes = Some(false);
+    options.heartbeat_freq = Some(Duration::from_millis(500));
     let client = crate::Client::for_test()
         .options(options)
         .use_single_mongos()
@@ -36,12 +41,10 @@ async fn run_test<F: Future>(
     let db = client.database(&name);
     let coll = db.collection(&name);
 
-    let wc_majority = WriteConcern::builder().w(Acknowledgment::Majority).build();
-
-    let _: Result<_, _> = coll.drop().write_concern(wc_majority.clone()).await;
+    let _ = coll.drop().write_concern(WriteConcern::majority()).await;
 
     db.create_collection(&name)
-        .write_concern(wc_majority)
+        .write_concern(WriteConcern::majority())
         .await
         .unwrap();
 
@@ -62,21 +65,15 @@ async fn get_more() {
         let db = client.database("admin");
 
         db.run_command(doc! { "replSetFreeze": 0 })
-            .selection_criteria(SelectionCriteria::ReadPreference(
-                crate::selection_criteria::ReadPreference::Secondary {
-                    options: Default::default(),
-                },
-            ))
+            .selection_criteria(ReadPreference::secondary(None).into())
             .await
             .expect("replSetFreeze should have succeeded");
 
-        client
-            .database("admin")
-            .run_command(doc! { "replSetStepDown": 30, "force": true })
+        db.run_command(doc! { "replSetStepDown": 30, "force": true })
             .await
             .expect("stepdown should have succeeded");
 
-        for _ in 0..5 {
+        while cursor.advance().await.unwrap() {
             cursor
                 .next()
                 .await
@@ -84,7 +81,7 @@ async fn get_more() {
                 .expect("cursor iteration should have succeeded");
         }
 
-        tokio::time::sleep(Duration::from_millis(250)).await;
+        client.sync_workers().await;
         assert_eq!(client.events.count_pool_cleared_events(), 0);
     }
 
@@ -98,33 +95,19 @@ async fn notwritableprimary_keep_pool() {
         _db: Database,
         coll: Collection<Document>,
     ) {
-        client
-            .database("admin")
-            .run_command(doc! {
-                "configureFailPoint": "failCommand",
-                "mode": { "times": 1 },
-                "data": {
-                    "failCommands": ["insert"],
-                    "errorCode": 10107
-                }
-            })
-            .await
-            .unwrap();
+        let error_code = 10107;
+        let fail_point =
+            FailPoint::fail_command(&["insert"], FailPointMode::Times(1)).error_code(error_code);
+        let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }).await;
-        assert!(
-            matches!(
-                result.map_err(|e| *e.kind),
-                Err(ErrorKind::Command(CommandError { code: 10107, .. }))
-            ),
-            "insert should have failed"
-        );
+        let error = coll.insert_one(doc! { "test": 1 }).await.unwrap_err();
+        assert_eq!(error.code(), Some(error_code as i32));
 
         coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
 
-        tokio::time::sleep(Duration::from_millis(250)).await;
+        client.sync_workers().await;
         assert_eq!(client.events.count_pool_cleared_events(), 0);
     }
 
@@ -142,29 +125,15 @@ async fn shutdown_in_progress() {
         _db: Database,
         coll: Collection<Document>,
     ) {
-        client
-            .database("admin")
-            .run_command(doc! {
-                "configureFailPoint": "failCommand",
-                "mode": { "times": 1 },
-                "data": {
-                    "failCommands": ["insert"],
-                    "errorCode": 91
-                }
-            })
-            .await
-            .unwrap();
+        let error_code = 91;
+        let fail_point =
+            FailPoint::fail_command(&["insert"], FailPointMode::Times(1)).error_code(error_code);
+        let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }).await;
-        assert!(
-            matches!(
-                result.map_err(|e| *e.kind),
-                Err(ErrorKind::Command(CommandError { code: 91, .. }))
-            ),
-            "insert should have failed"
-        );
+        let error = coll.insert_one(doc! { "test": 1 }).await.unwrap_err();
+        assert_eq!(error.code(), Some(error_code as i32));
 
-        tokio::time::sleep(Duration::from_millis(250)).await;
+        client.sync_workers().await;
         assert_eq!(client.events.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 })
@@ -182,36 +151,20 @@ async fn interrupted_at_shutdown() {
         _db: Database,
         coll: Collection<Document>,
     ) {
-        client
-            .database("admin")
-            .run_command(doc! {
-                "configureFailPoint": "failCommand",
-                "mode": { "times": 1 },
-                "data": {
-                    "failCommands": ["insert"],
-                    "errorCode": 11600
-                }
-            })
-            .await
-            .unwrap();
+        let error_code = 11600;
+        let fail_point =
+            FailPoint::fail_command(&["insert"], FailPointMode::Times(1)).error_code(error_code);
+        let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }).await;
-        assert!(
-            matches!(
-                result.map_err(|e| *e.kind),
-                Err(ErrorKind::Command(CommandError { code: 11600, .. }))
-            ),
-            "insert should have failed"
-        );
+        let error = coll.insert_one(doc! { "test": 1 }).await.unwrap_err();
+        assert_eq!(error.code(), Some(error_code as i32));
 
-        tokio::time::sleep(Duration::from_millis(250)).await;
+        client.sync_workers().await;
         assert_eq!(client.events.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 })
             .await
             .expect("insert should have succeeded");
-
-        tokio::time::sleep(Duration::from_millis(250)).await;
     }
 
     run_test("interrupted_at_shutdown", interrupted_at_shutdown_test).await;

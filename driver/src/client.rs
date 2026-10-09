@@ -588,9 +588,20 @@ impl Client {
             .collect()
     }
 
+    /// Sync all workers related to this client. When this method completes, all in-flight CMAP
+    /// events will have completed, and all of their corresponding monitoring and/or tracing events
+    /// will have been emitted.
     #[cfg(test)]
     pub(crate) async fn sync_workers(&self) {
         self.inner.topology.updater().sync_workers().await;
+    }
+
+    /// Waits for all sessions, GridFS buckets, and cursors derived from this client to finish their
+    /// async drop work. This guarantees that all command events emitted synchronously in spawned
+    /// tasks have been emitted.
+    #[cfg(test)]
+    pub(crate) async fn wait_for_async_drops(&self) {
+        self.inner.shutdown.pending_drops.wait().await
     }
 
     #[cfg(test)]

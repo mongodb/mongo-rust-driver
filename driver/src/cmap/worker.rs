@@ -20,6 +20,8 @@ use super::{
     status::{PoolGenerationPublisher, PoolGenerationSubscriber},
     DEFAULT_MAX_POOL_SIZE,
 };
+#[cfg(test)]
+use crate::runtime::AcknowledgmentSender;
 use crate::{
     bson::oid::ObjectId,
     client::auth::Credential,
@@ -145,6 +147,11 @@ pub(crate) struct ConnectionPoolWorker {
 
     /// Client shutdown handling.
     shutdown: TopologyShutdown,
+
+    /// Pending requests to sync workers. These can be acknowledged once all pending connections
+    /// have been created.
+    #[cfg(test)]
+    pending_sync_workers: Vec<AcknowledgmentSender<()>>,
 }
 
 impl ConnectionPoolWorker {
@@ -262,6 +269,8 @@ impl ConnectionPoolWorker {
             max_connecting,
             cancellation_sender,
             shutdown,
+            #[cfg(test)]
+            pending_sync_workers: Vec::new(),
         };
 
         runtime::spawn(worker.shutdown.tasks.clone().track_future(async move {
@@ -347,7 +356,11 @@ impl ConnectionPoolWorker {
                             }
                             #[cfg(test)]
                             BroadcastMessage::SyncWorkers => {
-                                ack.acknowledge(());
+                                if self.pending_connection_count != 0 {
+                                    self.pending_sync_workers.push(ack);
+                                } else {
+                                    ack.acknowledge(());
+                                }
                             }
                         }
                     }
@@ -360,6 +373,13 @@ impl ConnectionPoolWorker {
             if self.can_service_connection_request() {
                 if let Some(request) = self.wait_queue.pop_front() {
                     self.check_out(request);
+                }
+            }
+
+            #[cfg(test)]
+            if self.pending_connection_count == 0 {
+                for ack in self.pending_sync_workers.drain(..) {
+                    ack.acknowledge(());
                 }
             }
         }
