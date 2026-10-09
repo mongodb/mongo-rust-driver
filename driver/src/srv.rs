@@ -1,8 +1,12 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 #[cfg(feature = "dns-resolver")]
-use crate::error::{ErrorKind, Redact};
-use crate::{client::options::ResolverConfig, error::Result, options::ServerAddress};
+use crate::error::{Error, ErrorKind, Redact};
+use crate::{
+    client::options::ResolverConfig,
+    error::Result,
+    options::{ClientOptions, ServerAddress},
+};
 #[cfg(feature = "dns-resolver")]
 use hickory_proto::rr::RData;
 
@@ -15,15 +19,61 @@ pub(crate) struct ResolvedConfig {
     pub(crate) load_balanced: Option<bool>,
 }
 
+#[cfg(feature = "dns-resolver")]
+#[derive(Debug, Clone)]
+pub(crate) struct RawLookupHosts {
+    pub(crate) hosts: Vec<(hickory_proto::rr::Name, u16)>,
+    pub(crate) min_ttl: Duration,
+}
+
+#[cfg(feature = "dns-resolver")]
+#[derive(Debug, Clone)]
+pub(crate) struct NormalLookupHosts {
+    hosts: Vec<(String, u16)>,
+    min_ttl: Duration,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct LookupHosts {
     pub(crate) hosts: Vec<ServerAddress>,
     pub(crate) min_ttl: Duration,
 }
 
-impl LookupHosts {
-    #[cfg(feature = "dns-resolver")]
-    pub(crate) fn validate(mut self, original_hostname: &str, dm: DomainMismatch) -> Result<Self> {
+#[cfg(feature = "dns-resolver")]
+impl RawLookupHosts {
+    pub(crate) fn normalize(self) -> Result<NormalLookupHosts> {
+        let mut ok_hosts = vec![];
+        for (host, port) in self.hosts {
+            let mut host = dbg!(host.to_utf8());
+            // spec normalization steps:
+            // 1. Any trailing `.` MUST be stripped
+            if host.ends_with('.') {
+                host.pop();
+            }
+            // 2. The hostname MUST be converted to its A-label (Punycode) form
+            // 3. The hostname MUST be normalized to lowercase using ASCII case folding
+            // (both of these are done by `idna::domain_to_ascii_cow`)
+            let host = idna::domain_to_ascii_cow(host.as_bytes(), idna::AsciiDenyList::URL)
+                .map_err(|e| Error::invalid_response(e.to_string()))?
+                .into_owned();
+
+            ok_hosts.push((host, port));
+        }
+        Ok(NormalLookupHosts {
+            hosts: ok_hosts,
+            min_ttl: self.min_ttl,
+        })
+    }
+}
+
+#[cfg(feature = "dns-resolver")]
+impl NormalLookupHosts {
+    pub(crate) fn validate(
+        self,
+        original_hostname: &str,
+        validator: Option<&dyn Fn(&str) -> bool>,
+        dm: DomainMismatch,
+    ) -> Result<LookupHosts> {
         let original_hostname_parts: Vec<_> = original_hostname.split('.').collect();
         let original_domain_name = if original_hostname_parts.len() >= 3 {
             &original_hostname_parts[1..]
@@ -32,11 +82,18 @@ impl LookupHosts {
         };
 
         let mut ok_hosts = vec![];
-        for addr in self.hosts.drain(..) {
-            let host = addr.host();
-            let hostname_parts: Vec<_> = host.split('.').collect();
-            if hostname_parts[1..].ends_with(original_domain_name) {
-                ok_hosts.push(addr);
+        for (host, port) in self.hosts {
+            let valid = if let Some(f) = validator {
+                f(&host)
+            } else {
+                let hostname_parts: Vec<_> = host.split('.').collect();
+                hostname_parts[1..].ends_with(original_domain_name)
+            };
+            if valid {
+                ok_hosts.push(ServerAddress::Tcp {
+                    host,
+                    port: Some(port),
+                });
             } else {
                 let message = format!(
                     "SRV lookup for {} returned result {}, which does not match domain name {}",
@@ -65,9 +122,8 @@ impl LookupHosts {
                 }
             }
         }
-        self.hosts = ok_hosts;
 
-        if self.hosts.is_empty() {
+        if ok_hosts.is_empty() {
             return Err(ErrorKind::DnsResolve {
                 message: format!(
                     "SRV lookup for {} returned no records",
@@ -77,7 +133,10 @@ impl LookupHosts {
             .into());
         }
 
-        Ok(self)
+        Ok(LookupHosts {
+            hosts: ok_hosts,
+            min_ttl: self.min_ttl,
+        })
     }
 }
 
@@ -96,21 +155,46 @@ pub(crate) enum DomainMismatch {
 #[cfg(feature = "dns-resolver")]
 pub(crate) struct SrvResolver {
     resolver: crate::runtime::AsyncResolver,
-    srv_service_name: Option<String>,
+    options: SrvResolverOptions,
+}
+
+#[derive(Default)]
+pub(crate) struct SrvResolverOptions {
+    pub(crate) srv_service_name: Option<String>,
+    #[cfg_attr(not(feature = "dns-resolver"), expect(unused))]
+    pub(crate) srv_host_validator: Option<Arc<dyn Fn(&str) -> bool + Send + Sync>>,
+}
+
+impl std::fmt::Debug for SrvResolverOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            srv_service_name,
+            srv_host_validator: _,
+        } = self;
+        f.debug_struct("SrvResolverOptions")
+            .field("srv_service_name", srv_service_name)
+            .finish()
+    }
+}
+
+impl From<&ClientOptions> for SrvResolverOptions {
+    fn from(value: &ClientOptions) -> Self {
+        Self {
+            srv_service_name: value.srv_service_name.clone(),
+            srv_host_validator: value.srv_host_validator.clone(),
+        }
+    }
 }
 
 #[cfg(feature = "dns-resolver")]
 impl SrvResolver {
     pub(crate) async fn new(
         config: Option<ResolverConfig>,
-        srv_service_name: Option<String>,
+        options: SrvResolverOptions,
     ) -> Result<Self> {
         let resolver = crate::runtime::AsyncResolver::new(config.map(|c| c.inner)).await?;
 
-        Ok(Self {
-            resolver,
-            srv_service_name,
-        })
+        Ok(Self { resolver, options })
     }
 
     pub(crate) async fn resolve_client_options(
@@ -131,7 +215,7 @@ impl SrvResolver {
         Ok(config)
     }
 
-    async fn get_srv_hosts_unvalidated(&self, lookup_hostname: &str) -> Result<LookupHosts> {
+    async fn get_srv_hosts_raw(&self, lookup_hostname: &str) -> Result<RawLookupHosts> {
         let srv_lookup = self.resolver.srv_lookup(lookup_hostname).await?;
         let mut hosts = vec![];
         let mut min_ttl = u32::MAX;
@@ -139,16 +223,10 @@ impl SrvResolver {
             let RData::SRV(srv) = &record.data else {
                 continue;
             };
-            let mut host = srv.target.to_utf8();
-            // Remove the trailing '.'
-            if host.ends_with('.') {
-                host.pop();
-            }
-            let port = Some(srv.port);
-            hosts.push(ServerAddress::Tcp { host, port });
+            hosts.push((srv.target.clone(), srv.port));
             min_ttl = std::cmp::min(min_ttl, record.ttl);
         }
-        Ok(LookupHosts {
+        Ok(RawLookupHosts {
             hosts,
             min_ttl: Duration::from_secs(min_ttl.into()),
         })
@@ -161,12 +239,23 @@ impl SrvResolver {
     ) -> Result<LookupHosts> {
         let lookup_hostname = format!(
             "_{}._tcp.{}",
-            self.srv_service_name.as_deref().unwrap_or("mongodb"),
+            self.options
+                .srv_service_name
+                .as_deref()
+                .unwrap_or("mongodb"),
             original_hostname
         );
-        self.get_srv_hosts_unvalidated(&lookup_hostname)
+        self.get_srv_hosts_raw(&lookup_hostname)
             .await?
-            .validate(original_hostname, dm)
+            .normalize()?
+            .validate(
+                original_hostname,
+                self.options
+                    .srv_host_validator
+                    .as_deref()
+                    .map(|f| f as &dyn Fn(&str) -> bool),
+                dm,
+            )
     }
 
     async fn get_txt_options(
@@ -271,7 +360,7 @@ pub(crate) struct SrvResolver {}
 impl SrvResolver {
     pub(crate) async fn new(
         _config: Option<ResolverConfig>,
-        _srv_service_name: Option<String>,
+        _options: SrvResolverOptions,
     ) -> Result<Self> {
         Ok(Self {})
     }

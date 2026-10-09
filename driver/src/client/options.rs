@@ -14,6 +14,7 @@ use std::{
     net::{Ipv4Addr, Ipv6Addr, SocketAddr},
     path::PathBuf,
     str::FromStr,
+    sync::Arc,
     time::Duration,
 };
 
@@ -43,7 +44,7 @@ use crate::{
     sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     serde_util,
-    srv::{OriginalSrvInfo, SrvResolver},
+    srv::{OriginalSrvInfo, SrvResolver, SrvResolverOptions},
 };
 
 pub use bulk_write::*;
@@ -331,7 +332,7 @@ impl ServerAddress {
         })
     }
 
-    #[cfg(feature = "dns-resolver")]
+    #[cfg(any(feature = "tracing-unstable", test))]
     pub(crate) fn host(&self) -> std::borrow::Cow<'_, str> {
         match self {
             Self::Tcp { host, .. } => std::borrow::Cow::Borrowed(host.as_str()),
@@ -652,6 +653,12 @@ pub struct ClientOptions {
 
     /// Overrides the default "mongodb" service name for SRV lookup in both discovery and polling
     pub srv_service_name: Option<String>,
+
+    /// Replaces the default SRV domain name validation with a custom callback.  WARNING: Modifying
+    /// the default SRV domain name validation can create vulnerabilities.
+    #[serde(skip)]
+    #[derive_where(skip)]
+    pub srv_host_validator: Option<Arc<dyn Fn(&str) -> bool + Send + Sync>>,
 
     /// The TLS configuration for the Client to use in its connections with the server.
     ///
@@ -1152,13 +1159,12 @@ impl HostInfo {
     async fn resolve(
         self,
         resolver_config: Option<ResolverConfig>,
-        srv_service_name: Option<String>,
+        srv_options: SrvResolverOptions,
     ) -> Result<ResolvedHostInfo> {
         Ok(match self {
             Self::HostIdentifiers(hosts) => ResolvedHostInfo::HostIdentifiers(hosts),
             Self::DnsRecord(hostname) => {
-                let mut resolver =
-                    SrvResolver::new(resolver_config.clone(), srv_service_name).await?;
+                let mut resolver = SrvResolver::new(resolver_config.clone(), srv_options).await?;
                 let config = resolver.resolve_client_options(&hostname).await?;
                 ResolvedHostInfo::DnsRecord { hostname, config }
             }
@@ -1473,6 +1479,12 @@ impl ClientOptions {
                     }
                 }
             }
+        }
+
+        if self.srv_host_validator.is_some() && self.original_srv_info.is_some() {
+            return Err(Error::invalid_argument(
+                "cannot specify an srv host validator with a non-srv URI",
+            ));
         }
 
         Ok(())

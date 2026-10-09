@@ -2280,6 +2280,7 @@ dependencies = [
  "hmac",
  "home",
  "http 1.5.0",
+ "idna",
  "lambda_runtime",
  "log",
  "macro_magic",
