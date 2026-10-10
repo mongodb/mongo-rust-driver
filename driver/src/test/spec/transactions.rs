@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{doc, Document},
+    client::session::TransactionCallbackError,
     error::{
         Error,
         ErrorKind,
@@ -123,6 +124,56 @@ async fn convenient_api_custom_error() {
 }
 
 #[tokio::test]
+async fn convenient_api_custom_error_type() {
+    if !transactions_supported().await {
+        log_uncaptured("Skipping convenient_api_custom_error_type: no transaction support.");
+        return;
+    }
+
+    let client = Client::for_test().monitor_events().await;
+    let mut session = client.start_session().await.unwrap();
+    let coll = client
+        .database("test_convenient")
+        .collection::<Document>("test_convenient");
+
+    enum MyErr {
+        Own,
+        Mongo(Error),
+    }
+
+    impl From<Error> for MyErr {
+        fn from(e: Error) -> Self {
+            Self::Mongo(e)
+        }
+    }
+
+    impl TransactionCallbackError for MyErr {
+        fn as_mongo_error(&self) -> Option<&Error> {
+            if let MyErr::Mongo(e) = self {
+                Some(e)
+            } else {
+                None
+            }
+        }
+    }
+
+    let result: std::result::Result<(), MyErr> = session
+        .start_transaction()
+        .and_run2(async move |session| {
+            coll.find_one(doc! {}).session(session).await?;
+            Err(MyErr::Own)
+        })
+        .await;
+
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), MyErr::Own));
+
+    let events = client.events.get_all_command_started_events();
+    let commands: Vec<_> = events.iter().map(|ev| &ev.command_name).collect();
+    assert_eq!(&["find", "abortTransaction"], &commands[..]);
+}
+
+#[tokio::test]
 async fn convenient_api_returned_value() {
     if !transactions_supported().await {
         log_uncaptured("Skipping convenient_api_returned_value: no transaction support.");
@@ -137,7 +188,7 @@ async fn convenient_api_returned_value() {
 
     let value = session
         .start_transaction()
-        .and_run2(async move |session| {
+        .and_run2(async move |session| -> Result<i32> {
             coll.find_one(doc! {}).session(session).await?;
             Ok(42)
         })
