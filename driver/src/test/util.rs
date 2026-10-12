@@ -81,16 +81,6 @@ impl TestClientBuilder {
         self.use_single_mongos = true;
         self
     }
-
-    pub(crate) fn min_heartbeat_freq(
-        mut self,
-        min_heartbeat_freq: impl Into<Option<Duration>>,
-    ) -> Self {
-        let min_heartbeat_freq = min_heartbeat_freq.into();
-        assert!(self.min_heartbeat_freq.is_none() || min_heartbeat_freq.is_none());
-        self.min_heartbeat_freq = min_heartbeat_freq;
-        self
-    }
 }
 
 impl IntoFuture for TestClientBuilder {

@@ -21,6 +21,7 @@ use crate::{
         Topology,
         TopologyDescription,
         TopologyVersion,
+        MIN_HEARTBEAT_FREQUENCY,
     },
     selection_criteria::TagSet,
     test::{
@@ -564,7 +565,6 @@ async fn load_balanced() {
 async fn topology_closed_event_last() {
     let client = Client::for_test()
         .use_single_mongos()
-        .min_heartbeat_freq(Duration::from_millis(50))
         .monitor_events()
         .await;
     let events = client.events.clone();
@@ -599,7 +599,6 @@ async fn topology_closed_event_last() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "SERVER-128517"]
 async fn heartbeat_events() {
     if topology_is_load_balanced().await {
         log_uncaptured("skipping heartbeat_events tests due to load-balanced topology");
@@ -608,27 +607,26 @@ async fn heartbeat_events() {
 
     let mut options = get_client_options().await.clone();
     options.hosts.drain(1..);
-    options.heartbeat_freq = Some(Duration::from_millis(50));
+    options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
     options.app_name = "heartbeat_events".to_string().into();
 
     let client = Client::for_test()
         .options(options.clone())
         .use_single_mongos()
-        .min_heartbeat_freq(Duration::from_millis(50))
         .monitor_events()
         .await;
 
     let mut subscriber = client.events.stream_all();
 
     subscriber
-        .next_match(Duration::from_millis(500), |event| {
+        .next_match(MIN_HEARTBEAT_FREQUENCY * 4, |event| {
             matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatStarted(_)))
         })
         .await
         .expect("should see server heartbeat started event");
 
     subscriber
-        .next_match(Duration::from_millis(500), |event| {
+        .next_match(MIN_HEARTBEAT_FREQUENCY * 4, |event| {
             matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)))
         })
         .await
@@ -651,7 +649,7 @@ async fn heartbeat_events() {
     let _guard = fp_client.enable_fail_point(fail_point).await.unwrap();
 
     subscriber
-        .next_match(Duration::from_millis(500), |event| {
+        .next_match(MIN_HEARTBEAT_FREQUENCY * 4, |event| {
             matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatFailed(_)))
         })
         .await
