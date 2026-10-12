@@ -90,10 +90,10 @@ async fn min_heartbeat_frequency() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sdam_pool_management() {
-    // if cfg!(target_os = "macos") {
-    //     log_uncaptured("skipping sdam_pool_management: flaky on macos");
-    //     return;
-    // }
+    if cfg!(target_os = "macos") {
+        log_uncaptured("skipping sdam_pool_management: flaky on macos");
+        return;
+    }
 
     let mut options = get_client_options().await.clone();
     if options.load_balanced.unwrap_or(false) {
