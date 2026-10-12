@@ -596,14 +596,6 @@ impl Client {
         self.inner.topology.updater().sync_workers().await;
     }
 
-    /// Waits for all sessions, GridFS buckets, and cursors derived from this client to finish their
-    /// async drop work. This guarantees that all command events emitted synchronously in spawned
-    /// tasks have been emitted.
-    #[cfg(test)]
-    pub(crate) async fn wait_for_async_drops(&self) {
-        self.inner.shutdown.pending_drops.wait().await
-    }
-
     #[cfg(test)]
     pub(crate) fn topology_description(&self) -> crate::sdam::TopologyDescription {
         self.inner.topology.latest().description.clone()

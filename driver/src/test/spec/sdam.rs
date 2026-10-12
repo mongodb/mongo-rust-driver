@@ -318,10 +318,11 @@ async fn connection_pool_backpressure() {
     options.max_connecting = Some(100);
     // the driver has a default max pool size of 10 rather than the spec's default of 100
     options.max_pool_size = Some(100);
-    if topology_is_sharded().await {
-        options.hosts.drain(1..);
-    }
-    let client = Client::for_test().options(options).monitor_events().await;
+    let client = Client::for_test()
+        .options(options)
+        .use_single_mongos()
+        .monitor_events()
+        .await;
 
     async fn run_test(client: &EventClient) -> Result<()> {
         let admin = client.database("admin");
