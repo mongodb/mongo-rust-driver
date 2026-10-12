@@ -9,11 +9,16 @@ createEntities:
   - database:
       id: &database0 database0
       client: *client0
-      databaseName: operation-aggregate
+      databaseName: &databaseName0 operation-aggregate
   - collection:
       id: &collection0 collection0
       database: *database0
       collectionName: &collectionName0 test
+
+initialData:
+  - collectionName: *collectionName0
+    databaseName: *databaseName0
+    documents: []
 
 tests:
   - description: aggregation

@@ -9,11 +9,11 @@ createEntities:
   - database:
       id: &database0 database0
       client: *client0
-      databaseName: operation-drop-indexes
+      databaseName: &database0Name operation-drop-indexes
   - collection:
       id: &collection0 collection0
       database: *database0
-      collectionName: test
+      collectionName: &collection0Name test
   - client:
       id: &clientWithoutTracing clientWithoutTracing
       useMultipleMongoses: false
@@ -25,6 +25,11 @@ createEntities:
       id: &collectionWithoutTracing collectionWithoutTracing
       database: *databaseWithoutTracing
       collectionName: test
+
+initialData:
+  - collectionName: *collection0Name
+    databaseName: *database0Name
+    documents: []
 
 tests:
   - description: drop indexes

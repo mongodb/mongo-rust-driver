@@ -14,6 +14,12 @@ createEntities:
       id: &collection0 collection0
       database: *database0
       collectionName: &collection0Name test
+
+initialData:
+  - collectionName: *collection0Name
+    databaseName: *database0Name
+    documents: []
+
 tests:
   - description: create indexes
     operations:

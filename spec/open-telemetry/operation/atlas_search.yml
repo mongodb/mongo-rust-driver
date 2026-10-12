@@ -9,11 +9,16 @@ createEntities:
   - database:
       id: &database0 database0
       client: *client0
-      databaseName: operation-atlas-search
+      databaseName: &databaseName0 operation-atlas-search
   - collection:
       id: &collection0 collection0
       database: *database0
-      collectionName: test
+      collectionName: &collectionName0 test
+
+initialData:
+  - collectionName: *collectionName0
+    databaseName: *databaseName0
+    documents: []
 
 runOnRequirements:
   # Skip server versions without fix of SERVER-83107 to avoid error message "BSON field 'createSearchIndexes.indexes.type' is an unknown field."
