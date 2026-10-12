@@ -1,7 +1,5 @@
 use std::{future::Future, time::Duration};
 
-use futures::stream::StreamExt;
-
 use crate::{
     bson::{doc, Document},
     options::{ReadPreference, WriteConcern},
@@ -73,13 +71,7 @@ async fn get_more() {
             .await
             .expect("stepdown should have succeeded");
 
-        while cursor.advance().await.unwrap() {
-            cursor
-                .next()
-                .await
-                .unwrap()
-                .expect("cursor iteration should have succeeded");
-        }
+        while cursor.advance().await.unwrap() {}
 
         client.sync_workers().await;
         assert_eq!(client.events.count_pool_cleared_events(), 0);
@@ -88,7 +80,7 @@ async fn get_more() {
     run_test("get_more", get_more_test).await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn notwritableprimary_keep_pool() {
     async fn notwritableprimary_keep_pool_test(
         client: EventClient,
@@ -118,7 +110,7 @@ async fn notwritableprimary_keep_pool() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn shutdown_in_progress() {
     async fn shutdown_in_progress_test(
         client: EventClient,
@@ -144,7 +136,7 @@ async fn shutdown_in_progress() {
     run_test("shutdown_in_progress", shutdown_in_progress_test).await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn interrupted_at_shutdown() {
     async fn interrupted_at_shutdown_test(
         client: EventClient,

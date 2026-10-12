@@ -13,7 +13,6 @@ use crate::{
         spec::unified_runner::run_unified_tests,
         streaming_monitor_protocol_supported,
         topology_is_load_balanced,
-        topology_is_sharded,
         util::{
             event_buffer::EventBuffer,
             fail_point::{FailPoint, FailPointMode},
