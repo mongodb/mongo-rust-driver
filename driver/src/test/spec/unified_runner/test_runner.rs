@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref, path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use futures::TryStreamExt;
 use semver::Version;
@@ -251,13 +251,11 @@ impl TestRunner {
                     .await
                     .unwrap();
             }
-            drop(entities);
 
             if let Some(ref events) = test_case.expect_events {
                 for expected in events {
                     let entities = self.entities.read().await;
-                    let client = entities.get(&expected.client).unwrap().as_client().clone();
-                    drop(entities);
+                    let client = entities.get(&expected.client).unwrap().as_client();
                     let mut stream = client.events.stream_all();
 
                     let expected_type = expected.event_type.unwrap_or(ExpectedEventType::Command);
@@ -287,11 +285,9 @@ impl TestRunner {
                             );
                         };
 
-                        if let Err(error) = events_match(
-                            &actual_event,
-                            expected_event,
-                            Some(&self.entities.read().await.deref()),
-                        ) {
+                        if let Err(error) =
+                            events_match(&actual_event, expected_event, Some(&entities))
+                        {
                             panic!(
                                 "{description}: event mismatch: {error}\nactual: \
                                  {actual_event:?}\nexpected: {expected_event:?}"
@@ -300,34 +296,9 @@ impl TestRunner {
                     }
 
                     if expected.ignore_extra_events != Some(true) {
-                        let next = match expected_type {
-                            ExpectedEventType::Cmap
-                            | ExpectedEventType::CmapWithoutConnectionReady => {
-                                client.sync_workers().await;
-                                stream.collect_now(filter).first().cloned()
-                            }
-                            ExpectedEventType::Command => {
-                                // Command events are emitted synchronously, with the exception of
-                                // cleanup performed when sessions, GridFS buckets, and cursors are
-                                // dropped. First, drop all of those entities. Then, wait for their
-                                // spawned drop tasks to complete.
-                                let mut entities = self.entities.write().await;
-                                entities.retain(|_, e| {
-                                    !matches!(e, Entity::Bucket(_) | Entity::Cursor(_))
-                                });
-                                entities.iter_mut().for_each(|(_, e)| {
-                                    if let Entity::Session(session_entity) = e {
-                                        session_entity.client_session.take();
-                                    }
-                                });
-                                client.wait_for_async_drops().await;
-                                stream.collect_now(filter).first().cloned()
-                            }
-                            ExpectedEventType::Sdam => {
-                                stream.next_match(Duration::from_millis(100), filter).await
-                            }
-                        };
-                        if let Some(next) = next {
+                        if let Some(next) =
+                            stream.next_match(Duration::from_millis(100), filter).await
+                        {
                             panic!("{description}: observed extra event: {next:?}");
                         }
                     }
