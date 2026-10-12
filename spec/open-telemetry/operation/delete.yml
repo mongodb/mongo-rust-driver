@@ -15,6 +15,11 @@ createEntities:
       database: *database0
       collectionName: &collectionName0 test
 
+initialData:
+  - collectionName: *collectionName0
+    databaseName: *databaseName0
+    documents: []
+
 tests:
   - description: delete elements
     operations:

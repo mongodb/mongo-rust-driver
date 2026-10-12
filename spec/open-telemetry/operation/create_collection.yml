@@ -10,18 +10,64 @@ createEntities:
       id: &database0 database0
       client: *client0
       databaseName: &database0Name operation-create-collection
+
+# initialData drops and re-creates the collection so that the dropCollection
+# operation below always has a collection to drop, and so that the fixture is
+# repeatable within a single process.
+initialData:
+  - collectionName: &collectionName newlyCreatedCollection
+    databaseName: *database0Name
+    documents: []
+
 tests:
   - description: create collection
     operations:
       - object: *database0
+        name: dropCollection
+        arguments:
+          collection: *collectionName
+
+      - object: *database0
         name: createCollection
         arguments:
-          collection: &collectionName newlyCreatedCollection
+          collection: *collectionName
 
     expectTracingMessages:
       - client: *client0
         ignoreExtraSpans: false
         spans:
+          - name: dropCollection operation-create-collection.newlyCreatedCollection
+            attributes:
+              db.system.name: mongodb
+              db.namespace: *database0Name
+              db.collection.name: *collectionName
+              db.operation.name: dropCollection
+              db.operation.summary: dropCollection operation-create-collection.newlyCreatedCollection
+            nested:
+              - name: drop
+                attributes:
+                  db.system.name: mongodb
+                  db.namespace: *database0Name
+                  db.collection.name: *collectionName
+                  db.command.name: drop
+                  network.transport: tcp
+                  db.mongodb.cursor_id: { $$exists: false }
+                  db.response.status_code: { $$exists: false }
+                  exception.message: { $$exists: false }
+                  exception.type: { $$exists: false }
+                  exception.stacktrace: { $$exists: false }
+                  server.address: { $$type: string }
+                  server.port: { $$type: [int, long] }
+                  db.query.summary: drop operation-create-collection.newlyCreatedCollection
+                  db.query.text:
+                    $$matchAsDocument:
+                      $$matchAsRoot:
+                        drop: *collectionName
+                  db.mongodb.server_connection_id:
+                    $$type: [ int, long ]
+                  db.mongodb.driver_connection_id:
+                    $$type: [ int, long ]
+
           - name: createCollection operation-create-collection.newlyCreatedCollection
             attributes:
               db.system.name: mongodb

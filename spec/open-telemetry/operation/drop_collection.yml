@@ -13,12 +13,18 @@ createEntities:
   - database:
       id: &database0 database0
       client: *client0
-      databaseName: operation-drop-collection
+      databaseName: &database0Name operation-drop-collection
 
   - collection:
       id: collection0
       database: *database0
       collectionName: &collection_name test
+
+initialData:
+  - collectionName: *collection_name
+    databaseName: *database0Name
+    documents: []
+
 tests:
   - description: drop collection
     operations:
