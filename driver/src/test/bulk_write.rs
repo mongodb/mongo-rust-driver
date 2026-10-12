@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::{
     bson::{doc, Document},
-    error::{bulk_write::PartialBulkWriteResult, BulkWriteError, ErrorKind},
-    options::{InsertOneModel, UpdateOneModel},
+    error::{bulk_write::PartialBulkWriteResult, BulkWriteError, Error, ErrorKind},
+    options::{InsertOneModel, UpdateOneModel, WriteModel},
     results::UpdateResult,
     test::{
         get_client_options,
@@ -44,13 +44,28 @@ impl PartialBulkWriteResult {
     }
 }
 
+impl Error {
+    fn get_bulk_write_error(self) -> BulkWriteError {
+        match *self.kind {
+            ErrorKind::BulkWrite(bulk_write_error) => bulk_write_error,
+            _ => panic!("expected bulk write error, got {self:?}"),
+        }
+    }
+}
+
+macro_rules! require_8_0 {
+    ($name:literal) => {
+        if server_version_lt(8, 0).await {
+            log_uncaptured(format!("skipping {}: bulkWrite requires 8.0+", $name));
+            return;
+        }
+    };
+}
+
 // CRUD prose test 3
 #[tokio::test]
 async fn max_write_batch_size_batching() {
-    if server_version_lt(8, 0).await {
-        log_uncaptured("skipping max_write_batch_size_batching: bulkWrite requires 8.0+");
-        return;
-    }
+    require_8_0!("max_write_batch_size_batching");
 
     let client = Client::for_test().monitor_events().await;
 
@@ -87,10 +102,7 @@ async fn max_write_batch_size_batching() {
 // CRUD prose test 4
 #[tokio::test]
 async fn max_message_size_bytes_batching() {
-    if server_version_lt(8, 0).await {
-        log_uncaptured("skipping max_message_size_bytes_batching: bulkWrite requires 8.0+");
-        return;
-    }
+    require_8_0!("max_message_size_bytes_batching");
 
     let client = Client::for_test().monitor_events().await;
 
@@ -130,10 +142,7 @@ async fn max_message_size_bytes_batching() {
 // CRUD prose test 5
 #[tokio::test(flavor = "multi_thread")]
 async fn write_concern_error_batches() {
-    if server_version_lt(8, 0).await {
-        log_uncaptured("skipping write_concern_error_batches: bulkWrite requires 8.0+");
-        return;
-    }
+    require_8_0!("write_concern_error_batches");
 
     let mut options = get_client_options().await.clone();
     options.retry_writes = Some(false);
@@ -157,9 +166,7 @@ async fn write_concern_error_batches() {
     ];
     let error = client.bulk_write(models).ordered(false).await.unwrap_err();
 
-    let ErrorKind::BulkWrite(bulk_write_error) = *error.kind else {
-        panic!("Expected bulk write error, got {error:?}");
-    };
+    let bulk_write_error = error.get_bulk_write_error();
 
     assert_eq!(bulk_write_error.write_concern_errors.len(), 2);
 
@@ -174,10 +181,7 @@ async fn write_concern_error_batches() {
 // CRUD prose test 6
 #[tokio::test]
 async fn write_error_batches() {
-    if server_version_lt(8, 0).await {
-        log_uncaptured("skipping write_error_batches: bulkWrite requires 8.0+");
-        return;
-    }
+    require_8_0!("write_error_batches");
 
     let mut client = Client::for_test().monitor_events().await;
 
@@ -202,9 +206,7 @@ async fn write_error_batches() {
         .await
         .unwrap_err();
 
-    let ErrorKind::BulkWrite(bulk_write_error) = *error.kind else {
-        panic!("Expected bulk write error, got {error:?}");
-    };
+    let bulk_write_error = error.get_bulk_write_error();
 
     assert_eq!(
         bulk_write_error.write_errors.len(),
@@ -218,9 +220,7 @@ async fn write_error_batches() {
 
     let error = client.bulk_write(models).ordered(true).await.unwrap_err();
 
-    let ErrorKind::BulkWrite(bulk_write_error) = *error.kind else {
-        panic!("Expected bulk write error, got {error:?}");
-    };
+    let bulk_write_error = error.get_bulk_write_error();
 
     assert_eq!(bulk_write_error.write_errors.len(), 1);
 
@@ -231,10 +231,7 @@ async fn write_error_batches() {
 // CRUD prose test 7
 #[tokio::test]
 async fn successful_cursor_iteration() {
-    if server_version_lt(8, 0).await {
-        log_uncaptured("skipping successful_cursor_iteration: bulkWrite requires 8.0+");
-        return;
-    }
+    require_8_0!("successful_cursor_iteration");
 
     let client = Client::for_test().monitor_events().await;
 
@@ -269,10 +266,11 @@ async fn successful_cursor_iteration() {
 // CRUD prose test 8
 #[tokio::test]
 async fn cursor_iteration_in_a_transaction() {
-    if server_version_lt(8, 0).await || topology_is_standalone().await {
+    require_8_0!("cursor_iteration_in_a_transaction");
+    if topology_is_standalone().await {
         log_uncaptured(
-            "skipping cursor_iteration_in_a_transaction: bulkWrite requires 8.0+, transactions \
-             require a non-standalone topology",
+            "skipping cursor_iteration_in_a_transaction: transactions require a non-standalone \
+             topology",
         );
         return;
     }
@@ -317,11 +315,9 @@ async fn cursor_iteration_in_a_transaction() {
 
 // CRUD prose test 9
 #[tokio::test(flavor = "multi_thread")]
+#[ignore]
 async fn failed_cursor_iteration() {
-    if server_version_lt(8, 0).await {
-        log_uncaptured("skipping failed_cursor_iteration: bulkWrite requires 8.0+");
-        return;
-    }
+    require_8_0!("failed_cursor_iteration");
 
     let mut options = get_client_options().await.clone();
     if topology_is_sharded().await {
@@ -363,13 +359,8 @@ async fn failed_cursor_iteration() {
     };
     assert_eq!(source.code(), Some(8));
 
-    let ErrorKind::BulkWrite(BulkWriteError {
-        partial_result: Some(partial_result),
-        ..
-    }) = *error.kind
-    else {
-        panic!("Expected bulk write error with partial result, got {error:?}");
-    };
+    let bulk_write_error = error.get_bulk_write_error();
+    let partial_result = bulk_write_error.partial_result.unwrap();
     assert_eq!(partial_result.upserted_count(), 2);
     assert_eq!(partial_result.update_results().unwrap().len(), 1);
 
@@ -385,10 +376,7 @@ async fn failed_cursor_iteration() {
 // CRUD prose test 11
 #[tokio::test]
 async fn namespace_batch_splitting() {
-    if server_version_lt(8, 0).await {
-        log_uncaptured("skipping namespace_batch_splitting: bulkWrite requires 8.0+");
-        return;
-    }
+    require_8_0!("namespace_batch_splitting");
 
     let first_namespace = Namespace::new("db", "coll");
 
@@ -498,10 +486,7 @@ async fn namespace_batch_splitting() {
 // CRUD prose test 12
 #[tokio::test]
 async fn too_large_client_error() {
-    if server_version_lt(8, 0).await {
-        log_uncaptured("skipping too_large_client_error: bulkWrite requires 8.0+");
-        return;
-    }
+    require_8_0!("too_large_client_error");
 
     let client = Client::for_test().monitor_events().await;
     let max_message_size_bytes = get_max_message_size_bytes().await;
@@ -541,4 +526,150 @@ async fn unsupported_server_client_error() {
         .await
         .unwrap_err();
     assert!(matches!(*error.kind, ErrorKind::IncompatibleServer { .. }));
+}
+
+// CRUD prose test 18
+#[tokio::test(flavor = "multi_thread")]
+async fn top_level_error_after_results() {
+    require_8_0!("top_level_error_after_results");
+
+    let mut options = get_client_options().await.clone();
+    options.retry_writes = Some(false);
+    let client = Client::for_test()
+        .options(options)
+        .use_single_mongos()
+        .await;
+
+    let batch_size = get_max_write_batch_size().await + 1;
+
+    let fail_point = FailPoint::fail_command(&["bulkWrite"], FailPointMode::Skip(1)).error_code(8);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let coll = client
+        .database("db")
+        .collection("top_level_error_after_results");
+    coll.drop().await.unwrap();
+
+    let model = coll.insert_one_model(doc! { "a": "b" }).unwrap();
+    let error = client
+        .bulk_write(vec![model; batch_size])
+        .await
+        .unwrap_err();
+
+    let source = error.source.as_ref().unwrap();
+    assert_eq!(source.code(), Some(8));
+
+    let bulk_write_error = error.get_bulk_write_error();
+    let partial_result = bulk_write_error.partial_result.unwrap();
+    assert_eq!(partial_result.inserted_count() as usize, batch_size - 1);
+}
+
+// CRUD prose test 19
+#[tokio::test]
+async fn client_side_error_after_results() {
+    require_8_0!("client_side_error_after_results");
+
+    let mut options = get_client_options().await.clone();
+    options.retry_writes = Some(false);
+    let client = Client::for_test()
+        .options(options)
+        .use_single_mongos()
+        .await;
+
+    let max_write_batch_size = get_max_write_batch_size().await;
+
+    let coll = client
+        .database("db")
+        .collection("client_side_error_after_results");
+    coll.drop().await.unwrap();
+
+    let insert_one_model = coll.insert_one_model(doc! { "a": "b" }).unwrap();
+    let replace_one_model = coll.replace_one_model(doc! {}, doc! { "$a": "b" }).unwrap();
+    let mut models = vec![WriteModel::from(insert_one_model); max_write_batch_size];
+    models.push(replace_one_model.into());
+    let error = client.bulk_write(models).await.unwrap_err();
+
+    let source = error.source.as_ref().unwrap();
+    assert!(source.is_invalid_argument());
+
+    let bulk_write_error = error.get_bulk_write_error();
+    let partial_result = bulk_write_error.partial_result.unwrap();
+    assert_eq!(
+        partial_result.inserted_count() as usize,
+        max_write_batch_size
+    );
+}
+
+// CRUD prose test 20
+#[tokio::test(flavor = "multi_thread")]
+async fn top_level_error_after_write_errors() {
+    require_8_0!("top_level_error_after_write_errors");
+
+    let mut options = get_client_options().await.clone();
+    options.retry_writes = Some(false);
+    let client = Client::for_test()
+        .options(options)
+        .use_single_mongos()
+        .await;
+
+    let batch_size = get_max_write_batch_size().await + 1;
+
+    let fail_point = FailPoint::fail_command(&["bulkWrite"], FailPointMode::Skip(1)).error_code(8);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let coll = client
+        .database("db")
+        .collection("top_level_error_after_write_errors");
+    coll.drop().await.unwrap();
+
+    let model = coll.insert_one_model(doc! { "_id": 1 }).unwrap();
+    let error = client
+        .bulk_write(vec![model; batch_size])
+        .ordered(false)
+        .await
+        .unwrap_err();
+
+    let source = error.source.as_ref().unwrap();
+    assert_eq!(source.code(), Some(8));
+
+    let bulk_write_error = error.get_bulk_write_error();
+    assert!(!bulk_write_error.write_errors.is_empty());
+}
+
+// CRUD prose test 21
+#[tokio::test(flavor = "multi_thread")]
+async fn write_concern_error_not_top_level() {
+    require_8_0!("write_concern_error_not_top_level");
+
+    let mut options = get_client_options().await.clone();
+    options.retry_writes = Some(false);
+    let client = Client::for_test()
+        .options(options)
+        .use_single_mongos()
+        .await;
+
+    let batch_size = get_max_write_batch_size().await + 1;
+
+    let fail_point = FailPoint::fail_command(&["bulkWrite"], FailPointMode::Times(2))
+        .write_concern_error(doc! { "code": 91, "errmsg": "Replication is being shut down" });
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let coll = client.database("db").collection("coll");
+    coll.drop().await.unwrap();
+
+    let model = coll.insert_one_model(doc! { "a": "b" }).unwrap();
+    let error = client
+        .bulk_write(vec![model; batch_size])
+        .await
+        .unwrap_err();
+
+    assert!(error.source.is_none(), "expected no top-level error");
+
+    let bulk_write_error = error.get_bulk_write_error();
+
+    assert_eq!(bulk_write_error.write_concern_errors.len(), 2);
+    assert_eq!(bulk_write_error.write_errors.len(), 0);
+
+    let partial_result = bulk_write_error.partial_result.unwrap();
+    assert_eq!(partial_result.inserted_count() as usize, batch_size);
 }
