@@ -356,7 +356,8 @@ fn validator_receives_normalized_host() {
 // Prose test 13. Throw when srvHostValidator is used with a non-SRV URI
 #[test]
 fn validator_non_srv_uri() {
-    let mut options = ClientOptions::new_srv();
+    let mut options = ClientOptions::default();
+    assert!(options.validate().is_ok());
     options.srv_host_validator = Some(Arc::new(|_| true));
     assert!(options.validate().is_err());
 }

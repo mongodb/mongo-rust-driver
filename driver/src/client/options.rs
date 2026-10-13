@@ -1481,7 +1481,7 @@ impl ClientOptions {
             }
         }
 
-        if self.srv_host_validator.is_some() && self.original_srv_info.is_some() {
+        if self.srv_host_validator.is_some() && self.original_srv_info.is_none() {
             return Err(Error::invalid_argument(
                 "cannot specify an srv host validator with a non-srv URI",
             ));
