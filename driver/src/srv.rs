@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 #[cfg(feature = "dns-resolver")]
-use crate::error::{Error, ErrorKind, Redact};
+use crate::error::{ErrorKind, Redact};
 use crate::{
     client::options::ResolverConfig,
     error::Result,
@@ -44,18 +44,15 @@ impl RawLookupHosts {
     pub(crate) fn normalize(self) -> Result<NormalLookupHosts> {
         let mut ok_hosts = vec![];
         for (host, port) in self.hosts {
-            let mut host = dbg!(host.to_utf8());
             // spec normalization steps:
-            // 1. Any trailing `.` MUST be stripped
+            // The hostname MUST be normalized to lowercase using ASCII case folding
+            let host = host.to_lowercase();
+            // The hostname MUST be converted to its A-label (Punycode) form
+            let mut host = host.to_ascii();
+            // Any trailing `.` MUST be stripped
             if host.ends_with('.') {
                 host.pop();
             }
-            // 2. The hostname MUST be converted to its A-label (Punycode) form
-            // 3. The hostname MUST be normalized to lowercase using ASCII case folding
-            // (both of these are done by `idna::domain_to_ascii_cow`)
-            let host = idna::domain_to_ascii_cow(host.as_bytes(), idna::AsciiDenyList::URL)
-                .map_err(|e| Error::invalid_response(e.to_string()))?
-                .into_owned();
 
             ok_hosts.push((host, port));
         }

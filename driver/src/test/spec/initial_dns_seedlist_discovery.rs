@@ -254,10 +254,7 @@ fn validate_srv(
     validator: Option<&dyn Fn(&str) -> bool>,
 ) -> crate::error::Result<LookupHosts> {
     RawLookupHosts {
-        hosts: vec![(
-            dbg!(hickory_proto::rr::Name::from_str(resolved).unwrap()),
-            42,
-        )],
+        hosts: vec![(hickory_proto::rr::Name::from_str(resolved).unwrap(), 42)],
         min_ttl: Duration::from_secs(1),
     }
     .normalize()?
