@@ -144,7 +144,7 @@ impl Monitor {
             if self.topology_version.is_none() || !check_succeeded || !self.allow_streaming {
                 self.request_receiver
                     .wait_for_check_request(
-                        self.client_options.min_heartbeat_frequency(),
+                        MIN_HEARTBEAT_FREQUENCY,
                         heartbeat_frequency,
                         self.shutdown.token.clone(),
                     )

@@ -17,6 +17,7 @@ use crate::{
         command::{CommandEvent, CommandStartedEvent},
         sdam::SdamEvent,
     },
+    sdam::MIN_HEARTBEAT_FREQUENCY,
     test::{
         get_client_options,
         log_uncaptured,
@@ -204,22 +205,17 @@ async fn implicit_session_after_connection() {
 
 // Sessions prose test 20
 #[tokio::test]
-#[ignore = "SERVER-128517"]
 async fn no_cluster_time_in_sdam() {
     if topology_is_load_balanced().await {
         log_uncaptured("Skipping no_cluster_time_in_sdam: load-balanced topology");
         return;
     }
+
     let mut options = get_client_options().await.clone();
     options.direct_connection = Some(true);
     options.hosts.drain(1..);
-    let heartbeat_freq = Duration::from_millis(10);
-    options.heartbeat_freq = Some(heartbeat_freq);
-    let c1 = Client::for_test()
-        .options(options)
-        .min_heartbeat_freq(heartbeat_freq)
-        .monitor_events()
-        .await;
+    options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
+    let c1 = Client::for_test().options(options).monitor_events().await;
 
     // Send a ping on c1
     let cluster_time = c1
@@ -240,19 +236,18 @@ async fn no_cluster_time_in_sdam() {
 
     // Wait for the next (heartbeat started, heartbeat succeeded) event pair on c1
     let mut events = c1.events.stream();
-    const TIMEOUT: Duration = Duration::from_secs(1);
-    crate::runtime::timeout(TIMEOUT, async {
+    tokio::time::timeout(MIN_HEARTBEAT_FREQUENCY * 4, async {
         loop {
             // Find a started event...
             let _started = events
-                .next_match(TIMEOUT, |ev| {
+                .next_match(MIN_HEARTBEAT_FREQUENCY * 4, |ev| {
                     matches!(ev, Event::Sdam(SdamEvent::ServerHeartbeatStarted(_)))
                 })
                 .await
                 .unwrap();
             // ... and the next heartbeat event after that ...
             let next_hb = events
-                .next_map(TIMEOUT, |ev| match ev {
+                .next_map(MIN_HEARTBEAT_FREQUENCY * 4, |ev| match ev {
                     Event::Sdam(hb @ SdamEvent::ServerHeartbeatStarted(_)) => Some(hb),
                     Event::Sdam(hb @ SdamEvent::ServerHeartbeatFailed(_)) => Some(hb),
                     Event::Sdam(hb @ SdamEvent::ServerHeartbeatSucceeded(_)) => Some(hb),
@@ -275,13 +270,13 @@ async fn no_cluster_time_in_sdam() {
         .run_command(doc! { "ping": 1 })
         .await
         .unwrap();
-    let (start, _succeded) = events
-        .next_successful_command_execution(TIMEOUT, "ping")
+    let (started, _succeeded) = events
+        .next_successful_command_execution(Duration::from_millis(500), "ping")
         .await
         .unwrap();
 
     // Assert that the cluster time hasn't changed
-    assert_eq!(cluster_time.as_ref(), start.command.get("$clusterTime"));
+    assert_eq!(cluster_time.as_ref(), started.command.get("$clusterTime"));
 }
 
 // Sessions prose test 21
