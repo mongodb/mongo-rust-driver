@@ -77,7 +77,7 @@ impl State {
     fn set_busy(&mut self, new_future: GetBytesFuture) -> &mut GetBytesFuture {
         *self = State::Busy(new_future);
         match self {
-            Self::Busy(ref mut future) => future,
+            Self::Busy(future) => future,
             _ => unreachable!(),
         }
     }

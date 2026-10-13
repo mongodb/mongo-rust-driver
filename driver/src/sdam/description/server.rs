@@ -357,7 +357,7 @@ impl ServerDescription {
     }
 
     pub(crate) fn invalid_me(&self) -> Result<bool> {
-        if let Some(ref reply) = self.reply.as_ref().map_err(Clone::clone)? {
+        if let Some(reply) = self.reply.as_ref().map_err(Clone::clone)? {
             if let Some(ref me) = reply.command_response.me {
                 return Ok(self.address != ServerAddress::parse(me)?);
             }
@@ -453,7 +453,7 @@ impl ServerDescription {
         }
 
         let reply = match self.reply.as_ref() {
-            Ok(Some(ref reply)) => reply,
+            Ok(Some(reply)) => reply,
             _ => return false,
         };
 

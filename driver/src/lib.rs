@@ -11,7 +11,9 @@
     clippy::cognitive_complexity,
     clippy::float_cmp,
     clippy::match_like_matches_macro,
-    clippy::derive_partial_eq_without_eq
+    clippy::derive_partial_eq_without_eq,
+    // The 2024 edition makes let chains available, so this now fires on every nested `if let`.
+    clippy::collapsible_if
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]

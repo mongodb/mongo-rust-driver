@@ -378,7 +378,7 @@ pub(crate) enum ConnectionGeneration {
 impl ConnectionGeneration {
     pub(crate) fn service_id(self) -> Option<ObjectId> {
         match self {
-            ConnectionGeneration::LoadBalanced(Some(gen)) => Some(gen.service_id),
+            ConnectionGeneration::LoadBalanced(Some(generation)) => Some(generation.service_id),
             _ => None,
         }
     }
@@ -402,8 +402,8 @@ impl ConnectionGeneration {
 }
 
 impl From<LoadBalancedGeneration> for ConnectionGeneration {
-    fn from(gen: LoadBalancedGeneration) -> Self {
-        ConnectionGeneration::LoadBalanced(Some(gen))
+    fn from(generation: LoadBalancedGeneration) -> Self {
+        ConnectionGeneration::LoadBalanced(Some(generation))
     }
 }
 

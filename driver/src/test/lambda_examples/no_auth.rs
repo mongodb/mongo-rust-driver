@@ -46,7 +46,7 @@ async fn test_handler() {
         return;
     }
     if std::env::var("MONGODB_URI").is_err() {
-        std::env::set_var("MONGODB_URI", "mongodb://localhost:27017");
+        unsafe { std::env::set_var("MONGODB_URI", "mongodb://localhost:27017") };
     }
     let event = LambdaEvent::new(Value::Null, Default::default());
     handler(event).await.unwrap();

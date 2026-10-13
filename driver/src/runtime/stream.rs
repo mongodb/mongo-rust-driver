@@ -246,14 +246,14 @@ impl AsyncRead for AsyncStream {
     ) -> Poll<std::io::Result<()>> {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(())),
-            Self::Tcp(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
-            Self::Tls(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
+            Self::Tcp(inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
+            Self::Tls(inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
             #[cfg(unix)]
-            Self::Unix(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
+            Self::Unix(inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
             #[cfg(feature = "socks5-proxy")]
-            Self::Socks5(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
+            Self::Socks5(inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
             #[cfg(feature = "socks5-proxy")]
-            Self::Socks5Tls(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
+            Self::Socks5Tls(inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
         }
     }
 }
@@ -266,42 +266,42 @@ impl AsyncWrite for AsyncStream {
     ) -> Poll<std::io::Result<usize>> {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(0)),
-            Self::Tcp(ref mut inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_write(cx, buf),
+            Self::Tcp(inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
+            Self::Tls(inner) => Pin::new(inner).poll_write(cx, buf),
             #[cfg(unix)]
-            Self::Unix(ref mut inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
+            Self::Unix(inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
             #[cfg(feature = "socks5-proxy")]
-            Self::Socks5(ref mut inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
+            Self::Socks5(inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
             #[cfg(feature = "socks5-proxy")]
-            Self::Socks5Tls(ref mut inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
+            Self::Socks5Tls(inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
         }
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(())),
-            Self::Tcp(ref mut inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_flush(cx),
+            Self::Tcp(inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
+            Self::Tls(inner) => Pin::new(inner).poll_flush(cx),
             #[cfg(unix)]
-            Self::Unix(ref mut inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
+            Self::Unix(inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
             #[cfg(feature = "socks5-proxy")]
-            Self::Socks5(ref mut inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
+            Self::Socks5(inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
             #[cfg(feature = "socks5-proxy")]
-            Self::Socks5Tls(ref mut inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
+            Self::Socks5Tls(inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
         }
     }
 
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(())),
-            Self::Tcp(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
+            Self::Tcp(inner) => Pin::new(inner).poll_shutdown(cx),
+            Self::Tls(inner) => Pin::new(inner).poll_shutdown(cx),
             #[cfg(unix)]
-            Self::Unix(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
+            Self::Unix(inner) => Pin::new(inner).poll_shutdown(cx),
             #[cfg(feature = "socks5-proxy")]
-            Self::Socks5(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
+            Self::Socks5(inner) => Pin::new(inner).poll_shutdown(cx),
             #[cfg(feature = "socks5-proxy")]
-            Self::Socks5Tls(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
+            Self::Socks5Tls(inner) => Pin::new(inner).poll_shutdown(cx),
         }
     }
 
@@ -312,28 +312,28 @@ impl AsyncWrite for AsyncStream {
     ) -> Poll<std::result::Result<usize, std::io::Error>> {
         match self.get_mut() {
             Self::Null => Poll::Ready(Ok(0)),
-            Self::Tcp(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
+            Self::Tcp(inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
+            Self::Tls(inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
             #[cfg(unix)]
-            Self::Unix(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
+            Self::Unix(inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
             #[cfg(feature = "socks5-proxy")]
-            Self::Socks5(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
+            Self::Socks5(inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
             #[cfg(feature = "socks5-proxy")]
-            Self::Socks5Tls(ref mut inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
+            Self::Socks5Tls(inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
         }
     }
 
     fn is_write_vectored(&self) -> bool {
         match self {
             Self::Null => false,
-            Self::Tcp(ref inner) => inner.is_write_vectored(),
-            Self::Tls(ref inner) => inner.is_write_vectored(),
+            Self::Tcp(inner) => inner.is_write_vectored(),
+            Self::Tls(inner) => inner.is_write_vectored(),
             #[cfg(unix)]
-            Self::Unix(ref inner) => inner.is_write_vectored(),
+            Self::Unix(inner) => inner.is_write_vectored(),
             #[cfg(feature = "socks5-proxy")]
-            Self::Socks5(ref inner) => inner.is_write_vectored(),
+            Self::Socks5(inner) => inner.is_write_vectored(),
             #[cfg(feature = "socks5-proxy")]
-            Self::Socks5Tls(ref inner) => inner.is_write_vectored(),
+            Self::Socks5Tls(inner) => inner.is_write_vectored(),
         }
     }
 }

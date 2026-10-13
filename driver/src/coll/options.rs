@@ -80,8 +80,8 @@ pub enum Hint {
 impl Hint {
     pub(crate) fn to_raw_bson(&self) -> Result<RawBson> {
         Ok(match self {
-            Hint::Keys(ref d) => RawBson::Document(RawDocumentBuf::try_from(d)?),
-            Hint::Name(ref s) => RawBson::String(s.clone()),
+            Hint::Keys(d) => RawBson::Document(RawDocumentBuf::try_from(d)?),
+            Hint::Name(s) => RawBson::String(s.clone()),
         })
     }
 }

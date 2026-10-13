@@ -73,7 +73,7 @@ pub(crate) fn serialize_u32_option_as_i32<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(ref val) => serde_util::serialize_u32_as_i32(val, serializer),
+        Some(val) => serde_util::serialize_u32_as_i32(val, serializer),
         None => serializer.serialize_none(),
     }
 }
@@ -101,7 +101,7 @@ pub(crate) fn serialize_u64_option_as_i64<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(ref v) => serde_util::serialize_u64_as_i64(v, serializer),
+        Some(v) => serde_util::serialize_u64_as_i64(v, serializer),
         None => serializer.serialize_none(),
     }
 }

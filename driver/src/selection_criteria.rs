@@ -58,7 +58,7 @@ impl From<ReadPreference> for SelectionCriteria {
 impl SelectionCriteria {
     pub(crate) fn as_read_pref(&self) -> Option<&ReadPreference> {
         match self {
-            Self::ReadPreference(ref read_pref) => Some(read_pref),
+            Self::ReadPreference(read_pref) => Some(read_pref),
             Self::Predicate(..) => None,
         }
     }

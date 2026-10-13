@@ -1017,14 +1017,14 @@ async fn invalid_utf8_response() {
 /// unicode replacement character, meaning we gracefully handled the invalid UTF-8.
 fn assert_duplicate_key_error_with_utf8_replacement(error: &ErrorKind) {
     match error {
-        ErrorKind::Write(ref failure) => match failure {
+        ErrorKind::Write(failure) => match failure {
             WriteFailure::WriteError(err) => {
                 assert_eq!(err.code, 11000);
                 assert!(err.message.contains('�'));
             }
             e => panic!("expected WriteFailure::WriteError, got {e:?} instead"),
         },
-        ErrorKind::InsertMany(ref failure) => match &failure.write_errors {
+        ErrorKind::InsertMany(failure) => match &failure.write_errors {
             Some(write_errors) => {
                 assert_eq!(write_errors.len(), 1);
                 assert_eq!(write_errors[0].code, 11000);

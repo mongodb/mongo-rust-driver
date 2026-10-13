@@ -2668,7 +2668,7 @@ impl ConnectionString {
                     .tls
                     .get_or_insert_with(|| Tls::Enabled(Default::default()))
                 {
-                    Tls::Enabled(ref mut options) => {
+                    Tls::Enabled(options) => {
                         options.allow_invalid_certificates = Some(val);
                         #[cfg(feature = "openssl-tls")]
                         {
@@ -2689,7 +2689,7 @@ impl ConnectionString {
                     .tls
                     .get_or_insert_with(|| Tls::Enabled(Default::default()))
                 {
-                    Tls::Enabled(ref mut options) => {
+                    Tls::Enabled(options) => {
                         options.allow_invalid_certificates = Some(val);
                     }
                     Tls::Disabled => {

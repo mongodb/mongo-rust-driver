@@ -234,9 +234,7 @@ impl PooledConnection {
                 "cannot pin a checked-in connection (id = {})",
                 self.id
             ))),
-            PooledConnectionState::CheckedOut {
-                ref pool_manager, ..
-            } => {
+            PooledConnectionState::CheckedOut { pool_manager, .. } => {
                 let (tx, rx) = mpsc::channel(1);
                 self.state = PooledConnectionState::Pinned {
                     // Mark the connection as in-use while the operation currently using the

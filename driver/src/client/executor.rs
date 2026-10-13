@@ -120,7 +120,7 @@ impl<'a> ExecutionSession<'a> {
     fn as_ref_mut_option(&mut self) -> Option<&mut ClientSession> {
         match self {
             Self::Explicit(explicit) => Some(explicit),
-            Self::Implicit(ref mut implicit) => Some(implicit),
+            Self::Implicit(implicit) => Some(implicit),
             Self::None => None,
         }
     }
@@ -903,7 +903,7 @@ impl Client {
                 }
                 session.update_last_use();
             }
-            Some(ref session) if !op.supports_sessions() && !session.is_implicit() => {
+            Some(session) if !op.supports_sessions() && !session.is_implicit() => {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!("{} does not support sessions", cmd.name),
                 }

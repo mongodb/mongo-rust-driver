@@ -23,9 +23,9 @@
 //! ]).await?;
 //! # Ok(())
 //! # }
-mod gen;
+mod r#gen;
 
-pub use gen::*;
+pub use r#gen::*;
 
 use std::marker::PhantomData;
 
