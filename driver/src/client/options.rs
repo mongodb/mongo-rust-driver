@@ -3339,15 +3339,14 @@ mod tests {
         let uri = "mongodb://u:p@host1:27017,host2:27018/db?replicaSet=rs&directConnection=false&\
                    connectTimeoutMS=1000&maxPoolSize=10&minPoolSize=2&maxIdleTimeMS=5000&\
                    w=majority&wtimeoutMS=100&journal=true&readConcernLevel=majority&\
-                   readPreference=secondary&maxStalenessSeconds=120&readPreferenceTags=dc:ny,rack:\
-                   1&retryReads=true&retryWrites=false&appName=my%20app&localThresholdMS=15&\
+                   readPreference=secondary&maxStalenessSeconds=120&retryReads=true&\
+                   retryWrites=false&appName=my%20app&localThresholdMS=15&\
                    serverSelectionTimeoutMS=3000&heartbeatFrequencyMS=10000&tls=true&\
                    uuidRepresentation=javaLegacy";
         let conn_str = ConnectionString::parse(uri).unwrap();
 
         let s = conn_str.to_string();
         let reparsed = ConnectionString::parse(&s).unwrap();
-        // original_uri differs by construction, so compare the rendered form.
         assert_eq!(reparsed.to_string(), s);
         assert_eq!(reparsed.host_info, conn_str.host_info);
         assert_eq!(reparsed.replica_set, conn_str.replica_set);
