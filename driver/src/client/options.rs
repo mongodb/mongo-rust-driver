@@ -2909,7 +2909,7 @@ mod tests {
 
     use pretty_assertions::assert_eq;
 
-    use super::{ClientOptions, ServerAddress};
+    use super::{ClientOptions, ConnectionString, ServerAddress};
     use crate::{
         concern::{Acknowledgment, ReadConcernLevel, WriteConcern},
         selection_criteria::{ReadPreference, ReadPreferenceOptions},
@@ -3276,6 +3276,85 @@ mod tests {
                 ..Default::default()
             }
         );
+    }
+
+    #[test]
+    fn to_uri_str_simple() {
+        let conn_str = ConnectionString::parse("mongodb://localhost:27017/?appName=foo").unwrap();
+        assert_eq!(
+            conn_str.to_string(),
+            "mongodb://localhost:27017/?appName=foo"
+        );
+    }
+
+    #[test]
+    fn to_uri_str_escapes_option_values() {
+        let conn_str = ConnectionString::parse(
+            "mongodb://localhost/?appName=a%26b%3Dc%20d%23e%25f&replicaSet=r%26s",
+        )
+        .unwrap();
+        assert_eq!(conn_str.app_name.as_deref(), Some("a&b=c d#e%f"));
+
+        let s = conn_str.to_string();
+        // Reserved characters must not leak into the option string unescaped.
+        assert_eq!(s.matches('&').count(), 1, "{s}");
+        assert_eq!(s.matches('=').count(), 2, "{s}");
+        assert!(!s.contains('#'), "{s}");
+
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.app_name, conn_str.app_name);
+        assert_eq!(reparsed.replica_set.as_deref(), Some("r&s"));
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_escapes_default_database() {
+        let conn_str = ConnectionString::parse("mongodb://localhost/my%3Fdb%23x%40y").unwrap();
+        assert_eq!(conn_str.default_database.as_deref(), Some("my?db#x@y"));
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.default_database, conn_str.default_database);
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_escapes_credentials() {
+        let conn_str =
+            ConnectionString::parse("mongodb://us%40er:p%3Ass%2Fw%25rd@localhost/?authSource=a%26b")
+                .unwrap();
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        let credential = reparsed.credential.as_ref().unwrap();
+        assert_eq!(credential.username.as_deref(), Some("us@er"));
+        assert_eq!(credential.password.as_deref(), Some("p:ss/w%rd"));
+        assert_eq!(credential.source.as_deref(), Some("a&b"));
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_round_trip_many_options() {
+        let uri = "mongodb://u:p@host1:27017,host2:27018/db?replicaSet=rs&directConnection=false&\
+                   connectTimeoutMS=1000&maxPoolSize=10&minPoolSize=2&maxIdleTimeMS=5000&w=majority&\
+                   wtimeoutMS=100&journal=true&readConcernLevel=majority&\
+                   readPreference=secondary&maxStalenessSeconds=120&\
+                   readPreferenceTags=dc:ny,rack:1&retryReads=true&retryWrites=false&\
+                   appName=my%20app&localThresholdMS=15&serverSelectionTimeoutMS=3000&\
+                   heartbeatFrequencyMS=10000&tls=true&uuidRepresentation=javaLegacy";
+        let conn_str = ConnectionString::parse(uri).unwrap();
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        // original_uri differs by construction, so compare the rendered form.
+        assert_eq!(reparsed.to_string(), s);
+        assert_eq!(reparsed.host_info, conn_str.host_info);
+        assert_eq!(reparsed.replica_set, conn_str.replica_set);
+        assert_eq!(reparsed.app_name.as_deref(), Some("my app"));
+        assert_eq!(reparsed.write_concern, conn_str.write_concern);
+        assert_eq!(reparsed.read_preference, conn_str.read_preference);
+        assert_eq!(reparsed.max_pool_size, Some(10));
+        assert_eq!(reparsed.tls, conn_str.tls);
     }
 }
 
