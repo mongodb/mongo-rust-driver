@@ -3320,9 +3320,10 @@ mod tests {
 
     #[test]
     fn to_uri_str_escapes_credentials() {
-        let conn_str =
-            ConnectionString::parse("mongodb://us%40er:p%3Ass%2Fw%25rd@localhost/?authSource=a%26b")
-                .unwrap();
+        let conn_str = ConnectionString::parse(
+            "mongodb://us%40er:p%3Ass%2Fw%25rd@localhost/?authSource=a%26b",
+        )
+        .unwrap();
 
         let s = conn_str.to_string();
         let reparsed = ConnectionString::parse(&s).unwrap();
@@ -3336,12 +3337,12 @@ mod tests {
     #[test]
     fn to_uri_str_round_trip_many_options() {
         let uri = "mongodb://u:p@host1:27017,host2:27018/db?replicaSet=rs&directConnection=false&\
-                   connectTimeoutMS=1000&maxPoolSize=10&minPoolSize=2&maxIdleTimeMS=5000&w=majority&\
-                   wtimeoutMS=100&journal=true&readConcernLevel=majority&\
-                   readPreference=secondary&maxStalenessSeconds=120&\
-                   readPreferenceTags=dc:ny,rack:1&retryReads=true&retryWrites=false&\
-                   appName=my%20app&localThresholdMS=15&serverSelectionTimeoutMS=3000&\
-                   heartbeatFrequencyMS=10000&tls=true&uuidRepresentation=javaLegacy";
+                   connectTimeoutMS=1000&maxPoolSize=10&minPoolSize=2&maxIdleTimeMS=5000&\
+                   w=majority&wtimeoutMS=100&journal=true&readConcernLevel=majority&\
+                   readPreference=secondary&maxStalenessSeconds=120&readPreferenceTags=dc:ny,rack:\
+                   1&retryReads=true&retryWrites=false&appName=my%20app&localThresholdMS=15&\
+                   serverSelectionTimeoutMS=3000&heartbeatFrequencyMS=10000&tls=true&\
+                   uuidRepresentation=javaLegacy";
         let conn_str = ConnectionString::parse(uri).unwrap();
 
         let s = conn_str.to_string();
