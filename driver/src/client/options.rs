@@ -7,7 +7,7 @@ mod resolver_config;
 
 use std::{
     cmp::Ordering,
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     convert::TryFrom,
     fmt::{self, Display, Formatter, Write},
     hash::{Hash, Hasher},
@@ -1572,6 +1572,36 @@ fn percent_encode(s: &str) -> String {
     percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
 }
 
+struct UriOptions(String);
+
+impl UriOptions {
+    fn new() -> Self {
+        Self(String::new())
+    }
+
+    // Option keys are static to enforce that they're constants and not user input.
+    fn push_str(&mut self, key: &'static str, s: &str) {
+        let encoded = percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC);
+        // unwrap safety: write! to a string target is infallible
+        write!(&mut self.0, "&{key}={encoded}").unwrap();
+    }
+
+    fn push_bool(&mut self, key: &'static str, b: bool) {
+        self.push_str(key, if b { "true" } else { "false" });
+    }
+
+    fn push<T: Display>(&mut self, key: &'static str, v: &T) {
+        self.push_str(key, &v.to_string());
+    }
+
+    fn append_to(mut self, out: &mut String) {
+        if !self.0.is_empty() {
+            self.0.replace_range(0..1, "?"); // mark start of options
+            out.push_str(&self.0);
+        }
+    }
+}
+
 fn validate_and_parse_userinfo(s: &str, userinfo_type: &str) -> Result<String> {
     if s.chars().any(|c| USERINFO_RESERVED_CHARACTERS.contains(&c)) {
         return Err(Error::invalid_argument(format!(
@@ -1931,7 +1961,7 @@ impl ConnectionString {
         } = self;
 
         let mut res: String = String::new();
-        let mut opts = String::new();
+        let mut opts = UriOptions::new();
 
         if self.is_srv() {
             res.push_str("mongodb+srv://");
@@ -1966,75 +1996,68 @@ impl ConnectionString {
         res.push('/');
 
         if let Some(authdb) = default_database {
-            res.push_str(authdb);
+            res.push_str(&percent_encode(&authdb));
         }
 
         if let Some(replica_set) = replica_set {
-            opts.push_str(&format!("&replicaSet={replica_set}"));
+            opts.push_str("replicaSet", replica_set);
         }
 
         if let Some(direct_connection) = direct_connection {
-            opts.push_str(&format!("&directConnection={direct_connection}"));
+            opts.push_bool("directConnection", *direct_connection);
         }
 
         if let Some(tls) = tls {
             match tls {
                 Tls::Enabled(options) => {
-                    opts.push_str("&tls=true");
+                    opts.push_bool("tls", true);
 
                     if let Some(cert_key_file_path) = &options.cert_key_file_path {
-                        opts.push_str(&format!(
-                            "&tlsCertificateKeyFile={}",
-                            cert_key_file_path.to_str().unwrap()
-                        ));
+                        opts.push_str(
+                            "tlsCertificateKeyFile",
+                            &cert_key_file_path.to_str().unwrap(),
+                        );
                     }
 
                     #[cfg(feature = "cert-key-password")]
                     if let Some(tls_certificate_key_file_password) =
                         &options.tls_certificate_key_file_password
                     {
-                        opts.push_str(&format!(
-                            "&tlsCertificateKeyFilePassword={}",
-                            std::str::from_utf8(tls_certificate_key_file_password).unwrap()
-                        ));
+                        opts.push_str(
+                            "tlsCertificateKeyFilePassword",
+                            &std::str::from_utf8(tls_certificate_key_file_password).unwrap(),
+                        );
                     }
 
                     if let Some(ca_file_path) = &options.ca_file_path {
-                        opts.push_str(&format!("&tlsCAFile={}", ca_file_path.to_str().unwrap()));
+                        opts.push_str("tlsCAFile", ca_file_path.to_str().unwrap());
                     }
 
                     if let Some(allow_invalid_certificates) = options.allow_invalid_certificates {
-                        opts.push_str(&format!(
-                            "&tlsAllowInvalidCertificates={allow_invalid_certificates}"
-                        ));
+                        opts.push_bool("tlsAllowInvalidCertificates", allow_invalid_certificates);
                     }
 
                     #[cfg(feature = "openssl-tls")]
                     if let Some(allow_invalid_hostnames) = options.allow_invalid_hostnames {
-                        opts.push_str(&format!(
-                            "&tlsAllowInvalidHostnames={allow_invalid_hostnames}"
-                        ));
+                        opts.push_bool("tlsAllowInvalidHostnames", allow_invalid_hostnames);
                     }
 
                     if let Some(tls_insecure) = tls_insecure {
-                        opts.push_str(&format!("&tlsInsecure={tls_insecure}"));
+                        opts.push_bool("tlsInsecure", *tls_insecure);
                     }
                 }
                 Tls::Disabled => {
-                    opts.push_str("&tls=false");
+                    opts.push_bool("tls", false);
                 }
             }
         }
 
         if let Some(connect_timeout) = connect_timeout {
-            opts.push_str(&format!(
-                "&connectTimeoutMS={}",
-                connect_timeout.as_millis()
-            ));
+            opts.push("connectTimeoutMS", &connect_timeout.as_millis());
         }
 
         if let Some(socket_timeout) = socket_timeout {
-            opts.push_str(&format!("&socketTimeoutMS={}", socket_timeout.as_millis()));
+            opts.push("socketTimeoutMS", &socket_timeout.as_millis());
         }
 
         #[cfg(any(
@@ -2043,102 +2066,89 @@ impl ConnectionString {
             feature = "snappy-compression"
         ))]
         if let Some(compressors) = compressors {
-            opts.push_str(&format!(
-                "&compressors={}",
-                compressors
+            opts.push_str(
+                "compressors",
+                &compressors
                     .iter()
                     .map(|c| c.name())
                     .collect::<Vec<_>>()
-                    .join(",")
-            ));
+                    .join(","),
+            );
         }
 
         #[cfg(feature = "zlib-compression")]
         if let Some(compressors) = compressors {
             for compressor in compressors {
                 if let Compressor::Zlib { level: Some(level) } = compressor {
-                    opts.push_str(&format!("&zlibCompressionLevel={level}"));
+                    opts.push("zlibCompressionLevel", level);
                 }
             }
         }
 
         if let Some(max_pool_size) = max_pool_size {
-            opts.push_str(&format!("&maxPoolSize={max_pool_size}"));
+            opts.push("maxPoolSize", max_pool_size);
         }
 
         if let Some(min_pool_size) = min_pool_size {
-            opts.push_str(&format!("&minPoolSize={min_pool_size}"));
+            opts.push("minPoolSize", min_pool_size);
         }
 
         if let Some(max_connecting) = max_connecting {
-            opts.push_str(&format!("&maxConnecting={max_connecting}"));
+            opts.push("maxConnecting", max_connecting);
         }
 
         if let Some(max_idle_time) = max_idle_time {
-            opts.push_str(&format!("&maxIdleTimeMS={}", max_idle_time.as_millis()));
+            opts.push("maxIdleTimeMS", &max_idle_time.as_millis());
         }
 
         if let Some(wait_queue_timeout) = wait_queue_timeout {
-            opts.push_str(&format!(
-                "&waitQueueTimeoutMS={}",
-                wait_queue_timeout.as_millis()
-            ));
+            opts.push("waitQueueTimeoutMS", &wait_queue_timeout.as_millis());
         }
 
         if let Some(write_concern) = write_concern {
             if let Some(w) = &write_concern.w {
                 match w {
                     Acknowledgment::Nodes(i) => {
-                        opts.push_str(&format!("&w={i}"));
+                        opts.push("w", i);
                     }
                     Acknowledgment::Majority => {
-                        opts.push_str("&w=majority");
+                        opts.push_str("w", "majority");
                     }
                     Acknowledgment::Custom(tag) => {
-                        opts.push_str(&format!("&w={tag}"));
+                        opts.push_str("w", tag);
                     }
                 }
             }
 
             if let Some(w_timeout) = write_concern.w_timeout {
-                opts.push_str(&format!("&wtimeoutMS={}", w_timeout.as_millis()));
+                opts.push("wtimeoutMS", &w_timeout.as_millis());
             }
 
             if let Some(journal) = write_concern.journal {
-                opts.push_str(&format!("&journal={journal}"));
+                opts.push_bool("journal", journal);
             }
         }
 
         if let Some(read_concern) = read_concern {
-            opts.push_str(&format!(
-                "&readConcernLevel={}",
-                read_concern.level.as_str()
-            ));
+            opts.push_str("readConcernLevel", read_concern.level.as_str());
         }
 
         if let Some(read_preference) = read_preference {
-            opts.push_str(&format!("&readPreference={}", read_preference.mode()));
+            opts.push_str("readPreference", read_preference.mode());
 
             if let Some(max_staleness) = read_preference.max_staleness() {
-                opts.push_str(&format!("&maxStalenessSeconds={}", max_staleness.as_secs()));
+                opts.push("maxStalenessSeconds", &max_staleness.as_secs());
             }
 
             if let Some(tag_sets) = read_preference.tag_sets() {
-                let ser_tag_set = |tag_set: &HashMap<String, String>| -> String {
+                for tag_set in tag_sets {
                     let tags = tag_set
                         .iter()
                         .map(|(k, v)| format!("{k}:{v}"))
                         .collect::<Vec<_>>()
                         .join(",");
-                    format!("&readPreferenceTags={tags}")
-                };
-                opts.push_str(
-                    &tag_sets
-                        .iter()
-                        .map(ser_tag_set)
-                        .collect::<Vec<_>>()
-                        .join(""),
-                )
+                    opts.push_str("readPreferenceTags", &tags);
+                }
             }
         }
 
@@ -2146,17 +2156,14 @@ impl ConnectionString {
             .as_ref()
             .and_then(|c: &Credential| c.source.as_ref())
         {
-            opts.push_str(&format!("&authSource={auth_source}"));
+            opts.push_str("authSource", auth_source);
         }
 
         if let Some(auth_mechanism) = credential
             .as_ref()
             .and_then(|c: &Credential| c.mechanism.as_ref())
         {
-            opts.push_str(&format!(
-                "&authMechanism={}",
-                auth_mechanism.as_str().to_uppercase()
-            ));
+            opts.push_str("authMechanism", &auth_mechanism.as_str().to_uppercase());
         }
 
         if let Some(auth_mechanism_properties) = credential
@@ -2164,48 +2171,42 @@ impl ConnectionString {
             .and_then(|c: &Credential| c.mechanism_properties.as_ref())
         {
             if !auth_mechanism_properties.is_empty() {
-                opts.push_str(&format!(
-                    "&authMechanismProperties={}",
-                    auth_mechanism_properties
+                opts.push_str(
+                    "authMechanismProperties",
+                    &auth_mechanism_properties
                         .iter()
                         .map(|(k, v)| format!("{k}:{v}"))
                         .collect::<Vec<_>>()
-                        .join(",")
-                ))
+                        .join(","),
+                )
             }
         }
 
         if let Some(local_threshold) = local_threshold {
-            opts.push_str(&format!(
-                "&localThresholdMS={}",
-                local_threshold.as_millis()
-            ));
+            opts.push("localThresholdMS", &local_threshold.as_millis());
         }
 
         if let Some(server_selection_timeout) = server_selection_timeout {
-            opts.push_str(&format!(
-                "&serverSelectionTimeoutMS={}",
-                server_selection_timeout.as_millis()
-            ));
+            opts.push(
+                "serverSelectionTimeoutMS",
+                &server_selection_timeout.as_millis(),
+            );
         }
 
         if let Some(heartbeat_frequency) = heartbeat_frequency {
-            opts.push_str(&format!(
-                "&heartbeatFrequencyMS={}",
-                heartbeat_frequency.as_millis()
-            ));
+            opts.push("heartbeatFrequencyMS", &heartbeat_frequency.as_millis());
         }
 
         if let Some(app_name) = app_name {
-            opts.push_str(&format!("&appName={app_name}"));
+            opts.push_str("appName", app_name);
         }
 
         if let Some(retry_reads) = retry_reads {
-            opts.push_str(&format!("&retryReads={retry_reads}"));
+            opts.push_bool("retryReads", *retry_reads);
         }
 
         if let Some(retry_writes) = retry_writes {
-            opts.push_str(&format!("&retryWrites={retry_writes}"));
+            opts.push_bool("retryWrites", *retry_writes);
         }
 
         if let Some(uuid_rep) = uuid_representation {
@@ -2216,48 +2217,42 @@ impl ConnectionString {
                 UuidRepresentation::PythonLegacy => "pythonLegacy",
                 _ => "",
             };
-            opts.push_str(&format!("&uuidRepresentation={s}"));
+            opts.push_str("uuidRepresentation", s);
         }
 
         if let Some(load_balanced) = load_balanced {
-            opts.push_str(&format!("&loadBalanced={load_balanced}"));
+            opts.push_bool("loadBalanced", *load_balanced);
         }
 
         if let Some(srv_max_hosts) = srv_max_hosts {
-            opts.push_str(&format!("&srvMaxHosts={srv_max_hosts}"));
+            opts.push("srvMaxHosts", srv_max_hosts);
         }
 
         #[cfg(feature = "socks5-proxy")]
         if let Some(proxy) = socks5_proxy {
-            opts.push_str(&format!("&proxyHost={}", proxy.host));
+            opts.push_str("proxyHost", &proxy.host);
             if let Some(port) = proxy.port {
-                opts.push_str(&format!("&proxyPort={port}"));
+                opts.push("proxyPort", &port);
             }
             if let Some((username, password)) = proxy.authentication.as_ref() {
-                opts.push_str(&format!(
-                    "&proxyUsername={username}&proxyPassword={password}"
-                ));
+                opts.push_str("proxyUsername", username);
+                opts.push_str("proxyPassword", password);
             }
         }
 
         if let Some(adaptive_retries) = adaptive_retries {
-            opts.push_str(&format!("&adaptiveRetries={adaptive_retries}"));
+            opts.push_bool("adaptiveRetries", *adaptive_retries);
         }
 
         if let Some(max_adaptive_retries) = max_adaptive_retries {
-            opts.push_str(&format!("&maxAdaptiveRetries={max_adaptive_retries}"));
+            opts.push("maxAdaptiveRetries", max_adaptive_retries);
         }
 
         if let Some(enable_overload_retargeting) = enable_overload_retargeting {
-            opts.push_str(&format!(
-                "&enableOverloadRetargeting={enable_overload_retargeting}"
-            ));
+            opts.push_bool("enableOverloadRetargeting", *enable_overload_retargeting);
         }
 
-        if !opts.is_empty() {
-            opts.replace_range(0..1, "?"); // mark start of options
-            res.push_str(&opts);
-        }
+        opts.append_to(&mut res);
 
         res
     }
@@ -2926,7 +2921,7 @@ mod tests {
 
     use pretty_assertions::assert_eq;
 
-    use super::{ClientOptions, ServerAddress};
+    use super::{ClientOptions, ConnectionString, ServerAddress};
     use crate::{
         concern::{Acknowledgment, ReadConcernLevel, WriteConcern},
         selection_criteria::{ReadPreference, ReadPreferenceOptions},
@@ -3293,6 +3288,85 @@ mod tests {
                 ..Default::default()
             }
         );
+    }
+
+    #[test]
+    fn to_uri_str_simple() {
+        let conn_str = ConnectionString::parse("mongodb://localhost:27017/?appName=foo").unwrap();
+        assert_eq!(
+            conn_str.to_string(),
+            "mongodb://localhost:27017/?appName=foo"
+        );
+    }
+
+    #[test]
+    fn to_uri_str_escapes_option_values() {
+        let conn_str = ConnectionString::parse(
+            "mongodb://localhost/?appName=a%26b%3Dc%20d%23e%25f&replicaSet=r%26s",
+        )
+        .unwrap();
+        assert_eq!(conn_str.app_name.as_deref(), Some("a&b=c d#e%f"));
+
+        let s = conn_str.to_string();
+        // Reserved characters must not leak into the option string unescaped.
+        assert_eq!(s.matches('&').count(), 1, "{s}");
+        assert_eq!(s.matches('=').count(), 2, "{s}");
+        assert!(!s.contains('#'), "{s}");
+
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.app_name, conn_str.app_name);
+        assert_eq!(reparsed.replica_set.as_deref(), Some("r&s"));
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_escapes_default_database() {
+        let conn_str = ConnectionString::parse("mongodb://localhost/my%3Fdb%23x%40y").unwrap();
+        assert_eq!(conn_str.default_database.as_deref(), Some("my?db#x@y"));
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.default_database, conn_str.default_database);
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_escapes_credentials() {
+        let conn_str = ConnectionString::parse(
+            "mongodb://us%40er:p%3Ass%2Fw%25rd@localhost/?authSource=a%26b",
+        )
+        .unwrap();
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        let credential = reparsed.credential.as_ref().unwrap();
+        assert_eq!(credential.username.as_deref(), Some("us@er"));
+        assert_eq!(credential.password.as_deref(), Some("p:ss/w%rd"));
+        assert_eq!(credential.source.as_deref(), Some("a&b"));
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_round_trip_many_options() {
+        let uri = "mongodb://u:p@host1:27017,host2:27018/db?replicaSet=rs&directConnection=false&\
+                   connectTimeoutMS=1000&maxPoolSize=10&minPoolSize=2&maxIdleTimeMS=5000&\
+                   w=majority&wtimeoutMS=100&journal=true&readConcernLevel=majority&\
+                   readPreference=secondary&maxStalenessSeconds=120&retryReads=true&\
+                   retryWrites=false&appName=my%20app&localThresholdMS=15&\
+                   serverSelectionTimeoutMS=3000&heartbeatFrequencyMS=10000&tls=true&\
+                   uuidRepresentation=javaLegacy";
+        let conn_str = ConnectionString::parse(uri).unwrap();
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.to_string(), s);
+        assert_eq!(reparsed.host_info, conn_str.host_info);
+        assert_eq!(reparsed.replica_set, conn_str.replica_set);
+        assert_eq!(reparsed.app_name.as_deref(), Some("my app"));
+        assert_eq!(reparsed.write_concern, conn_str.write_concern);
+        assert_eq!(reparsed.read_preference, conn_str.read_preference);
+        assert_eq!(reparsed.max_pool_size, Some(10));
+        assert_eq!(reparsed.tls, conn_str.tls);
     }
 }
 
