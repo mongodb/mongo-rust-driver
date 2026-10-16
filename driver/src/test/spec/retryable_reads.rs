@@ -84,15 +84,15 @@ async fn retry_read_pool_cleared() {
 
     let mut client_options = get_client_options().await.clone();
     client_options.retry_reads = Some(true);
+    client_options.heartbeat_freq = Some(Duration::from_millis(500));
     client_options.max_pool_size = Some(1);
     client_options.cmap_event_handler = Some(buffer.handler());
     client_options.command_event_handler = Some(buffer.handler());
-    // on sharded clusters, ensure only a single mongos is used
-    if client_options.repl_set_name.is_none() {
-        client_options.hosts.drain(1..);
-    }
 
-    let client = Client::for_test().options(client_options.clone()).await;
+    let client = Client::for_test()
+        .options(client_options.clone())
+        .use_single_mongos()
+        .await;
 
     let collection = client
         .database("retry_read_pool_cleared")

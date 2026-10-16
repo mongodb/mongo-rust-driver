@@ -380,19 +380,26 @@ async fn run_test(test_file: TestFile) {
                 );
             }
             Outcome::Events(EventsOutcome { events: expected }) => {
-                let actual = event_stream
-                    .collect(Duration::from_millis(500), |e| matches!(e, Event::Sdam(_)))
-                    .await
-                    .into_iter()
-                    .map(|e| e.unwrap_sdam_event());
+                let filter_map = |event: Event| match event {
+                    Event::Sdam(event) => Some(event),
+                    _ => None,
+                };
 
-                assert_eq!(
-                    actual.len(),
-                    expected.len(),
-                    "{test_description}: {phase_description}: event list length mismatch:\n \
-                     actual: {actual:#?}, expected: {expected:#?}"
-                );
-                for (actual, expected) in actual.zip(expected) {
+                let mut actual = Vec::new();
+                while actual.len() < expected.len() {
+                    let next = event_stream
+                        .next_map(Duration::from_millis(500), filter_map)
+                        .await
+                        .expect("timed out waiting for expected event");
+                    actual.push(next);
+                }
+                if let Some(next) = event_stream
+                    .next_map(Duration::from_millis(50), filter_map)
+                    .await
+                {
+                    panic!("{test_description}: extra event: {next:?}");
+                }
+                for (actual, expected) in actual.into_iter().zip(expected) {
                     assert_eq!(
                         actual, expected,
                         "{test_description}: {phase_description}: SDAM events do not match:\n \

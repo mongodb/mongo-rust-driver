@@ -47,12 +47,12 @@ async fn run_unified() {
         .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn label_not_added_first_read_error() {
     label_not_added(false).await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn label_not_added_second_read_error() {
     label_not_added(true).await;
 }
@@ -60,6 +60,7 @@ async fn label_not_added_second_read_error() {
 async fn label_not_added(retry_reads: bool) {
     let mut options = get_client_options().await.clone();
     options.retry_reads = Some(retry_reads);
+    options.heartbeat_freq = Some(Duration::from_millis(500));
     let client = Client::for_test()
         .options(options)
         .use_single_mongos()
@@ -69,19 +70,10 @@ async fn label_not_added(retry_reads: bool) {
         .init_db_and_coll(&format!("{}{}", "label_not_added", retry_reads), "coll")
         .await;
 
-    let failpoint = doc! {
-        "configureFailPoint": "failCommand",
-        "mode": { "times": if retry_reads { 2 } else { 1 } },
-        "data": {
-            "failCommands": ["find"],
-            "errorCode": 11600
-        }
-    };
-    client
-        .database("admin")
-        .run_command(failpoint)
-        .await
-        .unwrap();
+    let times = if retry_reads { 2 } else { 1 };
+    let fail_point =
+        FailPoint::fail_command(&["find"], FailPointMode::Times(times)).error_code(11600);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
     let err = coll.find(doc! {}).await.unwrap_err();
 
@@ -104,15 +96,15 @@ async fn retry_write_pool_cleared() {
 
     let mut client_options = get_client_options().await.clone();
     client_options.retry_writes = Some(true);
+    client_options.heartbeat_freq = Some(Duration::from_millis(500));
     client_options.max_pool_size = Some(1);
     client_options.cmap_event_handler = Some(buffer.handler());
     client_options.command_event_handler = Some(buffer.handler());
-    // on sharded clusters, ensure only a single mongos is used
-    if client_options.repl_set_name.is_none() {
-        client_options.hosts.drain(1..);
-    }
 
-    let client = Client::for_test().options(client_options.clone()).await;
+    let client = Client::for_test()
+        .options(client_options)
+        .use_single_mongos()
+        .await;
 
     let collection = client
         .database("retry_write_pool_cleared")
@@ -234,6 +226,7 @@ async fn retry_write_retryable_write_error() {
         });
     }
     client_options.test_options_mut().async_event_listener = Some(event_tx);
+    client_options.heartbeat_freq = Some(Duration::from_millis(500));
     let client = Client::for_test().options(client_options).await;
     *listener_client.lock().await = Some(client.clone());
 
