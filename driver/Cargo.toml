@@ -91,6 +91,7 @@ chrono = { version = "0.4.32", default-features = false, optional = true, featur
     "std",
 ] }
 derive-where = "1.2.7"
+disjoint_impls = "1.4.3"
 fast-socks5 = { version = "0.10", optional = true }
 flate2 = { version = "1.0", optional = true }
 futures-io = "0.3.21"

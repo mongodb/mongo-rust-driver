@@ -28,6 +28,7 @@ mod update;
 use std::{borrow::Cow, fmt::Debug};
 
 use bson::{RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
+use disjoint_impls::disjoint_impls;
 use futures_util::FutureExt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -38,18 +39,12 @@ use crate::{
     client::{ClusterTime, Retry, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     cmap::{
         conn::{pooled::PooledConnection, PinnedConnectionHandle},
-        Command,
-        RawCommandResponse,
-        StreamDescription,
+        Command, RawCommandResponse, StreamDescription,
     },
     error::{CommandError, Error, ErrorKind, Result},
     options::{ClientOptions, ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
-    BoxFuture,
-    ClientSession,
-    Collection,
-    Database,
-    Namespace,
+    BoxFuture, ClientSession, Collection, Database, Namespace,
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
@@ -113,82 +108,6 @@ impl Retryability {
             Self::Read => error.is_read_retryable(),
             Self::None => false,
         }
-    }
-}
-
-/// A trait modeling the behavior of a server side operation.  This should not be implemented
-/// directly; use either the `BaseOperation` or `WrappedOperation` traits.
-pub(crate) trait Operation {
-    /// The output type of this operation.
-    type O;
-
-    /// The name of the server side command associated with this operation.
-    const NAME: &'static CStr;
-
-    /// Whether this operation prefers to take ownership of the server response body for
-    /// zero-copy handling.
-    const ZERO_COPY: bool;
-
-    /// Returns the command that should be sent to the server as part of this operation.
-    /// The operation may store some additional state that is required for handling the response.
-    fn build(&mut self, description: &StreamDescription) -> Result<Command>;
-
-    /// Parse the response for the atClusterTime field.
-    /// Depending on the operation, this may be found in different locations.
-    fn extract_at_cluster_time(&self, _response: &RawDocument) -> Result<Option<Timestamp>>;
-
-    /// Interprets the server response to the command.
-    fn handle_response<'a>(
-        &'a self,
-        response: Cow<'a, RawCommandResponse>,
-        context: ResponseContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>>;
-
-    /// Interpret an error encountered while sending the built command to the server, potentially
-    /// recovering.
-    fn handle_error(&self, error: Error) -> Result<Self::O>;
-
-    /// Criteria to use for selecting the server that this operation will be executed on.
-    fn selection_criteria(&self) -> Feature<&SelectionCriteria>;
-
-    /// The read concern to use for this operation, if any.
-    fn read_concern(&self) -> Feature<&ReadConcern>;
-
-    /// The write concern to use for this operation, if any.
-    fn write_concern(&self) -> Feature<&WriteConcern>;
-
-    /// Whether this operation supports sessions or not.
-    fn supports_sessions(&self) -> bool;
-
-    /// The level of retryability the operation supports.
-    fn retryability(&self, options: &ClientOptions) -> Retryability;
-
-    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool;
-
-    /// Updates this operation as needed for a retry.
-    fn update_for_retry(&mut self, retry: Option<&Retry>);
-
-    /// Returns a function handle to potentially override selection criteria based on server
-    /// topology.
-    fn override_criteria(&self) -> OverrideCriteriaFn;
-
-    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle>;
-
-    /// The name of the server side command associated with this operation.
-    fn name(&self) -> &CStr;
-
-    /// The noun to this operation's verb.
-    fn target(&self) -> OperationTarget;
-
-    /// Whether this is a write operation that needs `afterClusterTime` set.
-    fn is_after_cluster_time_write(&self) -> bool;
-
-    #[cfg(feature = "opentelemetry")]
-    type Otel: crate::otel::OtelWitness<Op = Self>;
-
-    #[cfg(feature = "opentelemetry")]
-    fn otel(&self) -> &impl crate::otel::OtelInfo {
-        <Self::Otel as crate::otel::OtelWitness>::otel(self)
     }
 }
 
@@ -405,128 +324,11 @@ pub(crate) trait BaseOperation: Send + Sync {
     type Otel: crate::otel::OtelWitness<Op = Self>;
 }
 
-/// We'd like both `BaseOperation` and `WrappedOperation` to automatically implement `Operation`.
-/// However, Rust only allows one blanket impl per trait, so we can't do both
-/// `impl<T: BaseOperation> Operation for T` and `impl<T: WrappedOperation> Operation for T`.
-///
-/// To work around this, `OperationDispatch` provides an indirection: the one blanket impl for
-/// `Operation` is a generic `OperationDispatch<K>`, and each specialized version of the trait
-/// has a blanket impl for `OperationDispatch` with a specific type parameter.
-///
-/// `OperationImpl` is a helper trait for this setup that binds specific impls to the appropriate
-/// dispatch type.
-pub(crate) trait OperationDispatch<Kind> {
-    type O;
-    const NAME: &'static CStr;
-    const ZERO_COPY: bool;
-    fn build(&mut self, description: &StreamDescription) -> Result<Command>;
-    fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>>;
-    fn handle_response<'a>(
-        &'a self,
-        response: Cow<'a, RawCommandResponse>,
-        context: ResponseContext<'a>,
-    ) -> BoxFuture<'a, Result<Self::O>>;
-    fn handle_error(&self, error: Error) -> Result<Self::O>;
-    fn selection_criteria(&self) -> Feature<&SelectionCriteria>;
-    fn read_concern(&self) -> Feature<&ReadConcern>;
-    fn write_concern(&self) -> Feature<&WriteConcern>;
-    fn supports_sessions(&self) -> bool;
-    fn retryability(&self, options: &ClientOptions) -> Retryability;
-    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool;
-    fn update_for_retry(&mut self, retry: Option<&Retry>);
-    fn override_criteria(&self) -> OverrideCriteriaFn;
-    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle>;
-    fn name(&self) -> &CStr;
-    fn target(&self) -> OperationTarget;
-    fn is_after_cluster_time_write(&self) -> bool;
-    #[cfg(feature = "opentelemetry")]
-    type Otel: crate::otel::OtelWitness<Op = Self>;
-}
-
-macro_rules! operation_dispatch {
-    ($trait:path, $tag:ty, $handle_response:ident) => {
-        impl<T: $trait> OperationDispatch<$tag> for T {
-            operation_dispatch_body! { $trait, $handle_response }
-        }
-    };
-}
-
-macro_rules! operation_dispatch_body {
-    ($trait:path, $handle_response:ident) => {
-        type O = <T as $trait>::O;
-        const NAME: &'static CStr = <T as $trait>::NAME;
-        const ZERO_COPY: bool = <T as $trait>::ZERO_COPY;
-        fn build(&mut self, description: &StreamDescription) -> Result<Command> {
-            <T as $trait>::build(self, description)
-        }
-        fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
-            <T as $trait>::extract_at_cluster_time(self, response)
-        }
-        fn handle_response<'a>(
-            &'a self,
-            response: Cow<'a, RawCommandResponse>,
-            context: ResponseContext<'a>,
-        ) -> BoxFuture<'a, Result<Self::O>> {
-            <T as $trait>::$handle_response(self, response, context)
-        }
-        fn handle_error(&self, error: Error) -> Result<Self::O> {
-            <T as $trait>::handle_error(self, error)
-        }
-        fn selection_criteria(&self) -> Feature<&SelectionCriteria> {
-            <T as $trait>::selection_criteria(self)
-        }
-        fn read_concern(&self) -> Feature<&ReadConcern> {
-            <T as $trait>::read_concern(self)
-        }
-        fn write_concern(&self) -> Feature<&WriteConcern> {
-            <T as $trait>::write_concern(self)
-        }
-        fn supports_sessions(&self) -> bool {
-            <T as $trait>::supports_sessions(self)
-        }
-        fn retryability(&self, options: &ClientOptions) -> Retryability {
-            <T as $trait>::retryability(self, options)
-        }
-        fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
-            <T as $trait>::is_backpressure_retryable(self, options)
-        }
-        fn update_for_retry(&mut self, retry: Option<&Retry>) {
-            <T as $trait>::update_for_retry(self, retry)
-        }
-        fn override_criteria(&self) -> OverrideCriteriaFn {
-            <T as $trait>::override_criteria(self)
-        }
-        fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
-            <T as $trait>::pinned_connection(self)
-        }
-        fn name(&self) -> &CStr {
-            <T as $trait>::name(self)
-        }
-        fn target(&self) -> OperationTarget {
-            <T as $trait>::target(self)
-        }
-        fn is_after_cluster_time_write(&self) -> bool {
-            <T as $trait>::is_after_cluster_time_write(self)
-        }
-        #[cfg(feature = "opentelemetry")]
-        type Otel = <T as $trait>::Otel;
-    };
-}
-
 pub(crate) trait OperationImpl {
     type Kind;
 }
 
-impl<K, T> Operation for T
-where
-    T: OperationImpl<Kind = K> + OperationDispatch<K> + Send + Sync,
-{
-    operation_dispatch_body! { OperationDispatch<K>, handle_response }
-}
-
 pub(crate) struct Base;
-
-operation_dispatch! { BaseOperation, Base, handle_response_async }
 
 /// A trait for operations that delegate most behavior to another wrapped operation.
 pub(crate) trait WrappedOperation {
@@ -597,7 +399,189 @@ pub(crate) trait WrappedOperation {
 
 pub(crate) struct Wrapped;
 
-operation_dispatch! { WrappedOperation, Wrapped, handle_response }
+disjoint_impls! {
+    /// A trait modeling the behavior of a server side operation.  This should not be implemented
+    /// directly; use either the `BaseOperation` or `WrappedOperation` traits.
+    pub(crate) trait Operation {
+        /// The output type of this operation.
+        type O;
+        /// The name of the server side command associated with this operation.
+        const NAME: &'static CStr;
+        /// Whether this operation prefers to take ownership of the server response body for
+        /// zero-copy handling.
+        const ZERO_COPY: bool;
+        /// Returns the command that should be sent to the server as part of this operation.
+        /// The operation may store some additional state that is required for handling the response.
+        fn build(&mut self, description: &StreamDescription) -> Result<Command>;
+        /// Parse the response for the atClusterTime field.
+        /// Depending on the operation, this may be found in different locations.
+        fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>>;
+        /// Interprets the server response to the command.
+        fn handle_response<'a>(
+            &'a self,
+            response: Cow<'a, RawCommandResponse>,
+            context: ResponseContext<'a>,
+        ) -> BoxFuture<'a, Result<Self::O>>;
+        /// Interpret an error encountered while sending the built command to the server, potentially
+        /// recovering.
+        fn handle_error(&self, error: Error) -> Result<Self::O>;
+        /// Criteria to use for selecting the server that this operation will be executed on.
+        fn selection_criteria(&self) -> Feature<&SelectionCriteria>;
+        /// The read concern to use for this operation, if any.
+        fn read_concern(&self) -> Feature<&ReadConcern>;
+        /// The write concern to use for this operation, if any.
+        fn write_concern(&self) -> Feature<&WriteConcern>;
+        /// Whether this operation supports sessions or not.
+        fn supports_sessions(&self) -> bool;
+        /// The level of retryability the operation supports.
+        fn retryability(&self, options: &ClientOptions) -> Retryability;
+        fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool;
+        /// Updates this operation as needed for a retry.
+        fn update_for_retry(&mut self, retry: Option<&Retry>);
+        /// Returns a function handle to potentially override selection criteria based on server
+        /// topology.
+        fn override_criteria(&self) -> OverrideCriteriaFn;
+        fn pinned_connection(&self) -> Option<&PinnedConnectionHandle>;
+        /// The name of the server side command associated with this operation.
+        fn name(&self) -> &CStr;
+        /// The noun to this operation's verb.
+        fn target(&self) -> OperationTarget;
+        /// Whether this is a write operation that needs `afterClusterTime` set.
+        fn is_after_cluster_time_write(&self) -> bool;
+        #[cfg(feature = "opentelemetry")]
+        type Otel: crate::otel::OtelWitness<Op = Self>;
+        #[cfg(feature = "opentelemetry")]
+        fn otel(&self) -> &impl crate::otel::OtelInfo {
+            <Self::Otel as crate::otel::OtelWitness>::otel(self)
+        }
+    }
+
+    impl<T> Operation for T
+    where
+        T: OperationImpl<Kind = Base> + BaseOperation + Send + Sync,
+    {
+        type O = <T as BaseOperation>::O;
+        const NAME: &'static CStr = <T as BaseOperation>::NAME;
+        const ZERO_COPY: bool = <T as BaseOperation>::ZERO_COPY;
+        fn build(&mut self, description: &StreamDescription) -> Result<Command> {
+            <T as BaseOperation>::build(self, description)
+        }
+        fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
+            <T as BaseOperation>::extract_at_cluster_time(self, response)
+        }
+        fn handle_response<'a>(
+            &'a self,
+            response: Cow<'a, RawCommandResponse>,
+            context: ResponseContext<'a>,
+        ) -> BoxFuture<'a, Result<Self::O>> {
+            <T as BaseOperation>::handle_response_async(self, response, context)
+        }
+        fn handle_error(&self, error: Error) -> Result<Self::O> {
+            <T as BaseOperation>::handle_error(self, error)
+        }
+        fn selection_criteria(&self) -> Feature<&SelectionCriteria> {
+            <T as BaseOperation>::selection_criteria(self)
+        }
+        fn read_concern(&self) -> Feature<&ReadConcern> {
+            <T as BaseOperation>::read_concern(self)
+        }
+        fn write_concern(&self) -> Feature<&WriteConcern> {
+            <T as BaseOperation>::write_concern(self)
+        }
+        fn supports_sessions(&self) -> bool {
+            <T as BaseOperation>::supports_sessions(self)
+        }
+        fn retryability(&self, options: &ClientOptions) -> Retryability {
+            <T as BaseOperation>::retryability(self, options)
+        }
+        fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+            <T as BaseOperation>::is_backpressure_retryable(self, options)
+        }
+        fn update_for_retry(&mut self, retry: Option<&Retry>) {
+            <T as BaseOperation>::update_for_retry(self, retry)
+        }
+        fn override_criteria(&self) -> OverrideCriteriaFn {
+            <T as BaseOperation>::override_criteria(self)
+        }
+        fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
+            <T as BaseOperation>::pinned_connection(self)
+        }
+        fn name(&self) -> &CStr {
+            <T as BaseOperation>::name(self)
+        }
+        fn target(&self) -> OperationTarget {
+            <T as BaseOperation>::target(self)
+        }
+        fn is_after_cluster_time_write(&self) -> bool {
+            <T as BaseOperation>::is_after_cluster_time_write(self)
+        }
+        #[cfg(feature = "opentelemetry")]
+        type Otel = <T as BaseOperation>::Otel;
+    }
+
+    impl<T> Operation for T
+    where
+        T: OperationImpl<Kind = Wrapped> + WrappedOperation + Send + Sync,
+    {
+        type O = <T as WrappedOperation>::O;
+        const NAME: &'static CStr = <T as WrappedOperation>::NAME;
+        const ZERO_COPY: bool = <T as WrappedOperation>::ZERO_COPY;
+        fn build(&mut self, description: &StreamDescription) -> Result<Command> {
+            <T as WrappedOperation>::build(self, description)
+        }
+        fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
+            <T as WrappedOperation>::extract_at_cluster_time(self, response)
+        }
+        fn handle_response<'a>(
+            &'a self,
+            response: Cow<'a, RawCommandResponse>,
+            context: ResponseContext<'a>,
+        ) -> BoxFuture<'a, Result<Self::O>> {
+            <T as WrappedOperation>::handle_response(self, response, context)
+        }
+        fn handle_error(&self, error: Error) -> Result<Self::O> {
+            <T as WrappedOperation>::handle_error(self, error)
+        }
+        fn selection_criteria(&self) -> Feature<&SelectionCriteria> {
+            <T as WrappedOperation>::selection_criteria(self)
+        }
+        fn read_concern(&self) -> Feature<&ReadConcern> {
+            <T as WrappedOperation>::read_concern(self)
+        }
+        fn write_concern(&self) -> Feature<&WriteConcern> {
+            <T as WrappedOperation>::write_concern(self)
+        }
+        fn supports_sessions(&self) -> bool {
+            <T as WrappedOperation>::supports_sessions(self)
+        }
+        fn retryability(&self, options: &ClientOptions) -> Retryability {
+            <T as WrappedOperation>::retryability(self, options)
+        }
+        fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+            <T as WrappedOperation>::is_backpressure_retryable(self, options)
+        }
+        fn update_for_retry(&mut self, retry: Option<&Retry>) {
+            <T as WrappedOperation>::update_for_retry(self, retry)
+        }
+        fn override_criteria(&self) -> OverrideCriteriaFn {
+            <T as WrappedOperation>::override_criteria(self)
+        }
+        fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
+            <T as WrappedOperation>::pinned_connection(self)
+        }
+        fn name(&self) -> &CStr {
+            <T as WrappedOperation>::name(self)
+        }
+        fn target(&self) -> OperationTarget {
+            <T as WrappedOperation>::target(self)
+        }
+        fn is_after_cluster_time_write(&self) -> bool {
+            <T as WrappedOperation>::is_after_cluster_time_write(self)
+        }
+        #[cfg(feature = "opentelemetry")]
+        type Otel = <T as WrappedOperation>::Otel;
+    }
+}
 
 fn should_redact_body(body: &RawDocumentBuf) -> bool {
     if let Some(Ok((command_name, _))) = body.into_iter().next() {
