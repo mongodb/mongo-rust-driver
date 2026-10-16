@@ -261,7 +261,7 @@ where
     /// execution.
     fn should_continue(&self, ordered: bool) -> bool {
         match self {
-            Self::Error(ref error) => {
+            Self::Error(error) => {
                 match *error.kind {
                     ErrorKind::BulkWrite(ref bulk_write_error) => {
                         // A top-level error is always fatal.

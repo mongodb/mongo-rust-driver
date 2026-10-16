@@ -383,16 +383,16 @@ impl Matchable for EventOptions {
 impl Matchable for CmapEvent {
     fn content_matches(&self, expected: &CmapEvent) -> std::result::Result<(), String> {
         match (self, expected) {
-            (CmapEvent::PoolCreated(actual), CmapEvent::PoolCreated(ref expected)) => {
+            (CmapEvent::PoolCreated(actual), CmapEvent::PoolCreated(expected)) => {
                 actual.options.matches(&expected.options)
             }
-            (CmapEvent::ConnectionCreated(actual), CmapEvent::ConnectionCreated(ref expected)) => {
+            (CmapEvent::ConnectionCreated(actual), CmapEvent::ConnectionCreated(expected)) => {
                 actual.connection_id.matches(&expected.connection_id)
             }
-            (CmapEvent::ConnectionReady(actual), CmapEvent::ConnectionReady(ref expected)) => {
+            (CmapEvent::ConnectionReady(actual), CmapEvent::ConnectionReady(expected)) => {
                 actual.connection_id.matches(&expected.connection_id)
             }
-            (CmapEvent::ConnectionClosed(actual), CmapEvent::ConnectionClosed(ref expected)) => {
+            (CmapEvent::ConnectionClosed(actual), CmapEvent::ConnectionClosed(expected)) => {
                 if expected.reason != ConnectionClosedReason::Unset {
                     eq_matches("reason", &actual.reason, &expected.reason)?;
                 }
@@ -408,15 +408,14 @@ impl Matchable for CmapEvent {
             }
             (
                 CmapEvent::ConnectionCheckedOut(actual),
-                CmapEvent::ConnectionCheckedOut(ref expected),
+                CmapEvent::ConnectionCheckedOut(expected),
             ) => actual.connection_id.matches(&expected.connection_id),
-            (
-                CmapEvent::ConnectionCheckedIn(actual),
-                CmapEvent::ConnectionCheckedIn(ref expected),
-            ) => actual.connection_id.matches(&expected.connection_id),
+            (CmapEvent::ConnectionCheckedIn(actual), CmapEvent::ConnectionCheckedIn(expected)) => {
+                actual.connection_id.matches(&expected.connection_id)
+            }
             (
                 CmapEvent::ConnectionCheckoutFailed(actual),
-                CmapEvent::ConnectionCheckoutFailed(ref expected),
+                CmapEvent::ConnectionCheckoutFailed(expected),
             ) => {
                 if expected.reason != ConnectionCheckoutFailedReason::Unset {
                     eq_matches("reason", &actual.reason, &expected.reason)?;

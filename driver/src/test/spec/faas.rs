@@ -24,7 +24,7 @@ impl TempVars {
         let mut restore = vec![];
         for (name, value) in vars {
             restore.push((*name, env::var_os(name)));
-            env::set_var(name, value);
+            unsafe { env::set_var(name, value) };
         }
 
         Self { restore }
@@ -35,9 +35,9 @@ impl Drop for TempVars {
     fn drop(&mut self) {
         for (name, value) in self.restore.drain(..) {
             if let Some(v) = value {
-                env::set_var(name, v);
+                unsafe { env::set_var(name, v) };
             } else {
-                env::remove_var(name);
+                unsafe { env::remove_var(name) };
             }
         }
     }

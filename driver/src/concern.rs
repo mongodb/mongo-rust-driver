@@ -167,7 +167,7 @@ impl ReadConcernLevel {
             ReadConcernLevel::Linearizable => "linearizable",
             ReadConcernLevel::Available => "available",
             ReadConcernLevel::Snapshot => "snapshot",
-            ReadConcernLevel::Custom(ref s) => s,
+            ReadConcernLevel::Custom(s) => s,
         }
     }
 }

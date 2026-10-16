@@ -54,7 +54,7 @@ fn get_env_var(var: &str) -> String {
 fn remove_mechanism_properties_placeholder(test_file: &mut TestFile) {
     if let Some(ref mut create_entities) = test_file.create_entities {
         for ref mut entity in create_entities {
-            if let TestFileEntity::Client(ref mut client) = entity {
+            if let TestFileEntity::Client(client) = entity {
                 if let Some(ref mut uri_options) = client.uri_options {
                     if let Some(mut mechanism_properties) = uri_options
                         .remove("authMechanismProperties")

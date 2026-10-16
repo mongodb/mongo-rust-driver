@@ -229,7 +229,7 @@ impl Matchable for Duration {
 impl<T: Matchable> Matchable for Option<T> {
     fn is_placeholder(&self) -> bool {
         match self {
-            Some(ref v) => v.is_placeholder(),
+            Some(v) => v.is_placeholder(),
             None => true,
         }
     }

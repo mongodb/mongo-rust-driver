@@ -12,7 +12,7 @@ authors = [
     "Patrick Meredith <pmeredit@protonmail.com>",
 ]
 license = "Apache-2.0"
-edition = "2021"
+edition = "2024"
 repository = "https://github.com/mongodb/mongo-rust-driver"
 rust-version = "1.88"
 

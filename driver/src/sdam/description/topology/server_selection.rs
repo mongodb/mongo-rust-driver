@@ -149,7 +149,7 @@ impl TopologyDescription {
                     self.filter_servers_in_replica_set(prioritized, read_preference)
                 }
             },
-            SelectionCriteria::Predicate(ref predicate) => prioritized
+            SelectionCriteria::Predicate(predicate) => prioritized
                 .filter(|s| {
                     // If we're direct-connected or connected to a standalone, ignore whether the
                     // single server in the topology is data-bearing.

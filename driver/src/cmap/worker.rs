@@ -537,14 +537,14 @@ impl ConnectionPoolWorker {
         }
 
         let was_ready = match (&mut self.generation, service_id) {
-            (PoolGeneration::Normal(gen), None) => {
-                *gen += 1;
+            (PoolGeneration::Normal(generation), None) => {
+                *generation += 1;
                 let prev = std::mem::replace(&mut self.state, PoolState::Paused(cause.clone()));
                 matches!(prev, PoolState::Ready)
             }
             (PoolGeneration::LoadBalanced(gen_map), Some(sid)) => {
-                let gen = gen_map.entry(sid).or_insert(0);
-                *gen += 1;
+                let generation = gen_map.entry(sid).or_insert(0);
+                *generation += 1;
                 true
             }
             (..) => load_balanced_mode_mismatch!(),
