@@ -318,7 +318,7 @@ impl Client {
         op: &mut T,
         context: &mut ExecutionContext<'_>,
     ) -> Result<ExecutionDetails<T>> {
-        let op_details = op.details(self.options());
+        let op_details = op.details();
         self.execute_operation_with_details_inner(op, op_details, context)
             .await
     }
@@ -331,17 +331,16 @@ impl Client {
     ) -> Result<ExecutionDetails<T>> {
         use crate::otel::FutureExt as _;
 
-        let op_details = op.details(self.options());
         let span = match context.span.clone() {
             Some(s) => s,
             None => {
-                let s = self.start_operation_span(op, &op_details, context.session.as_ref_option());
+                let s = self.start_operation_span(op, context.session.as_ref_option());
                 context.span = Some(s.clone());
                 s
             }
         };
         let result = self
-            .execute_operation_with_details_inner(op, op_details, context)
+            .execute_operation_with_details_inner(op, context)
             .with_span(&span)
             .await;
         span.record_operation_result::<T>(&result);
@@ -352,9 +351,10 @@ impl Client {
     async fn execute_operation_with_details_inner<T: Operation>(
         &self,
         op: &mut T,
-        op_details: OperationDetails,
         context: &mut ExecutionContext<'_>,
     ) -> Result<ExecutionDetails<T>> {
+        let op_details = op.details();
+
         // Validate inputs that can be checked before server selection and connection
         // checkout.
         if self.inner.shutdown.executed.load(Ordering::SeqCst) {
@@ -433,7 +433,7 @@ impl Client {
         }
 
         let result = Box::pin(async {
-            self.execute_operation_with_retry(op, op_details, context, selection_criteria)
+            self.execute_operation_with_retry(op, context, selection_criteria)
                 .await
         })
         .await;
@@ -450,11 +450,11 @@ impl Client {
     async fn execute_operation_with_retry<T: Operation>(
         &self,
         op: &mut T,
-        mut op_details: OperationDetails,
         context: &mut ExecutionContext<'_>,
         selection_criteria: Option<SelectionCriteria>,
     ) -> Result<ExecutionDetails<T>> {
         let mut retry: Option<Retry> = None;
+        let mut op_details = op.details();
         loop {
             match retry {
                 Some(retry) if retry.max_retries_reached() => {
@@ -465,7 +465,7 @@ impl Client {
                 }
                 Some(ref retry) => {
                     op.update_for_retry(Some(retry));
-                    op_details = op.details(self.options());
+                    op_details = op.details();
                     if retry.overloaded {
                         let backoff = retry.calculate_backoff(
                             #[cfg(test)]
@@ -513,13 +513,13 @@ impl Client {
                     Ok(connection) => connection,
                     Err(mut error) => {
                         error.add_labels_and_update_pin(
-                            op_details.retryability,
+                            op.retryability(self.options()),
                             context.session.as_ref_mut_option(),
                         );
                         retry = Some(Retry::for_connection_establishment_failure(
                             retry,
                             error,
-                            &op_details,
+                            op,
                             self,
                             server.address.clone(),
                             is_transaction_op,
@@ -542,12 +542,12 @@ impl Client {
             }
 
             let retryability = self.get_retryability(
-                &op_details,
+                op,
                 &context.session.as_ref_mut_option(),
                 connection.stream_description()?,
             );
             let overloaded = retry.as_ref().map(|r| r.overloaded).unwrap_or(false);
-            if overloaded && !op_details.is_backpressure_retryable
+            if overloaded && !op.is_backpressure_retryable(self.options())
                 || !overloaded && retryability == Retryability::None
             {
                 retry::return_last_error(&mut retry)?;
@@ -613,7 +613,7 @@ impl Client {
                     retry = Some(Retry::for_execution_failure(
                         retry,
                         error,
-                        &op_details,
+                        op,
                         self,
                         server_address,
                         is_transaction_op,
@@ -1128,9 +1128,9 @@ impl Client {
 
     /// Returns the retryability level for the execution of this operation with the given session
     /// and connection stream description.
-    fn get_retryability(
+    fn get_retryability<T: Operation>(
         &self,
-        op_details: &OperationDetails,
+        op: &T,
         session: &Option<&mut ClientSession>,
         stream_description: &StreamDescription,
     ) -> Retryability {
@@ -1141,7 +1141,7 @@ impl Client {
             return Retryability::None;
         }
 
-        match op_details.retryability {
+        match op.retryability(self.options()) {
             Retryability::Write if stream_description.supports_retryable_writes() => {
                 Retryability::Write
             }

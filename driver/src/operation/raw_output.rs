@@ -10,7 +10,6 @@ use crate::{
         ResponseContext,
         ResponseHandlingKind,
     },
-    options::ClientOptions,
 };
 
 /// Forwards all implementation to the wrapped `Operation`, but returns the response unparsed and
@@ -29,15 +28,17 @@ impl<Op: Operation> Operation for RawOutput<Op> {
         build,
         extract_at_cluster_time,
         update_for_retry,
+        retryability,
+        is_backpressure_retryable,
         pinned_connection
     );
 
     default_impl!(handle_error);
 
-    fn details(&self, options: &ClientOptions) -> OperationDetails {
+    fn details(&self) -> OperationDetails {
         OperationDetails {
             response_handling_kind: ResponseHandlingKind::Owned,
-            ..self.0.details(options)
+            ..self.0.details()
         }
     }
 

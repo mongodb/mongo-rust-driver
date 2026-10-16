@@ -10,12 +10,10 @@ use crate::{
         append_options_to_raw_document,
         default_impl,
         to_feature,
-        Feature,
         Operation,
         OperationDetails,
         OperationTarget,
         ResponseContext,
-        ResponseHandlingKind,
         Retryability,
     },
     options::{Acknowledgment, ClientOptions, TransactionOptions, WriteConcern},
@@ -48,20 +46,13 @@ impl Operation for CommitTransaction {
         pinned_connection
     );
 
-    fn details(&self, _options: &ClientOptions) -> OperationDetails {
-        OperationDetails {
-            response_handling_kind: ResponseHandlingKind::Borrowed,
-            selection_criteria: Feature::NotSupported,
-            read_concern: Feature::NotSupported,
-            write_concern: to_feature!(self.options, write_concern),
-            supports_sessions: true,
-            // commitTransaction is retryable regardless of the value of retryWrites
-            retryability: Retryability::Write,
-            is_backpressure_retryable: true,
-            override_criteria: None,
-            target: OperationTarget::admin(&self.target),
-            is_after_cluster_time_write: false,
-        }
+    fn details(&self) -> OperationDetails {
+        let mut details = OperationDetails::for_write(
+            OperationTarget::admin(&self.target),
+            to_feature!(self.options, write_concern),
+        );
+        details.is_after_cluster_time_write = false;
+        details
     }
 
     fn build(
@@ -88,6 +79,14 @@ impl Operation for CommitTransaction {
         _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
         response.validate_single_write()
+    }
+
+    fn retryability(&self, _options: &ClientOptions) -> super::Retryability {
+        Retryability::Write
+    }
+
+    fn is_backpressure_retryable(&self, _options: &ClientOptions) -> bool {
+        true
     }
 
     // Updates the write concern to use w: majority and a w_timeout of 10000 if w_timeout is not

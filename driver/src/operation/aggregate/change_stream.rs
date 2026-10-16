@@ -16,7 +16,7 @@ use crate::{
         ResponseContext,
         ResponseHandlingKind,
     },
-    options::{ChangeStreamOptions, ClientOptions},
+    options::ChangeStreamOptions,
 };
 
 use super::Aggregate;
@@ -60,15 +60,17 @@ impl Operation for ChangeStreamAggregate {
         name,
         extract_at_cluster_time,
         update_for_retry,
+        retryability,
+        is_backpressure_retryable,
         pinned_connection
     );
 
     default_impl!(handle_error);
 
-    fn details(&self, options: &ClientOptions) -> OperationDetails {
+    fn details(&self) -> OperationDetails {
         OperationDetails {
             response_handling_kind: ResponseHandlingKind::Owned,
-            ..self.inner.details(options)
+            ..self.inner.details()
         }
     }
 

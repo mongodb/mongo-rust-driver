@@ -112,15 +112,15 @@ impl Client {
     pub(crate) fn start_operation_span(
         &self,
         op: &impl Operation,
-        op_details: &OperationDetails,
         session: Option<&ClientSession>,
     ) -> OpSpan {
         let op = op.otel();
         if !self.options().otel_enabled() {
             return OpSpan::disabled();
         }
-        let span_name = format!("{} {}", op.log_name(), op_target(&op_details.target));
-        let mut attrs = common_attrs(&op_details.target, op.cursor_id());
+        let target = op.details().target;
+        let span_name = format!("{} {}", op.log_name(), op_target(&target));
+        let mut attrs = common_attrs(&target, op.cursor_id());
         attrs.extend([
             KeyValue::new("db.operation.name", op.log_name().to_owned()),
             KeyValue::new("db.operation.summary", span_name.clone()),

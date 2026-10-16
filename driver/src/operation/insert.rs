@@ -14,16 +14,14 @@ use crate::{
     error::{ErrorKind, Result},
     operation::{
         default_impl,
-        Feature,
+        write_retryable,
         Operation,
         OperationDetails,
         ResponseContext,
-        ResponseHandlingKind,
-        Retryability,
         MAX_ENCRYPTED_WRITE_SIZE,
         OP_MSG_OVERHEAD_BYTES,
     },
-    options::{ClientOptions, InsertManyOptions},
+    options::InsertManyOptions,
     results::InsertManyResult,
     Collection,
 };
@@ -71,20 +69,10 @@ impl Operation for Insert<'_> {
         update_for_retry,
         pinned_connection
     );
+    write_retryable!();
 
-    fn details(&self, options: &ClientOptions) -> OperationDetails {
-        OperationDetails {
-            response_handling_kind: ResponseHandlingKind::Borrowed,
-            selection_criteria: Feature::NotSupported,
-            read_concern: Feature::NotSupported,
-            write_concern: self.options.write_concern.clone().into(),
-            supports_sessions: true,
-            retryability: Retryability::write(options),
-            is_backpressure_retryable: options.retry_writes != Some(false),
-            override_criteria: None,
-            target: (&self.target).into(),
-            is_after_cluster_time_write: true,
-        }
+    fn details(&self) -> OperationDetails {
+        OperationDetails::for_write(&self.target, self.options.write_concern.clone().into())
     }
 
     fn build(

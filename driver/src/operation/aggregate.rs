@@ -62,7 +62,7 @@ impl Operation for Aggregate {
 
     default_impl!(name, handle_error, update_for_retry, pinned_connection);
 
-    fn details(&self, options: &ClientOptions) -> OperationDetails {
+    fn details(&self) -> OperationDetails {
         let override_criteria = |criteria: &SelectionCriteria, topology: &TopologyDescription| {
             if criteria.is_primary() || topology.topology_type() == TopologyType::LoadBalanced {
                 return None;
@@ -86,16 +86,6 @@ impl Operation for Aggregate {
             read_concern: to_feature!(self.options, read_concern),
             write_concern: to_feature!(self.options, write_concern),
             supports_sessions: true,
-            retryability: if self.is_out_or_merge {
-                Retryability::None
-            } else {
-                Retryability::read(options)
-            },
-            is_backpressure_retryable: if self.is_out_or_merge {
-                options.retry_writes != Some(false)
-            } else {
-                options.retry_reads != Some(false)
-            },
             override_criteria: self.is_out_or_merge.then_some(override_criteria),
             target: self.target.clone(),
             is_after_cluster_time_write: false,
@@ -154,6 +144,22 @@ impl Operation for Aggregate {
             self.options.as_ref().and_then(|opts| opts.max_await_time),
             self.options.as_ref().and_then(|opts| opts.comment.clone()),
         )
+    }
+
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        if self.is_out_or_merge {
+            Retryability::None
+        } else {
+            Retryability::read(options)
+        }
+    }
+
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        if self.is_out_or_merge {
+            options.retry_writes != Some(false)
+        } else {
+            options.retry_reads != Some(false)
+        }
     }
 
     #[cfg(feature = "opentelemetry")]

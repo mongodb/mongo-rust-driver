@@ -4,7 +4,7 @@ use std::{collections::HashSet, time::Duration};
 use crate::options::TestOptions;
 use crate::{
     error::{Error, Result, NO_WRITES_PERFORMED, RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
-    operation::{OperationDetails, Retryability},
+    operation::{Operation, Retryability},
     options::ServerAddress,
     Client,
 };
@@ -46,10 +46,10 @@ impl Failure {
 }
 
 impl Retry {
-    pub(super) fn for_connection_establishment_failure(
+    pub(super) fn for_connection_establishment_failure<T: Operation>(
         retry: Option<Self>,
         error: Error,
-        op_details: &OperationDetails,
+        op: &T,
         client: &Client,
         server: ServerAddress,
         is_transaction_op: bool,
@@ -58,21 +58,13 @@ impl Retry {
             error,
             phase: FailurePhase::ConnectionEstablishment,
         };
-        Self::handle_failure(
-            retry,
-            failure,
-            op_details,
-            client,
-            server,
-            is_transaction_op,
-            None,
-        )
+        Self::handle_failure(retry, failure, op, client, server, is_transaction_op, None)
     }
 
-    pub(super) fn for_execution_failure(
+    pub(super) fn for_execution_failure<T: Operation>(
         retry: Option<Self>,
         error: Error,
-        op_details: &OperationDetails,
+        op: &T,
         client: &Client,
         server: ServerAddress,
         is_transaction_op: bool,
@@ -85,7 +77,7 @@ impl Retry {
         Self::handle_failure(
             retry,
             failure,
-            op_details,
+            op,
             client,
             server,
             is_transaction_op,
@@ -96,10 +88,10 @@ impl Retry {
     /// Handles a failure by either creating a new `Retry` or updating the existing `Retry` with the
     /// new error. If the error cannot be retried, the appropriate error to return from the
     /// retry loop is returned and no further retries should be performed.
-    fn handle_failure(
+    fn handle_failure<T: Operation>(
         retry: Option<Retry>,
         failure: Failure,
-        op_details: &OperationDetails,
+        op: &T,
         client: &Client,
         server: ServerAddress,
         is_transaction_op: bool,
@@ -108,11 +100,11 @@ impl Retry {
         let error = &failure.error;
         let can_retry = if error.contains_label(SYSTEM_OVERLOADED_ERROR)
             && error.contains_label(RETRYABLE_ERROR)
-            && op_details.is_backpressure_retryable
+            && op.is_backpressure_retryable(client.options())
         {
             true
         } else {
-            let retryability = op_details.retryability;
+            let retryability = op.retryability(client.options());
             // Pool cleared errors should be retried for reads regardless of transaction status.
             retryability == Retryability::Read && error.is_pool_cleared()
                 || retryability.can_retry_error(error) && !is_transaction_op

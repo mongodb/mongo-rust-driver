@@ -9,15 +9,12 @@ use crate::{
     operation::{
         append_options_to_raw_document,
         default_impl,
+        read_retryable,
         to_feature,
-        Feature,
         Operation,
         OperationDetails,
         ResponseContext,
-        ResponseHandlingKind,
-        Retryability,
     },
-    options::ClientOptions,
     Collection,
 };
 
@@ -50,20 +47,14 @@ impl Operation for Distinct {
     const NAME: &'static CStr = cstr!("distinct");
 
     default_impl!(name, handle_error, update_for_retry, pinned_connection);
+    read_retryable!();
 
-    fn details(&self, options: &ClientOptions) -> OperationDetails {
-        OperationDetails {
-            response_handling_kind: ResponseHandlingKind::Borrowed,
-            selection_criteria: to_feature!(self.options, selection_criteria),
-            read_concern: to_feature!(self.options, read_concern),
-            write_concern: Feature::NotSupported,
-            supports_sessions: true,
-            retryability: Retryability::read(options),
-            is_backpressure_retryable: options.retry_reads != Some(false),
-            override_criteria: None,
-            target: (&self.target).into(),
-            is_after_cluster_time_write: false,
-        }
+    fn details(&self) -> OperationDetails {
+        OperationDetails::for_read(
+            &self.target,
+            to_feature!(self.options, selection_criteria),
+            to_feature!(self.options, read_concern),
+        )
     }
 
     fn build(

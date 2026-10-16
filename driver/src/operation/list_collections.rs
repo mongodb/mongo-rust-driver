@@ -7,14 +7,13 @@ use crate::{
     operation::{
         append_options_to_raw_document,
         default_impl,
+        read_retryable,
         Feature,
         Operation,
         OperationDetails,
         ResponseContext,
-        ResponseHandlingKind,
-        Retryability,
     },
-    options::{ClientOptions, ListCollectionsOptions, SelectionCriteria},
+    options::{ListCollectionsOptions, SelectionCriteria},
     Database,
 };
 
@@ -51,20 +50,14 @@ impl Operation for ListCollections {
         update_for_retry,
         pinned_connection
     );
+    read_retryable!();
 
-    fn details(&self, options: &ClientOptions) -> OperationDetails {
-        OperationDetails {
-            response_handling_kind: ResponseHandlingKind::Owned,
-            selection_criteria: Feature::Set(SelectionCriteria::primary()),
-            read_concern: Feature::NotSupported,
-            write_concern: Feature::NotSupported,
-            supports_sessions: true,
-            retryability: Retryability::read(options),
-            is_backpressure_retryable: options.retry_reads != Some(false),
-            override_criteria: None,
-            target: (&self.db).into(),
-            is_after_cluster_time_write: false,
-        }
+    fn details(&self) -> OperationDetails {
+        OperationDetails::for_read(
+            &self.db,
+            Feature::Set(SelectionCriteria::primary()),
+            Feature::NotSupported,
+        )
     }
 
     fn build(

@@ -7,14 +7,11 @@ use crate::{
         append_options_to_raw_document,
         default_impl,
         to_feature,
-        Feature,
         Operation,
         OperationDetails,
         ResponseContext,
-        ResponseHandlingKind,
-        Retryability,
     },
-    options::{ClientOptions, CreateCollectionOptions},
+    options::CreateCollectionOptions,
     Collection,
 };
 
@@ -43,22 +40,13 @@ impl Operation for Create {
         extract_at_cluster_time,
         handle_error,
         update_for_retry,
+        retryability,
+        is_backpressure_retryable,
         pinned_connection
     );
 
-    fn details(&self, _options: &ClientOptions) -> OperationDetails {
-        OperationDetails {
-            response_handling_kind: ResponseHandlingKind::Borrowed,
-            selection_criteria: Feature::NotSupported,
-            read_concern: Feature::NotSupported,
-            write_concern: to_feature!(self.options, write_concern),
-            supports_sessions: true,
-            retryability: Retryability::None,
-            is_backpressure_retryable: false,
-            override_criteria: None,
-            target: (&self.target).into(),
-            is_after_cluster_time_write: true,
-        }
+    fn details(&self) -> OperationDetails {
+        OperationDetails::for_write(&self.target, to_feature!(self.options, write_concern))
     }
 
     fn build(

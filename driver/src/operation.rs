@@ -122,8 +122,6 @@ pub(crate) struct OperationDetails {
     pub(crate) read_concern: Feature<ReadConcern>,
     pub(crate) write_concern: Feature<WriteConcern>,
     pub(crate) supports_sessions: bool,
-    pub(crate) retryability: Retryability,
-    pub(crate) is_backpressure_retryable: bool,
     pub(crate) override_criteria: Option<OverrideCriteriaFn>,
     pub(crate) target: OperationTarget,
     pub(crate) is_after_cluster_time_write: bool,
@@ -138,6 +136,38 @@ pub(crate) enum ResponseHandlingKind {
     Async,
 }
 
+impl OperationDetails {
+    fn for_read(
+        target: impl Into<OperationTarget>,
+        selection_criteria: Feature<SelectionCriteria>,
+        read_concern: Feature<ReadConcern>,
+    ) -> Self {
+        Self {
+            response_handling_kind: ResponseHandlingKind::Owned,
+            selection_criteria,
+            read_concern,
+            write_concern: Feature::NotSupported,
+            supports_sessions: true,
+            override_criteria: None,
+            target: target.into(),
+            is_after_cluster_time_write: false,
+        }
+    }
+
+    fn for_write(target: impl Into<OperationTarget>, write_concern: Feature<WriteConcern>) -> Self {
+        Self {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: Feature::NotSupported,
+            read_concern: Feature::NotSupported,
+            write_concern,
+            supports_sessions: true,
+            override_criteria: None,
+            target: target.into(),
+            is_after_cluster_time_write: true,
+        }
+    }
+}
+
 pub(crate) trait Operation: Send + Sync {
     /// The output type of this operation.
     type O;
@@ -146,7 +176,7 @@ pub(crate) trait Operation: Send + Sync {
     const NAME: &'static CStr;
 
     /// The details associated with the execution of this operation.
-    fn details(&self, options: &ClientOptions) -> OperationDetails;
+    fn details(&self) -> OperationDetails;
 
     fn name(&self) -> &CStr;
 
@@ -207,6 +237,12 @@ pub(crate) trait Operation: Send + Sync {
     /// recovering.
     fn handle_error(&self, error: Error) -> Result<Self::O>;
 
+    /// The level of retryability supported by this operation.
+    fn retryability(&self, options: &ClientOptions) -> Retryability;
+
+    /// Whether this operation is backpressure-retryable.
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool;
+
     /// Updates this operation as needed for a retry.
     fn update_for_retry(&mut self, retry: Option<&Retry>);
 
@@ -228,6 +264,38 @@ pub(crate) fn op_is_commit<T: Operation>(op: &T) -> bool {
 pub(crate) fn op_is_abort<T: Operation>(op: &T) -> bool {
     op.name() == AbortTransaction::NAME
 }
+
+/// Implements the standard methods for a write-retryable operation.
+macro_rules! read_retryable {
+    () => {
+        fn retryability(
+            &self,
+            options: &crate::options::ClientOptions,
+        ) -> crate::operation::Retryability {
+            crate::operation::Retryability::read(options)
+        }
+        fn is_backpressure_retryable(&self, options: &crate::options::ClientOptions) -> bool {
+            self.retryability(options) != crate::operation::Retryability::None
+        }
+    };
+}
+pub(crate) use read_retryable;
+
+/// Implements the standard methods for a write-retryable operation.
+macro_rules! write_retryable {
+    () => {
+        fn retryability(
+            &self,
+            options: &crate::options::ClientOptions,
+        ) -> crate::operation::Retryability {
+            crate::operation::Retryability::write(options)
+        }
+        fn is_backpressure_retryable(&self, options: &crate::options::ClientOptions) -> bool {
+            self.retryability(options) != crate::operation::Retryability::None
+        }
+    };
+}
+pub(crate) use write_retryable;
 
 /// Expands into the default behavior for each specified [Operation] method.
 macro_rules! default_impl {
@@ -263,6 +331,18 @@ macro_rules! default_impl {
         }
         $crate::operation::default_impl!($($rest),*);
     };
+    (retryability $(, $rest:ident)*) => {
+        fn retryability(&self, _: &crate::options::ClientOptions) -> crate::operation::Retryability {
+            crate::operation::Retryability::None
+        }
+        $crate::operation::default_impl!($($rest),*);
+    };
+    (is_backpressure_retryable $(, $rest:ident)*) => {
+        fn is_backpressure_retryable(&self, options: &crate::options::ClientOptions) -> bool {
+            self.retryability(options) != crate::operation::Retryability::None
+        }
+        $crate::operation::default_impl!($($rest),*);
+    }
 }
 pub(crate) use default_impl;
 
@@ -297,6 +377,21 @@ macro_rules! forward_impl {
     ($field:tt, update_for_retry $(, $rest:ident)*) => {
         fn update_for_retry(&mut self, retry: Option<&crate::client::Retry>) {
             self.$field.update_for_retry(retry)
+        }
+        $crate::operation::forward_impl!($field $(, $rest)*);
+    };
+    ($field:tt, retryability $(, $rest:ident)*) => {
+        fn retryability(
+            &self,
+            options: &crate::options::ClientOptions,
+        ) -> crate::operation::Retryability {
+            self.$field.retryability(options)
+        }
+        $crate::operation::forward_impl!($field $(, $rest)*);
+    };
+    ($field:tt, is_backpressure_retryable $(, $rest:ident)*) => {
+        fn is_backpressure_retryable(&self, options: &crate::options::ClientOptions) -> bool {
+            self.$field.is_backpressure_retryable(options)
         }
         $crate::operation::forward_impl!($field $(, $rest)*);
     };

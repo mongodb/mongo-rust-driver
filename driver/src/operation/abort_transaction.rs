@@ -45,7 +45,7 @@ impl Operation for AbortTransaction {
 
     default_impl!(name, extract_at_cluster_time, handle_error);
 
-    fn details(&self, _options: &ClientOptions) -> OperationDetails {
+    fn details(&self) -> OperationDetails {
         OperationDetails {
             response_handling_kind: ResponseHandlingKind::Borrowed,
             selection_criteria: match &self.pinned {
@@ -55,9 +55,6 @@ impl Operation for AbortTransaction {
             read_concern: Feature::NotSupported,
             write_concern: self.write_concern.clone().into(),
             supports_sessions: true,
-            // abortTransaction is retryable regardless of the value of retryWrites
-            retryability: Retryability::Write,
-            is_backpressure_retryable: true,
             override_criteria: None,
             target: OperationTarget::admin(&self.target),
             is_after_cluster_time_write: false,
@@ -93,6 +90,14 @@ impl Operation for AbortTransaction {
             Some(TransactionPin::Connection(h)) => Some(h),
             _ => None,
         }
+    }
+
+    fn retryability(&self, _options: &ClientOptions) -> Retryability {
+        Retryability::Write
+    }
+
+    fn is_backpressure_retryable(&self, _options: &ClientOptions) -> bool {
+        true
     }
 
     fn update_for_retry(&mut self, _retry: Option<&Retry>) {

@@ -11,14 +11,14 @@ use crate::{
         aggregate::Aggregate,
         default_impl,
         forward_impl,
+        read_retryable,
         Operation,
         OperationDetails,
         ResponseContext,
         ResponseHandlingKind,
-        Retryability,
         SingleCursorResult,
     },
-    options::{AggregateOptions, ClientOptions, CountOptions},
+    options::{AggregateOptions, CountOptions},
 };
 
 pub(crate) struct CountDocuments {
@@ -96,13 +96,12 @@ impl Operation for CountDocuments {
     );
 
     default_impl!(handle_error);
+    read_retryable!();
 
-    fn details(&self, options: &ClientOptions) -> OperationDetails {
+    fn details(&self) -> OperationDetails {
         OperationDetails {
             response_handling_kind: ResponseHandlingKind::Borrowed,
-            retryability: Retryability::read(options),
-            is_backpressure_retryable: options.retry_reads != Some(false),
-            ..self.aggregate.details(options)
+            ..self.aggregate.details()
         }
     }
 

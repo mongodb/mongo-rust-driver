@@ -18,7 +18,6 @@ use crate::{
         default_impl,
         run_command::RunCommand,
         to_feature,
-        Feature,
         GetMore,
         Operation,
         OperationDetails,
@@ -57,6 +56,7 @@ where
     inserted_ids: HashMap<usize, Bson>,
     /// The number of writes that were sent to the server. This value is populated in `build`.
     pub(crate) n_attempted: usize,
+    has_multi_op: bool,
     _phantom: PhantomData<R>,
 }
 
@@ -71,6 +71,7 @@ where
         options: Option<&'a BulkWriteOptions>,
     ) -> BulkWrite<'a, R> {
         let encrypted = client.should_auto_encrypt().await;
+        let has_multi_op = models.iter().any(|model| model.multi() == Some(true));
         Self {
             client,
             encrypted,
@@ -79,6 +80,7 @@ where
             options,
             n_attempted: 0,
             inserted_ids: HashMap::new(),
+            has_multi_op,
             _phantom: PhantomData,
         }
     }
@@ -122,7 +124,7 @@ where
                 .session
                 .as_mut()
                 .and_then(|s| s.get_txn_number_for_operation(Retryability::None));
-            let get_more_details = get_more.details(self.client.options());
+            let get_more_details = get_more.details();
             let mut exec_context = ExecutionContext::explicit(context.session.as_deref_mut());
             let get_more_result = self
                 .client
@@ -151,7 +153,7 @@ where
                             None,
                             None,
                         );
-                        let run_command_details = run_command.details(self.client.options());
+                        let run_command_details = run_command.details();
                         let mut exec_context =
                             ExecutionContext::explicit(context.session.as_deref_mut());
                         let _ = self
@@ -374,23 +376,13 @@ where
         pinned_connection
     );
 
-    fn details(&self, options: &ClientOptions) -> OperationDetails {
-        OperationDetails {
-            response_handling_kind: ResponseHandlingKind::Async,
-            selection_criteria: Feature::NotSupported,
-            read_concern: Feature::NotSupported,
-            write_concern: to_feature!(self.options, write_concern),
-            supports_sessions: true,
-            retryability: if self.models.iter().any(|model| model.multi() == Some(true)) {
-                Retryability::None
-            } else {
-                Retryability::write(options)
-            },
-            is_backpressure_retryable: options.retry_writes != Some(false),
-            override_criteria: None,
-            target: OperationTarget::admin(&self.client),
-            is_after_cluster_time_write: true,
-        }
+    fn details(&self) -> OperationDetails {
+        let mut details = OperationDetails::for_write(
+            OperationTarget::admin(&self.client),
+            to_feature!(self.options, write_concern),
+        );
+        details.response_handling_kind = ResponseHandlingKind::Async;
+        details
     }
 
     fn build(
@@ -548,6 +540,18 @@ where
             }
         }
         .boxed()
+    }
+
+    fn retryability(&self, options: &ClientOptions) -> Retryability {
+        if !self.has_multi_op {
+            Retryability::write(options)
+        } else {
+            Retryability::None
+        }
+    }
+
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        options.retry_writes != Some(false)
     }
 
     #[cfg(feature = "opentelemetry")]

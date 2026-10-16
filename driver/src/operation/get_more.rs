@@ -14,8 +14,6 @@ use crate::{
         OperationDetails,
         OperationTarget,
         ResponseContext,
-        ResponseHandlingKind,
-        Retryability,
     },
     options::{ClientOptions, SelectionCriteria},
     results::GetMoreResult,
@@ -59,22 +57,20 @@ impl Operation for GetMore<'_> {
         name,
         extract_at_cluster_time,
         handle_error,
-        update_for_retry
+        update_for_retry,
+        retryability
     );
 
-    fn details(&self, options: &ClientOptions) -> OperationDetails {
-        OperationDetails {
-            response_handling_kind: ResponseHandlingKind::Owned,
-            selection_criteria: Feature::Set(self.selection_criteria.clone()),
-            read_concern: Feature::NotSupported,
-            write_concern: Feature::NotSupported,
-            supports_sessions: true,
-            retryability: Retryability::None,
-            is_backpressure_retryable: options.retry_reads != Some(false),
-            override_criteria: None,
-            target: OperationTarget::Namespace(self.ns.clone()),
-            is_after_cluster_time_write: false,
-        }
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        options.retry_reads != Some(false)
+    }
+
+    fn details(&self) -> OperationDetails {
+        OperationDetails::for_read(
+            OperationTarget::Namespace(self.ns.clone()),
+            Feature::Set(self.selection_criteria.clone()),
+            Feature::NotSupported,
+        )
     }
 
     fn build(

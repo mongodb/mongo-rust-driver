@@ -7,12 +7,9 @@ use crate::{
         append_options_to_raw_document,
         default_impl,
         to_feature,
-        Feature,
         Operation,
         OperationDetails,
         ResponseContext,
-        ResponseHandlingKind,
-        Retryability,
     },
     options::{ClientOptions, DropIndexOptions},
     Collection,
@@ -47,22 +44,16 @@ impl Operation for DropIndexes {
         extract_at_cluster_time,
         handle_error,
         update_for_retry,
+        retryability,
         pinned_connection
     );
 
-    fn details(&self, options: &ClientOptions) -> OperationDetails {
-        OperationDetails {
-            response_handling_kind: ResponseHandlingKind::Borrowed,
-            selection_criteria: Feature::NotSupported,
-            read_concern: Feature::NotSupported,
-            write_concern: to_feature!(self.options, write_concern),
-            supports_sessions: true,
-            retryability: Retryability::None,
-            is_backpressure_retryable: options.retry_writes != Some(false),
-            override_criteria: None,
-            target: (&self.target).into(),
-            is_after_cluster_time_write: true,
-        }
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        options.retry_writes != Some(false)
+    }
+
+    fn details(&self) -> OperationDetails {
+        OperationDetails::for_write(&self.target, to_feature!(self.options, write_concern))
     }
 
     fn build(

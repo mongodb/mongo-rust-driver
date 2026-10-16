@@ -13,7 +13,6 @@ use crate::{
         OperationDetails,
         ResponseContext,
         ResponseHandlingKind,
-        Retryability,
     },
     options::ClientOptions,
     selection_criteria::SelectionCriteria,
@@ -59,9 +58,13 @@ impl Operation for RunCommand<'_> {
     // that should fail loudly if accidentally passed to the server.
     const NAME: &'static CStr = cstr!("$genericRunCommand");
 
-    default_impl!(handle_error, update_for_retry);
+    default_impl!(handle_error, update_for_retry, retryability);
 
-    fn details(&self, options: &ClientOptions) -> OperationDetails {
+    fn is_backpressure_retryable(&self, options: &ClientOptions) -> bool {
+        options.retry_reads != Some(false) && options.retry_writes != Some(false)
+    }
+
+    fn details(&self) -> OperationDetails {
         OperationDetails {
             response_handling_kind: ResponseHandlingKind::Borrowed,
             // Per spec, runCommand MUST ignore any default read preference from client, database
@@ -78,9 +81,6 @@ impl Operation for RunCommand<'_> {
                     !SESSIONS_UNSUPPORTED_COMMANDS.contains(command_name.to_lowercase().as_str())
                 })
                 .unwrap_or(false),
-            retryability: Retryability::None,
-            is_backpressure_retryable: options.retry_reads != Some(false)
-                && options.retry_writes != Some(false),
             override_criteria: None,
             target: (&self.db).into(),
             is_after_cluster_time_write: false,

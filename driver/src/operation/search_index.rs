@@ -11,11 +11,10 @@ use crate::{
         Feature,
         Operation,
         OperationDetails,
+        OperationTarget,
         ResponseContext,
         ResponseHandlingKind,
-        Retryability,
     },
-    options::ClientOptions,
     Collection,
     SearchIndexModel,
 };
@@ -32,6 +31,21 @@ impl CreateSearchIndexes {
     }
 }
 
+impl OperationDetails {
+    fn for_search_index_op(target: impl Into<OperationTarget>) -> Self {
+        Self {
+            response_handling_kind: ResponseHandlingKind::Borrowed,
+            selection_criteria: Feature::NotSupported,
+            read_concern: Feature::NotSupported,
+            write_concern: Feature::NotSupported,
+            supports_sessions: false,
+            override_criteria: None,
+            target: target.into(),
+            is_after_cluster_time_write: false,
+        }
+    }
+}
+
 impl Operation for CreateSearchIndexes {
     type O = Vec<String>;
     const NAME: &'static CStr = cstr!("createSearchIndexes");
@@ -41,22 +55,13 @@ impl Operation for CreateSearchIndexes {
         extract_at_cluster_time,
         handle_error,
         update_for_retry,
+        retryability,
+        is_backpressure_retryable,
         pinned_connection
     );
 
-    fn details(&self, _options: &ClientOptions) -> OperationDetails {
-        OperationDetails {
-            response_handling_kind: ResponseHandlingKind::Borrowed,
-            selection_criteria: Feature::NotSupported,
-            read_concern: Feature::NotSupported,
-            write_concern: Feature::NotSupported,
-            supports_sessions: false,
-            retryability: Retryability::None,
-            is_backpressure_retryable: false,
-            override_criteria: None,
-            target: (&self.target).into(),
-            is_after_cluster_time_write: false,
-        }
+    fn details(&self) -> OperationDetails {
+        OperationDetails::for_search_index_op(&self.target)
     }
 
     fn build(
@@ -133,22 +138,13 @@ impl Operation for UpdateSearchIndex {
         extract_at_cluster_time,
         handle_error,
         update_for_retry,
+        retryability,
+        is_backpressure_retryable,
         pinned_connection
     );
 
-    fn details(&self, _options: &ClientOptions) -> OperationDetails {
-        OperationDetails {
-            response_handling_kind: ResponseHandlingKind::Borrowed,
-            selection_criteria: Feature::NotSupported,
-            read_concern: Feature::NotSupported,
-            write_concern: Feature::NotSupported,
-            supports_sessions: false,
-            retryability: Retryability::None,
-            is_backpressure_retryable: false,
-            override_criteria: None,
-            target: (&self.target).into(),
-            is_after_cluster_time_write: false,
-        }
+    fn details(&self) -> OperationDetails {
+        OperationDetails::for_search_index_op(&self.target)
     }
 
     fn build(
@@ -203,22 +199,13 @@ impl Operation for DropSearchIndex {
         name,
         extract_at_cluster_time,
         update_for_retry,
+        retryability,
+        is_backpressure_retryable,
         pinned_connection
     );
 
-    fn details(&self, _options: &ClientOptions) -> OperationDetails {
-        OperationDetails {
-            response_handling_kind: ResponseHandlingKind::Borrowed,
-            selection_criteria: Feature::NotSupported,
-            read_concern: Feature::NotSupported,
-            write_concern: Feature::NotSupported,
-            supports_sessions: false,
-            retryability: Retryability::None,
-            is_backpressure_retryable: false,
-            override_criteria: None,
-            target: (&self.target).into(),
-            is_after_cluster_time_write: false,
-        }
+    fn details(&self) -> OperationDetails {
+        OperationDetails::for_search_index_op(&self.target)
     }
 
     fn build(

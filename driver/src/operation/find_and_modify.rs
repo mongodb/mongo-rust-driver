@@ -17,15 +17,12 @@ use crate::{
         default_impl,
         find_and_modify::options::Modification,
         to_feature,
-        Feature,
+        write_retryable,
         Operation,
         OperationDetails,
         ResponseContext,
-        ResponseHandlingKind,
-        Retryability,
         UpdateOrReplace,
     },
-    options::ClientOptions,
     Collection,
 };
 
@@ -71,20 +68,10 @@ impl<T: DeserializeOwned> Operation for FindAndModify<T> {
         update_for_retry,
         pinned_connection
     );
+    write_retryable!();
 
-    fn details(&self, options: &ClientOptions) -> OperationDetails {
-        OperationDetails {
-            response_handling_kind: ResponseHandlingKind::Borrowed,
-            selection_criteria: Feature::NotSupported,
-            read_concern: Feature::NotSupported,
-            write_concern: to_feature!(self.options, write_concern),
-            supports_sessions: true,
-            retryability: Retryability::write(options),
-            is_backpressure_retryable: options.retry_writes != Some(false),
-            override_criteria: None,
-            target: (&self.target).into(),
-            is_after_cluster_time_write: true,
-        }
+    fn details(&self) -> OperationDetails {
+        OperationDetails::for_write(&self.target, to_feature!(self.options, write_concern))
     }
 
     fn build(
