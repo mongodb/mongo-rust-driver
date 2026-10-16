@@ -102,7 +102,7 @@ impl Operation for RunCommand<'_> {
             ));
         }
 
-        Ok(Command::from_operation_details(
+        Ok(Command::from_op_details(
             op_details,
             self.name(),
             self.command.clone(),

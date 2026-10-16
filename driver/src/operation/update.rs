@@ -186,11 +186,7 @@ impl Operation for Update {
         body.append(cstr!("updates"), updates);
         body.append(cstr!("ordered"), true); // command monitoring tests expect this (SPEC-1130)
 
-        Ok(Command::from_operation_details(
-            op_details,
-            self.name(),
-            body,
-        ))
+        Ok(Command::from_op_details(op_details, self.name(), body))
     }
 
     fn handle_response<'a>(

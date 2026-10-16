@@ -100,7 +100,7 @@ impl Command {
         }
     }
 
-    pub(crate) fn from_operation_details(
+    pub(crate) fn from_op_details(
         op_details: &OperationDetails,
         op_name: &CStr,
         body: RawDocumentBuf,

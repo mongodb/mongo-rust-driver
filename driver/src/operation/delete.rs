@@ -104,7 +104,7 @@ impl Operation for Delete {
 
         append_options(&mut body, self.options.as_ref())?;
 
-        Ok(Command::from_operation_details(
+        Ok(Command::from_op_details(
             op_details,
             self.name(),
             (&body).try_into()?,

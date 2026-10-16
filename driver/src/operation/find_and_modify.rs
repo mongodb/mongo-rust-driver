@@ -93,11 +93,7 @@ impl<T: DeserializeOwned> Operation for FindAndModify<T> {
 
         append_options_to_raw_document(&mut body, self.options.as_ref())?;
 
-        Ok(Command::from_operation_details(
-            op_details,
-            self.name(),
-            body,
-        ))
+        Ok(Command::from_op_details(op_details, self.name(), body))
     }
 
     fn handle_response<'a>(

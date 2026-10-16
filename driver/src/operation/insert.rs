@@ -143,13 +143,9 @@ impl Operation for Insert<'_> {
         if self.encrypted {
             // Auto-encryption does not support document sequences
             body.append(cstr!("documents"), vec_to_raw_array_buf(docs));
-            Ok(Command::from_operation_details(
-                op_details,
-                self.name(),
-                body,
-            ))
+            Ok(Command::from_op_details(op_details, self.name(), body))
         } else {
-            let mut command = Command::from_operation_details(op_details, self.name(), body);
+            let mut command = Command::from_op_details(op_details, self.name(), body);
             command.add_document_sequence("documents", docs);
             Ok(command)
         }

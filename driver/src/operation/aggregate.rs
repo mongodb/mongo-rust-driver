@@ -111,7 +111,7 @@ impl Operation for Aggregate {
             }
         }
 
-        Ok(Command::from_operation_details(
+        Ok(Command::from_op_details(
             op_details,
             self.name(),
             (&body).try_into()?,

@@ -299,7 +299,7 @@ where
             )));
         }
 
-        let mut command = Command::from_operation_details(op_details, self.name(), command_body);
+        let mut command = Command::from_op_details(op_details, self.name(), command_body);
         namespace_info
             .namespaces
             .add_to_command(NS_INFO, &mut command);

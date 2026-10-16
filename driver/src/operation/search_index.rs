@@ -69,7 +69,7 @@ impl Operation for CreateSearchIndexes {
         _description: &crate::cmap::StreamDescription,
         op_details: &OperationDetails,
     ) -> Result<Command> {
-        Ok(Command::from_operation_details(
+        Ok(Command::from_op_details(
             op_details,
             self.name(),
             rawdoc! {
@@ -153,7 +153,7 @@ impl Operation for UpdateSearchIndex {
         op_details: &OperationDetails,
     ) -> crate::error::Result<crate::cmap::Command> {
         let raw_def: RawDocumentBuf = (&self.definition).try_into()?;
-        Ok(Command::from_operation_details(
+        Ok(Command::from_op_details(
             op_details,
             self.name(),
             rawdoc! {
@@ -213,7 +213,7 @@ impl Operation for DropSearchIndex {
         _description: &crate::cmap::StreamDescription,
         op_details: &OperationDetails,
     ) -> Result<Command> {
-        Ok(Command::from_operation_details(
+        Ok(Command::from_op_details(
             op_details,
             self.name(),
             rawdoc! {

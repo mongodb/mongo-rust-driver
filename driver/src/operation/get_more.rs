@@ -102,11 +102,7 @@ impl Operation for GetMore<'_> {
             body.append(cstr!("comment"), raw_comment);
         }
 
-        Ok(Command::from_operation_details(
-            op_details,
-            self.name(),
-            body,
-        ))
+        Ok(Command::from_op_details(op_details, self.name(), body))
     }
 
     fn handle_response_owned<'a>(
