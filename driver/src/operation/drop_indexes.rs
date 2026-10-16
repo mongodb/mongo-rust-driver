@@ -77,10 +77,10 @@ impl Operation for DropIndexes {
 
     fn handle_response<'a>(
         &'a self,
-        _response: &'a RawCommandResponse,
+        response: &'a RawCommandResponse,
         _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
-        Ok(())
+        response.validate_single_write()
     }
 
     #[cfg(feature = "opentelemetry")]

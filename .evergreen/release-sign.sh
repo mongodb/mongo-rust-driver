@@ -14,7 +14,7 @@ docker run \
   -v $(pwd):$(pwd) \
   -w $(pwd) \
   901841024863.dkr.ecr.us-east-1.amazonaws.com/release-infrastructure/garasign-gpg \
-  /bin/bash -c "gpgloader && gpg --yes -v --armor -o mongodb-${CRATE_VERSION}.sig --detach-sign target/package/mongodb-${CRATE_VERSION}.crate"
+  /bin/bash -c "gpgloader && gpg --yes -v --armor -o mongodb-${CRATE_VERSION}.sig --detach-sign ${CRATE_FILE_DIR}/mongodb-${CRATE_VERSION}.crate"
 
 docker run \
   --env-file=signing-envfile \
@@ -22,4 +22,4 @@ docker run \
   -v $(pwd):$(pwd) \
   -w $(pwd) \
   901841024863.dkr.ecr.us-east-1.amazonaws.com/release-infrastructure/garasign-gpg \
-  /bin/bash -c "gpgloader && gpg --yes -v --armor -o mongodb-internal-macros-${CRATE_VERSION}.sig --detach-sign target/package/mongodb-internal-macros-${CRATE_VERSION}.crate"
+  /bin/bash -c "gpgloader && gpg --yes -v --armor -o mongodb-internal-macros-${CRATE_VERSION}.sig --detach-sign ${CRATE_FILE_DIR}/mongodb-internal-macros-${CRATE_VERSION}.crate"

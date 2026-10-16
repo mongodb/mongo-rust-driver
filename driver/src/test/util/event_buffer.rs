@@ -308,7 +308,7 @@ impl<T: Clone> EventStream<'_, T> {
         .unwrap_or(None)
     }
 
-    /// Get the next unread event for which the provided closure returnes `true`, waiting for new
+    /// Get the next unread event for which the provided closure returns `true`, waiting for new
     /// events to arrive if all current ones have been read.
     pub(crate) async fn next_match<F>(&mut self, timeout: Duration, mut filter: F) -> Option<T>
     where

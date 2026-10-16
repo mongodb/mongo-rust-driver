@@ -183,7 +183,7 @@ tests:
                               ]
                             }
                           }
-                        ]
+                          ]
                         nsInfo: [
                           {
                             "ns": *namespace0
@@ -191,7 +191,7 @@ tests:
                           {
                             "ns": *namespace1
                           }
-                        ]
+                          ]
                   db.mongodb.server_connection_id:
                     $$type: [ int, long ]
                   db.mongodb.driver_connection_id:

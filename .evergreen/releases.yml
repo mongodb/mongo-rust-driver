@@ -1,28 +1,14 @@
-## Testing changes to this file
+## Testing changes to this file:
 #
-# You'll need to know the git tag of the most recent release; call that ${TAG}.
-#
-# The simplest way is to develop changes as a branch from the most recent release;
-# in that case, a release dry-run can be executed via:
-#
-# evergreen patch --path .evergreen/releases.yml \
-#     -t publish-release -v all \
-#     -p mongo-rust-driver-current \
-#     -u --browse \
-#     --param triggered_by_git_tag=${TAG} \
-#     --param DRY_RUN=yes
-#
-# If the changes need to be developed against the main branch, the "fetch tag" func call
-# in the "publish-release" task needs to be commented out before running:
+# 1. Comment out the "fetch tag" func call in the "publish-release" task
+#    (remember to uncomment this before merging!)
+# 2. Start a dry-run release:
 #
 # evergreen patch --path .evergreen/releases.yml \
 #     -t publish-release -v all \
 #     -p mongo-rust-driver \
 #     -u --browse \
-#     --param DRY_RUN=yes \
-#     --param PACKAGE_ONLY=yes
-#
-# Make sure to uncomment the call before merging!
+#     --param DRY_RUN=yes
 
 exec_timeout_secs: 3600
 
@@ -135,7 +121,6 @@ functions:
           - PROJECT_DIRECTORY
           - CARGO_REGISTRY_TOKEN
           - DRY_RUN
-          - PACKAGE_ONLY
         binary: bash
         args:
           - .evergreen/release-danger-do-not-run-manually.sh
@@ -148,8 +133,8 @@ functions:
         product: ${PAPERTRAIL_PRODUCT}
         version: ${CRATE_VERSION}
         filenames:
-          - src/target/package/mongodb-${CRATE_VERSION}.crate
-          - src/macros/target/package/mongodb-internal-macros-${CRATE_VERSION}.crate
+          - src/${CRATE_FILE_DIR}/mongodb-${CRATE_VERSION}.crate
+          - src/${CRATE_FILE_DIR}/mongodb-internal-macros-${CRATE_VERSION}.crate
 
   "sign release":
     - command: ec2.assume_role
@@ -165,6 +150,7 @@ functions:
           - GARASIGN_USERNAME
           - GARASIGN_PASSWORD
           - CRATE_VERSION
+          - CRATE_FILE_DIR
         binary: bash
         args:
           - .evergreen/release-sign.sh

@@ -15,11 +15,7 @@ use crate::{
     gridfs::GridFsBucket,
     runtime,
     sdam::TopologyDescription,
-    test::{
-        spec::unified_runner::{ExpectedEventType, ObserveEvent},
-        util::event_buffer::EventBuffer,
-        Event,
-    },
+    test::{spec::unified_runner::ObserveEvent, util::event_buffer::EventBuffer, Event},
     Client,
     ClientSession,
     Collection,
@@ -66,9 +62,9 @@ pub(crate) struct ClientEntity {
     /// This is None if a `close` operation has been executed for this entity.
     pub(crate) client: Option<Client>,
     pub(crate) topology_id: crate::bson::oid::ObjectId,
-    events: EventBuffer,
-    observe_events: Option<Vec<ObserveEvent>>,
-    ignore_command_names: Option<Vec<String>>,
+    pub(crate) events: EventBuffer,
+    pub(crate) observe_events: Option<Vec<ObserveEvent>>,
+    pub(crate) ignore_command_names: Option<Vec<String>>,
     observe_sensitive_commands: bool,
     #[cfg(feature = "opentelemetry")]
     pub(crate) tracing: Option<crate::otel::testing::ClientTracing>,
@@ -187,32 +183,6 @@ impl ClientEntity {
         }
     }
 
-    /// Gets a list of all of the events of the requested event types that occurred on this client.
-    /// Ignores any event with a name in the ignore list. Also ignores all configureFailPoint
-    /// events.
-    pub(crate) fn get_filtered_events(&self, expected_type: ExpectedEventType) -> Vec<Event> {
-        self.events
-            .all()
-            .into_iter()
-            .filter(|event| {
-                if !expected_type.matches(event) {
-                    return false;
-                }
-                if let Event::Command(cev) = event {
-                    if !self.allow_command_event(cev) {
-                        return false;
-                    }
-                }
-                if let Some(observe_events) = self.observe_events.as_ref() {
-                    if !observe_events.iter().any(|observe| observe.matches(event)) {
-                        return false;
-                    }
-                }
-                true
-            })
-            .collect()
-    }
-
     pub(crate) fn matching_events(
         &self,
         expected: &ExpectedEvent,
@@ -252,7 +222,7 @@ impl ClientEntity {
     }
 
     /// Returns `true` if a given `CommandEvent` is allowed to be observed.
-    fn allow_command_event(&self, event: &CommandEvent) -> bool {
+    pub(crate) fn allow_command_event(&self, event: &CommandEvent) -> bool {
         if event.command_name() == "configureFailPoint" {
             return false;
         }

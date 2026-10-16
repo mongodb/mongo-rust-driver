@@ -356,7 +356,7 @@ impl Error {
     }
 
     /// Gets the code from this error.
-    #[cfg(test)]
+    #[cfg(any(feature = "opentelemetry", test))]
     pub(crate) fn code(&self) -> Option<i32> {
         match self.kind.as_ref() {
             ErrorKind::Command(command_error) => Some(command_error.code),
@@ -1052,7 +1052,7 @@ impl WriteFailure {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(any(feature = "opentelemetry", test))]
     pub(crate) fn code(&self) -> i32 {
         match self {
             Self::WriteConcernError(e) => e.code,
