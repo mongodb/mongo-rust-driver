@@ -7,15 +7,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::common::CursorSpecification,
     error::Result,
-    operation::{
-        append_options,
-        default_impl,
-        forward_impl,
-        Operation,
-        OperationDetails,
-        ResponseContext,
-        ResponseHandlingKind,
-    },
+    operation::prelude::*,
     options::ChangeStreamOptions,
 };
 

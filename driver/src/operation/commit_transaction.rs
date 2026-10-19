@@ -6,16 +6,7 @@ use crate::{
     client::Retry,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{
-        append_options_to_raw_document,
-        default_impl,
-        to_feature,
-        Operation,
-        OperationDetails,
-        OperationTarget,
-        ResponseContext,
-        Retryability,
-    },
+    operation::prelude::*,
     options::{Acknowledgment, ClientOptions, TransactionOptions, WriteConcern},
     Client,
 };

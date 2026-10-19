@@ -8,7 +8,7 @@ use crate::{
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{default_impl, to_feature, Operation, OperationDetails, Retryability},
+    operation::prelude::*,
     options::{ClientOptions, UpdateModifications, UpdateOptions},
     results::UpdateResult,
     Collection,

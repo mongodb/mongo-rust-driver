@@ -3,14 +3,7 @@ use crate::{
     bson_compat::{cstr, CStr},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, Result},
-    operation::{
-        append_options_to_raw_document,
-        default_impl,
-        to_feature,
-        Operation,
-        OperationDetails,
-        ResponseContext,
-    },
+    operation::prelude::*,
     options::DropCollectionOptions,
     Collection,
 };

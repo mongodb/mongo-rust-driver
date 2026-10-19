@@ -66,14 +66,14 @@ pub(crate) use list_indexes::ListIndexes;
 pub(crate) use search_index::{CreateSearchIndexes, DropSearchIndex, UpdateSearchIndex};
 pub(crate) use update::{Update, UpdateOrReplace};
 
-const SERVER_5_0_0_WIRE_VERSION: i32 = 13;
-const SERVER_8_0_0_WIRE_VERSION: i32 = 25;
+pub(crate) const SERVER_5_0_0_WIRE_VERSION: i32 = 13;
+pub(crate) const SERVER_8_0_0_WIRE_VERSION: i32 = 25;
 // The maximum number of bytes that may be included in a write payload when auto-encryption is
 // enabled.
-const MAX_ENCRYPTED_WRITE_SIZE: usize = 2_097_152;
+pub(crate) const MAX_ENCRYPTED_WRITE_SIZE: usize = 2_097_152;
 // The amount of message overhead (OP_MSG bytes and command-agnostic fields) to account for when
 // building a multi-write operation using document sequences.
-const OP_MSG_OVERHEAD_BYTES: usize = 1_000;
+pub(crate) const OP_MSG_OVERHEAD_BYTES: usize = 1_000;
 
 /// Context for handling the response to an operation.
 pub(crate) struct ResponseContext<'a> {
@@ -632,4 +632,31 @@ where
         let mut full_body = FullCursorBody::deserialize(deserializer)?;
         Ok(SingleCursorResult(full_body.cursor.first_batch.pop()))
     }
+}
+
+/// Re-exports of the items that [`Operation`] implementations commonly need.
+pub(crate) mod prelude {
+    pub(crate) use super::{
+        append_options,
+        append_options_to_raw_document,
+        default_impl,
+        forward_impl,
+        read_retryable,
+        to_feature,
+        write_retryable,
+        Feature,
+        GetMore,
+        Operation,
+        OperationDetails,
+        OperationTarget,
+        ResponseContext,
+        ResponseHandlingKind,
+        Retryability,
+        SingleCursorResult,
+        UpdateOrReplace,
+        MAX_ENCRYPTED_WRITE_SIZE,
+        OP_MSG_OVERHEAD_BYTES,
+        SERVER_5_0_0_WIRE_VERSION,
+        SERVER_8_0_0_WIRE_VERSION,
+    };
 }

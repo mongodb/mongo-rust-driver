@@ -1,16 +1,4 @@
-use crate::{
-    bson_compat::CStr,
-    cmap::RawCommandResponse,
-    error::Result,
-    operation::{
-        default_impl,
-        forward_impl,
-        Operation,
-        OperationDetails,
-        ResponseContext,
-        ResponseHandlingKind,
-    },
-};
+use crate::{bson_compat::CStr, cmap::RawCommandResponse, error::Result, operation::prelude::*};
 
 /// Forwards all implementation to the wrapped `Operation`, but returns the response unparsed and
 /// unvalidated as a `RawCommandResponse`.

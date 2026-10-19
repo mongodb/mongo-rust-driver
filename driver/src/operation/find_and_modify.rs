@@ -12,17 +12,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::options::UpdateModifications,
     error::{Error, Result},
-    operation::{
-        append_options_to_raw_document,
-        default_impl,
-        find_and_modify::options::Modification,
-        to_feature,
-        write_retryable,
-        Operation,
-        OperationDetails,
-        ResponseContext,
-        UpdateOrReplace,
-    },
+    operation::{find_and_modify::options::Modification, prelude::*},
     Collection,
 };
 
