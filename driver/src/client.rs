@@ -588,6 +588,13 @@ impl Client {
             .collect()
     }
 
+    /// Sync workers related to this client. When this method completes, the following in-flight
+    /// CMAP events are guaranteed to have been emitted:
+    /// - `PoolCreated`
+    /// - `PoolCleared`
+    /// - `PoolReady`
+    /// - `PoolClosed`
+    /// - `ConnectionCheckedIn`
     #[cfg(test)]
     pub(crate) async fn sync_workers(&self) {
         self.inner.topology.updater().sync_workers().await;

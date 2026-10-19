@@ -147,6 +147,7 @@ async fn snapshot_read_concern() {
         let result = coll.find_one(doc! {}).session(&mut session).await;
         assert!(result.is_ok());
         assert_event_contains_read_concern(&client).await;
+        session.abort_transaction().await.unwrap();
     }
 
     if server_version_lt(4, 9).await {

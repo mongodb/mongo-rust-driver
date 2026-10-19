@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use crate::{
     bson::{doc, Document},
@@ -16,6 +16,7 @@ use crate::{
         topology_is_sharded,
         topology_is_standalone,
         util::fail_point::{FailPoint, FailPointMode},
+        Event,
     },
     Client,
     Namespace,
@@ -281,7 +282,9 @@ async fn cursor_iteration_in_a_transaction() {
 
     let max_bson_object_size = get_max_bson_object_size().await;
 
-    let collection = client.database("db").collection::<Document>("coll");
+    let collection = client
+        .database("db")
+        .collection::<Document>("cursor_iteration_in_a_transaction");
     collection.drop().await.unwrap();
 
     let mut session = client.start_session().await.unwrap();
@@ -313,6 +316,8 @@ async fn cursor_iteration_in_a_transaction() {
 
     let command_started_events = client.events.get_command_started_events(&["getMore"]);
     assert_eq!(command_started_events.len(), 1);
+
+    session.abort_transaction().await.unwrap();
 }
 
 // CRUD prose test 9
@@ -328,13 +333,16 @@ async fn failed_cursor_iteration() {
         options.hosts.drain(1..);
     }
     let client = Client::for_test().options(options).monitor_events().await;
+    let mut stream = client.events.stream_all();
 
     let max_bson_object_size = get_max_bson_object_size().await;
 
     let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(8);
     let _guard = client.enable_fail_point(fail_point).await.unwrap();
 
-    let collection = client.database("db").collection::<Document>("coll");
+    let collection = client
+        .database("db")
+        .collection::<Document>("failed_cursor_iteration");
     collection.drop().await.unwrap();
 
     let models = vec![
@@ -376,8 +384,17 @@ async fn failed_cursor_iteration() {
     let get_more_events = client.events.get_command_started_events(&["getMore"]);
     assert_eq!(get_more_events.len(), 1);
 
-    let kill_cursors_events = client.events.get_command_started_events(&["killCursors"]);
-    assert_eq!(kill_cursors_events.len(), 1);
+    // killCursors is spawned in the background, so give it some time to be observed
+    let kill_cursors_event = stream
+        .next_match(Duration::from_millis(250), |event| match event {
+            Event::Command(event) if event.command_name() == "killCursors" => true,
+            _ => false,
+        })
+        .await;
+    assert!(
+        kill_cursors_event.is_some(),
+        "did not observe killCursors event"
+    );
 }
 
 // CRUD prose test 10 not implemented. The driver does not support unacknowledged writes.
