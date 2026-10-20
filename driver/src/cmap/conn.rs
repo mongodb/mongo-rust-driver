@@ -132,7 +132,13 @@ impl Connection {
 
     pub(crate) fn take(&mut self) -> Self {
         Self {
-            stream: std::mem::replace(&mut self.stream, BufStream::new(AsyncStream::Null)),
+            // The placeholder left behind is never read from or written to, so give it
+            // zero-capacity buffers instead of `BufStream::new`'s default 8 KiB read +
+            // 8 KiB write buffers.
+            stream: std::mem::replace(
+                &mut self.stream,
+                BufStream::with_capacity(0, 0, AsyncStream::Null),
+            ),
             stream_description: self.stream_description.take(),
             address: self.address.clone(),
             id: self.id,
