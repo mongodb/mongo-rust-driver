@@ -332,7 +332,7 @@ impl ServerAddress {
         })
     }
 
-    #[cfg(any(feature = "tracing-unstable", test))]
+    #[cfg(any(feature = "tracing-unstable", feature = "gssapi-auth", test))]
     pub(crate) fn host(&self) -> std::borrow::Cow<'_, str> {
         match self {
             Self::Tcp { host, .. } => std::borrow::Cow::Borrowed(host.as_str()),
