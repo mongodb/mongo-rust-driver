@@ -18,7 +18,10 @@ use crate::{
     cmap::RawCommandResponse,
     options::ServerAddress,
     sdam::TopologyVersion,
-    serde_util::deserialize_duration_option_from_u64_millis,
+    serde_util::{
+        deserialize_document_bypass_extjson,
+        deserialize_duration_option_from_u64_millis,
+    },
 };
 
 pub use bulk_write::{BulkWriteError, PartialBulkWriteResult};
@@ -885,7 +888,11 @@ pub struct WriteConcernError {
     pub message: String,
 
     /// A document identifying the write concern setting related to the error.
-    #[serde(rename = "errInfo")]
+    #[serde(
+        rename = "errInfo",
+        default,
+        deserialize_with = "deserialize_document_bypass_extjson"
+    )]
     pub details: Option<Document>,
 
     /// Labels categorizing the error.
@@ -925,7 +932,11 @@ pub struct WriteError {
 
     /// A document providing more information about the write error (e.g. details
     /// pertaining to document validation).
-    #[serde(rename = "errInfo")]
+    #[serde(
+        rename = "errInfo",
+        default,
+        deserialize_with = "deserialize_document_bypass_extjson"
+    )]
     pub details: Option<Document>,
 }
 
@@ -963,7 +974,11 @@ pub struct IndexedWriteError {
 
     /// A document providing more information about the write error (e.g. details
     /// pertaining to document validation).
-    #[serde(rename = "errInfo")]
+    #[serde(
+        rename = "errInfo",
+        default,
+        deserialize_with = "deserialize_document_bypass_extjson"
+    )]
     pub details: Option<Document>,
 }
 
