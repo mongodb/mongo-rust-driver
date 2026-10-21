@@ -335,7 +335,12 @@ impl ServerAddress {
     pub(crate) fn unparse(&self) -> String {
         match self {
             Self::Tcp { host, port } => {
-                format!("{}:{}", host, port.unwrap_or(DEFAULT_PORT))
+                let port = port.unwrap_or(DEFAULT_PORT);
+                if host.contains(':') {
+                    format!("[{host}]:{port}")
+                } else {
+                    format!("{host}:{port}")
+                }
             }
             #[cfg(unix)]
             Self::Unix { path } => {
@@ -3368,6 +3373,21 @@ mod tests {
 
         let s = conn_str.to_string();
         assert!(s.contains("%2Ftmp%2Fmongodb-27017.sock"), "{s}");
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.host_info, conn_str.host_info);
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_brackets_ipv6_hosts() {
+        let conn_str =
+            ConnectionString::parse("mongodb://[::1]:27018,[fe80::1],host:27019/").unwrap();
+
+        let s = conn_str.to_string();
+        assert!(
+            s.starts_with("mongodb://[::1]:27018,[fe80::1]:27017,host:27019/"),
+            "{s}"
+        );
         let reparsed = ConnectionString::parse(&s).unwrap();
         assert_eq!(reparsed.host_info, conn_str.host_info);
         assert_eq!(reparsed.to_string(), s);
