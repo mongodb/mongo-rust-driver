@@ -948,6 +948,9 @@ where
 /// Contains the options that can be set via a MongoDB connection string.
 ///
 /// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
+///
+/// If values are set that would not be valid to parse from a MongoDB connection string, the output
+/// from the `Display` implementation may fail to parse or parse incorrectly.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1939,7 +1942,7 @@ impl ConnectionString {
     }
 
     /// Un-parses a [`ConnectionString`] struct back into a MongoDB connection string.
-    fn to_uri_str(&self) -> String {
+    fn unparse(&self) -> String {
         let ConnectionString {
             host_info,
             app_name,
@@ -2200,7 +2203,11 @@ impl ConnectionString {
                     "authMechanismProperties",
                     &auth_mechanism_properties
                         .iter()
-                        .map(|(k, v)| format!("{k}:{v}"))
+                        .map(|(k, v)| match v {
+                            // avoid quoting on emitted strings
+                            Bson::String(s) => format!("{k}:{s}"),
+                            _ => format!("{k}:{v}"),
+                        })
                         .collect::<Vec<_>>()
                         .join(","),
                 )
@@ -2913,7 +2920,7 @@ impl<'de> Deserialize<'de> for ConnectionString {
 
 impl Display for ConnectionString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_uri_str())
+        write!(f, "{}", self.unparse())
     }
 }
 
@@ -3401,6 +3408,46 @@ mod tests {
         assert_eq!(credential.password.as_deref(), Some("p:ss/w%rd"));
         assert_eq!(credential.source.as_deref(), Some("a&b"));
         assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_auth_mechanism_properties_unquoted() {
+        let conn_str = ConnectionString::parse(
+            "mongodb://u@localhost/?authMechanism=MONGODB-OIDC&\
+             authMechanismProperties=ENVIRONMENT:azure,TOKEN_RESOURCE:a%3Ab",
+        )
+        .unwrap();
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        let properties = reparsed
+            .credential
+            .as_ref()
+            .and_then(|c| c.mechanism_properties.as_ref())
+            .unwrap();
+        assert_eq!(properties.get_str("ENVIRONMENT").unwrap(), "azure");
+        assert_eq!(properties.get_str("TOKEN_RESOURCE").unwrap(), "a:b");
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn read_preference_tag_value_with_colon() {
+        let conn_str = ConnectionString::parse(
+            "mongodb://localhost/?readPreference=secondary&readPreferenceTags=a:b:c,dc:ny",
+        )
+        .unwrap();
+        let tag_sets = conn_str
+            .read_preference
+            .as_ref()
+            .and_then(|rp| rp.tag_sets())
+            .unwrap();
+        assert_eq!(tag_sets.len(), 1);
+        assert_eq!(tag_sets[0].get("a").map(String::as_str), Some("b:c"));
+        assert_eq!(tag_sets[0].get("dc").map(String::as_str), Some("ny"));
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.read_preference, conn_str.read_preference);
     }
 
     #[test]
