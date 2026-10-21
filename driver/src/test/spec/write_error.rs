@@ -1,5 +1,5 @@
 use crate::{
-    bson::{doc, Document},
+    bson::{doc, Bson, Document},
     error::{ErrorKind, WriteFailure},
     test::{log_uncaptured, server_version_lt},
     Client,
@@ -9,8 +9,7 @@ use crate::{
 #[tokio::test]
 async fn details() {
     if server_version_lt(5, 0).await {
-        // SERVER-58399
-        log_uncaptured("skipping write_error_details test due to server version");
+        log_uncaptured("skipping details: errInfo only reported on 5.0+");
         return;
     }
 
@@ -45,4 +44,33 @@ async fn details() {
             .get_document("errInfo")
             .unwrap()
     );
+}
+
+#[tokio::test]
+async fn details_ext_json() {
+    if server_version_lt(5, 0).await {
+        log_uncaptured("skipping details_ext_json: errInfo only reported on 5.0+");
+        return;
+    }
+
+    let client = Client::for_test().await;
+
+    let db = client.database("db");
+    db.create_collection("details_ext_json")
+        .validator(doc! { "x": { "$type": "string" } })
+        .await
+        .unwrap();
+
+    let coll = db.collection("details_ext_json");
+    let error = coll
+        .insert_one(doc! { "x": { "$numberLong": Bson::Null } })
+        .await
+        .unwrap_err();
+
+    let ErrorKind::Write(WriteFailure::WriteError(write_error)) = *error.kind else {
+        panic!("expected write error, got {error:?}");
+    };
+    let details = write_error.details.unwrap();
+    let considered_value = details["details"]["consideredValue"].as_document().unwrap();
+    assert_eq!(considered_value, &doc! { "$numberLong": Bson::Null });
 }
