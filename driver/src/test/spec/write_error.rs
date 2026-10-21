@@ -1,12 +1,18 @@
 use crate::{
     bson::{doc, Bson, Document},
     error::{ErrorKind, WriteFailure},
+    test::{log_uncaptured, server_version_lt},
     Client,
     Collection,
 };
 
 #[tokio::test]
 async fn details() {
+    if server_version_lt(5, 0).await {
+        log_uncaptured("skipping details: errInfo only reported on 5.0+");
+        return;
+    }
+
     let client = Client::for_test().monitor_events().await;
 
     let db = client.database("write_error_details");
@@ -42,6 +48,11 @@ async fn details() {
 
 #[tokio::test]
 async fn details_ext_json() {
+    if server_version_lt(5, 0).await {
+        log_uncaptured("skipping details_ext_json: errInfo only reported on 5.0+");
+        return;
+    }
+
     let client = Client::for_test().await;
 
     let db = client.database("db");
