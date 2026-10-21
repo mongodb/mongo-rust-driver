@@ -50,6 +50,9 @@ const NO_CHANNEL_BINDING: char = 'n';
 /// The minimum number of iterations of the hash function that we will accept from the server.
 const MIN_ITERATION_COUNT: u32 = 4096;
 
+/// The maximum number of iterations of the hash function that we will accept from the server.
+const MAX_ITERATION_COUNT: u32 = 100_000;
+
 /// Cache of pre-computed salted passwords.
 static CREDENTIAL_CACHE: LazyLock<RwLock<HashMap<CacheEntry, Vec<u8>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
@@ -518,12 +521,17 @@ impl ServerFirst {
                 "SCRAM",
                 "handshake terminated early",
             ))
-        } else if &self.nonce[0..nonce.len()] != nonce {
+        } else if !self.nonce.starts_with(nonce) {
             Err(Error::authentication_error("SCRAM", "mismatched nonce"))
         } else if self.i < MIN_ITERATION_COUNT {
             Err(Error::authentication_error(
                 "SCRAM",
                 "iteration count too low",
+            ))
+        } else if self.i > MAX_ITERATION_COUNT {
+            Err(Error::authentication_error(
+                "SCRAM",
+                "iteration count too high",
             ))
         } else {
             Ok(())
@@ -708,6 +716,25 @@ mod tests {
             i: 4096,
             ..invalid_iteration_count
         };
-        assert!(valid_iteration_count.validate(nonce).is_ok())
+        assert!(valid_iteration_count.validate(nonce).is_ok());
+
+        let too_high = ServerFirst {
+            i: super::MAX_ITERATION_COUNT + 1,
+            ..valid_iteration_count
+        };
+        assert!(too_high.validate(nonce).is_err());
+    }
+
+    #[test]
+    fn test_short_server_nonce() {
+        let short = ServerFirst {
+            conversation_id: Bson::Null,
+            done: false,
+            message: "mocked".to_string(),
+            nonce: "abc".to_string(),
+            salt: Vec::new(),
+            i: 4096,
+        };
+        assert!(short.validate("abcdef").is_err());
     }
 }
