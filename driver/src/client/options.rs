@@ -2610,21 +2610,15 @@ impl ConnectionString {
                 } else {
                     value
                         .split(',')
-                        .map(|tag| {
-                            let mut values = tag.split(':');
-
-                            match (values.next(), values.next()) {
-                                (Some(key), Some(value)) => {
-                                    Ok((key.to_string(), value.to_string()))
-                                }
-                                _ => Err(ErrorKind::InvalidArgument {
-                                    message: format!(
-                                        "'{value}' is not a valid read preference tag (which must \
-                                         be of the form 'key:value'",
-                                    ),
-                                }
-                                .into()),
+                        .map(|tag| match tag.split_once(':') {
+                            Some((key, value)) => Ok((key.to_string(), value.to_string())),
+                            None => Err(ErrorKind::InvalidArgument {
+                                message: format!(
+                                    "'{tag}' is not a valid read preference tag (which must be of \
+                                     the form 'key:value'",
+                                ),
                             }
+                            .into()),
                         })
                         .collect()
                 };
