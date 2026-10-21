@@ -84,6 +84,9 @@ task_groups:
           binary: bash
           env:
             GCPOIDC_VMNAME_PREFIX: "RUST_DRIVER"
+            # Run on the same OS family as the build host.
+            GCPKMS_IMAGEFAMILY: "ubuntu-2404-lts-amd64"
+            GCPKMS_IMAGEPROJECT: "ubuntu-os-cloud"
           args:
             - ${DRIVERS_TOOLS}/.evergreen/auth_oidc/gcp/setup.sh
           include_expansions_in_env:
