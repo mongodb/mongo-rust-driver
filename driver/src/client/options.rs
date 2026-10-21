@@ -332,6 +332,26 @@ impl ServerAddress {
         })
     }
 
+    pub(crate) fn unparse(&self) -> String {
+        match self {
+            Self::Tcp { host, port } => {
+                format!("{}:{}", host, port.unwrap_or(DEFAULT_PORT))
+            }
+            #[cfg(unix)]
+            Self::Unix { path } => {
+                // `parse` identifies socket paths by a literal ".sock" suffix, so the unreserved
+                // characters (including '.') must be left as-is.
+                const UNRESERVED: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
+                    .remove(b'-')
+                    .remove(b'.')
+                    .remove(b'_')
+                    .remove(b'~');
+                percent_encoding::utf8_percent_encode(&path.display().to_string(), UNRESERVED)
+                    .to_string()
+            }
+        }
+    }
+
     #[cfg(any(feature = "tracing-unstable", feature = "gssapi-auth", test))]
     pub(crate) fn host(&self) -> std::borrow::Cow<'_, str> {
         match self {
@@ -1987,7 +2007,7 @@ impl ConnectionString {
             res.push_str(
                 &hosts
                     .iter()
-                    .map(|h| h.to_string())
+                    .map(|h| h.unparse())
                     .collect::<Vec<_>>()
                     .join(","),
             );
@@ -3327,6 +3347,29 @@ mod tests {
         let s = conn_str.to_string();
         let reparsed = ConnectionString::parse(&s).unwrap();
         assert_eq!(reparsed.default_database, conn_str.default_database);
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn to_uri_str_escapes_unix_socket() {
+        let conn_str =
+            ConnectionString::parse("mongodb://localhost:27017,%2Ftmp%2Fmongodb-27017.sock/")
+                .unwrap();
+        let super::HostInfo::HostIdentifiers(hosts) = &conn_str.host_info else {
+            panic!("expected host identifiers");
+        };
+        assert_eq!(
+            hosts[1],
+            ServerAddress::Unix {
+                path: std::path::PathBuf::from("/tmp/mongodb-27017.sock")
+            }
+        );
+
+        let s = conn_str.to_string();
+        assert!(s.contains("%2Ftmp%2Fmongodb-27017.sock"), "{s}");
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.host_info, conn_str.host_info);
         assert_eq!(reparsed.to_string(), s);
     }
 
