@@ -1450,11 +1450,11 @@ impl ClientOptions {
         }
 
         if let Some(heartbeat_frequency) = self.heartbeat_freq {
-            if heartbeat_frequency < self.min_heartbeat_frequency() {
+            if heartbeat_frequency < MIN_HEARTBEAT_FREQUENCY {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
                         "'heartbeat_freq' must be at least {}ms, but {}ms was given",
-                        self.min_heartbeat_frequency().as_millis(),
+                        MIN_HEARTBEAT_FREQUENCY.as_millis(),
                         heartbeat_frequency.as_millis()
                     ),
                 }
@@ -1521,21 +1521,6 @@ impl ClientOptions {
     #[cfg(test)]
     pub(crate) fn test_options_mut(&mut self) -> &mut TestOptions {
         self.test_options.get_or_insert_with(Default::default)
-    }
-
-    pub(crate) fn min_heartbeat_frequency(&self) -> Duration {
-        #[cfg(test)]
-        {
-            self.test_options
-                .as_ref()
-                .and_then(|to| to.min_heartbeat_freq)
-                .unwrap_or(MIN_HEARTBEAT_FREQUENCY)
-        }
-
-        #[cfg(not(test))]
-        {
-            MIN_HEARTBEAT_FREQUENCY
-        }
     }
 
     pub(crate) fn resolver_config(&self) -> Option<&ResolverConfig> {

@@ -6,6 +6,7 @@ use crate::{
     event::{cmap::CmapEvent, sdam::SdamEvent},
     hello::LEGACY_HELLO_COMMAND_NAME,
     runtime,
+    sdam::MIN_HEARTBEAT_FREQUENCY,
     test::{
         get_client_options,
         log_uncaptured,
@@ -24,7 +25,6 @@ use crate::{
 };
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "SERVER-128517"]
 async fn run_unified() {
     // TODO RUST-1222: Unskip this file
     let mut skipped_files = vec!["interruptInUse-pool-clear.json"];
@@ -59,7 +59,6 @@ async fn run_unified() {
 
 /// Streaming protocol prose test 1 from SDAM spec tests.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "SERVER-128517"]
 async fn streaming_min_heartbeat_frequency() {
     if cfg!(target_os = "macos") {
         log_uncaptured("skipping streaming_min_heartbeat_frequency: flaky on macos");
@@ -72,7 +71,7 @@ async fn streaming_min_heartbeat_frequency() {
 
     let buffer = EventBuffer::new();
     let mut options = get_client_options().await.clone();
-    options.heartbeat_freq = Some(Duration::from_millis(500));
+    options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
     options.sdam_event_handler = Some(buffer.handler());
 
     let hosts = options.hosts.clone();
@@ -91,11 +90,10 @@ async fn streaming_min_heartbeat_frequency() {
     for address in hosts {
         let h = buffer.clone();
         tasks.push(runtime::spawn(async move {
-
             let mut event_stream = h.stream();
             for _ in 0..5 {
                 let event = event_stream
-                    .next_match(Duration::from_millis(750), |e| {
+                    .next_match(MIN_HEARTBEAT_FREQUENCY * 2, |e| {
                         matches!(e, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) if e.server_address == address)
                     })
                     .await;

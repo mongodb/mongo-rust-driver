@@ -3,15 +3,14 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::bson::doc;
-
 use crate::{
+    bson::doc,
     client::options::{ClientOptions, ServerAddress},
     cmap::RawCommandResponse,
     error::{Error, ErrorKind},
     event::{cmap::CmapEvent, sdam::SdamEvent},
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
-    sdam::{ServerDescription, Topology},
+    sdam::{ServerDescription, Topology, MIN_HEARTBEAT_FREQUENCY},
     test::{
         fail_command_appname_initial_handshake_supported,
         get_client_options,
@@ -90,7 +89,6 @@ async fn min_heartbeat_frequency() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "SERVER-128517"]
 async fn sdam_pool_management() {
     if cfg!(target_os = "macos") {
         log_uncaptured("skipping sdam_pool_management: flaky on macos");
@@ -105,26 +103,25 @@ async fn sdam_pool_management() {
     options.hosts.drain(1..);
     options.direct_connection = Some(true);
     options.app_name = Some("SDAMPoolManagementTest".to_string());
-    options.heartbeat_freq = Some(Duration::from_millis(50));
+    options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
 
     let client = Client::for_test()
         .options(options)
         .use_single_mongos()
-        .min_heartbeat_freq(Duration::from_millis(50))
         .monitor_events()
         .await;
 
     let mut subscriber = client.events.stream_all();
 
     subscriber
-        .next_match(Duration::from_millis(500), |event| {
+        .next_match(MIN_HEARTBEAT_FREQUENCY * 4, |event| {
             matches!(event, Event::Cmap(CmapEvent::PoolReady(_)))
         })
         .await
         .expect("should see pool ready event");
 
     subscriber
-        .next_match(Duration::from_millis(500), |event| {
+        .next_match(MIN_HEARTBEAT_FREQUENCY * 4, |event| {
             matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)))
         })
         .await
@@ -142,21 +139,37 @@ async fn sdam_pool_management() {
         .await
         .unwrap();
 
-    // Since there is no deterministic ordering, simply collect all the events and check for their
-    // presence.
-    let events = subscriber.collect(Duration::from_secs(1), |_| true).await;
-    assert!(events
-        .iter()
-        .any(|e| matches!(e, Event::Sdam(SdamEvent::ServerHeartbeatFailed(_)))));
-    assert!(events
-        .iter()
-        .any(|e| matches!(e, Event::Cmap(CmapEvent::PoolCleared(_)))));
-    assert!(events
-        .iter()
-        .any(|e| matches!(e, Event::Cmap(CmapEvent::PoolReady(_)))));
-    assert!(events
-        .iter()
-        .any(|e| matches!(e, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)))));
+    // Ordering is nondeterministic, so assert that each expected event was observed.
+    let mut failed_found = false;
+    let mut cleared_found = false;
+    let mut ready_found = false;
+    let mut succeeded_found = false;
+    tokio::time::timeout(MIN_HEARTBEAT_FREQUENCY * 10, async {
+        loop {
+            match subscriber
+                .next(MIN_HEARTBEAT_FREQUENCY * 10)
+                .await
+                .expect("failed to observe event")
+            {
+                Event::Sdam(SdamEvent::ServerHeartbeatFailed(_)) => failed_found = true,
+                Event::Cmap(CmapEvent::PoolCleared(_)) => cleared_found = true,
+                Event::Cmap(CmapEvent::PoolReady(_)) => ready_found = true,
+                Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)) => succeeded_found = true,
+                _ => {}
+            }
+            if failed_found && cleared_found && ready_found && succeeded_found {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap_or_else(|_| {
+        panic!(
+            "failed to observe all expected events: ServerHeartbeatFailed observed: \
+             {failed_found}, PoolCleared observed: {cleared_found}, PoolReady observed: \
+             {ready_found}, ServerHeartbeatSucceeded observed: {succeeded_found}"
+        )
+    });
 }
 
 #[tokio::test(flavor = "multi_thread")]
