@@ -332,6 +332,31 @@ impl ServerAddress {
         })
     }
 
+    pub(crate) fn unparse(&self) -> String {
+        match self {
+            Self::Tcp { host, port } => {
+                let port = port.unwrap_or(DEFAULT_PORT);
+                if host.contains(':') {
+                    format!("[{host}]:{port}")
+                } else {
+                    format!("{host}:{port}")
+                }
+            }
+            #[cfg(unix)]
+            Self::Unix { path } => {
+                // `parse` identifies socket paths by a literal ".sock" suffix, so the unreserved
+                // characters (including '.') must be left as-is.
+                const UNRESERVED: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
+                    .remove(b'-')
+                    .remove(b'.')
+                    .remove(b'_')
+                    .remove(b'~');
+                percent_encoding::utf8_percent_encode(&path.display().to_string(), UNRESERVED)
+                    .to_string()
+            }
+        }
+    }
+
     #[cfg(any(feature = "tracing-unstable", feature = "gssapi-auth", test))]
     pub(crate) fn host(&self) -> std::borrow::Cow<'_, str> {
         match self {
@@ -923,6 +948,9 @@ where
 /// Contains the options that can be set via a MongoDB connection string.
 ///
 /// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
+///
+/// If values are set that would not be valid to parse from a MongoDB connection string, the output
+/// from the `Display` implementation may fail to parse or parse incorrectly.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1914,7 +1942,7 @@ impl ConnectionString {
     }
 
     /// Un-parses a [`ConnectionString`] struct back into a MongoDB connection string.
-    fn to_uri_str(&self) -> String {
+    fn unparse(&self) -> String {
         let ConnectionString {
             host_info,
             app_name,
@@ -1987,7 +2015,7 @@ impl ConnectionString {
             res.push_str(
                 &hosts
                     .iter()
-                    .map(|h| h.to_string())
+                    .map(|h| h.unparse())
                     .collect::<Vec<_>>()
                     .join(","),
             );
@@ -2175,7 +2203,11 @@ impl ConnectionString {
                     "authMechanismProperties",
                     &auth_mechanism_properties
                         .iter()
-                        .map(|(k, v)| format!("{k}:{v}"))
+                        .map(|(k, v)| match v {
+                            // avoid quoting on emitted strings
+                            Bson::String(s) => format!("{k}:{s}"),
+                            _ => format!("{k}:{v}"),
+                        })
                         .collect::<Vec<_>>()
                         .join(","),
                 )
@@ -2585,21 +2617,15 @@ impl ConnectionString {
                 } else {
                     value
                         .split(',')
-                        .map(|tag| {
-                            let mut values = tag.split(':');
-
-                            match (values.next(), values.next()) {
-                                (Some(key), Some(value)) => {
-                                    Ok((key.to_string(), value.to_string()))
-                                }
-                                _ => Err(ErrorKind::InvalidArgument {
-                                    message: format!(
-                                        "'{value}' is not a valid read preference tag (which must \
-                                         be of the form 'key:value'",
-                                    ),
-                                }
-                                .into()),
+                        .map(|tag| match tag.split_once(':') {
+                            Some((key, value)) => Ok((key.to_string(), value.to_string())),
+                            None => Err(ErrorKind::InvalidArgument {
+                                message: format!(
+                                    "'{tag}' is not a valid read preference tag (which must be of \
+                                     the form 'key:value'",
+                                ),
                             }
+                            .into()),
                         })
                         .collect()
                 };
@@ -2894,7 +2920,7 @@ impl<'de> Deserialize<'de> for ConnectionString {
 
 impl Display for ConnectionString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_uri_str())
+        write!(f, "{}", self.unparse())
     }
 }
 
@@ -3330,6 +3356,44 @@ mod tests {
         assert_eq!(reparsed.to_string(), s);
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn to_uri_str_escapes_unix_socket() {
+        let conn_str =
+            ConnectionString::parse("mongodb://localhost:27017,%2Ftmp%2Fmongodb-27017.sock/")
+                .unwrap();
+        let super::HostInfo::HostIdentifiers(hosts) = &conn_str.host_info else {
+            panic!("expected host identifiers");
+        };
+        assert_eq!(
+            hosts[1],
+            ServerAddress::Unix {
+                path: std::path::PathBuf::from("/tmp/mongodb-27017.sock")
+            }
+        );
+
+        let s = conn_str.to_string();
+        assert!(s.contains("%2Ftmp%2Fmongodb-27017.sock"), "{s}");
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.host_info, conn_str.host_info);
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_brackets_ipv6_hosts() {
+        let conn_str =
+            ConnectionString::parse("mongodb://[::1]:27018,[fe80::1],host:27019/").unwrap();
+
+        let s = conn_str.to_string();
+        assert!(
+            s.starts_with("mongodb://[::1]:27018,[fe80::1]:27017,host:27019/"),
+            "{s}"
+        );
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.host_info, conn_str.host_info);
+        assert_eq!(reparsed.to_string(), s);
+    }
+
     #[test]
     fn to_uri_str_escapes_credentials() {
         let conn_str = ConnectionString::parse(
@@ -3344,6 +3408,46 @@ mod tests {
         assert_eq!(credential.password.as_deref(), Some("p:ss/w%rd"));
         assert_eq!(credential.source.as_deref(), Some("a&b"));
         assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_auth_mechanism_properties_unquoted() {
+        let conn_str = ConnectionString::parse(
+            "mongodb://u@localhost/?authMechanism=MONGODB-OIDC&\
+             authMechanismProperties=ENVIRONMENT:azure,TOKEN_RESOURCE:a%3Ab",
+        )
+        .unwrap();
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        let properties = reparsed
+            .credential
+            .as_ref()
+            .and_then(|c| c.mechanism_properties.as_ref())
+            .unwrap();
+        assert_eq!(properties.get_str("ENVIRONMENT").unwrap(), "azure");
+        assert_eq!(properties.get_str("TOKEN_RESOURCE").unwrap(), "a:b");
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn read_preference_tag_value_with_colon() {
+        let conn_str = ConnectionString::parse(
+            "mongodb://localhost/?readPreference=secondary&readPreferenceTags=a:b:c,dc:ny",
+        )
+        .unwrap();
+        let tag_sets = conn_str
+            .read_preference
+            .as_ref()
+            .and_then(|rp| rp.tag_sets())
+            .unwrap();
+        assert_eq!(tag_sets.len(), 1);
+        assert_eq!(tag_sets[0].get("a").map(String::as_str), Some("b:c"));
+        assert_eq!(tag_sets[0].get("dc").map(String::as_str), Some("ny"));
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.read_preference, conn_str.read_preference);
     }
 
     #[test]

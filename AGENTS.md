@@ -27,6 +27,9 @@ The driver provides a lot of optional functionality.  When checking compilation 
 - Run all tests: `cargo nextest run`
 - Run a single test: `cargo nextest run path::to::test_fn`
 
+## Formatting
+The repo uses a rustfmt config that requires nightly; see `.evergreen/check-rustfmt.sh`.
+
 ## Testing
 - A local mongod instance is always available for the tests that need it (most of them).
 - When running unified tests, the runner can be restricted to a single file using the `TEST_FILE` env var (just the filename, no path), or a single test using `TEST_DESCRIPTION`.
