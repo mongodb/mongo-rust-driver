@@ -326,6 +326,16 @@ pub struct DeleteOptions {
     /// information on how to use this option.
     pub collation: Option<Collation>,
 
+    /// The maximum time the server may spend executing the delete, sent as `maxTimeMS` in
+    /// integer milliseconds. Outside a transaction, a timeout can leave some documents deleted.
+    #[serde(
+        default,
+        rename = "maxTimeMS",
+        serialize_with = "serde_util::serialize_duration_option_as_int_millis",
+        deserialize_with = "serde_util::deserialize_duration_option_from_u64_millis"
+    )]
+    pub max_time: Option<Duration>,
+
     /// The write concern for the operation.
     #[serde(skip_serializing)]
     pub write_concern: Option<WriteConcern>,
