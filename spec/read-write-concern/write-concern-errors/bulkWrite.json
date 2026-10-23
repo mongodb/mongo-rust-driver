@@ -23,6 +23,13 @@
       }
     }
   ],
+  "initialData": [
+    {
+      "databaseName": "write-concern-errors-tests",
+      "collectionName": "coll",
+      "documents": []
+    }
+  ],
   "tests": [
     {
       "description": "bulkWrite reports a writeConcernError",

@@ -1,6 +1,6 @@
 description: write-concern-errors-client-bulkWrite
 
-schemaVersion: "1.0"
+schemaVersion: "1.21"
 
 runOnRequirements:
   - minServerVersion: "8.0"
@@ -9,6 +9,11 @@ createEntities:
   - client:
       id: &client0 client0
       useMultipleMongoses: false
+
+initialData:
+  - databaseName: write-concern-errors-tests
+    collectionName: coll
+    documents: []
 
 tests:
   - description: clientBulkWrite reports a writeConcernError
@@ -33,4 +38,5 @@ tests:
                 namespace: write-concern-errors-tests.coll
                 document: { _id: 3, x: 33 }
         expectError:
-          isError: true
+          writeConcernErrors:
+            - code: 79
