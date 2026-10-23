@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::bson::{Bson, Document};
 
 use crate::{

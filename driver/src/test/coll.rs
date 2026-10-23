@@ -6,7 +6,7 @@ use std::sync::LazyLock;
 
 use crate::{
     bson::{doc, rawdoc, serde_helpers::HumanReadable, Bson, Document, RawDocumentBuf},
-    bson_compat::serialize_to_document,
+    bson_compat::{deserialize_from_document, serialize_to_document},
     error::{ErrorKind, Result, WriteFailure, RETRYABLE_WRITE_ERROR},
     options::{
         Acknowledgment,
@@ -168,6 +168,58 @@ async fn update() {
         .unwrap();
     assert_eq!(upsert_results.modified_count, 0);
     assert!(upsert_results.upserted_id.is_some());
+}
+
+#[test]
+fn delete_max_time_options() {
+    for value in [
+        Bson::Int32(0),
+        Bson::Int32(1500),
+        Bson::Int64(i64::from(i32::MAX) + 1),
+    ] {
+        let document = doc! { "maxTimeMS": value };
+        let options: DeleteOptions = deserialize_from_document(document.clone()).unwrap();
+        assert_eq!(serialize_to_document(&options).unwrap(), document);
+    }
+    assert!(!serialize_to_document(&DeleteOptions::default())
+        .unwrap()
+        .contains_key("maxTimeMS"));
+    for value in [Bson::Int32(-1), Bson::String("1500".into())] {
+        assert!(deserialize_from_document::<DeleteOptions>(doc! { "maxTimeMS": value }).is_err());
+    }
+}
+
+#[tokio::test]
+async fn delete_max_time() {
+    let client = Client::for_test().monitor_events().await;
+    let coll = client
+        .init_db_and_coll("delete_max_time", "delete_max_time")
+        .await;
+    for timeout in [None, Some(Duration::from_millis(1500))] {
+        coll.insert_many(vec![doc! { "x": 1 }; 3]).await.unwrap();
+        let mut delete_one = coll.delete_one(doc! {});
+        let mut delete_many = coll.delete_many(doc! {});
+        if let Some(timeout) = timeout {
+            delete_one = delete_one.max_time(timeout);
+            delete_many = delete_many.max_time(timeout);
+        }
+        assert_eq!(delete_one.await.unwrap().deleted_count, 1);
+        assert_eq!(delete_many.await.unwrap().deleted_count, 2);
+    }
+    coll.delete_many(doc! {})
+        .max_time(Duration::MAX)
+        .await
+        .expect_err("out-of-range maxTimeMS fails before sending a command");
+    let events = client.events.get_command_started_events(&["delete"]);
+    assert_eq!(events.len(), 4);
+    for (event, expected) in events.iter().zip([None, None, Some(1500), Some(1500)]) {
+        assert_eq!(event.command.get_i32("maxTimeMS").ok(), expected);
+        let delete = event.command.get_array("deletes").unwrap()[0]
+            .as_document()
+            .unwrap();
+        assert!(!delete.contains_key("maxTimeMS"));
+    }
+    coll.drop().await.unwrap();
 }
 
 #[tokio::test]
