@@ -9,11 +9,18 @@ createEntities:
   - database:
       id: &database0 database0
       client: *client0
-      databaseName: write-concern-errors-tests
+      databaseName: &database_name write-concern-errors-tests
   - collection:
       id: &collection0 collection0
       database: *database0
-      collectionName: coll
+      collectionName: &collection_name coll
+
+initialData:
+  - collectionName: *collection_name
+    databaseName: *database_name
+    documents:
+      - { _id: 1, x: 11 }
+      - { _id: 2, x: 22 }
 
 tests:
   - description: aggregate with $out reports a writeConcernError
