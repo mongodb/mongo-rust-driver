@@ -368,6 +368,10 @@ impl Error {
                 ..
             }) => Some(wc_error.code),
             ErrorKind::Write(e) => Some(e.code()),
+            ErrorKind::Io(e) => e
+                .get_ref()
+                .and_then(|e| e.downcast_ref::<Error>())
+                .and_then(|e| e.code()),
             _ => None,
         }
         .or_else(|| self.source.as_ref().and_then(|s| s.sdam_code()))
