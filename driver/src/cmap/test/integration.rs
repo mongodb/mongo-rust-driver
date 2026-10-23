@@ -6,7 +6,7 @@ use crate::{
     bson::{doc, Document},
     cmap::{
         establish::{ConnectionEstablisher, EstablisherOptions},
-        options::ConnectionPoolOptions,
+        options::{BackgroundThreadInterval, ConnectionPoolOptions},
         Command,
         ConnectionPool,
     },
@@ -82,6 +82,69 @@ async fn acquire_connection_and_send_command() {
 
     assert!(names.iter().any(|name| name == "admin"));
     assert!(names.iter().any(|name| name == "config"));
+}
+
+#[tokio::test]
+async fn cancelled_checkouts_do_not_delay_later_checkouts() {
+    let client_options = get_client_options().await.clone();
+    let buffer = EventBuffer::<CmapEvent>::new();
+    let mut pool_options = ConnectionPoolOptions::from_client_options(&client_options);
+    pool_options.ready = Some(true);
+    pool_options.max_pool_size = Some(1);
+    pool_options.min_pool_size = Some(0);
+    pool_options.cmap_event_handler = Some(buffer.handler());
+    // Disable maintenance so it cannot mask a stalled checkout.
+    pool_options.background_thread_interval = Some(BackgroundThreadInterval::Never);
+
+    let pool = ConnectionPool::new(
+        client_options.hosts[0].clone(),
+        ConnectionEstablisher::new(EstablisherOptions::from(&client_options)).unwrap(),
+        TopologyUpdater::channel().0,
+        Some(pool_options),
+        TopologyShutdown::new(),
+        #[cfg(feature = "tracing-unstable")]
+        crate::bson::oid::ObjectId::new(),
+    );
+
+    // Hold the only connection while the other checkouts time out.
+    let connection = pool.check_out().await.unwrap();
+    let connection_id = connection.id;
+    let num_cancelled = 40;
+    for _ in 0..num_cancelled {
+        tokio::time::timeout(Duration::from_millis(10), pool.check_out())
+            .await
+            .expect_err("checkout should time out while the connection is held");
+    }
+    let events = buffer.all();
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(event, CmapEvent::ConnectionCheckoutStarted(_)))
+            .count(),
+        num_cancelled + 1
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(event, CmapEvent::ConnectionCheckedOut(_)))
+            .count(),
+        1
+    );
+
+    drop(connection);
+    let mut connection = tokio::time::timeout(EVENT_TIMEOUT, pool.check_out())
+        .await
+        .expect("checkout stalled after cancelling earlier waiters")
+        .unwrap();
+    assert_eq!(connection.id, connection_id);
+
+    let mut command = Command::new_raw("ping", "admin", rawdoc! { "ping": 1 });
+    if let Some(server_api) = client_options.server_api.as_ref() {
+        command.set_server_api(server_api);
+    }
+    let response = connection.send_message(command).await.unwrap();
+    let response: CommandResponse<Document> = response.body().unwrap();
+    assert!(response.is_success());
 }
 
 #[tokio::test]
