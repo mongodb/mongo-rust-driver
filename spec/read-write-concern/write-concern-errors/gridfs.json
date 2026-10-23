@@ -1,0 +1,107 @@
+{
+  "description": "write-concern-errors-gridfs",
+  "schemaVersion": "1.0",
+  "createEntities": [
+    {
+      "client": {
+        "id": "client0",
+        "useMultipleMongoses": false
+      }
+    },
+    {
+      "database": {
+        "id": "database0",
+        "client": "client0",
+        "databaseName": "write-concern-errors-tests"
+      }
+    },
+    {
+      "bucket": {
+        "id": "bucket0",
+        "database": "database0"
+      }
+    }
+  ],
+  "tests": [
+    {
+      "description": "upload reports a writeConcernError from a chunk insert",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "client0",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "insert"
+                ],
+                "writeConcernError": {
+                  "code": 79,
+                  "codeName": "UnknownReplWriteConcern"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "upload",
+          "object": "bucket0",
+          "arguments": {
+            "filename": "filename",
+            "source": {
+              "$$hexBytes": "1122334455"
+            }
+          },
+          "expectError": {
+            "errorCode": 79
+          }
+        }
+      ]
+    },
+    {
+      "description": "upload reports a writeConcernError from the files document insert",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "client0",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "skip": 1
+              },
+              "data": {
+                "failCommands": [
+                  "insert"
+                ],
+                "writeConcernError": {
+                  "code": 79,
+                  "codeName": "UnknownReplWriteConcern"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "upload",
+          "object": "bucket0",
+          "arguments": {
+            "filename": "filename",
+            "source": {
+              "$$hexBytes": "1122334455"
+            }
+          },
+          "expectError": {
+            "errorCode": 79
+          }
+        }
+      ]
+    }
+  ]
+}
