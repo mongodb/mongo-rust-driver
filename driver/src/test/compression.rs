@@ -87,10 +87,7 @@ mod contexts {
     #[test]
     fn rejects_output_longer_than_declared() {
         let section = section(10_000, 7);
-        for compressor in compressors()
-            .into_iter()
-            .filter(|compressor| compressor.name() != "snappy")
-        {
+        for compressor in compressors() {
             let compressed = compressor.compress(&[0; 4], &section).unwrap();
             assert!(
                 decompress_message(&compressed, compressor.id(), section.len()).is_err(),
@@ -101,6 +98,24 @@ mod contexts {
                 section.len() + 4
             );
         }
+    }
+
+    #[cfg(feature = "snappy-compression")]
+    #[test]
+    fn rejects_snappy_length_that_differs_from_the_header() {
+        let snappy = Compressor::Snappy;
+        let huge_length_and_no_data = [0xff, 0xff, 0xff, 0xff, 0x0f];
+        assert!(decompress_message(&huge_length_and_no_data, snappy.id(), 10).is_err());
+
+        let compressed = snappy.compress(&[0; 4], &section(100, 5)).unwrap();
+        assert!(decompress_message(&compressed, snappy.id(), 105).is_err());
+        assert!(decompress_message(&compressed, snappy.id(), 103).is_err());
+        assert_eq!(
+            decompress_message(&compressed, snappy.id(), 104)
+                .unwrap()
+                .len(),
+            104
+        );
     }
 
     #[test]

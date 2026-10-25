@@ -24,7 +24,7 @@ pub(crate) fn decompress_message(
 
     #[cfg(feature = "snappy-compression")]
     if compressor_id == super::SNAPPY_COMPRESSOR_ID {
-        return decompress_snappy(message);
+        return decompress_snappy(message, uncompressed_size);
     }
 
     let _ = uncompressed_size;
@@ -101,14 +101,25 @@ fn decompress_zlib(message: &[u8], uncompressed_size: usize) -> Result<Vec<u8>> 
 }
 
 #[cfg(feature = "snappy-compression")]
-fn decompress_snappy(message: &[u8]) -> Result<Vec<u8>> {
-    use snap::raw::Decoder;
+fn decompress_snappy(message: &[u8], uncompressed_size: usize) -> Result<Vec<u8>> {
+    use snap::raw::{decompress_len, Decoder};
 
-    let mut decoder = Decoder::new();
-    decoder.decompress_vec(message).map_err(|error| {
-        ErrorKind::Internal {
-            message: format!("Could not decompress message with snappy: {error}"),
+    let to_error = |error: snap::Error| ErrorKind::Internal {
+        message: format!("Could not decompress message with snappy: {error}"),
+    };
+
+    let snappy_len = decompress_len(message).map_err(to_error)?;
+    if snappy_len != uncompressed_size {
+        return Err(ErrorKind::InvalidResponse {
+            message: format!(
+                "The server's snappy message claims an uncompressed length of {snappy_len}, but \
+                 its header claims {uncompressed_size}"
+            ),
         }
-        .into()
-    })
+        .into());
+    }
+
+    Decoder::new()
+        .decompress_vec(message)
+        .map_err(|error| to_error(error).into())
 }

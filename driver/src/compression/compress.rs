@@ -156,11 +156,18 @@ fn compress_zlib(
 
 #[cfg(feature = "snappy-compression")]
 fn compress_snappy(flag_bytes: &[u8], section_bytes: &[u8]) -> std::io::Result<Vec<u8>> {
+    use std::cell::RefCell;
+
     use snap::raw::Encoder;
 
-    let mut uncompressed = flag_bytes.to_vec();
+    // Kept per thread so that the encoder's hash table is not allocated for every message.
+    thread_local! {
+        static ENCODER: RefCell<Encoder> = RefCell::new(Encoder::new());
+    }
+
+    let mut uncompressed = Vec::with_capacity(flag_bytes.len() + section_bytes.len());
+    uncompressed.extend_from_slice(flag_bytes);
     uncompressed.extend_from_slice(section_bytes);
 
-    let mut encoder = Encoder::new();
-    Ok(encoder.compress_vec(&uncompressed)?)
+    ENCODER.with_borrow_mut(|encoder| Ok(encoder.compress_vec(&uncompressed)?))
 }
