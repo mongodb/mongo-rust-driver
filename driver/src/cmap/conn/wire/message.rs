@@ -136,7 +136,8 @@ impl Message {
             return Self::read_op_msg(reader, &header, length_remaining.get()?).await;
         }
         if header.op_code == OpCode::Compressed {
-            return Self::read_op_compressed(reader, &header, length_remaining.get()?).await;
+            return Self::read_op_compressed(reader, &header, length_remaining.get()?, max_len)
+                .await;
         }
 
         Err(Error::new(
@@ -156,6 +157,7 @@ impl Message {
         reader: T,
         header: &Header,
         length_remaining: usize,
+        max_len: i32,
     ) -> Result<Self> {
         let mut reader = CountReader::new(reader);
 
@@ -171,13 +173,23 @@ impl Message {
             .into());
         }
 
-        let uncompressed_size = Checked::<usize>::try_from(reader.read_i32_le().await?)?;
+        let uncompressed_size = reader.read_i32_le().await?;
+        if uncompressed_size > max_len {
+            return Err(ErrorKind::InvalidResponse {
+                message: format!(
+                    "Uncompressed message length {uncompressed_size} over maximum {max_len}"
+                ),
+            }
+            .into());
+        }
+        let uncompressed_size = Checked::<usize>::try_from(uncompressed_size)?;
         let compressor_id = reader.read_u8().await?;
 
         let mut compressed = vec![0u8; (length_remaining - reader.bytes_read()).get()?];
         reader.read_exact(&mut compressed).await?;
 
-        let decompressed = decompress_message(&compressed, compressor_id)?;
+        let decompressed =
+            decompress_message(&compressed, compressor_id, uncompressed_size.get()?)?;
 
         if decompressed.len() != uncompressed_size.get()? {
             return Err(ErrorKind::InvalidResponse {
