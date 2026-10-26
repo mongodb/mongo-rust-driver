@@ -15,6 +15,7 @@ createEntities:
       database: *database0
       collectionName: &collection_name coll
 
+# Create the database used for mapReduce to avoid a NamespaceNotFound error.
 initialData:
   - collectionName: *collection_name
     databaseName: *database_name

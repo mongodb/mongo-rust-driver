@@ -14,13 +14,6 @@
       }
     }
   ],
-  "initialData": [
-    {
-      "databaseName": "write-concern-errors-tests",
-      "collectionName": "coll",
-      "documents": []
-    }
-  ],
   "tests": [
     {
       "description": "clientBulkWrite reports a writeConcernError",
@@ -56,7 +49,6 @@
                 "insertOne": {
                   "namespace": "write-concern-errors-tests.coll",
                   "document": {
-                    "_id": 3,
                     "x": 33
                   }
                 }

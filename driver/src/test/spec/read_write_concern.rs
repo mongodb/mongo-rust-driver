@@ -10,11 +10,17 @@ async fn operation() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn write_concern_errors() {
+    let mut skipped_files = vec![];
+    if cfg!(not(feature = "in-use-encryption")) {
+        skipped_files.push("client-side-encryption.json");
+    }
+
     run_unified_tests(&["read-write-concern", "write-concern-errors"])
-        // TODO RUST-1441: run this test
-        .skip_files(&["client-side-encryption.json"])
-        // our unified test operation implementation of rename uses run_command, which does not
-        // parse write concern errors
-        .skip_tests(&["rename reports a writeConcernError"])
+        .skip_files(&skipped_files)
+        .skip_tests(&[
+            // our unified test operation implementation of rename uses run_command, which does
+            // not parse write concern errors
+            "rename reports a writeConcernError",
+        ])
         .await;
 }

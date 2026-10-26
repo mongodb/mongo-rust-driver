@@ -10,11 +10,6 @@ createEntities:
       id: &client0 client0
       useMultipleMongoses: false
 
-initialData:
-  - databaseName: write-concern-errors-tests
-    collectionName: coll
-    documents: []
-
 tests:
   - description: clientBulkWrite reports a writeConcernError
     operations:
@@ -36,7 +31,7 @@ tests:
           models:
             - insertOne:
                 namespace: write-concern-errors-tests.coll
-                document: { _id: 3, x: 33 }
+                document: { x: 33 }
         expectError:
           writeConcernErrors:
             - code: 79

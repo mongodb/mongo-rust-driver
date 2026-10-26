@@ -23,22 +23,6 @@
       }
     }
   ],
-  "initialData": [
-    {
-      "collectionName": "coll",
-      "databaseName": "write-concern-errors-tests",
-      "documents": [
-        {
-          "_id": 1,
-          "x": 11
-        },
-        {
-          "_id": 2,
-          "x": 22
-        }
-      ]
-    }
-  ],
   "tests": [
     {
       "description": "insertOne reports a writeConcernError",
@@ -70,7 +54,6 @@
           "object": "collection0",
           "arguments": {
             "document": {
-              "_id": 3,
               "x": 33
             }
           },
@@ -111,11 +94,9 @@
           "arguments": {
             "documents": [
               {
-                "_id": 4,
                 "x": 44
               },
               {
-                "_id": 5,
                 "x": 55
               }
             ]

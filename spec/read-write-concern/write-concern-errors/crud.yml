@@ -9,18 +9,11 @@ createEntities:
   - database:
       id: &database0 database0
       client: *client0
-      databaseName: &database_name write-concern-errors-tests
+      databaseName: write-concern-errors-tests
   - collection:
       id: &collection0 collection0
       database: *database0
-      collectionName: &collection_name coll
-
-initialData:
-  - collectionName: *collection_name
-    databaseName: *database_name
-    documents:
-      - { _id: 1, x: 11 }
-      - { _id: 2, x: 22 }
+      collectionName: coll
 
 tests:
   - description: insertOne reports a writeConcernError
@@ -41,7 +34,7 @@ tests:
       - name: insertOne
         object: *collection0
         arguments:
-          document: { _id: 3, x: 33 }
+          document: { x: 33 }
         expectError: &expect_write_concern_error
           errorCode: 79
 
@@ -52,8 +45,8 @@ tests:
         object: *collection0
         arguments:
           documents:
-            - { _id: 4, x: 44 }
-            - { _id: 5, x: 55 }
+            - { x: 44 }
+            - { x: 55 }
         expectError:
           isError: true
 

@@ -15,12 +15,11 @@ createEntities:
       database: *database0
       collectionName: &collection_name coll
 
+# Create the database used for aggregate to avoid a NamespaceNotFound error.
 initialData:
   - collectionName: *collection_name
     databaseName: *database_name
-    documents:
-      - { _id: 1, x: 11 }
-      - { _id: 2, x: 22 }
+    documents: []
 
 tests:
   - description: aggregate with $out reports a writeConcernError

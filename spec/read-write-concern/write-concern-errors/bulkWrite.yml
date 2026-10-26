@@ -15,11 +15,6 @@ createEntities:
       database: *database0
       collectionName: coll
 
-initialData:
-  - databaseName: write-concern-errors-tests
-    collectionName: coll
-    documents: []
-
 tests:
   - description: bulkWrite reports a writeConcernError
     operations:
@@ -40,6 +35,6 @@ tests:
         arguments:
           requests:
             - insertOne:
-                document: { _id: 3, x: 33 }
+                document: { x: 33 }
         expectError:
           isError: true

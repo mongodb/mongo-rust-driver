@@ -15,11 +15,11 @@ createEntities:
       database: *database0
       collectionName: &collection_name coll
 
+# Create the collection to be renamed to avoid a NamespaceNotFound error.
 initialData:
   - collectionName: *collection_name
     databaseName: *database_name
-    documents:
-      - { _id: 1, x: 11 }
+    documents: []
 
 tests:
   - description: createCollection reports a writeConcernError

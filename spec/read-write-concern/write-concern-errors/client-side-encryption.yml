@@ -49,7 +49,7 @@ tests:
             mode: { times: 1 }
             data:
               failCommands: [ update ]
-              writeConcernError:
+              writeConcernError: &write_concern_error
                 code: 79
                 codeName: UnknownReplWriteConcern
       - name: rewrapManyDataKey
@@ -60,3 +60,70 @@ tests:
             provider: local
         expectError:
           isError: true
+
+  - description: createDataKey reports a writeConcernError
+    operations:
+      - name: failPoint
+        object: testRunner
+        arguments:
+          client: *client0
+          failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+              failCommands: [ insert ]
+              writeConcernError: *write_concern_error
+      - name: createDataKey
+        object: *clientEncryption0
+        arguments:
+          kmsProvider: local
+        expectError: &expect_write_concern_error
+          errorCode: 79
+
+  - description: deleteKey reports a writeConcernError
+    operations:
+      - name: failPoint
+        object: testRunner
+        arguments:
+          client: *client0
+          failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+              failCommands: [ delete ]
+              writeConcernError: *write_concern_error
+      - name: deleteKey
+        object: *clientEncryption0
+        arguments:
+          id: &local_key_id { $binary: { base64: bG9jYWxrZXlsb2NhbGtleQ==, subType: "04" } }
+        expectError: *expect_write_concern_error
+
+  - description: addKeyAltName reports a writeConcernError
+    operations:
+      - &failPoint_findAndModify
+        name: failPoint
+        object: testRunner
+        arguments:
+          client: *client0
+          failPoint:
+            configureFailPoint: failCommand
+            mode: { times: 1 }
+            data:
+              failCommands: [ findAndModify ]
+              writeConcernError: *write_concern_error
+      - name: addKeyAltName
+        object: *clientEncryption0
+        arguments:
+          id: *local_key_id
+          keyAltName: new_key_alt_name
+        expectError: *expect_write_concern_error
+
+  - description: removeKeyAltName reports a writeConcernError
+    operations:
+      - *failPoint_findAndModify
+      - name: removeKeyAltName
+        object: *clientEncryption0
+        arguments:
+          id: *local_key_id
+          keyAltName: local_key
+        expectError: *expect_write_concern_error

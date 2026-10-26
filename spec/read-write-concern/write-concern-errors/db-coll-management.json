@@ -27,12 +27,7 @@
     {
       "collectionName": "coll",
       "databaseName": "write-concern-errors-tests",
-      "documents": [
-        {
-          "_id": 1,
-          "x": 11
-        }
-      ]
+      "documents": []
     }
   ],
   "tests": [

@@ -109,6 +109,171 @@
           }
         }
       ]
+    },
+    {
+      "description": "createDataKey reports a writeConcernError",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "client0",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "insert"
+                ],
+                "writeConcernError": {
+                  "code": 79,
+                  "codeName": "UnknownReplWriteConcern"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "createDataKey",
+          "object": "clientEncryption0",
+          "arguments": {
+            "kmsProvider": "local"
+          },
+          "expectError": {
+            "errorCode": 79
+          }
+        }
+      ]
+    },
+    {
+      "description": "deleteKey reports a writeConcernError",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "client0",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "delete"
+                ],
+                "writeConcernError": {
+                  "code": 79,
+                  "codeName": "UnknownReplWriteConcern"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "deleteKey",
+          "object": "clientEncryption0",
+          "arguments": {
+            "id": {
+              "$binary": {
+                "base64": "bG9jYWxrZXlsb2NhbGtleQ==",
+                "subType": "04"
+              }
+            }
+          },
+          "expectError": {
+            "errorCode": 79
+          }
+        }
+      ]
+    },
+    {
+      "description": "addKeyAltName reports a writeConcernError",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "client0",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "findAndModify"
+                ],
+                "writeConcernError": {
+                  "code": 79,
+                  "codeName": "UnknownReplWriteConcern"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "addKeyAltName",
+          "object": "clientEncryption0",
+          "arguments": {
+            "id": {
+              "$binary": {
+                "base64": "bG9jYWxrZXlsb2NhbGtleQ==",
+                "subType": "04"
+              }
+            },
+            "keyAltName": "new_key_alt_name"
+          },
+          "expectError": {
+            "errorCode": 79
+          }
+        }
+      ]
+    },
+    {
+      "description": "removeKeyAltName reports a writeConcernError",
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "client0",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "findAndModify"
+                ],
+                "writeConcernError": {
+                  "code": 79,
+                  "codeName": "UnknownReplWriteConcern"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "removeKeyAltName",
+          "object": "clientEncryption0",
+          "arguments": {
+            "id": {
+              "$binary": {
+                "base64": "bG9jYWxrZXlsb2NhbGtleQ==",
+                "subType": "04"
+              }
+            },
+            "keyAltName": "local_key"
+          },
+          "expectError": {
+            "errorCode": 79
+          }
+        }
+      ]
     }
   ]
 }
