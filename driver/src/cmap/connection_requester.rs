@@ -109,6 +109,11 @@ impl ConnectionRequest {
     pub(super) fn is_warm_pool(&self) -> bool {
         self.warm_pool
     }
+
+    /// Whether the requester has stopped waiting.
+    pub(super) fn is_abandoned(&self) -> bool {
+        self.sender.is_closed()
+    }
 }
 
 #[derive(Debug)]

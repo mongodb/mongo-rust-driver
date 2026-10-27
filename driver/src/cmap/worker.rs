@@ -1,6 +1,9 @@
 use tokio::sync::broadcast;
 
 #[cfg(test)]
+mod test;
+
+#[cfg(test)]
 use super::options::BackgroundThreadInterval;
 use super::{
     conn::{pooled::PooledConnection, PendingConnection},
@@ -40,6 +43,7 @@ use crate::{
 
 use std::{
     collections::{HashMap, VecDeque},
+    ops::ControlFlow,
     time::{Duration, Instant},
 };
 
@@ -357,9 +361,16 @@ impl ConnectionPoolWorker {
                 }
             }
 
-            if self.can_service_connection_request() {
-                if let Some(request) = self.wait_queue.pop_front() {
-                    self.check_out(request);
+            // Skip cancelled requests without another wake-up.
+            while self.can_service_connection_request() {
+                let Some(request) = self.wait_queue.pop_front() else {
+                    break;
+                };
+                if request.is_abandoned() {
+                    continue;
+                }
+                if self.check_out(request).is_break() {
+                    break;
                 }
             }
         }
@@ -391,11 +402,14 @@ impl ConnectionPoolWorker {
         self.below_max_connections() && self.pending_connection_count < self.max_connecting
     }
 
-    fn check_out(&mut self, request: ConnectionRequest) {
+    /// Returns `Continue` to try the next waiter without another wake-up.
+    fn check_out(&mut self, request: ConnectionRequest) -> ControlFlow<()> {
         if request.is_warm_pool() {
             if self.total_connection_count >= self.min_pool_size.unwrap_or(0) {
-                let _ = request.fulfill(ConnectionRequestResult::PoolWarmed);
-                return;
+                return match request.fulfill(ConnectionRequestResult::PoolWarmed) {
+                    Ok(()) => ControlFlow::Break(()),
+                    Err(_) => ControlFlow::Continue(()),
+                };
             }
         } else {
             // first attempt to check out an available connection
@@ -413,17 +427,7 @@ impl ConnectionPoolWorker {
                 }
 
                 conn.mark_checked_out(self.manager.clone(), self.get_cancellation_receiver());
-                if let Err(request) =
-                    request.fulfill(ConnectionRequestResult::Pooled(Box::new(conn)))
-                {
-                    // checking out thread stopped listening, indicating it hit the WaitQueue
-                    // timeout, so we put connection back into pool.
-                    let mut connection = request.unwrap_pooled_connection();
-                    connection.mark_checked_in();
-                    self.available_connections.push_back(connection);
-                }
-
-                return;
+                return Self::fulfill_checkout(request, conn, &mut self.available_connections);
             }
         }
 
@@ -467,6 +471,23 @@ impl ConnectionPoolWorker {
             // next time a request can be processed.
             self.wait_queue.push_front(request);
         }
+        ControlFlow::Break(())
+    }
+
+    fn fulfill_checkout(
+        request: ConnectionRequest,
+        connection: PooledConnection,
+        available_connections: &mut VecDeque<PooledConnection>,
+    ) -> ControlFlow<()> {
+        if let Err(result) = request.fulfill(ConnectionRequestResult::Pooled(Box::new(connection)))
+        {
+            // The requester cancelled. Return the connection and try the next waiter.
+            let mut connection = result.unwrap_pooled_connection();
+            connection.mark_checked_in();
+            available_connections.push_back(connection);
+            return ControlFlow::Continue(());
+        }
+        ControlFlow::Break(())
     }
 
     fn create_pending_connection(&mut self) -> PendingConnection {
