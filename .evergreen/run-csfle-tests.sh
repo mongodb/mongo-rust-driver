@@ -27,6 +27,7 @@ set +o errexit
 
 TEST_OPTIONS=("--skip" "on_demand_aws::failure" "--skip" "custom_aws_credentials" "--skip" "on_demand_azure::success")
 cargo_test test::csfle
+cargo_test read_write_concern::write_concern_errors
 
 # Unset variables for credential failure tests.
 unset AWS_ACCESS_KEY_ID
