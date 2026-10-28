@@ -19,6 +19,9 @@ createEntities:
         - commandStartedEvent
         - commandSucceededEvent
         - commandFailedEvent
+      uriOptions:
+        appName: "retryableReadHandshakeTest"
+
   - database:
       id: &database database
       client: *client
@@ -70,6 +73,7 @@ tests:
             data:
               failCommands: [ping, saslContinue]
               closeConnection: true
+              appName: "retryableReadHandshakeTest"
       - name: runCommand
         object: *database
         arguments: { commandName: ping, command: { ping: 1 } }
@@ -122,6 +126,7 @@ tests:
             data:
               failCommands: [ping, saslContinue]
               closeConnection: true
+              appName: "retryableReadHandshakeTest"
       - name: runCommand
         object: *database
         arguments: { commandName: ping, command: { ping: 1 } }
