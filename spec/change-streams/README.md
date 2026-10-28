@@ -167,8 +167,7 @@ and sharded clusters unless otherwise specified:
 
 1. `ChangeStream` must continuously track the last seen `resumeToken`
 
-2. `ChangeStream` will throw an exception if the server response is missing the resume token (if wire version is < 8,
-    this is a driver-side error; for 8+, this is a server-side error)
+2. `ChangeStream` will throw an exception if the server response is missing the resume token (a server-side error)
 
 3. After receiving a `resumeToken`, `ChangeStream` will automatically resume one time on a resumable error with the
     initial pipeline and options, except for the addition/update of a `resumeToken`.
@@ -187,8 +186,7 @@ and sharded clusters unless otherwise specified:
 
 8. The `killCursors` command sent during the "Resume Process" must not be allowed to throw an exception.
 
-9. `$changeStream` stage for `ChangeStream` against a server `>=4.0` and `<4.0.7` that has not received any results yet
-    MUST include a `startAtOperationTime` option when resuming a change stream.
+9. **Removed**
 
 10. **Removed**
 
@@ -230,13 +228,11 @@ and sharded clusters unless otherwise specified:
 
 16. **Removed**
 
-17. `$changeStream` stage for `ChangeStream` started with `startAfter` against a server `>=4.1.1` that has not received
-    any results yet MUST include a `startAfter` option and MUST NOT include a `resumeAfter` option when resuming a
-    change stream.
+17. `$changeStream` stage for `ChangeStream` started with `startAfter` that has not received any results yet MUST
+    include a `startAfter` option and MUST NOT include a `resumeAfter` option when resuming a change stream.
 
-18. `$changeStream` stage for `ChangeStream` started with `startAfter` against a server `>=4.1.1` that has received at
-    least one result MUST include a `resumeAfter` option and MUST NOT include a `startAfter` option when resuming a
-    change stream.
+18. `$changeStream` stage for `ChangeStream` started with `startAfter` that has received at least one result MUST
+    include a `resumeAfter` option and MUST NOT include a `startAfter` option when resuming a change stream.
 
 19. Validate that large `ChangeStream` events are split when using `$changeStreamSplitLargeEvent`:
 

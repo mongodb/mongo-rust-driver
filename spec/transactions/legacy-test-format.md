@@ -145,13 +145,13 @@ Each YAML file has the following keys:
 
 ## Use as Integration Tests
 
-Run a MongoDB replica set with a primary, a secondary, and an arbiter, **server version 4.0.0 or later**. (Including a
-secondary ensures that server selection in a transaction works properly. Including an arbiter helps ensure that no new
-bugs have been introduced related to arbiters.)
+Run a MongoDB replica set with a primary, a secondary, and an arbiter. (Including a secondary ensures that server
+selection in a transaction works properly. Including an arbiter helps ensure that no new bugs have been introduced
+related to arbiters.)
 
 A driver that implements support for sharded transactions MUST also run these tests against a MongoDB sharded cluster
-with multiple mongoses and **server version 4.2 or later**. Some tests require initializing the MongoClient with
-multiple mongos seeds to ensures that mongos transaction pinning and the recoveryToken works properly.
+with multiple mongoses. Some tests require initializing the MongoClient with multiple mongos seeds to ensures that
+mongos transaction pinning and the recoveryToken works properly.
 
 Load each YAML (or JSON) file using a Canonical Extended JSON parser.
 
@@ -461,6 +461,8 @@ resolved so that mongos retries this operation transparently. The `distinct` com
 sharded transaction that uses the `dbVersion` concept so it is the only command affected.
 
 ## Changelog
+
+- 2026-06-17: Remove pre-4.2 version references.
 
 - 2024-02-15: Migrated from reStructuredText to Markdown.
 
