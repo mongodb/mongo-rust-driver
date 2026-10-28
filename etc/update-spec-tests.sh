@@ -79,7 +79,11 @@ while IFS=: read -r upstream local_path; do
     while IFS=$'\t' read -r status rel; do
         [ -z "$status" ] && continue
         dest="$local_path/$rel"
-        # Skip changes to files we don't have locally
+        # Ignore deleted files not present locally
+        if [ "$status" = "D" ] && [ ! -e "$dest" ]; then
+            continue
+        fi
+        # Skip but warn about changed files we don't have locally
         if [ "$status" != "A" ] && [ ! -e "$dest" ]; then
             skipped+=("$dest")
             continue
@@ -97,7 +101,7 @@ while IFS=: read -r upstream local_path; do
                  -- "$upstream" "${exclude_args[@]}")
 done < <(mappings)
 
-echo "Upstream: $(git log -1 --format='%h %s' "$tip")"
+echo "Upstream: $(git log -1 --format='mongodb/specifications@%h %s' "$tip")"
 echo "Applied cleanly: $applied files"
 if [ "${#skipped[@]}" -gt 0 ]; then
     echo "Skipped (changed upstream but not present locally): ${#skipped[@]}"
