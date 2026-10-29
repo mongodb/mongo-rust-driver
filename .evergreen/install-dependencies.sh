@@ -51,7 +51,7 @@ for arg; do
     mkdir ${PROJECT_DIRECTORY}/libmongocrypt
     cd ${PROJECT_DIRECTORY}/libmongocrypt
 
-    LIBMONGOCRYPT_TAG="1.20.3"
+    LIBMONGOCRYPT_TAG="1.21.1"
     git clone https://github.com/mongodb/libmongocrypt --depth=1 --branch $LIBMONGOCRYPT_TAG
 
     #mkdir libmongocrypt

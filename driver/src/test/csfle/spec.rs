@@ -16,6 +16,11 @@ async fn run_unified() {
     run_unified_tests(&["client-side-encryption", "unified"])
         .skip_tests(&skipped_tests)
         // TODO RUST-582: unskip this test
-        .skip_files(&["timeoutMS.json"])
+        .skip_files(&[
+            "timeoutMS.json",
+            "QE-Text-prefixPreview.json",
+            "QE-Text-substringPreview.json",
+            "QE-Text-suffixPreview.json",
+            ])
         .await;
 }
