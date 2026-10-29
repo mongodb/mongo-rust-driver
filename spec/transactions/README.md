@@ -86,7 +86,6 @@ these tests do not run against a standalone server.
 ### 1.0 Write concern not inherited from collection object inside transaction.
 
 - Create a MongoClient running against a configured sharded/replica set/load balanced cluster.
-    - transactions require a 4.0+ server when non-sharded and 4.2+ when sharded
 - Start a new session on the client.
 - Start a transaction on the session.
 - Instantiate a collection object in the driver with a default write concern of `{ w: 0 }`.
@@ -98,6 +97,7 @@ these tests do not run against a standalone server.
 
 ## Changelog
 
+- 2026-06-17: Remove pre-4.2 version references.
 - 2025-03-31: Move PoolClearedError tests to its own section.
 - 2025-03-27: Clarify server versions and collection creation for prose test
 - 2024-10-31: Add test for PoolClearedError.

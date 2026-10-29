@@ -19,11 +19,11 @@ client.admin.command('setParameter', 1, minSnapshotHistoryWindowInSeconds=600)
 
 ### Testing against servers that do not support sessions
 
-Since all regular 3.6+ servers support sessions, the prose tests which test for session non-support SHOULD use a
-mongocryptd server as the test server (available with server versions 4.2+); however, if future versions of mongocryptd
-support sessions or if mongocryptd is not a viable option for the driver implementing these tests, another server MAY be
-substituted as long as it does not return a non-null value for `logicalSessionTimeoutMinutes`; in the event that no such
-server is readily available, a mock server may be used as a last resort.
+Since all regular servers support sessions, the prose tests which test for session non-support SHOULD use a mongocryptd
+server as the test server; however, if future versions of mongocryptd support sessions or if mongocryptd is not a viable
+option for the driver implementing these tests, another server MAY be substituted as long as it does not return a
+non-null value for `logicalSessionTimeoutMinutes`; in the event that no such server is readily available, a mock server
+may be used as a last resort.
 
 As part of the test setup for these cases, create a `MongoClient` pointed at the test server with the options specified
 in the test case and verify that the test server does NOT define a value for `logicalSessionTimeoutMinutes` by sending a
@@ -61,8 +61,7 @@ This test applies to drivers with session pools.
 - Register a command-started and a command-succeeded APM listener. If the driver has no APM support, inspect
     commands/replies in another idiomatic way, such as monkey-patching or a mock server.
 - Send a `ping` command to the server with the generic `runCommand` method.
-- Assert that the command passed to the command-started listener includes `$clusterTime` if and only if `maxWireVersion`
-    > = 6.
+- Assert that the command passed to the command-started listener includes `$clusterTime`.
 - Record the `$clusterTime`, if any, in the reply passed to the command-succeeded APM listener.
 - Send another `ping` command.
 - Assert that `$clusterTime` in the command passed to the command-started listener, if any, equals the `$clusterTime` in
@@ -196,12 +195,7 @@ Skip this test if your driver does not allow forking.
     - Drivers MUST assert that the number of allocated sessions is strictly less than the number of concurrent operations
         in every retry of this test. In this instance it would be less than (but NOT equal to) 8.
 
-### 15. `lsid` is added inside `$query` when using OP_QUERY
-
-This test only applies to drivers that have not implemented OP_MSG and still use OP_QUERY.
-
-- For a command to a mongos that includes a readPreference, verify that the `lsid` on query commands is added inside the
-    `$query` field, and NOT as a top-level field.
+### 15. **Removed**
 
 ### 16. Authenticating as a second user after starting a session results in a server error
 
@@ -276,6 +270,8 @@ Snapshot sessions tests require server of version 5.0 or higher and replica set 
 
 ## Changelog
 
+- 2026-06-17: Remove pre-4.2 version references.
+- 2025-12-18: Make snapshot getter prose test optional.
 - 2025-09-25: Added tests for snapshotTime.
 - 2025-02-24: Test drivers do not gossip $clusterTime on SDAM.
 - 2024-05-08: Migrated from reStructuredText to Markdown.

@@ -15,7 +15,7 @@ be manually implemented by each driver.
 Test that `writeConcernError.errInfo` in a command response is propagated as `WriteConcernError.details` (or equivalent)
 in the driver.
 
-Using a 4.0+ server, set the following failpoint:
+Set the following failpoint:
 
 ```javascript
 {

@@ -9,9 +9,7 @@ Several prose tests, which are not easily expressed in YAML, are also presented 
 be manually implemented by each driver.
 
 Tests will require a MongoClient created with options defined in the tests. Integration tests will require a running
-MongoDB cluster with server versions 3.6.0 or later. The `{setFeatureCompatibilityVersion: 3.6}` admin command will also
-need to have been executed to enable support for retryable writes on the cluster. Some tests may have more stringent
-version requirements depending on the fail points used.
+MongoDB cluster. Some tests may have more stringent version requirements depending on the fail points used.
 
 ## Use as Integration Tests
 
@@ -263,6 +261,16 @@ debugger, code coverage tool, etc.
 7. Disable the fail point on `s0`.
 
 ## Changelog
+
+- 2026-06-17: Remove pre-4.2 version references.
+
+- 2026-04-14: Add prose tests for retry behavior when a mix of overload and non-overload errors are encountered.
+
+- 2026-04-02: Fix test for error propagation behavior when multiple errors are encountered.
+
+- 2026-02-17: Fix test for error propagation behavior when multiple errors are encountered.
+
+- 2026-02-03: Add tests for error propagation behavior when multiple errors are encountered.
 
 - 2024-10-29: Convert command construction tests to unified format.
 
