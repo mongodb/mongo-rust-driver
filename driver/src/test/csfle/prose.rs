@@ -2719,35 +2719,13 @@ mod text_indexes_explicit_encryption {
 
     macro_rules! server_check {
         ($name:expr) => {{
-            if server_version_lt(8, 2).await
+            if server_version_lt(9, 0).await
                 || topology_is_standalone().await
-                || mongocrypt_version_lt("1.15.1")
+                || mongocrypt_version_lt("1.21.0")
             {
                 log_uncaptured(format!(
                     "skipping text_indexes_explicit_encryption [{}]: requires non-standalone \
-                     topology, 8.2+, libmongocrypt 1.15.1+",
-                    $name
-                ));
-                return;
-            }
-        }};
-
-        ($name:expr, skip_on_9) => {{
-            server_check!($name);
-            if server_version_gte(9, 0).await {
-                log_uncaptured(format!(
-                    "skipping text_indexes_explicit_encryption [{}]: requires server < 9.0",
-                    $name
-                ));
-                return;
-            }
-        }};
-
-        ($name:expr, requires_9) => {{
-            server_check!($name);
-            if server_version_lt(9, 0).await {
-                log_uncaptured(format!(
-                    "skipping text_indexes_explicit_encryption [{}]: requires server >= 9.0",
+                     topology, 9.0+, libmongocrypt 1.21.0+",
                     $name
                 ));
                 return;
@@ -2756,11 +2734,8 @@ mod text_indexes_explicit_encryption {
     }
 
     const PREFIX_QUERY_TYPE: &str = "prefix";
-    const PREFIX_PREVIEW_QUERY_TYPE: &str = "prefixPreview";
     const SUFFIX_QUERY_TYPE: &str = "suffix";
-    const SUFFIX_PREVIEW_QUERY_TYPE: &str = "suffixPreview";
     const SUBSTRING_QUERY_TYPE: &str = "substring";
-    const SUBSTRING_PREVIEW_QUERY_TYPE: &str = "substringPreview";
 
     fn prefix_filter(prefix: Binary) -> Document {
         doc! { "$expr": { "$encStrStartsWith": { "input": "$encryptedText", "prefix": prefix } } }
@@ -2961,7 +2936,6 @@ mod text_indexes_explicit_encryption {
     #[tokio::test]
     async fn find_prefix_suffix() {
         server_check!("find by prefix/suffix");
-        let server_is_9 = server_version_gte(9, 0).await;
 
         enum QueryKind {
             Prefix,
@@ -3003,20 +2977,12 @@ mod text_indexes_explicit_encryption {
             let (query_type, string_options, filter): (_, _, fn(Binary) -> Document) =
                 match query_kind {
                     QueryKind::Prefix => (
-                        if server_is_9 {
-                            PREFIX_QUERY_TYPE
-                        } else {
-                            PREFIX_PREVIEW_QUERY_TYPE
-                        },
+                        PREFIX_QUERY_TYPE,
                         string_prefix_options.clone(),
                         prefix_filter,
                     ),
                     QueryKind::Suffix => (
-                        if server_is_9 {
-                            SUFFIX_QUERY_TYPE
-                        } else {
-                            SUFFIX_PREVIEW_QUERY_TYPE
-                        },
+                        SUFFIX_QUERY_TYPE,
                         string_suffix_options.clone(),
                         suffix_filter,
                     ),
@@ -3037,14 +3003,9 @@ mod text_indexes_explicit_encryption {
                 .await
                 .unwrap();
 
-            let coll_name = if server_is_9 {
-                "prefix-suffix"
-            } else {
-                "prefix-suffix-preview"
-            };
             let actual = explicit_encrypted_client
                 .database("db")
-                .collection::<Document>(coll_name)
+                .collection::<Document>("prefix-suffix")
                 .find_one(filter(encrypted_query))
                 .projection(doc! { "__safeContent__": 0 })
                 .await
@@ -3056,12 +3017,6 @@ mod text_indexes_explicit_encryption {
     #[tokio::test]
     async fn find_substring() {
         server_check!("find by substring");
-        let (query_type, collection) = if server_version_gte(9, 0).await {
-            (SUBSTRING_QUERY_TYPE, "substring")
-        } else {
-            (SUBSTRING_PREVIEW_QUERY_TYPE, "substring-preview")
-        };
-
         let string_substring_options = StringOptions::builder()
             .case_sensitive(true)
             .diacritic_sensitive(true)
@@ -3090,7 +3045,7 @@ mod text_indexes_explicit_encryption {
 
             let substring = client_encryption
                 .encrypt(query, key1_id, Algorithm::String)
-                .query_type(query_type)
+                .query_type(SUBSTRING_QUERY_TYPE)
                 .contention_factor(0)
                 .string_options(string_substring_options.clone())
                 .await
@@ -3098,7 +3053,7 @@ mod text_indexes_explicit_encryption {
 
             let actual = explicit_encrypted_client
                 .database("db")
-                .collection::<Document>(collection)
+                .collection::<Document>("substring")
                 .find_one(substring_filter(substring))
                 .projection(doc! { "__safeContent__": 0 })
                 .await
@@ -3110,7 +3065,7 @@ mod text_indexes_explicit_encryption {
     // Case 7: assert contentionFactor is required
     #[tokio::test]
     async fn contention_factor_required() {
-        server_check!("assert contentionFactor is required", requires_9);
+        server_check!("assert contentionFactor is required");
 
         let Setup {
             client_encryption,
@@ -3144,7 +3099,7 @@ mod text_indexes_explicit_encryption {
 
     #[tokio::test]
     async fn insensitive_prefix_suffix() {
-        server_check!("insensitive prefix/suffix", requires_9);
+        server_check!("insensitive prefix/suffix");
 
         let insensitive_prefix_options = StringOptions::builder()
             .case_sensitive(false)
@@ -3232,7 +3187,7 @@ mod text_indexes_explicit_encryption {
 
     #[tokio::test]
     async fn insensitive_substring() {
-        server_check!("insensitive substring", requires_9);
+        server_check!("insensitive substring");
 
         let insensitive_substring_options = StringOptions::builder()
             .case_sensitive(false)
