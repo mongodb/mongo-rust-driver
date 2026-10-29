@@ -241,7 +241,7 @@ async fn list_database_names() {
     let new_dbs = client.list_database_names().await.unwrap();
 
     for name in expected_dbs {
-        assert_eq!(new_dbs.iter().filter(|db_name| db_name == &name).count(), 1);
+        assert_eq!(new_dbs.iter().filter(|db_name| db_name == name).count(), 1);
     }
 }
 

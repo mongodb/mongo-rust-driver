@@ -123,7 +123,7 @@ async fn search_index_create_multiple() {
 
     let indexes = wait_for_search_indexes(&coll0, |indexes| {
         for name in names {
-            if !indexes.iter().any(|index| name_matches(&index, name)) {
+            if !indexes.iter().any(|index| name_matches(index, name)) {
                 return false;
             }
         }

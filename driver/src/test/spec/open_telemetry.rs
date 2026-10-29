@@ -65,7 +65,7 @@ async fn with_transaction_get_more_nests() {
                 .batch_size(2)
                 .await?;
             let mut stream = cursor.stream(session);
-            while let Some(_) = stream.next().await {}
+            while stream.next().await.is_some() {}
 
             Ok(())
         })
@@ -122,7 +122,7 @@ async fn get_more_cursor_id() {
 
     // 4. Iterate the cursor until it is exhausted. This sends exactly one getMore, and the server's
     //    reply to that getMore returns a cursor id of 0.
-    while let Some(_) = cursor.next().await {}
+    while cursor.next().await.is_some() {}
 
     // 5. Assert that both the getMore operation span and the getMore command span have a
     //    db.mongodb.cursor_id attribute whose value equals the cursor id recorded in step 3.

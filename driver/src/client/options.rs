@@ -501,6 +501,9 @@ impl Socks5Proxy {
     }
 }
 
+/// A custom callback to perform SRV domain name validation.
+pub type SrvHostValidator = Arc<dyn Fn(&str) -> bool + Send + Sync>;
+
 /// Contains the options that can be used to create a new [`Client`](../struct.Client.html).
 #[derive(Clone, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
@@ -683,7 +686,7 @@ pub struct ClientOptions {
     /// the default SRV domain name validation can create vulnerabilities.
     #[serde(skip)]
     #[derive_where(skip)]
-    pub srv_host_validator: Option<Arc<dyn Fn(&str) -> bool + Send + Sync>>,
+    pub srv_host_validator: Option<SrvHostValidator>,
 
     /// The TLS configuration for the Client to use in its connections with the server.
     ///
@@ -2009,7 +2012,7 @@ impl ConnectionString {
         res.push('/');
 
         if let Some(authdb) = default_database {
-            res.push_str(&percent_encode(&authdb));
+            res.push_str(&percent_encode(authdb));
         }
 
         if let Some(replica_set) = replica_set {
@@ -2028,7 +2031,7 @@ impl ConnectionString {
                     if let Some(cert_key_file_path) = &options.cert_key_file_path {
                         opts.push_str(
                             "tlsCertificateKeyFile",
-                            &cert_key_file_path.to_str().unwrap(),
+                            cert_key_file_path.to_str().unwrap(),
                         );
                     }
 
@@ -2038,7 +2041,7 @@ impl ConnectionString {
                     {
                         opts.push_str(
                             "tlsCertificateKeyFilePassword",
-                            &std::str::from_utf8(tls_certificate_key_file_password).unwrap(),
+                            std::str::from_utf8(tls_certificate_key_file_password).unwrap(),
                         );
                     }
 

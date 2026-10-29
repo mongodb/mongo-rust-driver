@@ -19,12 +19,12 @@ async fn run_test(canonicalize_host_name: Option<&str>) {
     }
 
     #[cfg(not(target_os = "windows"))]
-    let auth = percent_encode(&*PRINCIPAL);
+    let auth = percent_encode(&PRINCIPAL);
     #[cfg(target_os = "windows")]
     let auth = format!(
         "{}:{}",
-        percent_encode(&*PRINCIPAL),
-        percent_encode(&*SASL_PASS)
+        percent_encode(&PRINCIPAL),
+        percent_encode(&SASL_PASS)
     );
     let mut uri = format!(
         "mongodb://{auth}@{}:{}/{}?authMechanism=GSSAPI",
@@ -37,7 +37,7 @@ async fn run_test(canonicalize_host_name: Option<&str>) {
 
     let client = Client::with_uri_str(uri).await.unwrap();
     client
-        .database(&*GSSAPI_DB)
+        .database(&GSSAPI_DB)
         .collection::<Document>("test")
         .find_one(doc! {})
         .await
@@ -73,7 +73,7 @@ async fn bad_user() {
     let client = Client::with_uri_str(uri).await.unwrap();
 
     let error = client
-        .database(&*GSSAPI_DB)
+        .database(&GSSAPI_DB)
         .collection::<Document>("test")
         .find_one(doc! {})
         .await

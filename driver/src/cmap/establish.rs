@@ -118,7 +118,7 @@ impl ConnectionEstablisher {
         &self,
         mut pending_connection: PendingConnection,
         credential: Option<&Credential>,
-    ) -> std::result::Result<PooledConnection, EstablishError> {
+    ) -> std::result::Result<PooledConnection, Box<EstablishError>> {
         let pool_gen = pending_connection.generation.clone();
         let address = pending_connection.address.clone();
         let cancellation_receiver = pending_connection.cancellation_receiver.take();
@@ -154,7 +154,7 @@ impl ConnectionEstablisher {
                 // If the handshake succeeded and there isn't a service id, return a special error.
                 // If the handshake failed, just return the error from that instead.
                 if handshake_result.is_ok() {
-                    return Err(EstablishError::post_hello(
+                    return Err(Box::new(EstablishError::post_hello(
                         ErrorKind::IncompatibleServer {
                             message: "Driver attempted to initialize in load balancing mode, but \
                                       the server does not support this mode."
@@ -162,7 +162,7 @@ impl ConnectionEstablisher {
                         }
                         .into(),
                         connection.generation,
-                    ));
+                    )));
                 }
             }
         }

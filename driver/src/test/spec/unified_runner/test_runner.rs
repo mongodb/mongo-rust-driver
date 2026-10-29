@@ -238,8 +238,8 @@ impl TestRunner {
             // committed/aborted.
             let entities = self.entities.read().await;
             let lsids = entities
-                .iter()
-                .filter_map(|(_, entity)| match entity {
+                .values()
+                .filter_map(|entity| match entity {
                     Entity::Session(session) => Some(&session.lsid),
                     _ => None,
                 })

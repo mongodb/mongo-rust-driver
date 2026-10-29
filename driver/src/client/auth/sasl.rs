@@ -142,10 +142,14 @@ impl SaslResponse {
             .and_then(|b| b.as_bool())
             .ok_or_else(|| Error::invalid_authentication_response(auth_mechanism))?;
         let payload = response
-            .get_binary_generic_mut("payload")
-            .map_err(|_| Error::invalid_authentication_response(auth_mechanism))?
-            .drain(..)
-            .collect();
+            .remove("payload")
+            .and_then(|b| match b {
+                Bson::Binary(binary) if binary.subtype == BinarySubtype::Generic => {
+                    Some(binary.bytes)
+                }
+                _ => None,
+            })
+            .ok_or_else(|| Error::invalid_authentication_response(auth_mechanism))?;
 
         Ok(SaslResponse {
             conversation_id,
