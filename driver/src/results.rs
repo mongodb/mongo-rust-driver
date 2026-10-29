@@ -37,7 +37,7 @@ impl InsertOneResult {
 
 /// The result of a [`Collection::insert_many`](../struct.Collection.html#method.insert_many)
 /// operation.
-#[derive(Debug, Serialize, Default)]
+#[derive(Clone, Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct InsertManyResult {
