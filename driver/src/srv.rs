@@ -1,11 +1,11 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 #[cfg(feature = "dns-resolver")]
 use crate::error::{ErrorKind, Redact};
 use crate::{
     client::options::ResolverConfig,
     error::Result,
-    options::{ClientOptions, ServerAddress},
+    options::{ClientOptions, ServerAddress, SrvHostValidator},
 };
 #[cfg(feature = "dns-resolver")]
 use hickory_proto::rr::RData;
@@ -159,7 +159,7 @@ pub(crate) struct SrvResolver {
 pub(crate) struct SrvResolverOptions {
     pub(crate) srv_service_name: Option<String>,
     #[cfg_attr(not(feature = "dns-resolver"), expect(unused))]
-    pub(crate) srv_host_validator: Option<Arc<dyn Fn(&str) -> bool + Send + Sync>>,
+    pub(crate) srv_host_validator: Option<SrvHostValidator>,
 }
 
 impl std::fmt::Debug for SrvResolverOptions {

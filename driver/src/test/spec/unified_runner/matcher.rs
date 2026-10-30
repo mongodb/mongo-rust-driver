@@ -115,15 +115,16 @@ pub(crate) fn tracing_events_match(
                             match code.parse::<u32>() {
                                 Ok(code) => {
                                     if code == 0 {
-                                        return Err(format! {
+                                        return Err(format!(
                                             "Expected a non-zero error code, but got {code}",
-                                        });
+                                        ));
                                     }
                                 }
                                 Err(err) => {
-                                    return Err(format! {
-                                        "Expected error code {code} to be parseable to a u32 but was not; got error {err:?}",
-                                    })
+                                    return Err(format!(
+                                        "Expected error code {code} to be parseable to a u32 but \
+                                         was not; got error {err:?}",
+                                    ))
                                 }
                             }
 
@@ -132,15 +133,16 @@ pub(crate) fn tracing_events_match(
                             // does not contain `REDACTED`" to mean
                             // unredacted)
                             if codename.is_empty() {
-                                return Err(format! {
+                                return Err(format!(
                                     "Expected a non-empty error codename, but got {codename}",
-                                });
+                                ));
                             }
 
                             if codename.contains("REDACTED") {
-                                return Err(format! {
-                                    "Expected error codename to not be redacted, but got {codename}",
-                                });
+                                return Err(format!(
+                                    "Expected error codename to not be redacted, but got \
+                                     {codename}",
+                                ));
                             }
 
                             // note: we can't really assert on error labels being redacted here
@@ -151,20 +153,23 @@ pub(crate) fn tracing_events_match(
                             let errmsg = captures.name("message").unwrap().as_str();
 
                             if failure_should_be_redacted && errmsg != "REDACTED" {
-                                return Err(format! {
-                                    "Expected command error message to be redacted, but was not; got message {errmsg}",
-                                });
+                                return Err(format!(
+                                    "Expected command error message to be redacted, but was not; \
+                                     got message {errmsg}",
+                                ));
                             } else if !failure_should_be_redacted && errmsg.contains("REDACTED") {
-                                return Err(format! {
-                                    "Expected command error message to not be redacted, but was; got message {errmsg}",
-                                });
+                                return Err(format!(
+                                    "Expected command error message to not be redacted, but was; \
+                                     got message {errmsg}",
+                                ));
                             }
                         } else if let Some(captures) = IO_ERROR_REGEX.captures(failure_str) {
                             let message = captures.name("message").unwrap().as_str();
                             if message.is_empty() || message.contains("REDACTED") {
-                                return Err(format! {
-                                    "Expected I/O error message to not be redacted, but was; got message {message}",
-                                });
+                                return Err(format!(
+                                    "Expected I/O error message to not be redacted, but was; got \
+                                     message {message}",
+                                ));
                             }
                         }
                     }
