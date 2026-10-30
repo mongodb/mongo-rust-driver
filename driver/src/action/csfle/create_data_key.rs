@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use macro_magic::export_tokens;
 
 use crate::{
@@ -35,7 +37,7 @@ pub struct CreateDataKey<'a> {
 }
 
 /// Options for creating a data key.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 #[non_exhaustive]
 #[export_tokens]
 pub struct DataKeyOptions {
@@ -45,6 +47,22 @@ pub struct DataKeyOptions {
     /// created.  If unset, key material for the new data key is generated from a cryptographically
     /// secure random device.
     pub key_material: Option<Vec<u8>>,
+}
+
+impl Debug for DataKeyOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let DataKeyOptions {
+            key_alt_names,
+            key_material,
+        } = self;
+        f.debug_struct("DataKeyOptions")
+            .field("key_alt_names", key_alt_names)
+            .field(
+                "key_material",
+                &key_material.is_some().then_some("REDACTED"),
+            )
+            .finish()
+    }
 }
 
 #[option_setters(DataKeyOptions)]
