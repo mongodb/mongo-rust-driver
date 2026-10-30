@@ -114,10 +114,10 @@ buildvariants:
       - name: .replicaset !.4.4 !.5.0
       - name: .sharded !.4.4 !.5.0
 
-  - name: macos-14.00
-    display_name: "MacOS 14.00"
+  - name: macos-15
+    display_name: "MacOS 15"
     run_on:
-      - macos-14
+      - macos-15-amd64
     expansions:
       AUTH: auth
       SSL: ssl
@@ -169,7 +169,7 @@ buildvariants:
     display_name: "OpenSSL (MacOS)"
     patchable: false
     run_on:
-      - macos-14
+      - macos-15-amd64
     expansions:
       OPENSSL: true
       AUTH: auth
@@ -303,7 +303,7 @@ buildvariants:
     patchable: false
     disable: true
     run_on:
-      - macos-14
+      - macos-15-amd64
     tasks:
       - test-gssapi-auth
 
@@ -354,7 +354,7 @@ buildvariants:
     display_name: "OIDC MacOS"
     patchable: true
     run_on:
-      - macos-14
+      - macos-15-amd64
     expansions:
       AUTH: auth
       SSL: ssl
@@ -442,7 +442,7 @@ buildvariants:
     display_name: "Happy Eyeballs (MacOS)"
     patchable: false
     run_on:
-      - macos-14
+      - macos-15-amd64
     tasks:
       - happy-eyeballs-task-group
 
