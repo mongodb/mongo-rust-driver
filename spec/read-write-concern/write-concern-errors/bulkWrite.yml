@@ -30,6 +30,7 @@ tests:
               writeConcernError:
                 code: 79
                 codeName: UnknownReplWriteConcern
+                errmsg: "Triggered by failpoint"
       - name: bulkWrite
         object: *collection0
         arguments:

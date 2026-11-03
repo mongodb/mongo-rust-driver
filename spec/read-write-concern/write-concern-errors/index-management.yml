@@ -30,6 +30,7 @@ tests:
               writeConcernError: &write_concern_error
                 code: 79
                 codeName: UnknownReplWriteConcern
+                errmsg: "Triggered by failpoint"
       - name: createIndex
         object: *collection0
         arguments:
