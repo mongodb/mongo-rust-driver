@@ -642,15 +642,6 @@ impl Client {
             let mut message = Message::try_from(cmd)?;
             message.request_id = Some(request_id);
 
-            #[cfg(feature = "opentelemetry")]
-            let span = self.start_command_span(
-                op,
-                &connection_info,
-                connection.stream_description()?,
-                &message,
-                cmd_attrs,
-            );
-
             #[cfg(feature = "in-use-encryption")]
             {
                 let guard = self.inner.csfle.read().await;
@@ -663,6 +654,15 @@ impl Client {
                     }
                 }
             }
+
+            #[cfg(feature = "opentelemetry")]
+            let span = self.start_command_span(
+                op,
+                &connection_info,
+                connection.stream_description()?,
+                &message,
+                cmd_attrs,
+            );
 
             self.emit_command_event(|| {
                 let command_body = if should_redact {

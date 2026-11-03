@@ -18,7 +18,7 @@ use crate::{
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ObserveTracingMessages {
-    enable_command_payload: Option<bool>,
+    pub(crate) enable_command_payload: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

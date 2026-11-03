@@ -642,6 +642,75 @@ mod bypass_spawning_mongocryptd {
     }
 }
 
+// Command spans must record the encrypted payload, not the plaintext.
+#[cfg(feature = "opentelemetry")]
+#[tokio::test]
+async fn otel_command_span_encrypted_payload() -> Result<()> {
+    use crate::otel::testing::{ClientTracing, ObserveTracingMessages};
+
+    // Setup: key vault, collection with a schema requiring encryption of "encrypted".
+    let client_test = Client::for_test().await;
+    client_test
+        .database("keyvault")
+        .collection::<Document>("datakeys")
+        .drop()
+        .await?;
+    client_test
+        .database("db")
+        .collection::<Document>("coll")
+        .drop()
+        .await?;
+    client_test
+        .database("keyvault")
+        .collection::<Document>("datakeys")
+        .insert_one(load_testdata("external/external-key.json")?)
+        .write_concern(WriteConcern::majority())
+        .await?;
+    client_test
+        .database("db")
+        .create_collection("coll")
+        .validator(doc! { "$jsonSchema": load_testdata("external/external-schema.json")? })
+        .await?;
+
+    // Encrypted client with command payload tracing enabled.
+    let (tracing, tracing_opts) = ClientTracing::new(&ObserveTracingMessages {
+        enable_command_payload: Some(true),
+    });
+    let mut opts = get_client_options().await.clone();
+    opts.tracing = Some(tracing_opts);
+    let client_encrypted =
+        Client::encrypted_builder(opts, KV_NAMESPACE.clone(), vec![LOCAL_KMS.clone()])?
+            .extra_options(EXTRA_OPTIONS.clone())
+            .disable_crypt_shared(*DISABLE_CRYPT_SHARED)
+            .build()
+            .await?;
+
+    client_encrypted
+        .database("db")
+        .collection::<Document>("coll")
+        .insert_one(doc! { "_id": 0, "encrypted": "string0" })
+        .await?;
+
+    // The insert command span's query text must contain ciphertext and not the plaintext.
+    let spans = tracing.get_spans();
+    let cmd_span = spans
+        .values()
+        .flat_map(|v| v.iter())
+        .find(|s| s.name == "insert")
+        .expect("insert command span");
+    let text = cmd_span
+        .attributes
+        .iter()
+        .find(|a| a.key.as_str() == "db.query.text")
+        .expect("db.query.text")
+        .value
+        .to_string();
+    assert!(!text.contains("string0"), "plaintext leaked: {text}");
+    assert!(text.contains("$binary"), "no ciphertext found: {text}");
+
+    Ok(())
+}
+
 // Prose test 9. Deadlock Tests
 mod deadlock {
     use super::*;
