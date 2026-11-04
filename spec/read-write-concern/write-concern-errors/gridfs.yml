@@ -42,6 +42,7 @@ tests:
               writeConcernError: &write_concern_error
                 code: 79
                 codeName: UnknownReplWriteConcern
+                errmsg: "Triggered by failpoint"
       - name: upload
         object: *bucket0
         arguments:

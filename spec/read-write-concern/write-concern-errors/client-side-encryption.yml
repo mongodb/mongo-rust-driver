@@ -52,6 +52,7 @@ tests:
               writeConcernError: &write_concern_error
                 code: 79
                 codeName: UnknownReplWriteConcern
+                errmsg: "Triggered by failpoint"
       - name: rewrapManyDataKey
         object: *clientEncryption0
         arguments:

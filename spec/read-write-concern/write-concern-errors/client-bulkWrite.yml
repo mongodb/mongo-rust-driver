@@ -25,6 +25,7 @@ tests:
               writeConcernError:
                 code: 79
                 codeName: UnknownReplWriteConcern
+                errmsg: "Triggered by failpoint"
       - name: clientBulkWrite
         object: *client0
         arguments:
