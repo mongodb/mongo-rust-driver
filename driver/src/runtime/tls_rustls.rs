@@ -10,15 +10,23 @@ use rustls::crypto::aws_lc_rs as provider;
 #[cfg(all(feature = "rustls-tls", not(feature = "rustls-tls-aws-lc")))]
 use rustls::crypto::ring as provider;
 use rustls::{
-    client::ClientConfig,
+    client::{ClientConfig, ResolvesClientCert},
+    crypto::CryptoProvider,
     pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer, ServerName},
+    sign::{CertifiedKey, SingleCertAndKey},
     Error as TlsError,
+    InconsistentKeys,
     RootCertStore,
 };
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::TlsConnector;
 use webpki_roots::TLS_SERVER_ROOTS;
+use x509_cert::{
+    der::{Decode, Encode},
+    Certificate,
+    Version,
+};
 
 use crate::{
     client::options::TlsOptions,
@@ -68,6 +76,7 @@ pub(crate) async fn tls_connect<T: AsyncRead + AsyncWrite + Unpin>(
 
 /// Converts `TlsOptions` into a rustls::ClientConfig.
 fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
+    let provider = Arc::new(provider::default_provider());
     let mut store = RootCertStore::empty();
     if let Some(path) = cfg.ca_file_path {
         let ders = CertificateDer::pem_file_iter(&path)
@@ -83,7 +92,7 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
         store.extend(TLS_SERVER_ROOTS.iter().cloned());
     }
 
-    let config_builder = ClientConfig::builder_with_provider(provider::default_provider().into())
+    let config_builder = ClientConfig::builder_with_provider(provider.clone())
         .with_safe_default_protocol_versions()
         .map_err(|e| ErrorKind::InvalidTlsConfig {
             message: format!("built-in provider should support default protocol versions: {e}"),
@@ -131,11 +140,13 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
             }
         };
 
-        config_builder
-            .with_client_auth_cert(certs, key)
-            .map_err(|error| ErrorKind::InvalidTlsConfig {
-                message: error.to_string(),
-            })?
+        config_builder.with_client_cert_resolver(
+            client_cert_resolver(certs, key, &provider).map_err(|error| {
+                ErrorKind::InvalidTlsConfig {
+                    message: error.to_string(),
+                }
+            })?,
+        )
     } else {
         config_builder.with_no_client_auth()
     };
@@ -150,6 +161,38 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
     }
 
     Ok(config)
+}
+
+fn client_cert_resolver(
+    certs: Vec<CertificateDer<'static>>,
+    key: PrivateKeyDer<'static>,
+    provider: &CryptoProvider,
+) -> std::result::Result<Arc<dyn ResolvesClientCert>, TlsError> {
+    let v1_subject_public_key_info = certs.first().and_then(|cert| {
+        let cert = Certificate::from_der(cert.as_ref()).ok()?;
+        if cert.tbs_certificate().version() != Version::V1 {
+            return None;
+        }
+        cert.tbs_certificate()
+            .subject_public_key_info()
+            .to_der()
+            .ok()
+    });
+
+    let certified_key = if let Some(cert_spki) = v1_subject_public_key_info {
+        let signing_key = provider.key_provider.load_private_key(key)?;
+        if signing_key
+            .public_key()
+            .is_some_and(|key_spki| key_spki.as_ref() != cert_spki)
+        {
+            return Err(InconsistentKeys::KeyMismatch.into());
+        }
+        CertifiedKey::new(certs, signing_key)
+    } else {
+        CertifiedKey::from_der(certs, key, provider)?
+    };
+
+    Ok(Arc::new(SingleCertAndKey::from(certified_key)))
 }
 
 mod danger {
@@ -208,5 +251,33 @@ mod danger {
         fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
             self.0.signature_verification_algorithms.supported_schemes()
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn accepts_x509_v1_client_certificate() {
+        let cert_key_file_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("src/runtime/test_data/client-v1.pem");
+        let options = TlsOptions::builder()
+            .cert_key_file_path(cert_key_file_path)
+            .build();
+
+        make_rustls_config(options).unwrap();
+    }
+
+    #[test]
+    fn rejects_x509_v1_client_certificate_with_mismatched_key() {
+        let cert_key_file_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("src/runtime/test_data/client-v1-mismatched.pem");
+        let options = TlsOptions::builder()
+            .cert_key_file_path(cert_key_file_path)
+            .build();
+
+        let error = make_rustls_config(options).unwrap_err();
+        assert!(error.to_string().contains("KeyMismatch"), "{error:?}");
     }
 }
