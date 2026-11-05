@@ -1,5 +1,3 @@
-use std::env;
-
 use crate::bson::rawdoc;
 
 use crate::{
@@ -12,36 +10,9 @@ use crate::{
     Client,
 };
 
+use super::TempVars;
+
 type Result<T> = anyhow::Result<T>;
-
-struct TempVars {
-    restore: Vec<(&'static str, Option<std::ffi::OsString>)>,
-}
-
-impl TempVars {
-    #[must_use]
-    fn set(vars: &[(&'static str, &str)]) -> TempVars {
-        let mut restore = vec![];
-        for (name, value) in vars {
-            restore.push((*name, env::var_os(name)));
-            unsafe { env::set_var(name, value) };
-        }
-
-        Self { restore }
-    }
-}
-
-impl Drop for TempVars {
-    fn drop(&mut self) {
-        for (name, value) in self.restore.drain(..) {
-            if let Some(v) = value {
-                unsafe { env::set_var(name, v) };
-            } else {
-                unsafe { env::remove_var(name) };
-            }
-        }
-    }
-}
 
 async fn check_faas_handshake(
     vars: &[(&'static str, &str)],

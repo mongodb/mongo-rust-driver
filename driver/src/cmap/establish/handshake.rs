@@ -124,6 +124,7 @@ pub(crate) struct RuntimeEnvironment {
     pub(crate) timeout_sec: Option<i32>,
     pub(crate) memory_mb: Option<i32>,
     pub(crate) region: Option<String>,
+    pub(crate) agent: Option<String>,
     pub(crate) container: Option<RawDocumentBuf>,
 }
 
@@ -195,6 +196,7 @@ impl From<&RuntimeEnvironment> for RawBson {
             timeout_sec,
             memory_mb,
             region,
+            agent,
             container,
         } = env;
         let mut out = rawdoc! {};
@@ -213,6 +215,9 @@ impl From<&RuntimeEnvironment> for RawBson {
         if let Some(r) = region {
             out.append(cstr!("region"), r.as_str());
         }
+        if let Some(a) = agent {
+            out.append(cstr!("agent"), a.as_str());
+        }
         if let Some(c) = container {
             out.append(cstr!("container"), c.clone());
         }
@@ -227,6 +232,7 @@ impl RuntimeEnvironment {
         timeout_sec: None,
         memory_mb: None,
         region: None,
+        agent: None,
         container: None,
     };
 
@@ -258,6 +264,9 @@ impl RuntimeEnvironment {
                     out.region = env::var("VERCEL_REGION").ok();
                 }
             }
+        }
+        if let Some(agent) = ai_agent() {
+            out.agent = Some(agent);
         }
         let mut container = rawdoc! {};
         if std::path::Path::new("/.dockerenv").exists() {
@@ -321,6 +330,47 @@ impl FaasEnvironmentName {
     }
 }
 
+fn known_ai_agent() -> Option<&'static str> {
+    const TABLE: &[(&str, &str)] = &[
+        ("CLAUDECODE", "claude_code"),
+        ("CLAUDE_CODE_ENTRYPOINT", "claude_code"),
+        ("CURSOR_AGENT", "cursor"),
+        ("CODEX_SANDBOX", "codex_cli"),
+        ("CLINE_ACTIVE", "cline"),
+        ("GEMINI_CLI", "gemini_cli"),
+        ("AUGMENT_AGENT", "auggie_cli"),
+        ("OPENCODE", "opencode_client"),
+        ("OPENCODE_CLIENT", "opencode_client"),
+        ("TRAE_AI_SHELL_ID", "trae_ai"),
+        ("GOOSE_TERMINAL", "goose"),
+        ("GOOSE_AGENT", "goose"),
+    ];
+    for &(var, name) in TABLE {
+        if var_set(var) {
+            return Some(name);
+        }
+    }
+    None
+}
+
+fn ai_agent() -> Option<String> {
+    if let Some(agent) = known_ai_agent() {
+        return Some(agent.to_owned());
+    }
+
+    let generic = env::var_os("AI_AGENT")?.into_string().ok()?;
+    let norm = generic.trim().to_lowercase();
+    let ix = norm.floor_char_boundary(64);
+    let norm = &norm[..ix];
+    if norm.is_empty() {
+        return None;
+    }
+    if norm == "1" || norm == "true" {
+        return Some("ai_agent".to_owned());
+    }
+    Some(norm.to_owned())
+}
+
 /// Contains the basic handshake information that can be statically determined. This document
 /// (potentially with additional fields added) can be cloned and put in the `client` field of
 /// the `hello` or legacy hello command.
@@ -350,16 +400,26 @@ pub(crate) static BASE_CLIENT_METADATA: LazyLock<ClientMetadata> =
 type Truncation = fn(&mut ClientMetadata);
 
 const METADATA_TRUNCATIONS: &[Truncation] = &[
-    // clear `env.*` except `name`
+    // 1. Omit fields from `env` except `env.name` and `env.agent`.
     |metadata| {
         if let Some(env) = &mut metadata.env {
             *env = RuntimeEnvironment {
                 name: env.name,
+                agent: env.agent.clone(),
                 ..RuntimeEnvironment::UNSET
             }
         }
     },
-    // clear `os.*` except `type`
+    // 2. Omit `env.agent`. If `env` then has no remaining fields, omit `env` entirely.
+    |metadata| {
+        if let Some(env) = &mut metadata.env {
+            env.agent = None;
+            if *env == RuntimeEnvironment::UNSET {
+                metadata.env = None;
+            }
+        }
+    },
+    // 3. Omit fields from `os` except `os.type`.
     |metadata| {
         metadata.os = OsMetadata {
             os_type: metadata.os.os_type.clone(),
@@ -368,11 +428,11 @@ const METADATA_TRUNCATIONS: &[Truncation] = &[
             version: None,
         }
     },
-    // clear `env`
+    // 4. Omit the `env` document entirely.
     |metadata| {
         metadata.env = None;
     },
-    // truncate `platform`
+    // 5. Truncate `platform`.
     |metadata| {
         metadata.platform = rustc_version_runtime::version_meta().short_version_string;
     },

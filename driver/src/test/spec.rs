@@ -5,7 +5,6 @@ mod collection_management;
 mod command_monitoring;
 mod connection_stepdown;
 mod crud;
-mod faas;
 mod gridfs;
 #[cfg(not(any(
     feature = "zstd-compression",
