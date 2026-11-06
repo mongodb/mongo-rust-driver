@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, Bson, Document, RawDocumentBuf},
     cmap::{
         conn::PendingConnection,
         establish::{handshake::BASE_CLIENT_METADATA, ConnectionEstablisher, EstablisherOptions},
@@ -69,23 +69,26 @@ async fn arbitrary_auth_mechanism() {
         .unwrap();
 }
 
+/// Captures the most recent hello command sent.
 fn watch_hello(options: &mut ClientOptions) -> Arc<Mutex<Command>> {
     let hello: Arc<Mutex<Command>> = Arc::new(Mutex::new(Command::default()));
     let cb_hello = hello.clone();
-    options.test_options_mut().hello_cb = Some(EventHandler::callback(move |command: Command| {
-        *cb_hello.lock().unwrap() = command;
-    }));
+    options.test_options_mut().handshaker.hello_cb =
+        Some(EventHandler::callback(move |command: Command| {
+            *cb_hello.lock().unwrap() = command;
+        }));
     hello
 }
 
-impl Command {
-    fn client_metadata(&self) -> Document {
-        self.body
-            .get_document("client")
-            .unwrap()
-            .try_into()
-            .unwrap()
-    }
+/// Captures the most recent client metadata document, before any truncation is applied.
+fn watch_metadata(options: &mut ClientOptions) -> Arc<Mutex<Document>> {
+    let metadata: Arc<Mutex<Document>> = Arc::new(Mutex::new(Document::new()));
+    let cb_metadata = metadata.clone();
+    options.test_options_mut().handshaker.metadata_cb =
+        Some(EventHandler::callback(move |doc: RawDocumentBuf| {
+            *cb_metadata.lock().unwrap() = doc.try_into().unwrap();
+        }));
+    metadata
 }
 
 impl Client {
@@ -175,11 +178,11 @@ async fn agent_metadata_captured() {
 
         let mut options = get_client_options().await.clone();
         options.max_idle_time = Some(Duration::from_millis(1));
-        let hello = watch_hello(&mut options);
+        let metadata_cb = watch_metadata(&mut options);
         let client = Client::with_options(options).unwrap();
         client.ping().await;
 
-        let meta = hello.lock().unwrap().client_metadata();
+        let meta = metadata_cb.lock().unwrap().clone();
         assert_eq!(expected, meta["env"]["agent"].as_str());
     }
 
@@ -192,11 +195,11 @@ async fn agent_metadata_captured() {
 
     let mut options = get_client_options().await.clone();
     options.max_idle_time = Some(Duration::from_millis(1));
-    let hello = watch_hello(&mut options);
+    let metadata_cb = watch_metadata(&mut options);
     let client = Client::with_options(options).unwrap();
     client.ping().await;
 
-    let meta = hello.lock().unwrap().client_metadata();
+    let meta = metadata_cb.lock().unwrap().clone();
     assert_eq!(Some("claude_code"), meta["env"]["agent"].as_str());
     assert_eq!(Some("aws.lambda"), meta["env"]["name"].as_str());
     assert_eq!(Some("AWS_Lambda_java8"), meta["env"]["runtime"].as_str());
@@ -264,18 +267,18 @@ async fn append_metadata_driver_update() {
         let mut options = get_client_options().await.clone();
         options.max_idle_time = Some(Duration::from_millis(1));
         options.driver_info = Some(DriverInfo::new("library", "1.2", "Library Platform"));
-        let hello = watch_hello(&mut options);
+        let metadata_cb = watch_metadata(&mut options);
         let client = Client::with_options(options).unwrap();
 
         client.ping().await;
-        let initial_client_metadata = hello.lock().unwrap().client_metadata();
+        let initial_client_metadata = metadata_cb.lock().unwrap().clone();
         let (initial_name, initial_version, initial_platform) =
             extract_driver_info(&initial_client_metadata);
         tokio::time::sleep(Duration::from_millis(5)).await;
 
         client.append_metadata(addl_info.clone()).unwrap();
         client.ping().await;
-        let test_client_metadata = hello.lock().unwrap().client_metadata();
+        let test_client_metadata = metadata_cb.lock().unwrap().clone();
         let (test_name, test_version, test_platform) = extract_driver_info(&test_client_metadata);
 
         // Compare updated metadata
@@ -307,21 +310,21 @@ async fn append_metadata_successive_updates() {
     for addl_info in test_info {
         let mut options = get_client_options().await.clone();
         options.max_idle_time = Some(Duration::from_millis(1));
-        let hello = watch_hello(&mut options);
+        let metadata_cb = watch_metadata(&mut options);
         let client = Client::with_options(options).unwrap();
 
         client
             .append_metadata(DriverInfo::new("library", "1.2", "Library Platform"))
             .unwrap();
         client.ping().await;
-        let initial_client_metadata = hello.lock().unwrap().client_metadata();
+        let initial_client_metadata = metadata_cb.lock().unwrap().clone();
         let (initial_name, initial_version, initial_platform) =
             extract_driver_info(&initial_client_metadata);
         tokio::time::sleep(Duration::from_millis(5)).await;
 
         client.append_metadata(addl_info.clone()).unwrap();
         client.ping().await;
-        let test_client_metadata = hello.lock().unwrap().client_metadata();
+        let test_client_metadata = metadata_cb.lock().unwrap().clone();
         let (test_name, test_version, test_platform) = extract_driver_info(&test_client_metadata);
 
         // Compare updated metadata
@@ -356,18 +359,18 @@ async fn append_metadata_duplicate_successive() {
     for info in test_info {
         let mut options = get_client_options().await.clone();
         options.max_idle_time = Some(Duration::from_millis(1));
-        let hello = watch_hello(&mut options);
+        let metadata_cb = watch_metadata(&mut options);
         let client = Client::with_options(options).unwrap();
 
         let setup_info = DriverInfo::new("library", "1.2", "Library Platform");
         client.append_metadata(setup_info.clone()).unwrap();
         client.ping().await;
-        let updated_client_metadata = hello.lock().unwrap().client_metadata();
+        let updated_client_metadata = metadata_cb.lock().unwrap().clone();
         tokio::time::sleep(Duration::from_millis(5)).await;
 
         client.append_metadata(info.clone()).unwrap();
         client.ping().await;
-        let test_client_metadata = hello.lock().unwrap().client_metadata();
+        let test_client_metadata = metadata_cb.lock().unwrap().clone();
         let strip_default = |value: &Bson| {
             value
                 .as_str()
@@ -404,7 +407,7 @@ async fn append_metadata_duplicate_successive() {
 async fn append_metadata_duplicate_multiple() {
     let mut options = get_client_options().await.clone();
     options.max_idle_time = Some(Duration::from_millis(1));
-    let hello = watch_hello(&mut options);
+    let metadata_cb = watch_metadata(&mut options);
     let client = Client::with_options(options).unwrap();
 
     client
@@ -417,14 +420,14 @@ async fn append_metadata_duplicate_multiple() {
         .append_metadata(DriverInfo::new("framework", "2.0", "Framework Platform"))
         .unwrap();
     client.ping().await;
-    let client_metadata = hello.lock().unwrap().client_metadata();
+    let client_metadata = metadata_cb.lock().unwrap().clone();
     tokio::time::sleep(Duration::from_millis(5)).await;
 
     client
         .append_metadata(DriverInfo::new("library", "1.2", "Library Platform"))
         .unwrap();
     client.ping().await;
-    let updated_client_metadata = hello.lock().unwrap().client_metadata();
+    let updated_client_metadata = metadata_cb.lock().unwrap().clone();
 
     assert_eq!(client_metadata, updated_client_metadata);
 }
@@ -435,18 +438,18 @@ async fn append_metadata_duplicate_of_initial() {
     let mut options = get_client_options().await.clone();
     options.max_idle_time = Some(Duration::from_millis(1));
     options.driver_info = Some(DriverInfo::new("library", "1.2", "Library Platform"));
-    let hello = watch_hello(&mut options);
+    let metadata_cb = watch_metadata(&mut options);
     let client = Client::with_options(options).unwrap();
 
     client.ping().await;
-    let client_metadata = hello.lock().unwrap().client_metadata();
+    let client_metadata = metadata_cb.lock().unwrap().clone();
     tokio::time::sleep(Duration::from_millis(5)).await;
 
     client
         .append_metadata(DriverInfo::new("library", "1.2", "Library Platform"))
         .unwrap();
     client.ping().await;
-    let updated_client_metadata = hello.lock().unwrap().client_metadata();
+    let updated_client_metadata = metadata_cb.lock().unwrap().clone();
 
     assert_eq!(client_metadata, updated_client_metadata);
 }
@@ -458,7 +461,7 @@ async fn append_metadata_duplicate_of_initial_separated() {
     let mut options = get_client_options().await.clone();
     options.max_idle_time = Some(Duration::from_millis(1));
     options.driver_info = Some(DriverInfo::new("library", "1.2", "Library Platform"));
-    let hello = watch_hello(&mut options);
+    let metadata_cb = watch_metadata(&mut options);
     let client = Client::with_options(options).unwrap();
 
     client.ping().await;
@@ -468,14 +471,14 @@ async fn append_metadata_duplicate_of_initial_separated() {
         .append_metadata(DriverInfo::new("framework", "2.0", "Framework Platform"))
         .unwrap();
     client.ping().await;
-    let client_metadata = hello.lock().unwrap().client_metadata();
+    let client_metadata = metadata_cb.lock().unwrap().clone();
     tokio::time::sleep(Duration::from_millis(5)).await;
 
     client
         .append_metadata(DriverInfo::new("library", "1.2", "Library Platform"))
         .unwrap();
     client.ping().await;
-    let updated_client_metadata = hello.lock().unwrap().client_metadata();
+    let updated_client_metadata = metadata_cb.lock().unwrap().clone();
 
     assert_eq!(client_metadata, updated_client_metadata);
 }
@@ -497,17 +500,17 @@ async fn append_metadata_duplicate_empty_strings() {
     for (initial_info, appended_info) in test_info {
         let mut options = get_client_options().await.clone();
         options.max_idle_time = Some(Duration::from_millis(1));
-        let hello = watch_hello(&mut options);
+        let metadata_cb = watch_metadata(&mut options);
         let client = Client::with_options(options).unwrap();
 
         client.append_metadata(initial_info).unwrap();
         client.ping().await;
-        let initial_client_metadata = hello.lock().unwrap().client_metadata();
+        let initial_client_metadata = metadata_cb.lock().unwrap().clone();
         tokio::time::sleep(Duration::from_millis(5)).await;
 
         client.append_metadata(appended_info).unwrap();
         client.ping().await;
-        let updated_client_metadata = hello.lock().unwrap().client_metadata();
+        let updated_client_metadata = metadata_cb.lock().unwrap().clone();
 
         assert_eq!(initial_client_metadata, updated_client_metadata);
     }
@@ -531,16 +534,16 @@ async fn append_metadata_duplicate_empty_strings_initial() {
         let mut options = get_client_options().await.clone();
         options.max_idle_time = Some(Duration::from_millis(1));
         options.driver_info = Some(initial_info);
-        let hello = watch_hello(&mut options);
+        let metadata_cb = watch_metadata(&mut options);
         let client = Client::with_options(options).unwrap();
 
         client.ping().await;
-        let initial_client_metadata = hello.lock().unwrap().client_metadata();
+        let initial_client_metadata = metadata_cb.lock().unwrap().clone();
         tokio::time::sleep(Duration::from_millis(5)).await;
 
         client.append_metadata(appended_info).unwrap();
         client.ping().await;
-        let updated_client_metadata = hello.lock().unwrap().client_metadata();
+        let updated_client_metadata = metadata_cb.lock().unwrap().clone();
 
         assert_eq!(initial_client_metadata, updated_client_metadata);
     }
@@ -660,7 +663,7 @@ async fn append_metadata_name_version_correspond() {
         // 1. Create a MongoClient instance with a maxIdleTimeMS set to 1ms
         let mut options = get_client_options().await.clone();
         options.max_idle_time = Some(Duration::from_millis(1));
-        let hello = watch_hello(&mut options);
+        let metadata_cb = watch_metadata(&mut options);
         let client = Client::with_options(options).unwrap();
 
         // append info
@@ -675,7 +678,7 @@ async fn append_metadata_name_version_correspond() {
         tokio::time::sleep(Duration::from_millis(5)).await;
 
         // validate expectations
-        let metadata = hello.lock().unwrap().client_metadata();
+        let metadata = metadata_cb.lock().unwrap().clone();
         let actual_name = metadata["driver"]["name"].as_str().unwrap();
         let actual_version = metadata["driver"]["version"].as_str().unwrap();
         assert_eq!(
@@ -706,7 +709,7 @@ async fn metadata_delimiter_error() {
         let mut options = get_client_options().await.clone();
         options.max_idle_time = Some(Duration::from_millis(1));
         options.driver_info = Some(DriverInfo::new("library", "1.2", "Library Platform"));
-        let hello = watch_hello(&mut options);
+        let metadata_cb = watch_metadata(&mut options);
         let client = Client::with_options(options).unwrap();
 
         // 2. Send a ping command to the server and verify that the command succeeds.
@@ -727,7 +730,7 @@ async fn metadata_delimiter_error() {
         tokio::time::sleep(Duration::from_millis(5)).await;
 
         // 6. Assert that the intercepted client document is unchanged by the failed append
-        let metadata = hello.lock().unwrap().client_metadata();
+        let metadata = metadata_cb.lock().unwrap().clone();
         assert_eq!(
             metadata["driver"]["name"],
             Bson::String(format!("{driver_name}|library"))

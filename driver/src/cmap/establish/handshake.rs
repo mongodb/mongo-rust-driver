@@ -457,7 +457,18 @@ pub(crate) struct Handshaker {
     auth_options: AuthOptions,
 
     #[cfg(test)]
-    test_hello_cb: Option<EventHandler<crate::cmap::Command>>,
+    test: HandshakerTest,
+}
+
+/// Test-only hooks for observing the handshake.
+#[cfg(test)]
+#[derive(Debug, Clone, Default)]
+pub(crate) struct HandshakerTest {
+    /// Callback to receive the full hello command as sent.
+    pub(crate) hello_cb: Option<EventHandler<Command>>,
+
+    /// Callback to receive the client metadata document before any truncation is applied.
+    pub(crate) metadata_cb: Option<EventHandler<RawDocumentBuf>>,
 }
 
 impl Handshaker {
@@ -499,7 +510,7 @@ impl Handshaker {
             metadata: options.metadata,
             auth_options: options.auth_options,
             #[cfg(test)]
-            test_hello_cb: options.test_hello_cb,
+            test: options.test,
         })
     }
 
@@ -521,6 +532,10 @@ impl Handshaker {
         let mut metadata = self.metadata.read().unwrap().clone();
         let mut meta_doc: RawDocumentBuf = (&metadata).into();
         const OVERHEAD: usize = 1 /* tag */ + 6 /* name */ + 1 /* null */;
+        #[cfg(test)]
+        if let Some(handler) = &self.test.metadata_cb {
+            handler.handle(meta_doc.clone());
+        }
         for trunc_fn in METADATA_TRUNCATIONS {
             if body_size + OVERHEAD + meta_doc.as_bytes().len() <= MAX_HELLO_SIZE {
                 break;
@@ -542,7 +557,7 @@ impl Handshaker {
     ) -> Result<HelloReply> {
         let (command, client_first) = self.build_command(credential).await?;
         #[cfg(test)]
-        if let Some(handler) = &self.test_hello_cb {
+        if let Some(handler) = &self.test.hello_cb {
             handler.handle(command.clone());
         }
         let mut hello_reply = run_hello(conn, command, cancellation_receiver).await?;
@@ -614,9 +629,8 @@ pub(crate) struct HandshakerOptions {
 
     pub(crate) metadata: Arc<std::sync::RwLock<ClientMetadata>>,
 
-    /// Callback to receive hello commands.
     #[cfg(test)]
-    pub(crate) test_hello_cb: Option<EventHandler<crate::cmap::Command>>,
+    pub(crate) test: HandshakerTest,
 }
 
 impl From<&TopologySpec> for HandshakerOptions {
@@ -633,11 +647,12 @@ impl From<&TopologySpec> for HandshakerOptions {
             auth_options: AuthOptions::from(&spec.options),
             metadata: spec.metadata.clone(),
             #[cfg(test)]
-            test_hello_cb: spec
+            test: spec
                 .options
                 .test_options
                 .as_ref()
-                .and_then(|to| to.hello_cb.clone()),
+                .map(|to| to.handshaker.clone())
+                .unwrap_or_default(),
         }
     }
 }

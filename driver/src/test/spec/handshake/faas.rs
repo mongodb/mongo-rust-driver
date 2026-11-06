@@ -11,7 +11,7 @@ use crate::{
     Client,
 };
 
-use super::{watch_hello, TempVars};
+use super::{watch_hello, watch_metadata, TempVars};
 
 type Result<T> = anyhow::Result<T>;
 
@@ -22,10 +22,10 @@ async fn check_faas_handshake(
     let _tv = TempVars::set(vars);
 
     let mut options = get_client_options().await.clone();
-    let hello = watch_hello(&mut options);
+    let metadata_cb = watch_metadata(&mut options);
     let client = Client::for_test().options(options).await;
     client.list_database_names().await?;
-    let metadata = hello.lock().unwrap().client_metadata();
+    let metadata = metadata_cb.lock().unwrap().clone();
     let expected: Document = RawDocumentBuf::from(expected).try_into()?;
     assert_eq!(expected, metadata);
 
@@ -127,20 +127,32 @@ async fn invalid_multiple_providers() -> Result<()> {
 
 #[tokio::test]
 async fn invalid_long_string() -> Result<()> {
-    check_faas_handshake(
-        &[
-            ("AWS_EXECUTION_ENV", "AWS_Lambda_java8"),
-            ("AWS_REGION", &"a".repeat(512)),
-        ],
-        &ClientMetadata {
-            env: Some(RuntimeEnvironment {
-                name: Some(FaasEnvironmentName::AwsLambda),
-                ..RuntimeEnvironment::UNSET
-            }),
-            ..BASE_CLIENT_METADATA.clone()
-        },
-    )
-    .await
+    // The oversized region is only dropped by truncation, so this checks the hello as sent.
+    let _tv = TempVars::set(&[
+        ("AWS_EXECUTION_ENV", "AWS_Lambda_java8"),
+        ("AWS_REGION", &"a".repeat(512)),
+    ]);
+
+    let mut options = get_client_options().await.clone();
+    let hello = watch_hello(&mut options);
+    let client = Client::for_test().options(options).await;
+    client.list_database_names().await?;
+    let sent: Document = hello
+        .lock()
+        .unwrap()
+        .body
+        .get_document("client")?
+        .try_into()?;
+    let expected = ClientMetadata {
+        env: Some(RuntimeEnvironment {
+            name: Some(FaasEnvironmentName::AwsLambda),
+            ..RuntimeEnvironment::UNSET
+        }),
+        ..BASE_CLIENT_METADATA.clone()
+    };
+    assert_eq!(Document::try_from(RawDocumentBuf::from(&expected))?, sent);
+
+    Ok(())
 }
 
 #[tokio::test]
