@@ -6,11 +6,6 @@ mod command_monitoring;
 mod connection_stepdown;
 mod crud;
 mod gridfs;
-#[cfg(not(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-)))]
 mod handshake;
 #[cfg(feature = "dns-resolver")]
 mod initial_dns_seedlist_discovery;

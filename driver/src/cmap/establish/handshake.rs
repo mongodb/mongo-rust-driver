@@ -460,10 +460,6 @@ pub(crate) struct Handshaker {
     test_hello_cb: Option<EventHandler<crate::cmap::Command>>,
 }
 
-#[cfg(test)]
-#[allow(clippy::incompatible_msrv)]
-pub(crate) static TEST_METADATA: std::sync::OnceLock<ClientMetadata> = std::sync::OnceLock::new();
-
 impl Handshaker {
     /// Creates a new Handshaker.
     pub(crate) fn new(options: HandshakerOptions) -> Result<Self> {
@@ -532,9 +528,6 @@ impl Handshaker {
             trunc_fn(&mut metadata);
             meta_doc = (&metadata).into();
         }
-        #[cfg(test)]
-        #[allow(clippy::incompatible_msrv)]
-        let _ = TEST_METADATA.set(metadata);
         body.append(cstr!("client"), meta_doc);
 
         Ok((command, client_first))

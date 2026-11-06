@@ -1,4 +1,4 @@
-use crate::bson::rawdoc;
+use crate::bson::{rawdoc, Document, RawDocumentBuf};
 
 use crate::{
     cmap::establish::handshake::{
@@ -7,10 +7,11 @@ use crate::{
         RuntimeEnvironment,
         BASE_CLIENT_METADATA,
     },
+    test::get_client_options,
     Client,
 };
 
-use super::TempVars;
+use super::{watch_hello, TempVars};
 
 type Result<T> = anyhow::Result<T>;
 
@@ -20,12 +21,12 @@ async fn check_faas_handshake(
 ) -> Result<()> {
     let _tv = TempVars::set(vars);
 
-    let client = Client::for_test().await;
+    let mut options = get_client_options().await.clone();
+    let hello = watch_hello(&mut options);
+    let client = Client::for_test().options(options).await;
     client.list_database_names().await?;
-    #[allow(clippy::incompatible_msrv)]
-    let metadata = crate::cmap::establish::handshake::TEST_METADATA
-        .get()
-        .unwrap();
+    let metadata = hello.lock().unwrap().client_metadata();
+    let expected: Document = RawDocumentBuf::from(expected).try_into()?;
     assert_eq!(expected, metadata);
 
     Ok(())
