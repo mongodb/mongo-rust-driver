@@ -22,6 +22,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
     Client,
 };
+pub use action::TransactionCallbackError;
 pub use cluster_time::ClusterTime;
 pub(super) use pool::ServerSessionPool;
 
