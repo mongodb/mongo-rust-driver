@@ -124,6 +124,7 @@ pub(crate) struct RuntimeEnvironment {
     pub(crate) timeout_sec: Option<i32>,
     pub(crate) memory_mb: Option<i32>,
     pub(crate) region: Option<String>,
+    pub(crate) agent: Option<String>,
     pub(crate) container: Option<RawDocumentBuf>,
 }
 
@@ -195,6 +196,7 @@ impl From<&RuntimeEnvironment> for RawBson {
             timeout_sec,
             memory_mb,
             region,
+            agent,
             container,
         } = env;
         let mut out = rawdoc! {};
@@ -213,6 +215,9 @@ impl From<&RuntimeEnvironment> for RawBson {
         if let Some(r) = region {
             out.append(cstr!("region"), r.as_str());
         }
+        if let Some(a) = agent {
+            out.append(cstr!("agent"), a.as_str());
+        }
         if let Some(c) = container {
             out.append(cstr!("container"), c.clone());
         }
@@ -227,6 +232,7 @@ impl RuntimeEnvironment {
         timeout_sec: None,
         memory_mb: None,
         region: None,
+        agent: None,
         container: None,
     };
 
@@ -258,6 +264,9 @@ impl RuntimeEnvironment {
                     out.region = env::var("VERCEL_REGION").ok();
                 }
             }
+        }
+        if let Some(agent) = ai_agent() {
+            out.agent = Some(agent);
         }
         let mut container = rawdoc! {};
         if std::path::Path::new("/.dockerenv").exists() {
@@ -321,6 +330,47 @@ impl FaasEnvironmentName {
     }
 }
 
+fn known_ai_agent() -> Option<&'static str> {
+    const TABLE: &[(&str, &str)] = &[
+        ("CLAUDECODE", "claude_code"),
+        ("CLAUDE_CODE_ENTRYPOINT", "claude_code"),
+        ("CURSOR_AGENT", "cursor"),
+        ("CODEX_SANDBOX", "codex_cli"),
+        ("CLINE_ACTIVE", "cline"),
+        ("GEMINI_CLI", "gemini_cli"),
+        ("AUGMENT_AGENT", "auggie_cli"),
+        ("OPENCODE", "opencode_client"),
+        ("OPENCODE_CLIENT", "opencode_client"),
+        ("TRAE_AI_SHELL_ID", "trae_ai"),
+        ("GOOSE_TERMINAL", "goose"),
+        ("GOOSE_AGENT", "goose"),
+    ];
+    for &(var, name) in TABLE {
+        if var_set(var) {
+            return Some(name);
+        }
+    }
+    None
+}
+
+fn ai_agent() -> Option<String> {
+    if let Some(agent) = known_ai_agent() {
+        return Some(agent.to_owned());
+    }
+
+    let generic = env::var_os("AI_AGENT")?.into_string().ok()?;
+    let norm = generic.trim().to_lowercase();
+    let ix = norm.floor_char_boundary(64);
+    let norm = &norm[..ix];
+    if norm.is_empty() {
+        return None;
+    }
+    if norm == "1" || norm == "true" {
+        return Some("ai_agent".to_owned());
+    }
+    Some(norm.to_owned())
+}
+
 /// Contains the basic handshake information that can be statically determined. This document
 /// (potentially with additional fields added) can be cloned and put in the `client` field of
 /// the `hello` or legacy hello command.
@@ -350,16 +400,26 @@ pub(crate) static BASE_CLIENT_METADATA: LazyLock<ClientMetadata> =
 type Truncation = fn(&mut ClientMetadata);
 
 const METADATA_TRUNCATIONS: &[Truncation] = &[
-    // clear `env.*` except `name`
+    // 1. Omit fields from `env` except `env.name` and `env.agent`.
     |metadata| {
         if let Some(env) = &mut metadata.env {
             *env = RuntimeEnvironment {
                 name: env.name,
+                agent: env.agent.clone(),
                 ..RuntimeEnvironment::UNSET
             }
         }
     },
-    // clear `os.*` except `type`
+    // 2. Omit `env.agent`. If `env` then has no remaining fields, omit `env` entirely.
+    |metadata| {
+        if let Some(env) = &mut metadata.env {
+            env.agent = None;
+            if *env == RuntimeEnvironment::UNSET {
+                metadata.env = None;
+            }
+        }
+    },
+    // 3. Omit fields from `os` except `os.type`.
     |metadata| {
         metadata.os = OsMetadata {
             os_type: metadata.os.os_type.clone(),
@@ -368,11 +428,11 @@ const METADATA_TRUNCATIONS: &[Truncation] = &[
             version: None,
         }
     },
-    // clear `env`
+    // 4. Omit the `env` document entirely.
     |metadata| {
         metadata.env = None;
     },
-    // truncate `platform`
+    // 5. Truncate `platform`.
     |metadata| {
         metadata.platform = rustc_version_runtime::version_meta().short_version_string;
     },
@@ -397,12 +457,19 @@ pub(crate) struct Handshaker {
     auth_options: AuthOptions,
 
     #[cfg(test)]
-    test_hello_cb: Option<EventHandler<crate::cmap::Command>>,
+    test: HandshakerTest,
 }
 
+/// Test-only hooks for observing the handshake.
 #[cfg(test)]
-#[allow(clippy::incompatible_msrv)]
-pub(crate) static TEST_METADATA: std::sync::OnceLock<ClientMetadata> = std::sync::OnceLock::new();
+#[derive(Debug, Clone, Default)]
+pub(crate) struct HandshakerTest {
+    /// Callback to receive the full hello command as sent.
+    pub(crate) hello_cb: Option<EventHandler<Command>>,
+
+    /// Callback to receive the client metadata document before any truncation is applied.
+    pub(crate) metadata_cb: Option<EventHandler<RawDocumentBuf>>,
+}
 
 impl Handshaker {
     /// Creates a new Handshaker.
@@ -443,7 +510,7 @@ impl Handshaker {
             metadata: options.metadata,
             auth_options: options.auth_options,
             #[cfg(test)]
-            test_hello_cb: options.test_hello_cb,
+            test: options.test,
         })
     }
 
@@ -465,6 +532,10 @@ impl Handshaker {
         let mut metadata = self.metadata.read().unwrap().clone();
         let mut meta_doc: RawDocumentBuf = (&metadata).into();
         const OVERHEAD: usize = 1 /* tag */ + 6 /* name */ + 1 /* null */;
+        #[cfg(test)]
+        if let Some(handler) = &self.test.metadata_cb {
+            handler.handle(meta_doc.clone());
+        }
         for trunc_fn in METADATA_TRUNCATIONS {
             if body_size + OVERHEAD + meta_doc.as_bytes().len() <= MAX_HELLO_SIZE {
                 break;
@@ -472,9 +543,6 @@ impl Handshaker {
             trunc_fn(&mut metadata);
             meta_doc = (&metadata).into();
         }
-        #[cfg(test)]
-        #[allow(clippy::incompatible_msrv)]
-        let _ = TEST_METADATA.set(metadata);
         body.append(cstr!("client"), meta_doc);
 
         Ok((command, client_first))
@@ -489,7 +557,7 @@ impl Handshaker {
     ) -> Result<HelloReply> {
         let (command, client_first) = self.build_command(credential).await?;
         #[cfg(test)]
-        if let Some(handler) = &self.test_hello_cb {
+        if let Some(handler) = &self.test.hello_cb {
             handler.handle(command.clone());
         }
         let mut hello_reply = run_hello(conn, command, cancellation_receiver).await?;
@@ -561,9 +629,8 @@ pub(crate) struct HandshakerOptions {
 
     pub(crate) metadata: Arc<std::sync::RwLock<ClientMetadata>>,
 
-    /// Callback to receive hello commands.
     #[cfg(test)]
-    pub(crate) test_hello_cb: Option<EventHandler<crate::cmap::Command>>,
+    pub(crate) test: HandshakerTest,
 }
 
 impl From<&TopologySpec> for HandshakerOptions {
@@ -580,11 +647,12 @@ impl From<&TopologySpec> for HandshakerOptions {
             auth_options: AuthOptions::from(&spec.options),
             metadata: spec.metadata.clone(),
             #[cfg(test)]
-            test_hello_cb: spec
+            test: spec
                 .options
                 .test_options
                 .as_ref()
-                .and_then(|to| to.hello_cb.clone()),
+                .map(|to| to.handshaker.clone())
+                .unwrap_or_default(),
         }
     }
 }

@@ -778,8 +778,8 @@ pub(crate) struct TestOptions {
     /// Async-capable command event listener.
     pub(crate) async_event_listener: Option<TestEventSender>,
 
-    /// Callback to receive hello commands.
-    pub(crate) hello_cb: Option<EventHandler<crate::cmap::Command>>,
+    /// Hooks for observing the connection handshake.
+    pub(crate) handshaker: crate::cmap::establish::handshake::HandshakerTest,
 
     /// The value to use for jitter when calculating retry backoff.
     pub(crate) jitter: Option<f32>,
