@@ -164,10 +164,13 @@ async fn run_test(mut test_file: TestFile) {
                 if actual_hosts.len() == expected_host_count {
                     break;
                 }
-            } else if start.elapsed() > Duration::from_secs(5) {
+            }
+
+            if start.elapsed() > Duration::from_secs(5) {
                 panic!(
-                    "expected to eventually discover {:?}, instead found {:?}",
-                    test_file.hosts, actual_hosts
+                    "expected to eventually discover hosts {:?} (num hosts {:?}), instead found \
+                     {:?}",
+                    test_file.hosts, test_file.num_hosts, actual_hosts
                 )
             }
 

@@ -288,3 +288,4 @@ functions:
           - ZSTD
           - ZLIB
           - SNAPPY
+          - TEST_FILTER
