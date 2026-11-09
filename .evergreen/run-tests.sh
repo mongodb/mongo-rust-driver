@@ -19,6 +19,7 @@ if [ "Windows_NT" == "$OS" ]; then
   export SSL_CERT_DIR=$(cygpath /etc/ssl/certs --windows)
 fi
 
-cargo_test ""
+# Set the filter via `evergreen patch ... --param TEST_FILTER=<value>`.  Defaults to unset, i.e. all tests.
+cargo_test "${TEST_FILTER}"
 
 exit $CARGO_RESULT
