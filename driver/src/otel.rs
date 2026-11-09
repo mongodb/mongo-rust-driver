@@ -10,7 +10,7 @@ use derive_where::derive_where;
 
 use opentelemetry::{
     global::{BoxedTracer, ObjectSafeTracerProvider},
-    trace::{SpanKind, TraceContextExt, Tracer, TracerProvider},
+    trace::{Span, SpanKind, TraceContextExt, Tracer, TracerProvider},
     Context,
     KeyValue,
 };
@@ -130,17 +130,20 @@ impl Client {
             .span_builder(span_name)
             .with_kind(SpanKind::Client)
             .with_attributes(attrs);
-        let context = if let Some(TxnSpan(txn_ctx)) =
-            session.and_then(|s| s.transaction.otel_span.as_ref())
-        {
-            txn_ctx.with_span(builder.start_with_context(self.tracer(), txn_ctx))
-        } else {
-            Context::current_with_span(builder.start(self.tracer()))
-        };
-        OpSpan {
-            context,
-            enabled: true,
+        let parent = session
+            .and_then(|s| s.transaction.otel_span.as_ref())
+            .map(|TxnSpan(cx)| cx.clone())
+            .unwrap_or_else(Context::current);
+        let span = builder.start_with_context(self.tracer(), &parent);
+        if !span.span_context().is_valid() {
+            return OpSpan {
+                context: parent,
+                enabled: false,
+            };
         }
+        let enabled = span.is_recording();
+        let context = parent.with_span(span);
+        OpSpan { context, enabled }
     }
 
     pub(crate) fn start_command_span(
@@ -189,25 +192,34 @@ impl Client {
         if let Some(server_id) = &conn_info.server_id {
             attrs.push(KeyValue::new("db.mongodb.server_connection_id", *server_id));
         }
-        let text_max_len = self.options().otel_query_text_max_length();
-        if text_max_len > 0 {
-            let doc = message.get_raw_command_document();
-
-            attrs.push(KeyValue::new(
-                "db.query.text",
-                crate::bson_util::rawdoc_to_json_str_otel(&doc, text_max_len)
-                    .unwrap_or_else(crate::bson_util::doc_err),
-            ));
-        }
-        let span = self
+        let mut span = self
             .tracer()
             .span_builder(cmd_attrs.name)
             .with_kind(SpanKind::Client)
             .with_attributes(attrs)
             .start(self.tracer());
+        if !span.span_context().is_valid() {
+            return CmdSpan {
+                context: Context::current(),
+                enabled: false,
+            };
+        }
+        let enabled = span.is_recording();
+        if enabled {
+            let text_max_len = self.options().otel_query_text_max_length();
+            if text_max_len > 0 {
+                let doc = message.get_raw_command_document();
+
+                span.set_attribute(KeyValue::new(
+                    "db.query.text",
+                    crate::bson_util::rawdoc_to_json_str_otel(&doc, text_max_len)
+                        .unwrap_or_else(crate::bson_util::doc_err),
+                ));
+            }
+        }
         CmdSpan {
             context: Context::current_with_span(span),
-            enabled: true,
+            enabled,
         }
     }
 
@@ -224,6 +236,9 @@ impl Client {
                 KeyValue::new("db.system.name", "mongodb"),
             ])
             .start(self.tracer());
+        if !span.span_context().is_valid() {
+            return TxnSpan(Context::current());
+        }
         TxnSpan(Context::current_with_span(span))
     }
 }
