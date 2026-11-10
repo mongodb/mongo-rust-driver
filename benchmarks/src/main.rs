@@ -10,6 +10,8 @@ mod bench;
 mod data;
 mod fs;
 mod models;
+#[cfg(any(feature = "otel-sdk-ratio", feature = "otel-sdk-always"))]
+mod otel;
 mod score;
 
 use std::{collections::HashSet, convert::TryFrom, path::PathBuf};
