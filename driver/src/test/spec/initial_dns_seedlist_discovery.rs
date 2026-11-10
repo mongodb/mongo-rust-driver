@@ -155,6 +155,11 @@ async fn run_test(mut test_file: TestFile) {
         loop {
             let mut actual_hosts = client.get_hosts();
             actual_hosts.sort();
+            for host in &mut actual_hosts {
+                if let Some(("127.0.0.1", port)) = host.split_once(':') {
+                    *host = format!("localhost:{port}");
+                }
+            }
 
             if let Some(ref expected_hosts) = test_file.hosts {
                 if actual_hosts == *expected_hosts {
