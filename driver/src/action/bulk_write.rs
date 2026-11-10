@@ -239,6 +239,10 @@ where
                     let current_bulk_write_error =
                         Self::get_current_bulk_write_error(&mut current_error);
                     current_bulk_write_error.merge(bulk_write_error);
+                    // A result-cursor failure must stop execution of further batches.
+                    if let Some(source) = error.source {
+                        current_error.source = Some(source);
+                    }
                     Self::Error(current_error)
                 }
                 _ => Self::Error(current_error.with_source(error)),
@@ -277,6 +281,62 @@ where
                 }
             }
             _ => true,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::WriteError;
+
+    #[test]
+    fn merging_bulk_write_errors_preserves_fatal_source() {
+        for fatal in [false, true] {
+            let mut previous = BulkWriteError::default();
+            previous.write_errors.insert(
+                0,
+                WriteError {
+                    code: 11000,
+                    code_name: None,
+                    message: "duplicate key".into(),
+                    details: None,
+                },
+            );
+            let next = BulkWriteError {
+                partial_result: Some(
+                    SummaryBulkWriteResult {
+                        inserted_count: 1,
+                        ..Default::default()
+                    }
+                    .into_partial_result(),
+                ),
+                ..Default::default()
+            };
+            let error: Error = ErrorKind::BulkWrite(next).into();
+            let error = error.with_source(fatal.then(|| Error::internal("cursor failed")));
+            let status = ExecutionStatus::<SummaryBulkWriteResult>::Error(
+                ErrorKind::BulkWrite(previous).into(),
+            )
+            .with_failure(error);
+
+            assert_eq!(status.should_continue(false), !fatal);
+            let ExecutionStatus::Error(error) = status else {
+                panic!("expected error");
+            };
+            assert_eq!(error.source.is_some(), fatal);
+            if let Some(source) = error.source.as_ref() {
+                assert!(source.to_string().contains("cursor failed"));
+            }
+            let ErrorKind::BulkWrite(bulk) = *error.kind else {
+                panic!("expected bulk write error");
+            };
+            assert_eq!(bulk.write_errors.get(&0).unwrap().code, 11000);
+            let Some(crate::error::PartialBulkWriteResult::Summary(result)) = bulk.partial_result
+            else {
+                panic!("expected partial summary");
+            };
+            assert_eq!(result.inserted_count, 1);
         }
     }
 }
