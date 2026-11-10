@@ -12,8 +12,8 @@ rust-version.workspace = true
 default = []
 tracing = ["dep:tracing", "mongodb/tracing-unstable"]
 otel-api-only = ["mongodb/opentelemetry"]
-otel-sdk-ratio = ["mongodb/opentelemetry", "dep:opentelemetry_sdk"]
-otel-sdk-always = ["mongodb/opentelemetry", "dep:opentelemetry_sdk"]
+otel-sdk-ratio = ["mongodb/opentelemetry", "dep:opentelemetry", "dep:opentelemetry_sdk"]
+otel-sdk-always = ["mongodb/opentelemetry", "dep:opentelemetry", "dep:opentelemetry_sdk"]
 
 [dependencies]
 mongodb = { path = "../driver" }
@@ -30,4 +30,5 @@ serde = "1"
 num_enum = "0.5"
 futures-util = "0.3.30"
 tracing = { version = "0.1.36", optional = true }
-opentelemetry_sdk = { version = "0.31.0", optional = true, features = ["testing"] }
+opentelemetry_sdk = { version = "0.31.0", optional = true }
+opentelemetry = { version = "0.31.0", optional = true }

@@ -3034,6 +3034,7 @@ dependencies = [
  "indicatif",
  "mongodb",
  "num_enum",
+ "opentelemetry",
  "opentelemetry_sdk",
  "serde",
  "serde_json",
