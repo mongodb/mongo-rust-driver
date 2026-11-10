@@ -11,6 +11,7 @@ rust-version.workspace = true
 [features]
 default = []
 tracing = ["dep:tracing", "mongodb/tracing-unstable"]
+opentelemetry = ["dep:opentelemetry", "mongodb/opentelemetry"]
 otel-api-only = ["mongodb/opentelemetry"]
 otel-sdk-ratio = ["mongodb/opentelemetry", "dep:opentelemetry", "dep:opentelemetry_sdk"]
 otel-sdk-always = ["mongodb/opentelemetry", "dep:opentelemetry", "dep:opentelemetry_sdk"]
