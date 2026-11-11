@@ -25,6 +25,7 @@ use super::{
 
 const DOCUMENT_PAYLOAD_TYPE: u8 = 0;
 const DOCUMENT_SEQUENCE_PAYLOAD_TYPE: u8 = 1;
+const TELEMETRY_PAYLOAD_TYPE: u8 = 2;
 
 /// Represents an OP_MSG wire protocol operation.
 #[derive(Debug)]
@@ -34,6 +35,9 @@ pub(crate) struct Message {
 
     /// OP_MSG payload type 1.
     pub(crate) document_sequences: Vec<DocumentSequence>,
+
+    /// OP_MSG payload type 3.
+    pub(crate) telemetry: Option<RawDocumentBuf>,
 
     pub(crate) response_to: i32,
 
@@ -79,6 +83,7 @@ impl TryFrom<Command> for Message {
         Ok(Self {
             document_payload,
             document_sequences: command.document_sequences,
+            telemetry: None,
             response_to: 0,
             flags,
             checksum: None,
@@ -209,7 +214,6 @@ impl Message {
 
         let mut count_reader = CountReader::new(&mut reader);
         let mut document_payload = None;
-        let mut document_sequences = Vec::new();
         while (length_remaining - count_reader.bytes_read()).get()? > 4 {
             let next_section = MessageSection::read(&mut count_reader).await?;
             match next_section {
@@ -224,9 +228,6 @@ impl Message {
                     } else {
                         document_payload = Some(document);
                     }
-                }
-                MessageSection::Sequence(document_sequence) => {
-                    document_sequences.push(document_sequence)
                 }
             }
         }
@@ -255,7 +256,8 @@ impl Message {
                 message: "an OP_MSG response must contain exactly one payload type 0 section"
                     .into(),
             })?,
-            document_sequences,
+            document_sequences: vec![],
+            telemetry: None,
             checksum,
             request_id: None,
             #[cfg(any(
@@ -394,6 +396,11 @@ impl Message {
             }
         }
 
+        if let Some(telemetry) = &self.telemetry {
+            sections.push(TELEMETRY_PAYLOAD_TYPE);
+            sections.extend(telemetry.as_bytes());
+        }
+
         Ok(sections)
     }
 }
@@ -414,8 +421,8 @@ bitflags! {
 #[derive(Debug)]
 enum MessageSection {
     Document(RawDocumentBuf),
-    #[expect(unused)] // the server never returns document sequences, so parsing is unsupported
-    Sequence(DocumentSequence),
+    // The server never returns document sequences or telemetry, so parsing is unsupported for
+    // those section types.
 }
 
 impl MessageSection {
@@ -430,6 +437,9 @@ impl MessageSection {
             }
             DOCUMENT_SEQUENCE_PAYLOAD_TYPE => Err(Error::invalid_response(
                 "Unexpected document sequence included in OP_MSG reply",
+            )),
+            TELEMETRY_PAYLOAD_TYPE => Err(Error::invalid_response(
+                "Unexpected telemetry included in OP_MSG reply",
             )),
             other => Err(Error::invalid_response(format!(
                 "Unexpected payload type included in OP_MSG reply: {other}"
