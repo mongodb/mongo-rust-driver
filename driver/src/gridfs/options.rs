@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use macro_magic::export_tokens;
+use mongodb_internal_macros::TestDeserialize;
 use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
@@ -10,7 +11,7 @@ use crate::{
 };
 
 /// Contains the options for creating a [`GridFsBucket`](crate::gridfs::GridFsBucket).
-#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[derive(Clone, Debug, Default, TestDeserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct GridFsBucketOptions {
@@ -31,7 +32,7 @@ pub struct GridFsBucketOptions {
 }
 
 /// Contains the options for uploading a file to a [`GridFsBucket`](crate::gridfs::GridFsBucket).
-#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[derive(Clone, Debug, Default, TestDeserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]

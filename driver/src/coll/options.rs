@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use macro_magic::export_tokens;
+use mongodb_internal_macros::TestDeserialize;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -87,7 +88,7 @@ impl Hint {
 }
 
 /// Specifies the type of cursor to return from a find operation.
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, TestDeserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum CursorType {
@@ -106,7 +107,7 @@ pub enum CursorType {
 /// Specifies the options to a
 /// [`Collection::insert_one`](../struct.Collection.html#method.insert_one) operation.
 #[skip_serializing_none]
-#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[derive(Clone, Debug, Default, TestDeserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
