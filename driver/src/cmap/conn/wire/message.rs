@@ -25,7 +25,7 @@ use super::{
 
 const DOCUMENT_PAYLOAD_TYPE: u8 = 0;
 const DOCUMENT_SEQUENCE_PAYLOAD_TYPE: u8 = 1;
-const TELEMETRY_PAYLOAD_TYPE: u8 = 2;
+const TELEMETRY_PAYLOAD_TYPE: u8 = 3;
 
 /// Represents an OP_MSG wire protocol operation.
 #[derive(Debug)]
