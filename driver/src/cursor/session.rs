@@ -1,4 +1,5 @@
-use derive_where::derive_where;
+use std::fmt::Debug;
+
 use serde::{de::DeserializeOwned, Deserialize};
 
 use futures_util::StreamExt;
@@ -44,13 +45,18 @@ use super::{common, stream};
 /// If a [`SessionCursor`] is still open when it goes out of scope, it will automatically be closed
 /// via an asynchronous [killCursors](https://www.mongodb.com/docs/manual/reference/command/killCursors/) command executed
 /// from its [`Drop`](https://doc.rust-lang.org/std/ops/trait.Drop.html) implementation.
-#[derive_where(Debug)]
 pub struct SessionCursor<T> {
     // `None` while a `SessionCursorStream` is live; because that stream holds a `&mut` to this
     // struct, any access of this will always see `Some`.
     buffer: Option<stream::BatchBuffer<()>>,
     raw: SessionRawBatchCursor,
     _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T> Debug for SessionCursor<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SessionCursor").finish()
+    }
 }
 
 impl<T> crate::cursor::NewCursor for SessionCursor<T> {

@@ -29,7 +29,6 @@ use super::{
     options::KmsProviders,
 };
 
-#[derive(Debug)]
 pub(crate) struct CryptExecutor {
     key_vault_client: WeakClient,
     key_vault_namespace: Namespace,
@@ -517,17 +516,18 @@ fn raw_to_doc(raw: &RawDocument) -> Result<Document> {
 
 #[cfg(feature = "azure-kms")]
 pub(crate) mod azure {
-    use crate::bson::{rawdoc, RawDocumentBuf};
-    use serde::Deserialize;
+
     use std::time::{Duration, Instant};
+
+    use serde::Deserialize;
     use tokio::sync::Mutex;
 
     use crate::{
+        bson::{rawdoc, RawDocumentBuf},
         error::{Error, Result},
         runtime::HttpClient,
     };
 
-    #[derive(Debug)]
     pub(crate) struct ExecutorState {
         cached_access_token: Mutex<Option<CachedAccessToken>>,
         http: HttpClient,
@@ -631,7 +631,7 @@ pub(crate) mod azure {
         }
     }
 
-    #[derive(Debug, Deserialize)]
+    #[derive(Deserialize)]
     pub(crate) struct ServerResponse {
         pub(crate) access_token: String,
         pub(crate) expires_in: String,
@@ -639,7 +639,6 @@ pub(crate) mod azure {
         pub(crate) resource: String,
     }
 
-    #[derive(Debug)]
     pub(crate) struct CachedAccessToken {
         pub(crate) token_doc: RawDocumentBuf,
         pub(crate) expire_time: Instant,

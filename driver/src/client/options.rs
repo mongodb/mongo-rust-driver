@@ -9,7 +9,7 @@ use std::{
     cmp::Ordering,
     collections::HashSet,
     convert::TryFrom,
-    fmt::{self, Display, Formatter, Write},
+    fmt::{self, Debug, Display, Formatter, Write},
     hash::{Hash, Hasher},
     net::{Ipv4Addr, Ipv6Addr, SocketAddr},
     path::PathBuf,
@@ -449,7 +449,7 @@ pub struct ServerApi {
 
 /// Configuration for connecting to a SOCKS5 proxy.
 #[cfg(feature = "socks5-proxy")]
-#[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
+#[derive(Clone, Deserialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct Socks5Proxy {
@@ -462,6 +462,25 @@ pub struct Socks5Proxy {
 
     /// A username/password pair to authenticate to the proxy.
     pub authentication: Option<(String, String)>,
+}
+
+#[cfg(feature = "socks5-proxy")]
+impl Debug for Socks5Proxy {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let Socks5Proxy {
+            host,
+            port,
+            authentication,
+        } = self;
+        f.debug_struct("Socks5Proxy")
+            .field("host", host)
+            .field("port", port)
+            .field(
+                "authentication",
+                &authentication.is_some().then_some("REDACTED"),
+            )
+            .finish()
+    }
 }
 
 /// Dummy struct for internal use.
@@ -1250,7 +1269,7 @@ impl Tls {
 }
 
 /// Specifies the TLS configuration that the [`Client`](../struct.Client.html) should use.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, TypedBuilder)]
+#[derive(Clone, Default, Deserialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct TlsOptions {
@@ -1282,6 +1301,34 @@ pub struct TlsOptions {
     /// If set, the key in `cert_key_file_path` must be encrypted with this password.
     #[cfg(feature = "cert-key-password")]
     pub tls_certificate_key_file_password: Option<Vec<u8>>,
+}
+
+impl Debug for TlsOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let TlsOptions {
+            allow_invalid_certificates,
+            ca_file_path,
+            cert_key_file_path,
+            #[cfg(feature = "openssl-tls")]
+            allow_invalid_hostnames,
+            #[cfg(feature = "cert-key-password")]
+            tls_certificate_key_file_password,
+        } = self;
+        let mut d = f.debug_struct("TlsOptions");
+        d.field("allow_invalid_certificates", allow_invalid_certificates)
+            .field("ca_file_path", ca_file_path)
+            .field("cert_key_file_path", cert_key_file_path);
+        #[cfg(feature = "openssl-tls")]
+        d.field("allow_invalid_hostnames", allow_invalid_hostnames);
+        #[cfg(feature = "cert-key-password")]
+        d.field(
+            "tls_certificate_key_file_password",
+            &tls_certificate_key_file_password
+                .is_some()
+                .then_some("REDACTED"),
+        );
+        d.finish()
+    }
 }
 
 impl TlsOptions {
