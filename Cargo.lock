@@ -2256,7 +2256,7 @@ source = "git+https://github.com/mongodb/libmongocrypt-rust.git?branch=main#852b
 
 [[package]]
 name = "mongodb"
-version = "3.10.0"
+version = "3.10.1"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -2334,7 +2334,7 @@ dependencies = [
 
 [[package]]
 name = "mongodb-internal-macros"
-version = "3.10.0"
+version = "3.10.1"
 dependencies = [
  "macro_magic",
  "proc-macro2",
