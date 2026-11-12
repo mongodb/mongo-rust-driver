@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use futures_util::stream::StreamExt;
 use serde::de::DeserializeOwned;
 
@@ -150,6 +152,12 @@ where
     T: DeserializeOwned + Unpin,
 {
     async_stream: AsyncSessionChangeStream<T>,
+}
+
+impl<T: DeserializeOwned + Unpin> Debug for SessionChangeStream<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SessionChangeStream").finish()
+    }
 }
 
 impl<T> SessionChangeStream<T>

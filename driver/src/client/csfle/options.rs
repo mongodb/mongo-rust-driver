@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, fmt::Debug, time::Duration};
 
 use crate::bson::Array;
 use mongocrypt::ctx::KmsProvider;
@@ -24,7 +24,7 @@ use super::client_encryption::KmsConnectCallback;
 /// https://specifications.readthedocs.io/en/latest/client-side-encryption/client-side-encryption/#libmongocrypt-auto-encryption-allow-list
 /// )). To bypass automatic encryption for all operations, set bypassAutoEncryption=true in
 /// AutoEncryptionOpts.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct AutoEncryptionOptions {
     /// Used for data key queries.  Will default to an internal client if not set.
@@ -104,7 +104,7 @@ impl AutoEncryptionOptions {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Clone)]
 pub(crate) struct KmsProviders {
     #[serde(flatten)]
     credentials: HashMap<KmsProvider, Document>,
