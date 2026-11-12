@@ -7,11 +7,11 @@ pub mod session;
 #[cfg(test)]
 use std::collections::VecDeque;
 use std::{
+    fmt::Debug,
     pin::Pin,
     task::{Context, Poll},
 };
 
-use derive_where::derive_where;
 use futures_core::Stream;
 use futures_util::FutureExt;
 use serde::de::DeserializeOwned;
@@ -71,12 +71,17 @@ use common::{ChangeStreamData, WatchArgs};
 ///
 /// See the documentation [here](https://www.mongodb.com/docs/manual/changeStreams) for more
 /// details. Also see the documentation on [usage recommendations](https://www.mongodb.com/docs/manual/administration/change-streams-production-recommendations/).
-#[derive_where(Debug)]
 pub struct ChangeStream<T>
 where
     T: DeserializeOwned,
 {
     inner: ChangeStreamState<T>,
+}
+
+impl<T: DeserializeOwned> Debug for ChangeStream<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChangeStream").finish()
+    }
 }
 
 impl<T> ChangeStream<T>

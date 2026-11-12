@@ -6,9 +6,8 @@ pub(crate) mod stream;
 #[cfg(feature = "sync")]
 pub(crate) mod sync;
 
-use std::task::Poll;
+use std::{fmt::Debug, task::Poll};
 
-use derive_where::derive_where;
 use futures_core::Stream as AsyncStream;
 use futures_util::stream::StreamExt;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -83,9 +82,14 @@ use crate::{
 /// If a [`Cursor`] is still open when it goes out of scope, it will automatically be closed via an
 /// asynchronous [killCursors](https://www.mongodb.com/docs/manual/reference/command/killCursors/) command executed
 /// from its [`Drop`](https://doc.rust-lang.org/std/ops/trait.Drop.html) implementation.
-#[derive_where(Debug)]
 pub struct Cursor<T> {
     stream: stream::Stream<'static, raw_batch::RawBatchCursor, T>,
+}
+
+impl<T> Debug for Cursor<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Cursor").finish()
+    }
 }
 
 #[allow(dead_code)]

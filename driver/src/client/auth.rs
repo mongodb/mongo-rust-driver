@@ -614,7 +614,6 @@ impl Debug for Credential {
 }
 
 /// Contains the first client message sent as part of the authentication handshake.
-#[derive(Debug)]
 pub(crate) enum ClientFirst {
     Scram(ScramVersion, scram::ClientFirst),
     X509(Box<Command>),

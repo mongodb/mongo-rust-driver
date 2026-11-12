@@ -8,6 +8,7 @@ pub mod session;
 
 use std::{
     collections::HashSet,
+    fmt::Debug,
     sync::atomic::{AtomicBool, Ordering},
     time::{Duration, Instant},
 };
@@ -136,9 +137,15 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 ///   overload errors are encountered.
 /// - Set [`ClientOptions::enable_overload_retargeting`] to deprioritize servers on which an
 ///   overload error has occurred.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Client {
     inner: TrackingArc<ClientInner>,
+}
+
+impl Debug for Client {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Client").finish()
+    }
 }
 
 #[allow(dead_code, unreachable_code, clippy::diverging_sub_expression)]
@@ -151,7 +158,6 @@ const _: fn() = || {
     assert_sync(_c);
 };
 
-#[derive(Debug)]
 struct ClientInner {
     topology: Topology,
     options: ClientOptions,
@@ -703,7 +709,7 @@ impl Client {
 }
 
 #[cfg(feature = "in-use-encryption")]
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct WeakClient {
     inner: crate::tracking_arc::Weak<ClientInner>,
 }

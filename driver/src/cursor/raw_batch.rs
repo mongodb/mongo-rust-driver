@@ -40,6 +40,7 @@
 //! ```
 
 use std::{
+    fmt::Debug,
     pin::Pin,
     task::{ready, Context, Poll},
 };
@@ -121,6 +122,12 @@ pub struct RawBatchCursor {
     disable_drop_op_span: bool,
     #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
+}
+
+impl Debug for RawBatchCursor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RawBatchCursor").finish()
+    }
 }
 
 #[allow(dead_code, unreachable_code, clippy::diverging_sub_expression)]
@@ -377,7 +384,6 @@ impl Drop for RawBatchCursor {
 }
 
 /// A raw batch cursor that was created with a [`ClientSession`] and must be iterated using one.
-#[derive(Debug)]
 pub struct SessionRawBatchCursor {
     client: Client,
     drop_token: AsyncDropToken,
@@ -387,6 +393,12 @@ pub struct SessionRawBatchCursor {
     disable_drop_op_span: bool,
     #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
+}
+
+impl Debug for SessionRawBatchCursor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SessionRawBatchCursor").finish()
+    }
 }
 
 impl super::NewCursor for SessionRawBatchCursor {
