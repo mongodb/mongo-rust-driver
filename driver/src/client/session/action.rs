@@ -127,6 +127,19 @@ impl<'a> Action for StartTransaction<&'a mut ClientSession> {
     }
 }
 
+/// Error types that can be returned from the callback passed to
+/// [`and_run`](StartTransaction::and_run) and [`and_run2`](StartTransaction::and_run2).
+pub trait TransactionCallbackError: From<Error> {
+    /// Returns the underlying MongoDB error, if this error represents one.
+    fn as_mongo_error(&self) -> Option<&Error>;
+}
+
+impl TransactionCallbackError for Error {
+    fn as_mongo_error(&self) -> Option<&Error> {
+        Some(self)
+    }
+}
+
 macro_rules! convenient_run {
     (
         $session:expr,
@@ -153,7 +166,7 @@ macro_rules! convenient_run {
                     $session.convenient_transaction_jitter,
                 );
                 if start_time.elapsed() + backoff >= max_time {
-                    return Err(make_timeout_error(last_error));
+                    return Err(make_timeout_error(last_error).into());
                 }
                 $sleep(backoff).$await;
             }
@@ -170,11 +183,13 @@ macro_rules! convenient_run {
                     ) {
                         $abort_transaction?;
                     }
-                    if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
-                        last_error = e;
-                        continue 'transaction;
+                    if let Some(e) = e.as_mongo_error() {
+                        if e.contains_label(TRANSIENT_TRANSACTION_ERROR) {
+                            last_error = e.clone();
+                            continue 'transaction;
+                        }
                     }
-                    return Err(e);
+                    return Err(e.into());
                 }
             };
             if matches!(
@@ -193,7 +208,7 @@ macro_rules! convenient_run {
                             && !e.is_max_time_ms_expired_error()
                         {
                             if start_time.elapsed() >= max_time {
-                                return Err(make_timeout_error(e));
+                                return Err(make_timeout_error(e).into());
                             } else {
                                 continue 'commit;
                             }
@@ -201,7 +216,7 @@ macro_rules! convenient_run {
                             last_error = e;
                             continue 'transaction;
                         } else {
-                            return Err(e);
+                            return Err(e.into());
                         }
                     }
                 }
@@ -252,9 +267,11 @@ impl StartTransaction<&mut ClientSession> {
     ///
     /// Transient transaction errors will cause the callback or the commit to be retried;
     /// other errors will cause the transaction to be aborted and the error returned to the
-    /// caller.  If the callback needs to provide its own error information, the
+    /// caller. If the callback needs to provide its own error information, the
     /// [`Error::custom`](crate::error::Error::custom) method can accept an arbitrary payload that
-    /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom).
+    /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom). Or, you can
+    /// implement [`TransactionCallbackError`](crate::client::session::TransactionCallbackError) for
+    /// your error.
     ///
     /// Retries will be performed for up to 120 seconds total, after which an error of
     /// [`ErrorKind::Transaction`] will be returned indicating that a timeout occurred. The last
@@ -299,9 +316,17 @@ impl StartTransaction<&mut ClientSession> {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn and_run<R, C, F>(self, mut context: C, mut callback: F) -> Result<R>
+    pub async fn and_run<R, E, C, F>(
+        self,
+        mut context: C,
+        mut callback: F,
+    ) -> std::result::Result<R, E>
     where
-        F: for<'b> FnMut(&'b mut ClientSession, &'b mut C) -> BoxFuture<'b, Result<R>>,
+        E: TransactionCallbackError,
+        F: for<'b> FnMut(
+            &'b mut ClientSession,
+            &'b mut C,
+        ) -> BoxFuture<'b, std::result::Result<R, E>>,
     {
         convenient_run!(
             self.session,
@@ -321,9 +346,11 @@ impl StartTransaction<&mut ClientSession> {
     ///
     /// Transient transaction errors will cause the callback or the commit to be retried;
     /// other errors will cause the transaction to be aborted and the error returned to the
-    /// caller.  If the callback needs to provide its own error information, the
+    /// caller. If the callback needs to provide its own error information, the
     /// [`Error::custom`](crate::error::Error::custom) method can accept an arbitrary payload that
-    /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom).
+    /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom). Or, you can
+    /// implement [`TransactionCallbackError`](crate::client::session::TransactionCallbackError) for
+    /// your error.
     ///
     /// Retries will be performed for up to 120 seconds total, after which an error of
     /// [`ErrorKind::Transaction`] will be returned indicating that a timeout occurred. The last
@@ -374,9 +401,10 @@ impl StartTransaction<&mut ClientSession> {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn and_run2<R, F>(self, mut callback: F) -> Result<R>
+    pub async fn and_run2<R, E, F>(self, mut callback: F) -> std::result::Result<R, E>
     where
-        F: for<'b> AsyncFnMut(&'b mut ClientSession) -> Result<R>,
+        E: TransactionCallbackError,
+        F: for<'b> AsyncFnMut(&'b mut ClientSession) -> std::result::Result<R, E>,
     {
         convenient_run!(
             self.session,
@@ -407,9 +435,11 @@ impl StartTransaction<&mut crate::sync::ClientSession> {
     /// Starts a transaction, runs the given callback, and commits or aborts the transaction.
     /// Transient transaction errors will cause the callback or the commit to be retried;
     /// other errors will cause the transaction to be aborted and the error returned to the
-    /// caller.  If the callback needs to provide its own error information, the
+    /// caller. If the callback needs to provide its own error information, the
     /// [`Error::custom`](crate::error::Error::custom) method can accept an arbitrary payload that
-    /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom).
+    /// can be retrieved via [`Error::get_custom`](crate::error::Error::get_custom). Or, you can
+    /// implement [`TransactionCallbackError`](crate::client::session::TransactionCallbackError) for
+    /// your error.
     ///
     /// Retries will be performed for up to 120 seconds total, after which an error of
     /// [`ErrorKind::Transaction`] will be returned indicating that a timeout occurred. The last
@@ -422,9 +452,10 @@ impl StartTransaction<&mut crate::sync::ClientSession> {
     /// callback indefinitely. To avoid this situation, the application MUST NOT silently handle
     /// errors within the callback. If the application needs to handle errors within the
     /// callback, it MUST return them after doing so.
-    pub fn and_run<R, F>(self, mut callback: F) -> Result<R>
+    pub fn and_run<R, E, F>(self, mut callback: F) -> std::result::Result<R, E>
     where
-        F: for<'b> FnMut(&'b mut crate::sync::ClientSession) -> Result<R>,
+        E: TransactionCallbackError,
+        F: for<'b> FnMut(&'b mut crate::sync::ClientSession) -> std::result::Result<R, E>,
     {
         convenient_run!(
             self.session.async_client_session,
