@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use crate::bson::doc;
 use macro_magic::export_tokens;
+use mongodb_internal_macros::TestDeserialize;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -373,7 +374,7 @@ pub struct RunCommandOptions {
 
 /// Specifies the options to a
 /// [`Database::run_cursor_command`](crate::Database::run_cursor_command) operation.
-#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[derive(Clone, Debug, Default, TestDeserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
