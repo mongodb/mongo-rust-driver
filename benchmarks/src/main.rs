@@ -10,7 +10,14 @@ mod bench;
 mod data;
 mod fs;
 mod models;
+#[cfg(any(feature = "otel-sdk-ratio", feature = "otel-sdk-always"))]
+mod otel;
+#[cfg(feature = "otel-api-only")]
+mod otel_stub;
 mod score;
+
+#[cfg(feature = "otel-api-only")]
+use otel_stub as otel;
 
 use std::{collections::HashSet, convert::TryFrom, path::PathBuf};
 
@@ -724,8 +731,19 @@ mod trace_buffer {
     }
 }
 
+fn main() {
+    #[cfg(any(
+        feature = "otel-api-only",
+        feature = "otel-sdk-ratio",
+        feature = "otel-sdk-always"
+    ))]
+    let _otel = otel::init();
+
+    run()
+}
+
 #[tokio::main]
-async fn main() {
+async fn run() {
     #[cfg(feature = "tracing")]
     let buffer = trace_buffer::TracingBuffer::register();
 
