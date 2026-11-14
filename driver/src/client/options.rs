@@ -2759,14 +2759,14 @@ impl ConnectionString {
 
                 match self.tls {
                     Some(Tls::Enabled(_)) if !tls => {
-                        return Err(Error::invalid_argument(
-                            "cannot set {key}={tls} if other TLS options are set",
-                        ));
+                        return Err(Error::invalid_argument(format!(
+                            "cannot set {key}={value} if other TLS options are set"
+                        )));
                     }
                     Some(Tls::Disabled) if tls => {
-                        return Err(Error::invalid_argument(
-                            "cannot set {key}={tls} if TLS is disabled",
-                        ));
+                        return Err(Error::invalid_argument(format!(
+                            "cannot set {key}={value} if TLS is disabled"
+                        )));
                     }
                     None => {
                         if tls {
@@ -3098,6 +3098,29 @@ mod tests {
                 }
                 _ => panic!("expected ServerAddress::Unix"),
             }
+        }
+    }
+
+    #[test]
+    fn tls_conflict_errors_name_the_option() {
+        let cases = [
+            (
+                "mongodb://localhost/?tlsCAFile=/tmp/ca.pem&tls=false",
+                "cannot set tls=false if other TLS options are set",
+            ),
+            (
+                "mongodb://localhost/?tlsInsecure=true&tls=false",
+                "cannot set tls=false if other TLS options are set",
+            ),
+            (
+                "mongodb://localhost/?tls=false&ssl=true",
+                "cannot set ssl=true if TLS is disabled",
+            ),
+        ];
+
+        for (uri, expected) in cases {
+            let error = ConnectionString::parse(uri).unwrap_err();
+            assert_eq!(error.message().as_deref(), Some(expected), "{uri}");
         }
     }
 
