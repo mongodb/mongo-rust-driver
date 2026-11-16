@@ -320,7 +320,6 @@ async fn cursor_iteration_in_a_transaction() {
 
 // CRUD prose test 9
 #[tokio::test(flavor = "multi_thread")]
-#[ignore]
 async fn failed_cursor_iteration() {
     require_8_0!("failed_cursor_iteration");
 
@@ -689,4 +688,110 @@ async fn write_concern_error_not_top_level() {
 
     let partial_result = bulk_write_error.partial_result.unwrap();
     assert_eq!(partial_result.inserted_count() as usize, batch_size);
+}
+
+// CRUD prose test 22
+#[tokio::test(flavor = "multi_thread")]
+async fn top_level_error_halts_batches() {
+    require_8_0!("top_level_error_halts_batches");
+
+    async fn test(ordered: bool) {
+        let client = Client::for_test()
+            .use_single_mongos()
+            .monitor_events()
+            .await;
+
+        let fail_point =
+            FailPoint::fail_command(&["bulkWrite"], FailPointMode::Times(1)).error_code(2);
+        let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+        let max_write_batch_size = get_max_write_batch_size().await;
+
+        let models = vec![
+            InsertOneModel::builder()
+                .namespace(Namespace::new("db", "coll"))
+                .document(doc! { "a": "b" })
+                .build();
+            max_write_batch_size + 1
+        ];
+        let error = client
+            .bulk_write(models)
+            .ordered(ordered)
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), Some(2));
+
+        let events = client.events.get_command_started_events(&["bulkWrite"]);
+        assert_eq!(events.len(), 1);
+    }
+
+    test(true).await;
+    test(false).await;
+}
+
+// CRUD prose test 23
+#[tokio::test(flavor = "multi_thread")]
+async fn top_level_error_halts_get_mores() {
+    require_8_0!("top_level_error_halts_get_mores");
+
+    async fn test(ordered: bool) {
+        let client = Client::for_test()
+            .use_single_mongos()
+            .monitor_events()
+            .await;
+
+        let coll = client.database("db").collection::<Document>("coll");
+        coll.drop().await.unwrap();
+
+        let fail_point =
+            FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(2);
+        let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+        let max_bson_object_size = get_max_bson_object_size().await;
+
+        let models = vec![
+            UpdateOneModel::builder()
+                .namespace(coll.namespace())
+                .filter(doc! { "_id": "a".repeat(max_bson_object_size / 2) })
+                .update(doc! { "$set": { "x": 1 } })
+                .upsert(true)
+                .build(),
+            UpdateOneModel::builder()
+                .namespace(coll.namespace())
+                .filter(doc! { "_id": "b".repeat(max_bson_object_size / 2) })
+                .update(doc! { "$set": { "x": 1 } })
+                .upsert(true)
+                .build(),
+            UpdateOneModel::builder()
+                .namespace(coll.namespace())
+                .filter(doc! { "_id": "c".repeat(max_bson_object_size / 2) })
+                .update(doc! { "$set": { "x": 1 } })
+                .upsert(true)
+                .build(),
+        ];
+        let error = client
+            .bulk_write(models)
+            .ordered(ordered)
+            .verbose_results()
+            .await
+            .unwrap_err();
+        assert!(matches!(*error.kind, ErrorKind::BulkWrite(..)));
+        assert_eq!(error.code(), Some(2));
+
+        let events = client.events.get_command_started_events(&["getMore"]);
+        assert_eq!(events.len(), 1);
+
+        client
+            .events
+            .stream_all()
+            .next_match(Duration::from_millis(500), |event| match event {
+                Event::Command(event) if event.command_name() == "killCursors" => true,
+                _ => false,
+            })
+            .await
+            .expect("no killCursors observed");
+    }
+
+    test(true).await;
+    test(false).await;
 }
