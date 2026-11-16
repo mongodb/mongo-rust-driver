@@ -1,9 +1,11 @@
 //! Contains the functionality for [`OIDC`](https://openid.net/developers/how-connect-works/) authorization and authentication.
-use serde::Deserialize;
 use std::{
+    fmt::Debug,
     sync::Arc,
     time::{Duration, Instant},
 };
+
+use serde::Deserialize;
 use tokio::sync::Mutex;
 use typed_builder::TypedBuilder;
 
@@ -290,7 +292,6 @@ impl Callback {
 }
 
 /// The OIDC state containing the cache of necessary OIDC info as well as the function
-#[derive(Debug)]
 struct CallbackInner {
     function: Function,
     cache: Cache,
@@ -311,9 +312,7 @@ enum CallbackKind {
     Machine,
 }
 
-use std::fmt::Debug;
-
-impl std::fmt::Debug for Function {
+impl Debug for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(format!("Callback: {:?}", self.kind).as_str())
             .finish()
@@ -324,7 +323,7 @@ struct FunctionInner {
     f: Box<dyn Fn(CallbackContext) -> BoxFuture<'static, Result<IdpServerResponse>> + Send + Sync>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct Cache {
     idp_server_info: Option<IdpServerInfo>,
     refresh_token: Option<String>,
@@ -416,7 +415,7 @@ pub struct IdpServerInfo {
 ///     Client::with_options(opts)
 /// }
 /// ```
-#[derive(Clone, Debug, TypedBuilder)]
+#[derive(Clone, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct CallbackContext {
@@ -430,6 +429,26 @@ pub struct CallbackContext {
     pub refresh_token: Option<String>,
     /// The information necessary to locate and authorize with an OIDC server.
     pub idp_info: Option<IdpServerInfo>,
+}
+
+impl Debug for CallbackContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let CallbackContext {
+            timeout,
+            version,
+            refresh_token,
+            idp_info,
+        } = self;
+        f.debug_struct("CallbackContext")
+            .field("timeout", timeout)
+            .field("version", version)
+            .field(
+                "refresh_token",
+                &refresh_token.is_some().then_some("REDACTED"),
+            )
+            .field("idp_info", idp_info)
+            .finish()
+    }
 }
 
 /// The return type of the OIDC authentication function. It contains the access token
@@ -456,7 +475,7 @@ pub struct CallbackContext {
 ///     Client::with_options(opts)
 /// }
 /// ```
-#[derive(Clone, Debug, TypedBuilder)]
+#[derive(Clone, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct IdpServerResponse {
@@ -468,6 +487,24 @@ pub struct IdpServerResponse {
     /// The token that the driver will use to refresh the access token when the
     /// access_token expires.
     pub refresh_token: Option<String>,
+}
+
+impl Debug for IdpServerResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let IdpServerResponse {
+            access_token: _,
+            expires,
+            refresh_token,
+        } = self;
+        f.debug_struct("IdpServerResponse")
+            .field("access_token", &"REDACTED")
+            .field("expires", expires)
+            .field(
+                "refresh_token",
+                &refresh_token.is_some().then_some("REDACTED"),
+            )
+            .finish()
+    }
 }
 
 fn make_spec_auth_command(
