@@ -16,11 +16,7 @@ mod otel;
 mod otel_stub;
 mod score;
 
-#[cfg(all(
-    feature = "otel-api-only",
-    not(feature = "otel-sdk-ratio"),
-    not(feature = "otel-sdk-always")
-))]
+#[cfg(feature = "otel-api-only")]
 use otel_stub as otel;
 
 use std::{collections::HashSet, convert::TryFrom, path::PathBuf};
