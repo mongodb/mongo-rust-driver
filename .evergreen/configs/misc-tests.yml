@@ -54,3 +54,14 @@ tasks:
           include_expansions_in_env:
             - PROJECT_DIRECTORY
             - MONGODB_URI
+
+  - name: test-otel
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: latest
+          TOPOLOGY: standalone
+          OTEL: true
+      - func: run driver test suite
+        vars:
+          TEST_FILTER: "test::spec::open_telemetry::server_trace"

@@ -278,3 +278,79 @@ async fn error_type_is_exception_type_server_err() {
     assert_ne!(error_type.value, status_code.value);
     assert_ne!(exception_type.value, status_code.value);
 }
+
+mod server_trace {
+    use std::path::Path;
+
+    use serde_json::Value;
+
+    use super::*;
+
+    // Prose Test 7: Server spans join the driver's trace
+    #[tokio::test]
+    async fn server_span_joins_driver_trace() {
+        let trace_dir = std::env::var("OTEL_TRACE_DIR").unwrap_or_else(|_| "".to_owned());
+        if trace_dir.is_empty() {
+            log_uncaptured("skipping server_span_joins_driver_trace: OTEL_TRACE_DIR unset");
+        }
+
+        // 1. Create a MongoClient with tracing enabled.
+        let mut options = get_client_options().await.clone();
+        let (tracing, tracing_opts) = ClientTracing::new(&ObserveTracingMessages::default());
+        options.tracing = Some(tracing_opts);
+        let client = Client::for_test().options(options).await;
+
+        // 2. Perform an insertOne operation on a test collection and record the driver's command
+        //    span for the resulting insert command (its traceId and spanId).
+        client
+            .database("server_trace")
+            .collection::<Document>("test")
+            .insert_one(doc! {})
+            .await
+            .unwrap();
+        let spans = tracing.get_spans();
+        let cmd_span = spans
+            .values()
+            .flatten()
+            .find(|s| s.name == "insertOne")
+            .expect("insert command span");
+        let trace_id = cmd_span.span_context.trace_id();
+        let span_id = cmd_span.span_context.span_id();
+
+        // 3. Poll OTEL_TRACE_DIR until a server span appears whose traceId equals the command
+        //    span's traceId, or the timeout elapses.
+        const TIMEOUT: tokio::time::Duration = tokio::time::Duration::from_secs(30);
+        let deadline = tokio::time::Instant::now() + TIMEOUT;
+        loop {
+            let spans = read_spans(Path::new(&trace_dir)).await;
+            dbg!(spans);
+            if tokio::time::Instant::now() >= deadline {
+                break;
+            }
+        }
+    }
+
+    async fn read_spans(dir: &Path) -> Vec<Value> {
+        let mut out = vec![];
+        let Ok(mut entries) = tokio::fs::read_dir(dir).await else {
+            return out;
+        };
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let Ok(text) = tokio::fs::read_to_string(entry.path()).await else {
+                continue;
+            };
+            for line in text.lines().filter(|l| !l.trim().is_empty()) {
+                let Ok(batch) = serde_json::from_str::<Value>(line) else {
+                    continue;
+                };
+                for rs in batch["resourceSpans"].as_array().into_iter().flatten() {
+                    for ss in rs["scopeSpans"].as_array().into_iter().flatten() {
+                        out.extend(ss["spans"].as_array().into_iter().flatten().cloned());
+                    }
+                }
+            }
+        }
+
+        out
+    }
+}

@@ -212,6 +212,7 @@ functions:
           - AWS_ACCESS_KEY_ID
           - AWS_SECRET_ACCESS_KEY
           - AWS_SESSION_TOKEN
+          - OTEL
     - command: expansions.update
       params:
         file: mo-expansion.yml
@@ -289,3 +290,4 @@ functions:
           - ZLIB
           - SNAPPY
           - TEST_FILTER
+          - OTEL_TRACE_DIR
