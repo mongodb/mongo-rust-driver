@@ -425,7 +425,7 @@ impl FromStr for AuthMechanism {
             .into()),
 
             _ => Err(ErrorKind::InvalidArgument {
-                message: format!("invalid mechanism string: {str}"),
+                message: "invalid authentication mechanism".to_string(),
             }
             .into()),
         }
