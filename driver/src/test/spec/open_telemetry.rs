@@ -283,6 +283,7 @@ mod server_trace {
     use std::path::Path;
 
     use serde_json::Value;
+    use tokio::time::Duration;
 
     use super::*;
 
@@ -308,36 +309,62 @@ mod server_trace {
             .insert_one(doc! {})
             .await
             .unwrap();
-        let spans = tracing.get_spans();
+        let spans = dbg!(tracing.get_spans());
         let cmd_span = spans
             .values()
             .flatten()
-            .find(|s| s.name == "insertOne")
+            .find(|s| s.name == "insert")
             .expect("insert command span");
         let trace_id = cmd_span.span_context.trace_id();
+        let trace_id_hex = format!("{trace_id:x}");
         let span_id = cmd_span.span_context.span_id();
 
         // 3. Poll OTEL_TRACE_DIR until a server span appears whose traceId equals the command
         //    span's traceId, or the timeout elapses.
-        const TIMEOUT: tokio::time::Duration = tokio::time::Duration::from_secs(30);
+        const TIMEOUT: Duration = Duration::from_secs(30);
         let deadline = tokio::time::Instant::now() + TIMEOUT;
+        let mut found = vec![];
         loop {
-            let spans = read_spans(Path::new(&trace_dir)).await;
-            dbg!(spans);
+            let spans = read_spans(Path::new(&trace_dir));
             if tokio::time::Instant::now() >= deadline {
+                panic!("timed out waiting for traces in {trace_dir:?}, spans = {spans:#?}");
+            }
+            for span in spans {
+                if span["traceId"] == trace_id_hex {
+                    found.push(span);
+                }
+            }
+            if !found.is_empty() {
                 break;
             }
+            tokio::time::sleep(Duration::from_secs(1)).await;
         }
+
+        // 4. Assert that exactly one such server span exists for the insert command and that its
+        //    parentSpanId equals the driver command span's spanId.
+        let [server_span] = found.as_slice() else {
+            panic!("expected a single span, got {found:#?}");
+        };
+        assert_eq!(server_span["name"], "insert");
+        assert_eq!(server_span["parentSpanId"], format!("{span_id:x}"));
     }
 
-    async fn read_spans(dir: &Path) -> Vec<Value> {
+    fn read_spans(dir: &Path) -> Vec<Value> {
         let mut out = vec![];
-        let Ok(mut entries) = tokio::fs::read_dir(dir).await else {
-            return out;
-        };
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let Ok(text) = tokio::fs::read_to_string(entry.path()).await else {
+        for entry in walkdir::WalkDir::new(dir)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
+            if !entry.file_type().is_file() {
                 continue;
+            }
+            eprintln!("reading {:?}", entry.path());
+            let text = match std::fs::read_to_string(entry.path()) {
+                Ok(text) => text,
+                Err(e) => {
+                    eprintln!("unable to read {:?}: {e}", entry.path());
+                    continue;
+                }
             };
             for line in text.lines().filter(|l| !l.trim().is_empty()) {
                 let Ok(batch) = serde_json::from_str::<Value>(line) else {
