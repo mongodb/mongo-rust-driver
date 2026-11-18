@@ -7,8 +7,8 @@ if [ ! -f "driver/Cargo.toml" ]; then
     exit 1
 fi
 
-if ! command -v cargo-cyclonedx > /dev/null 2>&1; then
-    echo "cargo-cyclonedx is required; install with \`cargo install cargo-cyclonedx\`"
+if ! command -v sbom-attest > /dev/null 2>&1; then
+    echo "sbom-attest is required; install with \`cargo install sbom-attest\`"
     exit 1
 fi
 
@@ -21,9 +21,8 @@ pushd etc/update_version
 cargo run -- "$@"
 popd
 
-RUST_LOG=cargo_cyclonedx=info cargo cyclonedx --manifest-path driver/Cargo.toml --spec-version 1.5 -vv --format json --override-filename sbom --all-features
-cp driver/sbom.json sbom.json
-# Clean up workspace member SBOMs - we only want the driver SBOM
-rm -f driver/sbom.json macros/sbom.json benchmarks/sbom.json etc/update_version/sbom.json
+# Dependencies and features are resolved for the driver alone (as a crate depending on it would
+# get them), so the driver's dev-dependencies and the other workspace members are not included.
+sbom-attest generate --manifest-path driver/Cargo.toml --package mongodb --all-features --author "MongoDB, Inc." --cdx sbom.json
 
 cyclonedx validate --input-file sbom.json --fail-on-errors
