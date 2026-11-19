@@ -992,8 +992,10 @@ pub(super) fn validate_credential(credential: &Credential) -> Result<()> {
         .unwrap_or(default_document);
     for k in properties.keys() {
         if VALID_PROPERTIES.iter().all(|p| *p != k) {
+            // The key came from user input and may be sensitive, so it is not included.
             return Err(Error::invalid_argument(format!(
-                "'{k}' is not a valid property for {MONGODB_OIDC_STR} authentication",
+                "an invalid property was provided for {MONGODB_OIDC_STR} authentication; valid \
+                 properties are {VALID_PROPERTIES:?}",
             )));
         }
     }

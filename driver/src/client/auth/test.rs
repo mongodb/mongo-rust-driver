@@ -1,6 +1,12 @@
 use std::sync::LazyLock;
 
-use crate::{cmap::StreamDescription, options::AuthMechanism};
+use crate::{
+    bson::doc,
+    cmap::StreamDescription,
+    options::{AuthMechanism, Credential},
+    test::get_client_options,
+    Client,
+};
 
 use super::sasl::SaslStart;
 
@@ -98,4 +104,48 @@ fn sasl_first_options_not_specified() {
         command.body.get_document("options").is_err(),
         "SaslStart should not contain options document for X.509 authentication"
     );
+}
+
+#[tokio::test]
+async fn plain_auth_username_with_null_byte_rejected() {
+    let credential = Credential::builder()
+        .username("user\0name".to_string())
+        .password("password".to_string())
+        .mechanism(AuthMechanism::Plain)
+        .build();
+    let mut options = get_client_options().await.clone();
+    options.credential = Some(credential);
+    let client = Client::with_options(options).unwrap();
+    let error = client
+        .database("db")
+        .run_command(doc! { "ping": 1 })
+        .await
+        .unwrap_err();
+    assert!(error.is_invalid_argument());
+    assert!(error
+        .message()
+        .unwrap()
+        .contains("cannot contain NUL characters"));
+}
+
+#[tokio::test]
+async fn plain_auth_password_with_null_byte_rejected() {
+    let credential = Credential::builder()
+        .username("username".to_string())
+        .password("pass\0word".to_string())
+        .mechanism(AuthMechanism::Plain)
+        .build();
+    let mut options = get_client_options().await.clone();
+    options.credential = Some(credential);
+    let client = Client::with_options(options).unwrap();
+    let error = client
+        .database("db")
+        .run_command(doc! { "ping": 1 })
+        .await
+        .unwrap_err();
+    assert!(error.is_invalid_argument());
+    assert!(error
+        .message()
+        .unwrap()
+        .contains("cannot contain NUL characters"));
 }
