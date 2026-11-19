@@ -532,9 +532,6 @@ async fn connection_logging_unified() {
             // We don't support any of these options (and are unlikely ever to support them).
             "waitQueueTimeoutMS should be included in connection pool created message when \
              specified",
-            "waitQueueSize should be included in connection pool created message when specified",
-            "waitQueueMultiple should be included in connection pool created message when \
-             specified",
         ])
         .await;
 }
