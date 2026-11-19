@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use mongodb_internal_macros::TestSerialize;
+
 use crate::{
     error::{WriteConcernError, WriteError},
     results::{BulkWriteResult, SummaryBulkWriteResult, VerboseBulkWriteResult},
@@ -25,9 +27,8 @@ pub struct BulkWriteError {
 }
 
 /// The results of a partially-successful [`bulk_write`](crate::Client::bulk_write) operation.
-#[derive(Clone, Debug)]
-#[cfg_attr(test, derive(serde::Serialize))]
-#[cfg_attr(test, serde(untagged))]
+#[derive(Clone, Debug, TestSerialize)]
+#[serde(untagged)]
 pub enum PartialBulkWriteResult {
     /// Summary bulk write results. This variant will be populated if
     /// [`verbose_results`](crate::action::BulkWrite::verbose_results) was not configured in the
