@@ -3,7 +3,7 @@ use std::{collections::HashMap, time::Duration};
 use crate::{
     bson::{doc, Document},
     error::{bulk_write::PartialBulkWriteResult, BulkWriteError, ErrorKind},
-    options::{InsertOneModel, UpdateOneModel},
+    options::{InsertOneModel, UpdateOneModel, WriteModel},
     results::UpdateResult,
     test::{
         get_client_options,
@@ -395,6 +395,79 @@ async fn failed_cursor_iteration() {
         kill_cursors_event.is_some(),
         "did not observe killCursors event"
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn cursor_error_after_write_error_in_previous_batch() {
+    if server_version_lt(8, 0).await {
+        log_uncaptured(
+            "skipping cursor_error_after_write_error_in_previous_batch: bulkWrite requires 8.0+",
+        );
+        return;
+    }
+
+    let mut options = get_client_options().await.clone();
+    options.retry_writes = Some(false);
+    let client = Client::for_test()
+        .options(options)
+        .use_single_mongos()
+        .monitor_events()
+        .await;
+    let collection = client
+        .database("db")
+        .collection::<Document>("cursor_error_after_write_error_in_previous_batch");
+    collection.drop().await.unwrap();
+    let existing = doc! { "_id": 1 };
+    collection.insert_one(existing.clone()).await.unwrap();
+
+    let max_write_batch_size = get_max_write_batch_size().await;
+    let max_bson_object_size = get_max_bson_object_size().await;
+    let insert = collection.insert_one_model(doc! {}).unwrap();
+    let duplicate = collection.insert_one_model(existing).unwrap();
+
+    let mut models: Vec<WriteModel> = vec![duplicate.into()];
+    models.resize(max_write_batch_size, insert.clone().into());
+
+    // Large upserted IDs force a getMore on the second batch's result cursor.
+    for id in ["a", "b"] {
+        models.push(
+            UpdateOneModel::builder()
+                .namespace(collection.namespace())
+                .filter(doc! { "_id": id.repeat(max_bson_object_size / 2) })
+                .update(doc! { "$set": { "x": 1 } })
+                .upsert(true)
+                .build()
+                .into(),
+        );
+    }
+    models.resize(2 * max_write_batch_size + 1, insert.into());
+
+    let fail_point = FailPoint::fail_command(&["getMore"], FailPointMode::Times(1)).error_code(8);
+    let _guard = client.enable_fail_point(fail_point).await.unwrap();
+
+    let error = client
+        .bulk_write(models)
+        .ordered(false)
+        .verbose_results()
+        .await
+        .unwrap_err();
+
+    let events = client.events.get_command_started_events(&["bulkWrite"]);
+    assert_eq!(
+        events.len(),
+        2,
+        "the cursor error must stop the third batch"
+    );
+    assert_eq!(
+        error.source.as_ref().and_then(|source| source.code()),
+        Some(8)
+    );
+
+    let ErrorKind::BulkWrite(bulk_write_error) = *error.kind else {
+        panic!("Expected bulk write error, got {error:?}");
+    };
+    assert_eq!(bulk_write_error.write_errors.len(), 1);
+    assert_eq!(bulk_write_error.write_errors[&0].code, 11000);
 }
 
 // CRUD prose test 10 not implemented. The driver does not support unacknowledged writes.
