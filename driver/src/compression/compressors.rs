@@ -128,8 +128,8 @@ impl FromStr for Compressor {
                 }
                 .into())
             }
-            other => Err(ErrorKind::InvalidArgument {
-                message: format!("Unsupported compressor: {other}"),
+            _ => Err(ErrorKind::InvalidArgument {
+                message: "Unsupported compressor".to_string(),
             }
             .into()),
         }
