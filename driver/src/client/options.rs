@@ -2759,14 +2759,14 @@ impl ConnectionString {
 
                 match self.tls {
                     Some(Tls::Enabled(_)) if !tls => {
-                        return Err(Error::invalid_argument(
-                            "cannot set {key}={tls} if other TLS options are set",
-                        ));
+                        return Err(Error::invalid_argument(format!(
+                            "cannot set {key}={value} if other TLS options are set"
+                        )));
                     }
                     Some(Tls::Disabled) if tls => {
-                        return Err(Error::invalid_argument(
-                            "cannot set {key}={tls} if TLS is disabled",
-                        ));
+                        return Err(Error::invalid_argument(format!(
+                            "cannot set {key}={value} if TLS is disabled"
+                        )));
                     }
                     None => {
                         if tls {
