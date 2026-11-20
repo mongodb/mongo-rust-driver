@@ -9,7 +9,7 @@ use std::{
     cmp::Ordering,
     collections::HashSet,
     convert::TryFrom,
-    fmt::{self, Display, Formatter, Write},
+    fmt::{self, Debug, Display, Formatter, Write},
     hash::{Hash, Hasher},
     net::{Ipv4Addr, Ipv6Addr, SocketAddr},
     path::PathBuf,
@@ -38,7 +38,7 @@ use crate::{
     bson::{doc, Bson, Document, Timestamp, UuidRepresentation},
     client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
-    error::{Error, ErrorKind, Redact, Result},
+    error::{Error, ErrorKind, Result},
     event::EventHandler,
     options::ReadConcernLevel,
     sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
@@ -252,17 +252,15 @@ impl ServerAddress {
         let (hostname, port) = if let Some(ip_literal) = address.strip_prefix("[") {
             let Some((hostname, port)) = ip_literal.split_once("]") else {
                 return Err(ErrorKind::InvalidArgument {
-                    message: format!(
-                        "invalid server address {}: missing closing ']' in IP literal hostname",
-                        Redact(address),
-                    ),
+                    message: "invalid server address: missing closing ']' in IP literal hostname"
+                        .to_string(),
                 }
                 .into());
             };
 
             if let Err(parse_error) = Ipv6Addr::from_str(hostname) {
                 return Err(ErrorKind::InvalidArgument {
-                    message: format!("invalid server address {}: {parse_error}", Redact(address)),
+                    message: format!("invalid server address: {parse_error}"),
                 }
                 .into());
             }
@@ -273,11 +271,9 @@ impl ServerAddress {
                 Some(port)
             } else {
                 return Err(ErrorKind::InvalidArgument {
-                    message: format!(
-                        "invalid server address {}: the hostname can only be followed by a port \
-                         prefixed with ':', got {port}",
-                        Redact(address)
-                    ),
+                    message: "invalid server address: the hostname can only be followed by a port \
+                              prefixed with ':'"
+                        .to_string(),
                 }
                 .into());
             };
@@ -292,10 +288,7 @@ impl ServerAddress {
 
         if hostname.is_empty() {
             return Err(ErrorKind::InvalidArgument {
-                message: format!(
-                    "invalid server address {}: the hostname cannot be empty",
-                    Redact(address)
-                ),
+                message: "invalid server address: the hostname cannot be empty".to_string(),
             }
             .into());
         }
@@ -312,11 +305,9 @@ impl ServerAddress {
             match u16::from_str(port) {
                 Ok(0) | Err(_) => {
                     return Err(ErrorKind::InvalidArgument {
-                        message: format!(
-                            "invalid server address {}: the port must be an integer between 1 and \
-                             65535, got {port}",
-                            Redact(address)
-                        ),
+                        message: "invalid server address: the port must be an integer between 1 \
+                                  and 65535"
+                            .to_string(),
                     }
                     .into());
                 }
@@ -449,7 +440,7 @@ pub struct ServerApi {
 
 /// Configuration for connecting to a SOCKS5 proxy.
 #[cfg(feature = "socks5-proxy")]
-#[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
+#[derive(Clone, Deserialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct Socks5Proxy {
@@ -462,6 +453,25 @@ pub struct Socks5Proxy {
 
     /// A username/password pair to authenticate to the proxy.
     pub authentication: Option<(String, String)>,
+}
+
+#[cfg(feature = "socks5-proxy")]
+impl Debug for Socks5Proxy {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let Socks5Proxy {
+            host,
+            port,
+            authentication,
+        } = self;
+        f.debug_struct("Socks5Proxy")
+            .field("host", host)
+            .field("port", port)
+            .field(
+                "authentication",
+                &authentication.is_some().then_some("REDACTED"),
+            )
+            .finish()
+    }
 }
 
 /// Dummy struct for internal use.
@@ -952,10 +962,19 @@ where
 ///
 /// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
 ///
+/// The `Display` and `Debug` implementations replace the username, the password, and the arguments
+/// of sensitive options with a fixed `<redacted>` marker, and will not parse back into an
+/// equivalent `ConnectionString`. Use
+/// [`to_unredacted_string`](ConnectionString::to_unredacted_string) to obtain a string that
+/// includes the sensitive values.
+///
 /// If values are set that would not be valid to parse from a MongoDB connection string, the output
-/// from the `Display` implementation may fail to parse or parse incorrectly.
+/// from [`to_unredacted_string`](ConnectionString::to_unredacted_string) may fail to parse or parse
+/// incorrectly.
 #[skip_serializing_none]
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Default, PartialEq, Serialize)]
+#[cfg_attr(not(test), derive(Debug))]
+#[cfg_attr(test, derive_where(Debug))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionString {
@@ -1148,6 +1167,7 @@ pub struct ConnectionString {
 
     #[cfg(test)]
     #[serde(skip_serializing)]
+    #[derive_where(skip(Debug))]
     original_uri: String,
 }
 
@@ -1250,7 +1270,7 @@ impl Tls {
 }
 
 /// Specifies the TLS configuration that the [`Client`](../struct.Client.html) should use.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, TypedBuilder)]
+#[derive(Clone, Default, Deserialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct TlsOptions {
@@ -1282,6 +1302,34 @@ pub struct TlsOptions {
     /// If set, the key in `cert_key_file_path` must be encrypted with this password.
     #[cfg(feature = "cert-key-password")]
     pub tls_certificate_key_file_password: Option<Vec<u8>>,
+}
+
+impl Debug for TlsOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let TlsOptions {
+            allow_invalid_certificates,
+            ca_file_path,
+            cert_key_file_path,
+            #[cfg(feature = "openssl-tls")]
+            allow_invalid_hostnames,
+            #[cfg(feature = "cert-key-password")]
+            tls_certificate_key_file_password,
+        } = self;
+        let mut d = f.debug_struct("TlsOptions");
+        d.field("allow_invalid_certificates", allow_invalid_certificates)
+            .field("ca_file_path", ca_file_path)
+            .field("cert_key_file_path", cert_key_file_path);
+        #[cfg(feature = "openssl-tls")]
+        d.field("allow_invalid_hostnames", allow_invalid_hostnames);
+        #[cfg(feature = "cert-key-password")]
+        d.field(
+            "tls_certificate_key_file_password",
+            &tls_certificate_key_file_password
+                .is_some()
+                .then_some("REDACTED"),
+        );
+        d.finish()
+    }
 }
 
 impl TlsOptions {
@@ -1588,11 +1636,26 @@ fn percent_encode(s: &str) -> String {
     percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
 }
 
+/// The fixed string that replaces sensitive values in the string representation of a
+/// [`ConnectionString`].
+const REDACTED_MARKER: &str = "<redacted>";
+
 struct UriOptions(String);
 
 impl UriOptions {
     fn new() -> Self {
         Self(String::new())
+    }
+
+    /// Pushes an option whose argument is sensitive; if `redact` is set, the argument is replaced
+    /// with the fixed marker.
+    fn push_sensitive(&mut self, key: &'static str, s: &str, redact: bool) {
+        if redact {
+            // unwrap safety: write! to a string target is infallible
+            write!(&mut self.0, "&{key}={REDACTED_MARKER}").unwrap();
+        } else {
+            self.push_str(key, s);
+        }
     }
 
     // Option keys are static to enforce that they're constants and not user input.
@@ -1686,10 +1749,10 @@ impl ConnectionString {
                      feature is disabled",
                 ));
             }
-            other => {
-                return Err(Error::invalid_argument(format!(
-                    "unsupported connection string scheme: {other}"
-                )));
+            _ => {
+                return Err(Error::invalid_argument(
+                    "unsupported connection string scheme",
+                ));
             }
         };
 
@@ -1719,7 +1782,16 @@ impl ConnectionString {
 
         let hosts = hosts
             .split(",")
-            .map(ServerAddress::parse)
+            .enumerate()
+            .map(|(i, host)| {
+                ServerAddress::parse(host).map_err(|e| match *e.kind {
+                    ErrorKind::InvalidArgument { message } => Error::invalid_argument(format!(
+                        "host identifier {} of the connection string: {message}",
+                        i + 1
+                    )),
+                    _ => e,
+                })
+            })
             .collect::<Result<Vec<ServerAddress>>>()?;
         let host_info = if !srv {
             HostInfo::HostIdentifiers(hosts)
@@ -1752,12 +1824,13 @@ impl ConnectionString {
             Some("") | None => None,
             Some(db) => {
                 let decoded = percent_decode(db, "database name must be URL encoded")?;
-                for c in decoded.chars() {
-                    if ILLEGAL_DATABASE_CHARACTERS.contains(&c) {
-                        return Err(Error::invalid_argument(format!(
-                            "illegal character in database name: {c}"
-                        )));
-                    }
+                if decoded
+                    .chars()
+                    .any(|c| ILLEGAL_DATABASE_CHARACTERS.contains(&c))
+                {
+                    return Err(Error::invalid_argument(
+                        "illegal character in database name",
+                    ));
                 }
                 Some(decoded)
             }
@@ -1828,11 +1901,10 @@ impl ConnectionString {
                                 "none" | "forward" | "forwardandreverse" => Bson::String(s),
                                 _ => {
                                     return Err(ErrorKind::InvalidArgument {
-                                        message: format!(
-                                            "Invalid CANONICALIZE_HOST_NAME value: {s}. Valid \
-                                             values are 'none', 'forward', 'forwardAndReverse', \
-                                             'true', 'false'"
-                                        ),
+                                        message: "Invalid CANONICALIZE_HOST_NAME value. Valid \
+                                                  values are 'none', 'forward', \
+                                                  'forwardAndReverse', 'true', 'false'"
+                                            .to_string(),
                                     }
                                     .into());
                                 }
@@ -1929,8 +2001,19 @@ impl ConnectionString {
         Ok(conn_str)
     }
 
-    /// Un-parses a [`ConnectionString`] struct back into a MongoDB connection string.
-    fn unparse(&self) -> String {
+    /// Returns this connection string as a MongoDB connection string that **includes** the
+    /// username, the password, and the arguments of all sensitive options (e.g.
+    /// `authMechanismProperties` and `tlsCertificateKeyFilePassword`) in plaintext. Take care not
+    /// to log or otherwise disclose the result; the `Display` implementation produces a
+    /// redacted string suitable for that.
+    pub fn to_unredacted_string(&self) -> String {
+        self.unparse(false)
+    }
+
+    /// Un-parses a [`ConnectionString`] struct back into a MongoDB connection string. If `redact`
+    /// is set, the username, the password, and the arguments of sensitive options are replaced
+    /// with a fixed marker.
+    fn unparse(&self, redact: bool) -> String {
         let ConnectionString {
             host_info,
             app_name,
@@ -1987,9 +2070,17 @@ impl ConnectionString {
 
         if let Some(credential) = credential {
             if let Some(username) = &credential.username {
-                res.push_str(&percent_encode(username));
+                if redact {
+                    res.push_str(REDACTED_MARKER);
+                } else {
+                    res.push_str(&percent_encode(username));
+                }
                 if let Some(password) = &credential.password {
-                    res.push_str(&format!(":{}", percent_encode(password)))
+                    if redact {
+                        write!(&mut res, ":{REDACTED_MARKER}").unwrap();
+                    } else {
+                        res.push_str(&format!(":{}", percent_encode(password)));
+                    }
                 }
                 res.push('@');
             }
@@ -2039,9 +2130,10 @@ impl ConnectionString {
                     if let Some(tls_certificate_key_file_password) =
                         &options.tls_certificate_key_file_password
                     {
-                        opts.push_str(
+                        opts.push_sensitive(
                             "tlsCertificateKeyFilePassword",
                             std::str::from_utf8(tls_certificate_key_file_password).unwrap(),
+                            redact,
                         );
                     }
 
@@ -2187,7 +2279,7 @@ impl ConnectionString {
             .and_then(|c: &Credential| c.mechanism_properties.as_ref())
         {
             if !auth_mechanism_properties.is_empty() {
-                opts.push_str(
+                opts.push_sensitive(
                     "authMechanismProperties",
                     &auth_mechanism_properties
                         .iter()
@@ -2198,6 +2290,7 @@ impl ConnectionString {
                         })
                         .collect::<Vec<_>>()
                         .join(","),
+                    redact,
                 )
             }
         }
@@ -2255,8 +2348,8 @@ impl ConnectionString {
                 opts.push("proxyPort", &port);
             }
             if let Some((username, password)) = proxy.authentication.as_ref() {
-                opts.push_str("proxyUsername", username);
-                opts.push_str("proxyPassword", password);
+                opts.push_sensitive("proxyUsername", username, redact);
+                opts.push_sensitive("proxyPassword", password, redact);
             }
         }
 
@@ -2303,12 +2396,18 @@ impl ConnectionString {
 
         let mut keys = HashSet::new();
 
+        // Byte offset of the current option within the query segment, for diagnostics that must
+        // not repeat any of the (possibly sensitive) text.
+        let mut offset = 0;
         for option_pair in options.split('&') {
+            let pair_offset = offset;
+            offset += option_pair.len() + 1;
             let (key, value) = match option_pair.split_once('=') {
                 Some((key, value)) => (key.to_lowercase(), value),
                 None => {
                     return Err(Error::invalid_argument(format!(
-                        "connection string option is not a 'key=value' pair: {option_pair}"
+                        "the option at offset {pair_offset} in the query segment is not a \
+                         'key=value' pair"
                     )));
                 }
             };
@@ -2325,6 +2424,7 @@ impl ConnectionString {
                 percent_encoding::percent_decode(value.as_bytes())
                     .decode_utf8_lossy()
                     .as_ref(),
+                pair_offset,
             )?;
         }
 
@@ -2405,6 +2505,7 @@ impl ConnectionString {
         parts: &mut ConnectionStringParts,
         key: &str,
         value: &str,
+        offset: usize,
     ) -> Result<()> {
         macro_rules! get_bool {
             ($value:expr, $option:expr) => {
@@ -2488,10 +2589,10 @@ impl ConnectionString {
 
                 for property in value.split(",") {
                     let Some((k, v)) = property.split_once(":") else {
-                        return Err(Error::invalid_argument(format!(
+                        return Err(Error::invalid_argument(
                             "each entry in authMechanismProperties must be a colon-separated \
-                             key-value pair, got {property}"
-                        )));
+                             key-value pair",
+                        ));
                     };
                     if k == "ALLOWED_HOSTS" || k == "OIDC_CALLBACK" || k == "OIDC_HUMAN_CALLBACK" {
                         return Err(Error::invalid_argument(format!(
@@ -2591,11 +2692,10 @@ impl ConnectionString {
                     "nearest" => ReadPreference::Nearest {
                         options: Default::default(),
                     },
-                    other => {
-                        return Err(ErrorKind::InvalidArgument {
-                            message: format!("'{other}' is not a valid read preference"),
-                        }
-                        .into());
+                    _ => {
+                        return Err(Error::invalid_argument(
+                            "readPreference is not a valid read preference mode",
+                        ));
                     }
                 });
             }
@@ -2607,13 +2707,10 @@ impl ConnectionString {
                         .split(',')
                         .map(|tag| match tag.split_once(':') {
                             Some((key, value)) => Ok((key.to_string(), value.to_string())),
-                            None => Err(ErrorKind::InvalidArgument {
-                                message: format!(
-                                    "'{tag}' is not a valid read preference tag (which must be of \
-                                     the form 'key:value'",
-                                ),
-                            }
-                            .into()),
+                            None => Err(Error::invalid_argument(
+                                "a readPreferenceTags entry is not a valid read preference tag \
+                                 (which must be of the form 'key:value')",
+                            )),
                         })
                         .collect()
                 };
@@ -2637,10 +2734,10 @@ impl ConnectionString {
                     "stream" => ServerMonitoringMode::Stream,
                     "poll" => ServerMonitoringMode::Poll,
                     "auto" => ServerMonitoringMode::Auto,
-                    other => {
-                        return Err(Error::invalid_argument(format!(
-                            "{other:?} is not a valid server monitoring mode"
-                        )));
+                    _ => {
+                        return Err(Error::invalid_argument(
+                            "serverMonitoringMode is not a valid server monitoring mode",
+                        ));
                     }
                 });
             }
@@ -2788,11 +2885,9 @@ impl ConnectionString {
                 "pythonlegacy" => self.uuid_representation = Some(UuidRepresentation::PythonLegacy),
                 _ => {
                     return Err(ErrorKind::InvalidArgument {
-                        message: format!(
-                            "connection string `uuidRepresentation` option can be one of \
-                             `csharpLegacy`, `javaLegacy`, or `pythonLegacy`. Received invalid \
-                             `{value}`"
-                        ),
+                        message: "connection string `uuidRepresentation` option can be one of \
+                                  `csharpLegacy`, `javaLegacy`, or `pythonLegacy`"
+                            .to_string(),
                     }
                     .into());
                 }
@@ -2856,7 +2951,7 @@ impl ConnectionString {
             #[cfg(feature = "socks5-proxy")]
             PROXY_PORT => {
                 let port = u16::from_str(value)
-                    .map_err(|_| Error::invalid_argument(format!("invalid proxy port: {value}")))?;
+                    .map_err(|_| Error::invalid_argument("invalid proxy port"))?;
                 parts.proxy_port = Some(port);
             }
             #[cfg(feature = "socks5-proxy")]
@@ -2878,10 +2973,13 @@ impl ConnectionString {
                     }
                     acc
                 });
-                let mut message = format!("{other} is an invalid option");
+                // The unknown key itself may be sensitive, so only report its position.
+                let mut message =
+                    format!("Unsupported option at offset {offset} in the query segment");
                 if jaro_winkler >= 0.84 {
                     let _ = write!(message, ". An option with a similar name exists: {option}");
                 }
+                message.push('.');
                 return Err(ErrorKind::InvalidArgument { message }.into());
             }
         }
@@ -2908,7 +3006,7 @@ impl<'de> Deserialize<'de> for ConnectionString {
 
 impl Display for ConnectionString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.unparse())
+        write!(f, "{}", self.unparse(true))
     }
 }
 
@@ -3308,7 +3406,7 @@ mod tests {
     fn to_uri_str_simple() {
         let conn_str = ConnectionString::parse("mongodb://localhost:27017/?appName=foo").unwrap();
         assert_eq!(
-            conn_str.to_string(),
+            conn_str.to_unredacted_string(),
             "mongodb://localhost:27017/?appName=foo"
         );
     }
@@ -3321,7 +3419,7 @@ mod tests {
         .unwrap();
         assert_eq!(conn_str.app_name.as_deref(), Some("a&b=c d#e%f"));
 
-        let s = conn_str.to_string();
+        let s = conn_str.to_unredacted_string();
         // Reserved characters must not leak into the option string unescaped.
         assert_eq!(s.matches('&').count(), 1, "{s}");
         assert_eq!(s.matches('=').count(), 2, "{s}");
@@ -3330,7 +3428,7 @@ mod tests {
         let reparsed = ConnectionString::parse(&s).unwrap();
         assert_eq!(reparsed.app_name, conn_str.app_name);
         assert_eq!(reparsed.replica_set.as_deref(), Some("r&s"));
-        assert_eq!(reparsed.to_string(), s);
+        assert_eq!(reparsed.to_unredacted_string(), s);
     }
 
     #[test]
@@ -3338,10 +3436,10 @@ mod tests {
         let conn_str = ConnectionString::parse("mongodb://localhost/my%3Fdb%23x%40y").unwrap();
         assert_eq!(conn_str.default_database.as_deref(), Some("my?db#x@y"));
 
-        let s = conn_str.to_string();
+        let s = conn_str.to_unredacted_string();
         let reparsed = ConnectionString::parse(&s).unwrap();
         assert_eq!(reparsed.default_database, conn_str.default_database);
-        assert_eq!(reparsed.to_string(), s);
+        assert_eq!(reparsed.to_unredacted_string(), s);
     }
 
     #[cfg(unix)]
@@ -3360,11 +3458,11 @@ mod tests {
             }
         );
 
-        let s = conn_str.to_string();
+        let s = conn_str.to_unredacted_string();
         assert!(s.contains("%2Ftmp%2Fmongodb-27017.sock"), "{s}");
         let reparsed = ConnectionString::parse(&s).unwrap();
         assert_eq!(reparsed.host_info, conn_str.host_info);
-        assert_eq!(reparsed.to_string(), s);
+        assert_eq!(reparsed.to_unredacted_string(), s);
     }
 
     #[test]
@@ -3372,14 +3470,14 @@ mod tests {
         let conn_str =
             ConnectionString::parse("mongodb://[::1]:27018,[fe80::1],host:27019/").unwrap();
 
-        let s = conn_str.to_string();
+        let s = conn_str.to_unredacted_string();
         assert!(
             s.starts_with("mongodb://[::1]:27018,[fe80::1]:27017,host:27019/"),
             "{s}"
         );
         let reparsed = ConnectionString::parse(&s).unwrap();
         assert_eq!(reparsed.host_info, conn_str.host_info);
-        assert_eq!(reparsed.to_string(), s);
+        assert_eq!(reparsed.to_unredacted_string(), s);
     }
 
     #[test]
@@ -3389,13 +3487,13 @@ mod tests {
         )
         .unwrap();
 
-        let s = conn_str.to_string();
+        let s = conn_str.to_unredacted_string();
         let reparsed = ConnectionString::parse(&s).unwrap();
         let credential = reparsed.credential.as_ref().unwrap();
         assert_eq!(credential.username.as_deref(), Some("us@er"));
         assert_eq!(credential.password.as_deref(), Some("p:ss/w%rd"));
         assert_eq!(credential.source.as_deref(), Some("a&b"));
-        assert_eq!(reparsed.to_string(), s);
+        assert_eq!(reparsed.to_unredacted_string(), s);
     }
 
     #[test]
@@ -3406,7 +3504,7 @@ mod tests {
         )
         .unwrap();
 
-        let s = conn_str.to_string();
+        let s = conn_str.to_unredacted_string();
         let reparsed = ConnectionString::parse(&s).unwrap();
         let properties = reparsed
             .credential
@@ -3415,7 +3513,7 @@ mod tests {
             .unwrap();
         assert_eq!(properties.get_str("ENVIRONMENT").unwrap(), "azure");
         assert_eq!(properties.get_str("TOKEN_RESOURCE").unwrap(), "a:b");
-        assert_eq!(reparsed.to_string(), s);
+        assert_eq!(reparsed.to_unredacted_string(), s);
     }
 
     #[test]
@@ -3433,7 +3531,7 @@ mod tests {
         assert_eq!(tag_sets[0].get("a").map(String::as_str), Some("b:c"));
         assert_eq!(tag_sets[0].get("dc").map(String::as_str), Some("ny"));
 
-        let s = conn_str.to_string();
+        let s = conn_str.to_unredacted_string();
         let reparsed = ConnectionString::parse(&s).unwrap();
         assert_eq!(reparsed.read_preference, conn_str.read_preference);
     }
@@ -3449,9 +3547,9 @@ mod tests {
                    uuidRepresentation=javaLegacy";
         let conn_str = ConnectionString::parse(uri).unwrap();
 
-        let s = conn_str.to_string();
+        let s = conn_str.to_unredacted_string();
         let reparsed = ConnectionString::parse(&s).unwrap();
-        assert_eq!(reparsed.to_string(), s);
+        assert_eq!(reparsed.to_unredacted_string(), s);
         assert_eq!(reparsed.host_info, conn_str.host_info);
         assert_eq!(reparsed.replica_set, conn_str.replica_set);
         assert_eq!(reparsed.app_name.as_deref(), Some("my app"));
@@ -3459,6 +3557,29 @@ mod tests {
         assert_eq!(reparsed.read_preference, conn_str.read_preference);
         assert_eq!(reparsed.max_pool_size, Some(10));
         assert_eq!(reparsed.tls, conn_str.tls);
+    }
+
+    #[test]
+    fn display_redacts_sensitive_values() {
+        let conn_str =
+            ConnectionString::parse("mongodb://us%40er:p%3Ass@localhost/?appName=foo").unwrap();
+        assert_eq!(
+            conn_str.to_string(),
+            "mongodb://<redacted>:<redacted>@localhost:27017/?appName=foo"
+        );
+        assert!(conn_str.to_unredacted_string().contains("us%40er:p%3Ass@"));
+
+        let conn_str = ConnectionString::parse(
+            "mongodb://user@localhost/?authMechanism=MONGODB-OIDC&\
+             authMechanismProperties=ENVIRONMENT:azure,TOKEN_RESOURCE:secret",
+        )
+        .unwrap();
+        assert_eq!(
+            conn_str.to_string(),
+            "mongodb://<redacted>@localhost:27017/?authMechanism=MONGODB%2DOIDC&\
+             authMechanismProperties=<redacted>"
+        );
+        assert!(conn_str.to_unredacted_string().contains("TOKEN%5FRESOURCE"));
     }
 }
 

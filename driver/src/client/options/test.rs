@@ -241,6 +241,8 @@ async fn run_connection_string_spec_tests() {
         // All the tests in this file use unix domain sockets
         skipped_files.push("valid-db-with-dotted-name.json");
     }
+    // Different test format; run by `test::spec::credential_disclosure`.
+    skipped_files.push("credential-disclosure.json");
 
     run_tests(&["connection-string"], &skipped_files).await;
 }
@@ -267,7 +269,7 @@ async fn uuid_representations() {
         .expect_err("expect `unknownLegacy` to be an invalid argument for `uuidRepresentation`");
     assert_eq!(
         "connection string `uuidRepresentation` option can be one of `csharpLegacy`, \
-         `javaLegacy`, or `pythonLegacy`. Received invalid `unknownLegacy`"
+         `javaLegacy`, or `pythonLegacy`"
             .to_string(),
         uuid_err
     );

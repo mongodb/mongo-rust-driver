@@ -41,6 +41,7 @@ functions:
         working_dir: "src"
         include_expansions_in_env:
           - MONGODB_URI
+          - FEATURES
         script: |
           ${PREPARE_SHELL}
           .evergreen/run-driver-benchmarks.sh
@@ -173,6 +174,39 @@ buildvariants:
       TOPOLOGY: "sharded_cluster"
       PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
       VENV_BIN_DIR: "bin"
+    tasks:
+      - ".driver"
+
+  - name: "driver-otel-api-only"
+    display_name: "Benchmark OpenTelemetry API-only"
+    run_on: rhel90-dbx-perf-large
+    expansions:
+      TOPOLOGY: "server"
+      PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+      VENV_BIN_DIR: "bin"
+      FEATURES: "otel-api-only"
+    tasks:
+      - ".driver"
+
+  - name: "driver-otel-sdk-ratio"
+    display_name: "Benchmark OpenTelemetry Sample Ratio"
+    run_on: rhel90-dbx-perf-large
+    expansions:
+      TOPOLOGY: "server"
+      PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+      VENV_BIN_DIR: "bin"
+      FEATURES: "otel-sdk-ratio"
+    tasks:
+      - ".driver"
+
+  - name: "driver-otel-sdk-always"
+    display_name: "Benchmark OpenTelemetry Sample Always"
+    run_on: rhel90-dbx-perf-large
+    expansions:
+      TOPOLOGY: "server"
+      PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+      VENV_BIN_DIR: "bin"
+      FEATURES: "otel-sdk-always"
     tasks:
       - ".driver"
 

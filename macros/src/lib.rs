@@ -1,6 +1,7 @@
 extern crate proc_macro;
 
 mod action_impl;
+mod deserialize;
 mod option;
 mod rustdoc;
 
@@ -67,6 +68,14 @@ pub fn options_doc(
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     crate::rustdoc::options_doc(attr, item, __custom_tokens)
+}
+
+/// Derives a `serde::Deserialize` impl that only exists under `#[cfg(test)]`, for types the driver
+/// never deserializes itself but tests do.  Reads the same `#[serde(...)]` attributes as the serde
+/// derives; in non-test builds those attributes are accepted but generate nothing.
+#[proc_macro_derive(TestDeserialize, attributes(serde))]
+pub fn test_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    crate::deserialize::derive(input)
 }
 
 /// Parse an identifier with a specific expected value.

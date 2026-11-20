@@ -175,25 +175,31 @@ impl AuthMechanism {
                 Ok(())
             }
             AuthMechanism::Plain => {
-                if credential.username.is_none() {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "No username provided for PLAIN authentication".to_string(),
-                    }
-                    .into());
+                let Some(ref username) = credential.username else {
+                    return Err(Error::invalid_argument(
+                        "No username provided for PLAIN authentication",
+                    ));
+                };
+                if username.is_empty() {
+                    return Err(Error::invalid_argument(
+                        "Username for PLAIN authentication must be non-empty",
+                    ));
+                }
+                if username.as_bytes().contains(&0) {
+                    return Err(Error::invalid_argument(
+                        "PLAIN authentication username cannot contain NUL characters",
+                    ));
                 }
 
-                if credential.username.as_deref() == Some("") {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "Username for PLAIN authentication must be non-empty".to_string(),
-                    }
-                    .into());
-                }
-
-                if credential.password.is_none() {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "No password provided for PLAIN authentication".to_string(),
-                    }
-                    .into());
+                let Some(ref password) = credential.password else {
+                    return Err(Error::invalid_argument(
+                        "No password provided for PLAIN authentication",
+                    ));
+                };
+                if password.as_bytes().contains(&0) {
+                    return Err(Error::invalid_argument(
+                        "PLAIN authentication password cannot contain NUL characters",
+                    ));
                 }
 
                 Ok(())
@@ -425,7 +431,7 @@ impl FromStr for AuthMechanism {
             .into()),
 
             _ => Err(ErrorKind::InvalidArgument {
-                message: format!("invalid mechanism string: {str}"),
+                message: "invalid authentication mechanism".to_string(),
             }
             .into()),
         }
@@ -614,7 +620,6 @@ impl Debug for Credential {
 }
 
 /// Contains the first client message sent as part of the authentication handshake.
-#[derive(Debug)]
 pub(crate) enum ClientFirst {
     Scram(ScramVersion, scram::ClientFirst),
     X509(Box<Command>),
