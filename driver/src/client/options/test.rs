@@ -470,6 +470,13 @@ async fn tls_insecure() {
         Some("cannot set ssl=true if TLS is disabled")
     );
 
+    let uri = "mongodb://localhost:27017?tlsCAFile=/tmp/ca.pem&tls=false";
+    let error = ClientOptions::parse(uri).await.unwrap_err();
+    assert_eq!(
+        error.message().as_deref(),
+        Some("cannot set tls=false if other TLS options are set")
+    );
+
     let uri = "mongodb://localhost:27017?tlsInsecure=true&tlsAllowInvalidCertificates=true";
     let error = ClientOptions::parse(uri).await.unwrap_err();
     assert!(error.message().unwrap().contains("cannot set both"));
