@@ -75,7 +75,15 @@ pub fn options_doc(
 /// derives; in non-test builds those attributes are accepted but generate nothing.
 #[proc_macro_derive(TestDeserialize, attributes(serde))]
 pub fn test_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    crate::deserialize::derive(input)
+    crate::deserialize::derive_deserialize(input)
+}
+
+/// Derives a `serde::Serialize` impl that only exists under `#[cfg(test)]`, for types the driver
+/// never serializes itself but tests do.  Reads the same `#[serde(...)]` attributes as the serde
+/// derives; in non-test builds those attributes are accepted but generate nothing.
+#[proc_macro_derive(TestSerialize, attributes(serde))]
+pub fn test_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    crate::deserialize::derive_serialize(input)
 }
 
 /// Parse an identifier with a specific expected value.
