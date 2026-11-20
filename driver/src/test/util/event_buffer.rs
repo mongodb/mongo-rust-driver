@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use chrono::{DateTime, Utc};
+use time::UtcDateTime;
 use tokio::sync::Notify;
 
 use crate::{
@@ -30,7 +30,7 @@ pub(crate) struct EventBuffer<T = Event> {
 
 #[derive(Debug)]
 struct EventBufferInner<T> {
-    events: Mutex<GenVec<(T, DateTime<Utc>)>>,
+    events: Mutex<GenVec<(T, UtcDateTime)>>,
     event_received: Notify,
 }
 
@@ -99,7 +99,7 @@ impl<T> EventBuffer<T> {
     // The `mut` isn't necessary on `self` here, but it serves as a useful lint on those
     // methods that modify; if the caller only has a `&EventHandler` it can at worst case
     // `clone` to get a `mut` one.
-    fn invalidate<R>(&mut self, f: impl FnOnce(&mut Vec<(T, DateTime<Utc>)>) -> R) -> R {
+    fn invalidate<R>(&mut self, f: impl FnOnce(&mut Vec<(T, UtcDateTime)>) -> R) -> R {
         let mut events = self.inner.events.lock().unwrap();
         events.generation = Generation(events.generation.0 + 1);
         let out = f(&mut events.data);
@@ -124,7 +124,7 @@ impl<T> EventBuffer<T> {
             .lock()
             .unwrap()
             .data
-            .push((ev, Utc::now()));
+            .push((ev, UtcDateTime::now()));
         self.inner.event_received.notify_waiters();
     }
 }
@@ -135,7 +135,7 @@ impl<T: Clone> EventBuffer<T> {
         self.all_timed().into_iter().map(|(ev, _)| ev).collect()
     }
 
-    pub(crate) fn all_timed(&self) -> Vec<(T, DateTime<Utc>)> {
+    pub(crate) fn all_timed(&self) -> Vec<(T, UtcDateTime)> {
         self.inner.events.lock().unwrap().data.clone()
     }
 }

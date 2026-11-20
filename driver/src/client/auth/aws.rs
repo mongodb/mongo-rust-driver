@@ -4,9 +4,12 @@ use aws_sigv4::{
     http_request::{sign, SignableBody, SignableRequest, SigningSettings},
     sign::v4::SigningParams,
 };
-use chrono::{offset::Utc, DateTime};
 use http::Request;
 use serde::Deserialize;
+use time::{
+    format_description::well_known::{iso8601, Iso8601},
+    UtcDateTime,
+};
 
 use crate::{
     base64,
@@ -67,7 +70,7 @@ pub(super) async fn authenticate_stream(
     server_first.validate(&nonce)?;
 
     let credentials = get_aws_credentials(credential).await?;
-    let date = Utc::now();
+    let date = UtcDateTime::now();
     let client_second_payload = compute_aws_sigv4_payload(
         credentials,
         date,
@@ -153,7 +156,7 @@ pub(crate) fn get_aws_credentials_from_uri(credential: &Credential) -> Option<Cr
 
 pub fn compute_aws_sigv4_payload(
     creds: Credentials,
-    date: DateTime<Utc>,
+    date: UtcDateTime,
     host: &str,
     server_nonce: &[u8],
 ) -> Result<Document> {
@@ -165,7 +168,17 @@ pub fn compute_aws_sigv4_payload(
     };
 
     let url = format!("https://{host}");
-    let date_str = date.format("%Y%m%dT%H%M%SZ").to_string();
+
+    const DATE_FORMAT: iso8601::EncodedConfig = iso8601::Config::DEFAULT
+        .set_use_separators(false)
+        .set_time_precision(iso8601::TimePrecision::Second {
+            decimal_digits: None,
+        })
+        .encode();
+    let date_str = date
+        .format(&Iso8601::<DATE_FORMAT>)
+        .map_err(|_| Error::authentication_error(MECH_NAME, "failed to format date"))?;
+
     let body_str = "Action=GetCallerIdentity&Version=2011-06-15";
     let body_bytes = body_str.as_bytes();
     let nonce_b64 = base64::encode(server_nonce);

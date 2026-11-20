@@ -774,15 +774,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chrono"
-version = "0.4.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "cipher"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2259,7 +2250,6 @@ dependencies = [
  "bitflags",
  "bson 2.15.0",
  "bson 3.1.0",
- "chrono",
  "cross-krb5",
  "derive-where",
  "fast-socks5",
@@ -2312,6 +2302,7 @@ dependencies = [
  "strsim",
  "take_mut",
  "thiserror 2.0.21",
+ "time",
  "tokio",
  "tokio-openssl",
  "tokio-rustls",

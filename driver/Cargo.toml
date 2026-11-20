@@ -39,7 +39,7 @@ cert-key-password = ["dep:pem", "dep:pkcs8"]
 socks5-proxy = ["dep:fast-socks5"]
 
 # Enable support for MONGODB-AWS authentication.
-aws-auth = ["dep:aws-config", "dep:aws-credential-types", "dep:aws-sigv4", "dep:chrono", "dep:http"]
+aws-auth = ["dep:aws-config", "dep:aws-credential-types", "dep:aws-sigv4", "dep:time", "dep:http"]
 
 # Enable support for on-demand Azure KMS credentials.
 azure-kms = ["dep:reqwest"]
@@ -86,10 +86,6 @@ log = ["dep:log"]
 [dependencies]
 base64 = "0.22"
 bitflags = "2"
-chrono = { version = "0.4.32", default-features = false, optional = true, features = [
-    "now",
-    "std",
-] }
 derive-where = "1.2.7"
 fast-socks5 = { version = "0.10", optional = true }
 flate2 = { version = "1.0", optional = true }
@@ -122,6 +118,7 @@ snap = { version = "1.0.5", optional = true }
 stringprep = "0.1.2"
 strsim = "0.11.1"
 take_mut = "0.2.2"
+time = { version = "0.3", features = ["formatting"], optional = true }
 thiserror = "2"
 tokio-openssl = { version = "0.6.3", optional = true }
 tracing = { version = "0.1.36", optional = true }
@@ -216,7 +213,6 @@ features = ["v4"]
 [dev-dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
 backtrace = { version = "0.3.68" }
-chrono = { version = "0.4.32", default-features = false, features = ["std", "now"] }
 futures = "0.3"
 hex = "0.4"
 home = "0.5"
@@ -227,6 +223,7 @@ pretty_assertions = "1.3.0"
 serde = { version = ">= 0.0.0", features = ["rc"] }
 serde_json = "1.0.64"
 semver = "1.0.0"
+time = "0.3"
 tokio = { version = ">= 0.0.0", features = ["fs", "parking_lot"] }
 regex = "1.6.0"
 reqwest = { version = "0.12.2", features = ["json", "rustls-tls"] }
