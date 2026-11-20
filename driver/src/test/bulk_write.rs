@@ -795,3 +795,43 @@ async fn top_level_error_halts_get_mores() {
     test(true).await;
     test(false).await;
 }
+
+#[tokio::test]
+async fn replace_one_model_setters() {
+    require_8_0!("replace_one_model_setters");
+
+    let client = Client::for_test().monitor_events().await;
+    let collection = client
+        .database("db")
+        .collection::<Document>("replace_one_model_setters");
+    collection.drop().await.unwrap();
+
+    let model = collection
+        .replace_one_model(doc! { "_id": 1 }, doc! { "x": 1 })
+        .unwrap()
+        .collation(doc! { "locale": "en" })
+        .hint(doc! { "_id": 1 })
+        .upsert(true)
+        .sort(doc! { "_id": 1 });
+    assert_eq!(model.collation, Some(doc! { "locale": "en" }));
+    assert_eq!(model.hint, Some(doc! { "_id": 1 }.into()));
+    assert_eq!(model.upsert, Some(true));
+    assert_eq!(model.sort, Some(doc! { "_id": 1 }));
+
+    let result = client.bulk_write(vec![model]).await.unwrap();
+    assert_eq!(result.upserted_count, 1);
+
+    let events = client.events.get_command_started_events(&["bulkWrite"]);
+    assert_eq!(events.len(), 1);
+    let ops = events[0].command.get_array("ops").unwrap();
+    let op = ops[0].as_document().unwrap();
+    assert_eq!(op.get_document("collation"), Ok(&doc! { "locale": "en" }));
+    assert_eq!(op.get_document("hint"), Ok(&doc! { "_id": 1 }));
+    assert_eq!(op.get_bool("upsert"), Ok(true));
+    assert_eq!(op.get_document("sort"), Ok(&doc! { "_id": 1 }));
+
+    assert_eq!(
+        collection.find_one(doc! {}).await.unwrap(),
+        Some(doc! { "_id": 1, "x": 1 })
+    );
+}
