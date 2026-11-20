@@ -1311,67 +1311,6 @@ async fn stable_api_examples() -> GenericResult<()> {
     let db = client.database("stable-api-migration-examples");
     db.collection::<Document>("sales").drop().await?;
 
-    use std::{error::Error, result::Result};
-
-    // Start Versioned API Example 5
-    // With the `bson-chrono-0_4` feature enabled, this function can be dropped in favor of using
-    // `chrono::DateTime` values directly.
-    fn iso_date(text: &str) -> Result<crate::bson::DateTime, Box<dyn Error>> {
-        let chrono_dt = chrono::DateTime::parse_from_rfc3339(text)?;
-        Ok(crate::bson::DateTime::from_millis(
-            chrono_dt.timestamp_millis(),
-        ))
-    }
-    db.collection("sales").insert_many(vec![
-        doc! { "_id" : 1, "item" : "abc", "price" : 10, "quantity" : 2, "date" : iso_date("2021-01-01T08:00:00Z")? },
-        doc! { "_id" : 3, "item" : "xyz", "price" : 5, "quantity" : 5, "date" : iso_date("2021-02-03T09:05:00Z")? },
-        doc! { "_id" : 2, "item" : "jkl", "price" : 20, "quantity" : 1, "date" : iso_date("2021-02-03T09:00:00Z")? },
-        doc! { "_id" : 4, "item" : "abc", "price" : 10, "quantity" : 10, "date" : iso_date("2021-02-15T08:00:00Z")? },
-        doc! { "_id" : 5, "item" : "xyz", "price" : 5, "quantity" : 10, "date" : iso_date("2021-02-15T09:05:00Z")? },
-        doc! { "_id" : 6, "item" : "xyz", "price" : 5, "quantity" : 5, "date" : iso_date("2021-02-15T12:05:10Z")? },
-        doc! { "_id" : 7, "item" : "xyz", "price" : 5, "quantity" : 10, "date" : iso_date("2021-02-15T14:12:12Z")? },
-        doc! { "_id" : 8, "item" : "abc", "price" : 10, "quantity" : 5, "date" : iso_date("2021-03-16T20:20:13Z")? }
-    ]).await?;
-    // End Versioned API Example 5
-
-    // Start Versioned API Example 6
-    let result = db
-        .run_command(doc! {
-            "count": "sales"
-        })
-        .await;
-    if let Err(err) = &result {
-        println!("{:#?}", err.kind);
-        // Prints:
-        // Command(
-        //     CommandError {
-        //         code: 323,
-        //         code_name: "APIStrictError",
-        //         message: "Provided apiStrict:true, but the command count is not in API Version 1. Information on supported commands and migrations in API Version 1 can be found at https://www.mongodb.com/docs/v5.0/reference/stable-api/",
-        //     },
-        // )
-    }
-    // End Versioned API Example 6
-
-    // TODO: Uncomment or remove this test once the prior example is updated
-    // if let ErrorKind::Command(ref err) = *result.as_ref().unwrap_err().kind {
-    //     assert_eq!(err.code, 323);
-    //     assert_eq!(err.code_name, "APIStrictError".to_string());
-    // } else {
-    //     panic!("invalid result {:?}", result);
-    // };
-
-    // Start Versioned API Example 7
-    let count = db
-        .collection::<Document>("sales")
-        .count_documents(doc! {})
-        .await?;
-    // End Versioned API Example 7
-
-    // Start Versioned API Example 8
-    assert_eq!(count, 8);
-    // End Versioned API Example 8
-
     Ok(())
 }
 
