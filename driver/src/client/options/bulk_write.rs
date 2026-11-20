@@ -228,6 +228,37 @@ pub struct ReplaceOneModel {
     pub sort: Option<Document>,
 }
 
+impl ReplaceOneModel {
+    /// Sets the collation to use.
+    #[must_use]
+    pub fn collation(mut self, value: Document) -> Self {
+        self.collation = Some(value);
+        self
+    }
+
+    /// Sets the index to use. Specify either the index name as a string or the index key pattern.
+    #[must_use]
+    pub fn hint(mut self, value: impl Into<Bson>) -> Self {
+        self.hint = Some(value.into());
+        self
+    }
+
+    /// Sets whether a new document should be created if no document matches the filter.
+    #[must_use]
+    pub fn upsert(mut self, value: bool) -> Self {
+        self.upsert = Some(value);
+        self
+    }
+
+    /// Sets the sort order that decides which document is replaced if the filter matches multiple
+    /// documents.
+    #[must_use]
+    pub fn sort(mut self, value: Document) -> Self {
+        self.sort = Some(value);
+        self
+    }
+}
+
 impl From<ReplaceOneModel> for WriteModel {
     fn from(model: ReplaceOneModel) -> Self {
         Self::ReplaceOne(model)
@@ -314,6 +345,9 @@ where
 
     /// Constructs a [`ReplaceOneModel`] with this collection's namespace by serializing the
     /// provided value into a [`Document`]. Returns an error if serialization fails.
+    ///
+    /// Optional fields can be set on the returned model with its setter methods, e.g.
+    /// [`upsert`](ReplaceOneModel::upsert).
     ///
     /// Note that the returned value must be provided to [`bulk_write`](crate::Client::bulk_write)
     /// for the replace to be performed.
