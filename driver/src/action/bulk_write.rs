@@ -239,6 +239,10 @@ where
                     let current_bulk_write_error =
                         Self::get_current_bulk_write_error(&mut current_error);
                     current_bulk_write_error.merge(bulk_write_error);
+                    // A result-cursor failure must stop execution of further batches.
+                    if let Some(source) = error.source {
+                        current_error.source = Some(source);
+                    }
                     Self::Error(current_error)
                 }
                 _ => Self::Error(current_error.with_source(error)),
