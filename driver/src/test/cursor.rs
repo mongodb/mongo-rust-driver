@@ -4,10 +4,16 @@ use futures::{future::Either, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bson::doc,
-    options::{CreateCollectionOptions, CursorType, FindOptions},
+    bson::{doc, Bson},
+    options::{
+        CreateCollectionOptions,
+        CursorType,
+        FindOptions,
+        ReadPreference,
+        SelectionCriteria,
+    },
     runtime,
-    test::log_uncaptured,
+    test::{log_uncaptured, topology_is_replica_set},
     Client,
 };
 
@@ -142,6 +148,80 @@ async fn batch_exhaustion() {
     let cursor = last.get_document("cursor").unwrap();
     let id = cursor.get_i64("id").unwrap();
     assert_eq!(0, id);
+}
+
+#[tokio::test]
+async fn drop_aggregate_cursor_on_secondary() {
+    if !topology_is_replica_set().await {
+        log_uncaptured("skipping drop_aggregate_cursor_on_secondary: requires a replica set");
+        return;
+    }
+    let client = Client::for_test().monitor_events().await;
+    let hello = client.hello().await.unwrap();
+    let data_bearing_members =
+        hello.hosts.as_ref().map_or(0, Vec::len) + hello.passives.as_ref().map_or(0, Vec::len);
+    if data_bearing_members < 2 {
+        log_uncaptured("skipping drop_aggregate_cursor_on_secondary: requires a secondary");
+        return;
+    }
+
+    let coll = client
+        .create_fresh_collection("drop_aggregate_cursor_on_secondary", "items", None)
+        .await;
+    coll.insert_many((0..6).map(|i| doc! { "_id": i }))
+        .await
+        .unwrap();
+
+    let secondary = SelectionCriteria::from(ReadPreference::secondary(None));
+    tokio::time::timeout(Duration::from_secs(25), async {
+        while coll
+            .find_one(doc! { "_id": 5 })
+            .selection_criteria(secondary.clone())
+            .await
+            .unwrap()
+            .is_none()
+        {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("seed documents did not replicate to the secondary");
+
+    let mut cursor = coll
+        .aggregate([])
+        .selection_criteria(secondary)
+        .batch_size(2)
+        .await
+        .unwrap();
+    let (aggregate, response) = client.events.get_successful_command_execution("aggregate");
+    let cursor_id = response
+        .reply
+        .get_document("cursor")
+        .unwrap()
+        .get_i64("id")
+        .unwrap();
+    assert_ne!(cursor_id, 0);
+
+    let (completion, done) = tokio::sync::oneshot::channel();
+    cursor.raw_mut().unwrap().set_kill_watcher(completion);
+    drop(cursor);
+    tokio::time::timeout(Duration::from_secs(10), done)
+        .await
+        .expect("timed out waiting for killCursors")
+        .expect("killCursors watcher was dropped");
+
+    let (kill, response) = client
+        .events
+        .get_successful_command_execution("killCursors");
+    assert_eq!(kill.connection.address, aggregate.connection.address);
+    assert_eq!(
+        response
+            .reply
+            .get_array("cursorsKilled")
+            .unwrap()
+            .as_slice(),
+        &[Bson::Int64(cursor_id)]
+    );
 }
 
 #[tokio::test]
