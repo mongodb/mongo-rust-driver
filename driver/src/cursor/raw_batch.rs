@@ -373,7 +373,11 @@ impl Drop for RawBatchCursor {
             self.client.collection(&self.state.info.ns),
             self.state.info.id,
             self.state.pinned_connection.handle().map(|h| h.replicate()),
-            self.drop_address.take(),
+            Some(
+                self.drop_address
+                    .take()
+                    .unwrap_or_else(|| self.state.info.address.clone()),
+            ),
             #[cfg(feature = "opentelemetry")]
             self.disable_drop_op_span
                 .then(crate::otel::OpSpan::disabled),
@@ -491,7 +495,11 @@ impl Drop for SessionRawBatchCursor {
             self.client.collection(&self.state.info.ns),
             self.state.info.id,
             self.state.pinned_connection.handle().map(|h| h.replicate()),
-            self.drop_address.take(),
+            Some(
+                self.drop_address
+                    .take()
+                    .unwrap_or_else(|| self.state.info.address.clone()),
+            ),
             #[cfg(feature = "opentelemetry")]
             self.disable_drop_op_span
                 .then(crate::otel::OpSpan::disabled),
