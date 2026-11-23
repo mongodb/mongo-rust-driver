@@ -293,6 +293,7 @@ mod server_trace {
         let trace_dir = std::env::var("OTEL_TRACE_DIR").unwrap_or_else(|_| "".to_owned());
         if trace_dir.is_empty() {
             log_uncaptured("skipping server_span_joins_driver_trace: OTEL_TRACE_DIR unset");
+            return;
         }
 
         // 1. Create a MongoClient with tracing enabled.
@@ -342,7 +343,8 @@ mod server_trace {
     async fn one_server_span_per_retry() {
         let trace_dir = std::env::var("OTEL_TRACE_DIR").unwrap_or_else(|_| "".to_owned());
         if trace_dir.is_empty() {
-            log_uncaptured("skipping server_span_joins_driver_trace: OTEL_TRACE_DIR unset");
+            log_uncaptured("skipping one_server_span_per_retry: OTEL_TRACE_DIR unset");
+            return;
         }
 
         // 1. Create a MongoClient with tracing enabled and retryable reads enabled (the default).
@@ -427,7 +429,8 @@ mod server_trace {
     async fn no_trace_for_auth() {
         let trace_dir = std::env::var("OTEL_TRACE_DIR").unwrap_or_else(|_| "".to_owned());
         if trace_dir.is_empty() {
-            log_uncaptured("skipping server_span_joins_driver_trace: OTEL_TRACE_DIR unset");
+            log_uncaptured("skipping no_trace_for_auth: OTEL_TRACE_DIR unset");
+            return;
         }
 
         // 1. Create a MongoClient with tracing enabled against a deployment that requires
