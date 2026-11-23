@@ -1,9 +1,9 @@
 extern crate proc_macro;
 
 mod action_impl;
-mod deserialize;
 mod option;
 mod rustdoc;
+mod serde;
 
 use macro_magic::import_tokens_attr;
 use syn::{bracketed, parse::ParseStream, punctuated::Punctuated, Error, Ident, Token};
@@ -75,7 +75,7 @@ pub fn options_doc(
 /// derives; in non-test builds those attributes are accepted but generate nothing.
 #[proc_macro_derive(TestDeserialize, attributes(serde))]
 pub fn test_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    crate::deserialize::derive_deserialize(input)
+    crate::serde::derive_deserialize(input)
 }
 
 /// Derives a `serde::Serialize` impl that only exists under `#[cfg(test)]`, for types the driver
@@ -83,7 +83,7 @@ pub fn test_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 /// derives; in non-test builds those attributes are accepted but generate nothing.
 #[proc_macro_derive(TestSerialize, attributes(serde))]
 pub fn test_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    crate::deserialize::derive_serialize(input)
+    crate::serde::derive_serialize(input)
 }
 
 /// Parse an identifier with a specific expected value.
