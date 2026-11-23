@@ -287,7 +287,7 @@ mod server_trace {
 
     use super::*;
 
-    // Prose Test 7: Server spans join the driver's trace
+    /// Prose Test 7: Server spans join the driver's trace
     #[tokio::test]
     async fn server_span_joins_driver_trace() {
         let trace_dir = std::env::var("OTEL_TRACE_DIR").unwrap_or_else(|_| "".to_owned());
@@ -309,36 +309,24 @@ mod server_trace {
             .insert_one(doc! {})
             .await
             .unwrap();
-        let spans = dbg!(tracing.get_spans());
+        let spans = tracing.get_spans();
         let cmd_span = spans
             .values()
             .flatten()
             .find(|s| s.name == "insert")
             .expect("insert command span");
         let trace_id = cmd_span.span_context.trace_id();
-        let trace_id_hex = format!("{trace_id:x}");
         let span_id = cmd_span.span_context.span_id();
 
         // 3. Poll OTEL_TRACE_DIR until a server span appears whose traceId equals the command
         //    span's traceId, or the timeout elapses.
-        const TIMEOUT: Duration = Duration::from_secs(30);
-        let deadline = tokio::time::Instant::now() + TIMEOUT;
-        let mut found = vec![];
-        loop {
-            let spans = read_spans(Path::new(&trace_dir));
-            if tokio::time::Instant::now() >= deadline {
-                panic!("timed out waiting for traces in {trace_dir:?}, spans = {spans:#?}");
-            }
-            for span in spans {
-                if span["traceId"] == trace_id_hex {
-                    found.push(span);
-                }
-            }
-            if !found.is_empty() {
-                break;
-            }
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
+        let trace_id_hex = format!("{trace_id:x}");
+        let found = find_spans(
+            Path::new(&trace_dir),
+            |span| span["traceId"] == trace_id_hex,
+            1,
+        )
+        .await;
 
         // 4. Assert that exactly one such server span exists for the insert command and that its
         //    parentSpanId equals the driver command span's spanId.
@@ -347,6 +335,91 @@ mod server_trace {
         };
         assert_eq!(server_span["name"], "insert");
         assert_eq!(server_span["parentSpanId"], format!("{span_id:x}"));
+    }
+
+    /// Prose Test 8: One server span per retry attempt
+    #[tokio::test(flavor = "multi_thread")]
+    async fn one_server_span_per_retry() {
+        let trace_dir = std::env::var("OTEL_TRACE_DIR").unwrap_or_else(|_| "".to_owned());
+        if trace_dir.is_empty() {
+            log_uncaptured("skipping server_span_joins_driver_trace: OTEL_TRACE_DIR unset");
+        }
+
+        // 1. Create a MongoClient with tracing enabled and retryable reads enabled (the default).
+        let mut options = get_client_options().await.clone();
+        let (tracing, tracing_opts) = ClientTracing::new(&ObserveTracingMessages::default());
+        options.tracing = Some(tracing_opts);
+        options.retry_reads = Some(true);
+        let client = Client::for_test()
+            .options(options)
+            .use_single_mongos()
+            .await;
+
+        // 2. Configure the following failpoint:
+        let _fp = client.enable_fail_point(
+            FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(91),  // ShutdownInProgress (retryable)
+        ).await.unwrap();
+
+        // 3. Perform a find operation and assert it succeeds. Record the driver's command spans for
+        //    both find attempts (the failed first attempt and the successful retry); assert they
+        //    share one traceId and have distinct spanId values.
+        client
+            .database("one_server_span_per_retry")
+            .collection::<Document>("test")
+            .find(doc! {})
+            .await
+            .unwrap();
+        let spans = dbg!(tracing.get_spans());
+        let cmd_spans: Vec<_> = spans
+            .values()
+            .flatten()
+            .filter(|s| s.name == "find")
+            .collect();
+        let &[fail_span, retry_span] = cmd_spans.as_slice() else {
+            panic!("expected 2 spans, got {cmd_spans:#?}");
+        };
+        assert_eq!(
+            fail_span.span_context.trace_id(),
+            retry_span.span_context.trace_id()
+        );
+        assert_ne!(
+            fail_span.span_context.span_id(),
+            retry_span.span_context.span_id()
+        );
+
+        // 4. Poll OTEL_TRACE_DIR for server spans with that traceId.
+        let trace_id_hex = format!("{:x}", fail_span.span_context.trace_id());
+        let found = find_spans(
+            Path::new(&trace_dir),
+            |span| span["traceId"] == trace_id_hex,
+            2,
+        )
+        .await;
+
+        // 5. Assert that there are exactly two server spans whose parentSpanId is one of the two
+        //    command span spanIds, and that each attempt's command span has exactly one such child
+        //    (i.e. the server spans are parented per attempt, not both under one span).
+        let fail_span_id = format!("{:x}", fail_span.span_context.span_id());
+        let retry_span_id = format!("{:x}", retry_span.span_context.span_id());
+        let expected_ids = [fail_span_id.as_str(), retry_span_id.as_str()];
+        assert_eq!(
+            found
+                .iter()
+                .filter(|span| expected_ids.contains(&span["parentSpanId"].as_str().unwrap()))
+                .count(),
+            2,
+            "expected 2 spans parented by {expected_ids:?}, span list {found:#?}",
+        );
+        for id in expected_ids {
+            assert_eq!(
+                found
+                    .iter()
+                    .filter(|span| span["parentSpanId"] == id)
+                    .count(),
+                1,
+                "expected 1 span parented by {id:?}, span list {found:#?}",
+            );
+        }
     }
 
     fn read_spans(dir: &Path) -> Vec<Value> {
@@ -379,5 +452,20 @@ mod server_trace {
         }
 
         out
+    }
+
+    async fn find_spans(dir: &Path, pred: impl Fn(&Value) -> bool, min_count: usize) -> Vec<Value> {
+        const TIMEOUT: Duration = Duration::from_secs(30);
+        let deadline = tokio::time::Instant::now() + TIMEOUT;
+        loop {
+            let found: Vec<_> = read_spans(dir).into_iter().filter(&pred).collect();
+            if found.len() >= min_count {
+                return found;
+            }
+            if tokio::time::Instant::now() >= deadline {
+                panic!("timed out waiting for {min_count} spans in {dir:?}, found {found:#?}");
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
     }
 }
