@@ -1,6 +1,6 @@
 use opentelemetry_sdk::trace::{Sampler, SdkTracerProvider};
 
-#[cfg(feature = "otel-sdk-ratio")]
+#[cfg(all(feature = "otel-sdk-ratio", not(feature = "otel-sdk-always")))]
 const SAMPLE_RATIO: f64 = 0.01;
 
 pub(crate) struct OtelGuard {
@@ -13,7 +13,7 @@ pub(crate) fn init() -> OtelGuard {
         std::env::set_var("OTEL_RUST_INSTRUMENTATION_MONGODB_ENABLED", "true");
     }
 
-    #[cfg(feature = "otel-sdk-ratio")]
+    #[cfg(all(feature = "otel-sdk-ratio", not(feature = "otel-sdk-always")))]
     let sampler = Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(SAMPLE_RATIO)));
     #[cfg(feature = "otel-sdk-always")]
     let sampler = Sampler::AlwaysOn;
