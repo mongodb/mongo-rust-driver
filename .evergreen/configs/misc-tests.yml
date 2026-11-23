@@ -62,6 +62,7 @@ tasks:
           MONGODB_VERSION: latest
           TOPOLOGY: standalone
           OTEL: true
+          AUTH: auth
       - func: run driver test suite
         vars:
           TEST_FILTER: "test::spec::open_telemetry::server_trace"

@@ -280,7 +280,7 @@ async fn error_type_is_exception_type_server_err() {
 }
 
 mod server_trace {
-    use std::path::Path;
+    use std::{collections::HashSet, path::Path};
 
     use serde_json::Value;
     use tokio::time::Duration;
@@ -369,7 +369,7 @@ mod server_trace {
             .find(doc! {})
             .await
             .unwrap();
-        let spans = dbg!(tracing.get_spans());
+        let spans = tracing.get_spans();
         let cmd_spans: Vec<_> = spans
             .values()
             .flatten()
@@ -420,6 +420,86 @@ mod server_trace {
                 "expected 1 span parented by {id:?}, span list {found:#?}",
             );
         }
+    }
+
+    // Prose Test 9: No trace context for authentication and monitoring commands
+    #[tokio::test]
+    async fn no_trace_for_auth() {
+        let trace_dir = std::env::var("OTEL_TRACE_DIR").unwrap_or_else(|_| "".to_owned());
+        if trace_dir.is_empty() {
+            log_uncaptured("skipping server_span_joins_driver_trace: OTEL_TRACE_DIR unset");
+        }
+
+        // 1. Create a MongoClient with tracing enabled against a deployment that requires
+        //    authentication.
+        let mut options = get_client_options().await.clone();
+        let (tracing, tracing_opts) = ClientTracing::new(&ObserveTracingMessages::default());
+        options.tracing = Some(tracing_opts);
+        options.retry_reads = Some(true);
+        let client = Client::for_test()
+            .options(options)
+            .use_single_mongos()
+            .await;
+
+        // 2.Perform a find operation on a test collection, so that connection handshakes,
+        // authentication (e.g. saslStart/saslContinue), and server monitoring (hello) have all
+        // occurred.
+        client
+            .database("no_trace_for_auth")
+            .collection::<Document>("test")
+            .find(doc! {})
+            .await
+            .unwrap();
+
+        // 3. Record the set of traceId values of every span emitted by the driver.
+        let spans = tracing.get_spans();
+        let trace_ids: HashSet<_> = spans
+            .values()
+            .flatten()
+            .map(|s| format!("{:x}", s.span_context.trace_id()))
+            .collect();
+        let find_span = spans
+            .values()
+            .flatten()
+            .find(|s| s.name == "find")
+            .expect("find command span");
+
+        // 4. Poll OTEL_TRACE_DIR until the server span for the find command appears (this bounds
+        //    the wait for the remaining assertions), then collect all server spans whose traceId is
+        //    in the recorded set.
+        let find_id_hex = format!("{:x}", find_span.span_context.trace_id());
+        find_spans(Path::new(&trace_dir), |s| s["traceId"] == find_id_hex, 1).await;
+        let found = find_spans(
+            Path::new(&trace_dir),
+            |s| {
+                s["traceId"]
+                    .as_str()
+                    .is_some_and(|tid| trace_ids.contains(tid))
+            },
+            0,
+        )
+        .await;
+
+        // 5. Assert that no collected server span corresponds to an authentication or monitoring
+        //    command (hello, legacy hello, saslStart, saslContinue, authenticate): the driver
+        //    attaches no trace context to those commands, so any server spans they produce cannot
+        //    join the driver's traces.
+        const DISALLOWED_COMMANDS: &[&str] = &[
+            "hello",
+            "isMaster",
+            "ismaster",
+            "saslStart",
+            "saslContinue",
+            "authenticate",
+            "getnonce",
+        ];
+        assert!(
+            !found.iter().any(|s| s["name"]
+                .as_str()
+                .is_some_and(|n| DISALLOWED_COMMANDS.contains(&n))),
+            "span for auth or monitoring command present: {:#?}",
+            found,
+        );
     }
 
     fn read_spans(dir: &Path) -> Vec<Value> {
