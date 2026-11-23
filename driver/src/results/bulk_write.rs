@@ -1,16 +1,15 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use mongodb_internal_macros::TestSerialize;
-
 use crate::{
     error::bulk_write::PartialBulkWriteResult,
     results::{DeleteResult, InsertOneResult, UpdateResult},
 };
 
 /// Summary results returned from a [`bulk_write`](crate::Client::bulk_write) operation.
-#[serde_with::skip_serializing_none]
-#[derive(Clone, Debug, Default, TestSerialize)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(test, serde_with::skip_serializing_none)]
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
+#[cfg_attr(test, serde(rename_all = "camelCase"))]
 #[non_exhaustive]
 pub struct SummaryBulkWriteResult {
     /// The total number of documents inserted across all operations.
@@ -30,25 +29,35 @@ pub struct SummaryBulkWriteResult {
 }
 
 /// Verbose results returned from a [`bulk_write`](crate::Client::bulk_write) operation.
-#[serde_with::skip_serializing_none]
-#[derive(Clone, Debug, Default, TestSerialize)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(test, serde_with::skip_serializing_none)]
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(test, derive(serde::Serialize))]
+#[cfg_attr(test, serde(rename_all = "camelCase"))]
 #[non_exhaustive]
 pub struct VerboseBulkWriteResult {
     /// The summary results.
-    #[serde(flatten)]
+    #[cfg_attr(test, serde(flatten))]
     pub summary: SummaryBulkWriteResult,
 
     /// The results of each insert operation that was successfully performed.
-    #[serde(serialize_with = "crate::serde_util::serialize_indexed_map")]
+    #[cfg_attr(
+        test,
+        serde(serialize_with = "crate::serde_util::serialize_indexed_map")
+    )]
     pub insert_results: HashMap<usize, InsertOneResult>,
 
     /// The results of each update operation that was successfully performed.
-    #[serde(serialize_with = "crate::serde_util::serialize_indexed_map")]
+    #[cfg_attr(
+        test,
+        serde(serialize_with = "crate::serde_util::serialize_indexed_map")
+    )]
     pub update_results: HashMap<usize, UpdateResult>,
 
     /// The results of each delete operation that was successfully performed.
-    #[serde(serialize_with = "crate::serde_util::serialize_indexed_map")]
+    #[cfg_attr(
+        test,
+        serde(serialize_with = "crate::serde_util::serialize_indexed_map")
+    )]
     pub delete_results: HashMap<usize, DeleteResult>,
 }
 
