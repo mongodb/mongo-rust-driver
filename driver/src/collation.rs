@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 
-use serde::{Deserialize, Serialize};
+use mongodb_internal_macros::{InternalDeserialize, InternalSerialize};
+use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
 use crate::error::{Error, ErrorKind};
@@ -9,7 +10,7 @@ use crate::error::{Error, ErrorKind};
 /// [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more information on
 /// each of the fields.
 #[serde_with::skip_serializing_none]
-#[derive(Clone, Debug, Default, Serialize, Deserialize, TypedBuilder)]
+#[derive(Clone, Debug, Default, InternalSerialize, InternalDeserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
@@ -21,12 +22,14 @@ pub struct Collation {
     pub locale: String,
 
     /// The level of comparison to perform. Corresponds to [ICU Comparison Levels](http://userguide.icu-project.org/collation/concepts#TOC-Comparison-Levels).
+    #[serde(default, with = "crate::serde_util::internal")]
     pub strength: Option<CollationStrength>,
 
     /// Whether to include a separate level for case differences. See [ICU Collation: CaseLevel](http://userguide.icu-project.org/collation/concepts#TOC-CaseLevel) for more information.
     pub case_level: Option<bool>,
 
     /// The sort order of case differences during tertiary level comparisons.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub case_first: Option<CollationCaseFirst>,
 
     /// Whether to compare numeric strings as numbers or strings.
@@ -34,10 +37,12 @@ pub struct Collation {
 
     /// Whether collation should consider whitespace and punctuation as base characters for
     /// purposes of comparison.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub alternate: Option<CollationAlternate>,
 
     /// Up to which characters are considered ignorable when `alternate` is "shifted". Has no
     /// effect if `alternate` is set to "non-ignorable".
+    #[serde(default, with = "crate::serde_util::internal")]
     pub max_variable: Option<CollationMaxVariable>,
 
     /// Whether to check if text require normalization and to perform it.
@@ -115,8 +120,8 @@ impl TryFrom<u32> for CollationStrength {
     }
 }
 
-impl Serialize for CollationStrength {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+impl crate::serde_util::InternalSerialize for CollationStrength {
+    fn serialize_internal<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -125,8 +130,8 @@ impl Serialize for CollationStrength {
     }
 }
 
-impl<'de> Deserialize<'de> for CollationStrength {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+impl<'de> crate::serde_util::InternalDeserialize<'de> for CollationStrength {
+    fn deserialize_internal<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -143,7 +148,7 @@ impl std::fmt::Display for CollationStrength {
 
 /// Setting that determines sort order of case differences during case tertiary level comparisons.
 /// For more info, see <http://userguide.icu-project.org/collation/customization>.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, InternalSerialize, InternalDeserialize)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum CollationCaseFirst {
@@ -193,7 +198,7 @@ impl std::fmt::Display for CollationCaseFirst {
 
 /// Setting that determines whether collation should consider whitespace and punctuation as base
 /// characters for purposes of comparison.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, InternalSerialize, InternalDeserialize)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum CollationAlternate {
@@ -237,7 +242,7 @@ impl std::fmt::Display for CollationAlternate {
 }
 
 /// Field that determines up to which characters are considered ignorable when alternate: "shifted".
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, InternalSerialize, InternalDeserialize)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum CollationMaxVariable {

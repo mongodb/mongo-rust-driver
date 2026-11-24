@@ -128,7 +128,9 @@ impl BaseOperation for Update {
             if let Some(ref collation) = options.collation {
                 update.append(
                     cstr!("collation"),
-                    crate::bson_compat::serialize_to_raw_document_buf(&collation)?,
+                    crate::bson_compat::serialize_to_raw_document_buf(
+                        &crate::serde_util::Internal(collation),
+                    )?,
                 );
             }
 

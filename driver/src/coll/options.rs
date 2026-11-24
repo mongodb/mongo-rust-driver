@@ -214,6 +214,7 @@ pub struct UpdateOptions {
     ///
     /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub collation: Option<Collation>,
 
     /// A document or string that specifies the index to use to support the query predicate.
@@ -279,6 +280,7 @@ pub struct ReplaceOptions {
     ///
     /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub collation: Option<Collation>,
 
     /// A document or string that specifies the index to use to support the query predicate.
@@ -324,6 +326,7 @@ pub struct DeleteOptions {
     ///
     /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub collation: Option<Collation>,
 
     /// The write concern for the operation.
@@ -376,6 +379,7 @@ pub struct FindOneAndDeleteOptions {
     ///
     /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub collation: Option<Collation>,
 
     /// The index to use for the operation.
@@ -433,6 +437,7 @@ pub struct FindOneAndReplaceOptions {
     ///
     /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub collation: Option<Collation>,
 
     /// The index to use for the operation.
@@ -496,6 +501,7 @@ pub struct FindOneAndUpdateOptions {
     ///
     /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub collation: Option<Collation>,
 
     /// The index to use for the operation.
@@ -546,6 +552,7 @@ pub struct AggregateOptions {
     ///
     /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub collation: Option<Collation>,
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
@@ -642,6 +649,7 @@ pub struct CountOptions {
     ///
     /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub collation: Option<Collation>,
 
     /// The criteria used to select a server for this operation.
@@ -736,6 +744,7 @@ pub struct DistinctOptions {
     ///
     /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub collation: Option<Collation>,
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
@@ -861,6 +870,7 @@ pub struct FindOptions {
     ///
     /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub collation: Option<Collation>,
 
     /// Map of parameter names and values. Values must be constant or closed
@@ -932,6 +942,7 @@ pub struct FindOneOptions {
     ///
     /// See the [documentation](https://www.mongodb.com/docs/manual/reference/collation/) for more
     /// information on how to use this option.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub collation: Option<Collation>,
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the

@@ -51,6 +51,7 @@ pub(crate) struct FindAndModifyOptions {
     #[serde(rename = "fields")]
     pub(crate) projection: Option<Document>,
 
+    #[serde(serialize_with = "crate::serde_util::internal::serialize")]
     pub(crate) collation: Option<Collation>,
 
     pub(crate) hint: Option<Hint>,

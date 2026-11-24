@@ -98,6 +98,7 @@ pub struct IndexOptions {
     pub partial_filter_expression: Option<Document>,
 
     /// Specifies the collation for the index.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub collation: Option<Collation>,
 
     /// Allows users to include or exclude specific field paths from a wildcard index.

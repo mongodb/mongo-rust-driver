@@ -75,7 +75,7 @@ pub fn options_doc(
 /// derives; in non-test builds those attributes are accepted but generate nothing.
 #[proc_macro_derive(TestDeserialize, attributes(serde))]
 pub fn test_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    crate::serde::derive_deserialize(input)
+    crate::serde::test::derive_deserialize(input)
 }
 
 /// Derives a `serde::Serialize` impl that only exists under `#[cfg(test)]`, for types the driver
@@ -83,7 +83,27 @@ pub fn test_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 /// derives; in non-test builds those attributes are accepted but generate nothing.
 #[proc_macro_derive(TestSerialize, attributes(serde))]
 pub fn test_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    crate::serde::derive_serialize(input)
+    crate::serde::test::derive_serialize(input)
+}
+
+/// Derives the `InternalSerialize` trait.  Reads the `#[serde(...)]` attributes as the serde
+/// derives. Fields whose types also implement `InternalSerialize` must be annotated with
+/// `#[serde(serialize_with = "crate::serde_util::internal::serialize")]`, or with
+/// `#[serde(with = "crate::serde_util::internal")]` if they also implement
+/// `InternalDeserialize`.
+#[proc_macro_derive(InternalSerialize, attributes(serde))]
+pub fn internal_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    crate::serde::internal::derive_serialize(input)
+}
+
+/// Derives `InternalDeserialize` trait. Reads the same `#[serde(...)]` attributes as the serde
+/// derives. Fields whose types also implement `InternalDeserialize` must be annotated with
+/// `#[serde(deserialize_with = "crate::serde_util::internal::deserialize")]`, or with
+/// `#[serde(with = "crate::serde_util::internal")]` if they also implement
+/// `InternalSerialize`.
+#[proc_macro_derive(InternalDeserialize, attributes(serde))]
+pub fn internal_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    crate::serde::internal::derive_deserialize(input)
 }
 
 /// Parse an identifier with a specific expected value.
