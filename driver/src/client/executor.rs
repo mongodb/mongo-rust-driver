@@ -660,7 +660,7 @@ impl Client {
                 op,
                 &connection_info,
                 connection.stream_description()?,
-                &message,
+                &mut message,
                 cmd_attrs,
             );
 

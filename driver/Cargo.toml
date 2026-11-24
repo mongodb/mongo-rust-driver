@@ -229,6 +229,7 @@ regex = "1.6.0"
 reqwest = { version = "0.12.2", features = ["json", "rustls-tls"] }
 serde-hex = "0.1.0"
 serde_path_to_error = "0.1"
+walkdir = "2"
 
 [dev-dependencies.bson3]
 git = "https://github.com/mongodb/bson-rust"

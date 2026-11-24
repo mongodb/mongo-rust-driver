@@ -151,7 +151,7 @@ impl Client {
         op: &impl Operation,
         conn_info: &ConnectionInfo,
         stream_desc: &StreamDescription,
-        message: &Message,
+        message: &mut Message,
         cmd_attrs: CommandAttributes,
     ) -> CmdSpan {
         let op = op.otel();
@@ -217,10 +217,16 @@ impl Client {
                 ));
             }
         }
-        CmdSpan {
+        let out = CmdSpan {
             context: Context::current_with_span(span),
             enabled,
+        };
+        if stream_desc.max_wire_version.is_some_and(|v| v >= 29) {
+            message.telemetry = out
+                .traceparent()
+                .map(|p| crate::bson::rawdoc! { "otel": {"traceparent": p}});
         }
+        out
     }
 
     pub(crate) fn start_transaction_span(&self) -> TxnSpan {
@@ -295,6 +301,20 @@ impl CmdSpan {
             };
             span.set_attribute(KeyValue::new("error.type", error_type));
         }
+    }
+
+    fn traceparent(&self) -> Option<String> {
+        let span = self.context.span();
+        let ctx = span.span_context();
+        if !ctx.is_valid() {
+            return None;
+        }
+        Some(format!(
+            "00-{:032x}-{:016x}-{:02x}",
+            ctx.trace_id(),
+            ctx.span_id(),
+            ctx.trace_flags().to_u8()
+        ))
     }
 }
 

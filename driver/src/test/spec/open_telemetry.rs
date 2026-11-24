@@ -278,3 +278,261 @@ async fn error_type_is_exception_type_server_err() {
     assert_ne!(error_type.value, status_code.value);
     assert_ne!(exception_type.value, status_code.value);
 }
+
+mod server_trace {
+    use std::{collections::HashSet, path::PathBuf, sync::LazyLock};
+
+    use serde_json::Value;
+    use tokio::time::Duration;
+
+    use super::*;
+
+    /// Prose Test 7: Server spans join the driver's trace
+    #[tokio::test]
+    #[ignore]
+    async fn server_span_joins_driver_trace() {
+        // 1. Create a MongoClient with tracing enabled.
+        let mut options = get_client_options().await.clone();
+        let (tracing, tracing_opts) = ClientTracing::new(&ObserveTracingMessages::default());
+        options.tracing = Some(tracing_opts);
+        let client = Client::for_test().options(options).await;
+
+        // 2. Perform an insertOne operation on a test collection and record the driver's command
+        //    span for the resulting insert command (its traceId and spanId).
+        client
+            .database("server_trace")
+            .collection::<Document>("test")
+            .insert_one(doc! {})
+            .await
+            .unwrap();
+        let spans = tracing.get_spans();
+        let cmd_span = spans
+            .values()
+            .flatten()
+            .find(|s| s.name == "insert")
+            .expect("insert command span");
+        let trace_id = cmd_span.span_context.trace_id();
+        let span_id = cmd_span.span_context.span_id();
+
+        // 3. Poll OTEL_TRACE_DIR until a server span appears whose traceId equals the command
+        //    span's traceId, or the timeout elapses.
+        let trace_id_hex = trace_id.to_string();
+        let found = find_spans(|span| span["traceId"] == trace_id_hex, 1).await;
+
+        // 4. Assert that exactly one such server span exists for the insert command and that its
+        //    parentSpanId equals the driver command span's spanId.
+        let [server_span] = found.as_slice() else {
+            panic!("expected a single span, got {found:#?}");
+        };
+        assert_eq!(server_span["name"], "insert");
+        assert_eq!(server_span["parentSpanId"], span_id.to_string());
+    }
+
+    /// Prose Test 8: One server span per retry attempt
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn one_server_span_per_retry() {
+        // 1. Create a MongoClient with tracing enabled and retryable reads enabled (the default).
+        let mut options = get_client_options().await.clone();
+        let (tracing, tracing_opts) = ClientTracing::new(&ObserveTracingMessages::default());
+        options.tracing = Some(tracing_opts);
+        options.retry_reads = Some(true);
+        let client = Client::for_test()
+            .options(options)
+            .use_single_mongos()
+            .await;
+
+        // 2. Configure the following failpoint:
+        let _fp = client.enable_fail_point(
+            FailPoint::fail_command(&["find"], FailPointMode::Times(1)).error_code(91),  // ShutdownInProgress (retryable)
+        ).await.unwrap();
+
+        // 3. Perform a find operation and assert it succeeds. Record the driver's command spans for
+        //    both find attempts (the failed first attempt and the successful retry); assert they
+        //    share one traceId and have distinct spanId values.
+        client
+            .database("one_server_span_per_retry")
+            .collection::<Document>("test")
+            .find(doc! {})
+            .await
+            .unwrap();
+        let spans = tracing.get_spans();
+        let cmd_spans: Vec<_> = spans
+            .values()
+            .flatten()
+            .filter(|s| s.name == "find")
+            .collect();
+        let &[fail_span, retry_span] = cmd_spans.as_slice() else {
+            panic!("expected 2 spans, got {cmd_spans:#?}");
+        };
+        assert_eq!(
+            fail_span.span_context.trace_id(),
+            retry_span.span_context.trace_id()
+        );
+        assert_ne!(
+            fail_span.span_context.span_id(),
+            retry_span.span_context.span_id()
+        );
+
+        // 4. Poll OTEL_TRACE_DIR for server spans with that traceId.
+        let trace_id_hex = fail_span.span_context.trace_id().to_string();
+        let found = find_spans(|span| span["traceId"] == trace_id_hex, 2).await;
+
+        // 5. Assert that there are exactly two server spans whose parentSpanId is one of the two
+        //    command span spanIds, and that each attempt's command span has exactly one such child
+        //    (i.e. the server spans are parented per attempt, not both under one span).
+        let fail_span_id = fail_span.span_context.span_id().to_string();
+        let retry_span_id = retry_span.span_context.span_id().to_string();
+        let expected_ids = [fail_span_id.as_str(), retry_span_id.as_str()];
+        assert_eq!(
+            found
+                .iter()
+                .filter(|span| expected_ids.contains(&span["parentSpanId"].as_str().unwrap()))
+                .count(),
+            2,
+            "expected 2 spans parented by {expected_ids:?}, span list {found:#?}",
+        );
+        for id in expected_ids {
+            assert_eq!(
+                found
+                    .iter()
+                    .filter(|span| span["parentSpanId"] == id)
+                    .count(),
+                1,
+                "expected 1 span parented by {id:?}, span list {found:#?}",
+            );
+        }
+    }
+
+    // Prose Test 9: No trace context for authentication and monitoring commands
+    #[tokio::test]
+    #[ignore]
+    async fn no_trace_for_auth() {
+        // 1. Create a MongoClient with tracing enabled against a deployment that requires
+        //    authentication.
+        let mut options = get_client_options().await.clone();
+        let (tracing, tracing_opts) = ClientTracing::new(&ObserveTracingMessages::default());
+        options.tracing = Some(tracing_opts);
+        options.retry_reads = Some(true);
+        let client = Client::for_test()
+            .options(options)
+            .use_single_mongos()
+            .await;
+
+        // 2.Perform a find operation on a test collection, so that connection handshakes,
+        // authentication (e.g. saslStart/saslContinue), and server monitoring (hello) have all
+        // occurred.
+        client
+            .database("no_trace_for_auth")
+            .collection::<Document>("test")
+            .find(doc! {})
+            .await
+            .unwrap();
+
+        // 3. Record the set of traceId values of every span emitted by the driver.
+        let spans = tracing.get_spans();
+        let trace_ids: HashSet<_> = spans
+            .values()
+            .flatten()
+            .map(|s| s.span_context.trace_id().to_string())
+            .collect();
+        let find_span = spans
+            .values()
+            .flatten()
+            .find(|s| s.name == "find")
+            .expect("find command span");
+
+        // 4. Poll OTEL_TRACE_DIR until the server span for the find command appears (this bounds
+        //    the wait for the remaining assertions), then collect all server spans whose traceId is
+        //    in the recorded set.
+        let find_id_hex = find_span.span_context.trace_id().to_string();
+        find_spans(|s| s["traceId"] == find_id_hex, 1).await;
+        let found = find_spans(
+            |s| {
+                s["traceId"]
+                    .as_str()
+                    .is_some_and(|tid| trace_ids.contains(tid))
+            },
+            0,
+        )
+        .await;
+
+        // 5. Assert that no collected server span corresponds to an authentication or monitoring
+        //    command (hello, legacy hello, saslStart, saslContinue, authenticate): the driver
+        //    attaches no trace context to those commands, so any server spans they produce cannot
+        //    join the driver's traces.
+        const DISALLOWED_COMMANDS: &[&str] = &[
+            "hello",
+            "isMaster",
+            "ismaster",
+            "saslStart",
+            "saslContinue",
+            "authenticate",
+            "getnonce",
+        ];
+        assert!(
+            !found.iter().any(|s| s["name"]
+                .as_str()
+                .is_some_and(|n| DISALLOWED_COMMANDS.contains(&n))),
+            "span for auth or monitoring command present: {:#?}",
+            found,
+        );
+    }
+
+    async fn find_spans(pred: impl Fn(&Value) -> bool, min_count: usize) -> Vec<Value> {
+        const TIMEOUT: Duration = Duration::from_secs(30);
+        let deadline = tokio::time::Instant::now() + TIMEOUT;
+        loop {
+            let found: Vec<_> = read_spans().into_iter().filter(&pred).collect();
+            if found.len() >= min_count {
+                return found;
+            }
+            if tokio::time::Instant::now() >= deadline {
+                panic!(
+                    "timed out waiting for {min_count} spans in {TRACE_DIR:?}, found {found:#?}"
+                );
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    }
+
+    static TRACE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+        let dir = std::env::var("OTEL_TRACE_DIR").expect("env var OTEL_TRACE_DIR unset");
+        if dir.is_empty() {
+            panic!("env var OTEL_TRACE_DIR empty");
+        }
+        PathBuf::from(dir)
+    });
+
+    fn read_spans() -> Vec<Value> {
+        let mut out = vec![];
+        for entry in walkdir::WalkDir::new(&*TRACE_DIR)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            eprintln!("reading {:?}", entry.path());
+            let text = match std::fs::read_to_string(entry.path()) {
+                Ok(text) => text,
+                Err(e) => {
+                    eprintln!("unable to read {:?}: {e}", entry.path());
+                    continue;
+                }
+            };
+            for line in text.lines().filter(|l| !l.trim().is_empty()) {
+                let Ok(batch) = serde_json::from_str::<Value>(line) else {
+                    continue;
+                };
+                for rs in batch["resourceSpans"].as_array().into_iter().flatten() {
+                    for ss in rs["scopeSpans"].as_array().into_iter().flatten() {
+                        out.extend(ss["spans"].as_array().into_iter().flatten().cloned());
+                    }
+                }
+            }
+        }
+
+        out
+    }
+}
