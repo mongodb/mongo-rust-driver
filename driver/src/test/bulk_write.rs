@@ -898,10 +898,13 @@ async fn replace_one_model_setters() {
     assert_eq!(events.len(), 1);
     let ops = events[0].command.get_array("ops").unwrap();
     let op = ops[0].as_document().unwrap();
-    assert_eq!(op.get_document("collation"), Ok(&doc! { "locale": "en" }));
-    assert_eq!(op.get_document("hint"), Ok(&doc! { "_id": 1 }));
-    assert_eq!(op.get_bool("upsert"), Ok(true));
-    assert_eq!(op.get_document("sort"), Ok(&doc! { "_id": 1 }));
+    assert_eq!(
+        op.get_document("collation").unwrap(),
+        &doc! { "locale": "en" }
+    );
+    assert_eq!(op.get_document("hint").unwrap(), &doc! { "_id": 1 });
+    assert_eq!(op.get_bool("upsert").unwrap(), true);
+    assert_eq!(op.get_document("sort").unwrap(), &doc! { "_id": 1 });
 
     assert_eq!(
         collection.find_one(doc! {}).await.unwrap(),
