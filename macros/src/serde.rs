@@ -17,35 +17,29 @@ use syn::{
     Token,
 };
 
-pub(crate) fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub(crate) fn derive_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    match derive_inner(input) {
+    into_output(derive_deserialize_inner(input))
+}
+
+pub(crate) fn derive_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    into_output(derive_serialize_inner(input))
+}
+
+fn into_output(result: syn::Result<TokenStream>) -> proc_macro::TokenStream {
+    match result {
         Ok(tokens) => tokens.into(),
         Err(e) => e.into_compile_error().into(),
     }
 }
 
-fn derive_inner(input: DeriveInput) -> syn::Result<TokenStream> {
+fn derive_deserialize_inner(input: DeriveInput) -> syn::Result<TokenStream> {
     let name = &input.ident;
     let mirror_name = Ident::new("__DeserializeMirror", Span::call_site());
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
-    let mut mirror = input.clone();
-    mirror.ident = mirror_name.clone();
-    mirror.vis = syn::Visibility::Inherited;
-    retain_serde_attrs(&mut mirror.attrs);
-    match &mut mirror.data {
-        Data::Struct(data) => strip_fields(&mut data.fields),
-        Data::Enum(data) => {
-            for variant in &mut data.variants {
-                retain_serde_attrs(&mut variant.attrs);
-                strip_fields(&mut variant.fields);
-            }
-        }
-        Data::Union(_) => {
-            return Err(syn::Error::new_spanned(&input, "unions are not supported"));
-        }
-    }
+    let mut mirror = mirror(&input, &mirror_name)?;
 
     let default_fn = Ident::new("__mirror_default", Span::call_site());
     let default_fn_str = LitStr::new(&default_fn.to_string(), Span::call_site());
@@ -113,6 +107,69 @@ fn derive_inner(input: DeriveInput) -> syn::Result<TokenStream> {
             }
         };
     })
+}
+
+fn derive_serialize_inner(input: DeriveInput) -> syn::Result<TokenStream> {
+    let name = &input.ident;
+    let mirror_name = Ident::new("__SerializeMirror", Span::call_site());
+    let (impl_generics, ty_generics, _) = input.generics.split_for_impl();
+
+    let mut mirror = mirror(&input, &mirror_name)?;
+    let remote = LitStr::new(&name.to_string(), Span::call_site());
+    mirror.attrs.push(parse_quote!(#[serde(remote = #remote)]));
+
+    let mut ser_generics = input.generics.clone();
+    let type_params: Vec<_> = ser_generics
+        .type_params()
+        .map(|param| param.ident.clone())
+        .collect();
+    let ser_where_clause = ser_generics.make_where_clause();
+    for param in type_params {
+        ser_where_clause
+            .predicates
+            .push(parse_quote!(#param: ::serde::Serialize));
+    }
+    let (_, _, ser_where_clause) = ser_generics.split_for_impl();
+
+    Ok(quote! {
+        #[cfg(test)]
+        const _: () = {
+            #[derive(::serde::Serialize)]
+            #mirror
+
+            #[automatically_derived]
+            impl #impl_generics ::serde::Serialize for #name #ty_generics #ser_where_clause {
+                fn serialize<__S>(&self, serializer: __S) -> ::std::result::Result<__S::Ok, __S::Error>
+                where
+                    __S: ::serde::Serializer,
+                {
+                    #mirror_name::serialize(self, serializer)
+                }
+            }
+        };
+    })
+}
+
+/// Creates a private copy of the input type with the given name that has only `#[serde(...)]`
+/// attributes, suitable for passing to the serde derives.
+fn mirror(input: &DeriveInput, mirror_name: &Ident) -> syn::Result<DeriveInput> {
+    let mut mirror = input.clone();
+    mirror.ident = mirror_name.clone();
+    mirror.vis = syn::Visibility::Inherited;
+    retain_serde_attrs(&mut mirror.attrs);
+    match &mut mirror.data {
+        Data::Struct(data) => strip_fields(&mut data.fields),
+        Data::Enum(data) => {
+            for variant in &mut data.variants {
+                retain_serde_attrs(&mut variant.attrs);
+                strip_fields(&mut variant.fields);
+            }
+        }
+        Data::Union(_) => {
+            return Err(syn::Error::new_spanned(input, "unions are not supported"));
+        }
+    }
+    Ok(mirror)
 }
 
 fn strip_fields(fields: &mut Fields) {
