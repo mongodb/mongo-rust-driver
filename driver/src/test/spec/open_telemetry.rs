@@ -280,7 +280,7 @@ async fn error_type_is_exception_type_server_err() {
 }
 
 mod server_trace {
-    use std::{collections::HashSet, path::Path};
+    use std::{collections::HashSet, path::PathBuf, sync::LazyLock};
 
     use serde_json::Value;
     use tokio::time::Duration;
@@ -289,13 +289,8 @@ mod server_trace {
 
     /// Prose Test 7: Server spans join the driver's trace
     #[tokio::test]
+    #[ignore]
     async fn server_span_joins_driver_trace() {
-        let trace_dir = std::env::var("OTEL_TRACE_DIR").unwrap_or_else(|_| "".to_owned());
-        if trace_dir.is_empty() {
-            log_uncaptured("skipping server_span_joins_driver_trace: OTEL_TRACE_DIR unset");
-            return;
-        }
-
         // 1. Create a MongoClient with tracing enabled.
         let mut options = get_client_options().await.clone();
         let (tracing, tracing_opts) = ClientTracing::new(&ObserveTracingMessages::default());
@@ -321,13 +316,8 @@ mod server_trace {
 
         // 3. Poll OTEL_TRACE_DIR until a server span appears whose traceId equals the command
         //    span's traceId, or the timeout elapses.
-        let trace_id_hex = format!("{trace_id:x}");
-        let found = find_spans(
-            Path::new(&trace_dir),
-            |span| span["traceId"] == trace_id_hex,
-            1,
-        )
-        .await;
+        let trace_id_hex = trace_id.to_string();
+        let found = find_spans(|span| span["traceId"] == trace_id_hex, 1).await;
 
         // 4. Assert that exactly one such server span exists for the insert command and that its
         //    parentSpanId equals the driver command span's spanId.
@@ -335,18 +325,13 @@ mod server_trace {
             panic!("expected a single span, got {found:#?}");
         };
         assert_eq!(server_span["name"], "insert");
-        assert_eq!(server_span["parentSpanId"], format!("{span_id:x}"));
+        assert_eq!(server_span["parentSpanId"], span_id.to_string());
     }
 
     /// Prose Test 8: One server span per retry attempt
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
     async fn one_server_span_per_retry() {
-        let trace_dir = std::env::var("OTEL_TRACE_DIR").unwrap_or_else(|_| "".to_owned());
-        if trace_dir.is_empty() {
-            log_uncaptured("skipping one_server_span_per_retry: OTEL_TRACE_DIR unset");
-            return;
-        }
-
         // 1. Create a MongoClient with tracing enabled and retryable reads enabled (the default).
         let mut options = get_client_options().await.clone();
         let (tracing, tracing_opts) = ClientTracing::new(&ObserveTracingMessages::default());
@@ -390,19 +375,14 @@ mod server_trace {
         );
 
         // 4. Poll OTEL_TRACE_DIR for server spans with that traceId.
-        let trace_id_hex = format!("{:x}", fail_span.span_context.trace_id());
-        let found = find_spans(
-            Path::new(&trace_dir),
-            |span| span["traceId"] == trace_id_hex,
-            2,
-        )
-        .await;
+        let trace_id_hex = fail_span.span_context.trace_id().to_string();
+        let found = find_spans(|span| span["traceId"] == trace_id_hex, 2).await;
 
         // 5. Assert that there are exactly two server spans whose parentSpanId is one of the two
         //    command span spanIds, and that each attempt's command span has exactly one such child
         //    (i.e. the server spans are parented per attempt, not both under one span).
-        let fail_span_id = format!("{:x}", fail_span.span_context.span_id());
-        let retry_span_id = format!("{:x}", retry_span.span_context.span_id());
+        let fail_span_id = fail_span.span_context.span_id().to_string();
+        let retry_span_id = retry_span.span_context.span_id().to_string();
         let expected_ids = [fail_span_id.as_str(), retry_span_id.as_str()];
         assert_eq!(
             found
@@ -426,13 +406,8 @@ mod server_trace {
 
     // Prose Test 9: No trace context for authentication and monitoring commands
     #[tokio::test]
+    #[ignore]
     async fn no_trace_for_auth() {
-        let trace_dir = std::env::var("OTEL_TRACE_DIR").unwrap_or_else(|_| "".to_owned());
-        if trace_dir.is_empty() {
-            log_uncaptured("skipping no_trace_for_auth: OTEL_TRACE_DIR unset");
-            return;
-        }
-
         // 1. Create a MongoClient with tracing enabled against a deployment that requires
         //    authentication.
         let mut options = get_client_options().await.clone();
@@ -459,7 +434,7 @@ mod server_trace {
         let trace_ids: HashSet<_> = spans
             .values()
             .flatten()
-            .map(|s| format!("{:x}", s.span_context.trace_id()))
+            .map(|s| s.span_context.trace_id().to_string())
             .collect();
         let find_span = spans
             .values()
@@ -470,10 +445,9 @@ mod server_trace {
         // 4. Poll OTEL_TRACE_DIR until the server span for the find command appears (this bounds
         //    the wait for the remaining assertions), then collect all server spans whose traceId is
         //    in the recorded set.
-        let find_id_hex = format!("{:x}", find_span.span_context.trace_id());
-        find_spans(Path::new(&trace_dir), |s| s["traceId"] == find_id_hex, 1).await;
+        let find_id_hex = find_span.span_context.trace_id().to_string();
+        find_spans(|s| s["traceId"] == find_id_hex, 1).await;
         let found = find_spans(
-            Path::new(&trace_dir),
             |s| {
                 s["traceId"]
                     .as_str()
@@ -505,9 +479,34 @@ mod server_trace {
         );
     }
 
-    fn read_spans(dir: &Path) -> Vec<Value> {
+    async fn find_spans(pred: impl Fn(&Value) -> bool, min_count: usize) -> Vec<Value> {
+        const TIMEOUT: Duration = Duration::from_secs(30);
+        let deadline = tokio::time::Instant::now() + TIMEOUT;
+        loop {
+            let found: Vec<_> = read_spans().into_iter().filter(&pred).collect();
+            if found.len() >= min_count {
+                return found;
+            }
+            if tokio::time::Instant::now() >= deadline {
+                panic!(
+                    "timed out waiting for {min_count} spans in {TRACE_DIR:?}, found {found:#?}"
+                );
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    }
+
+    static TRACE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+        let dir = std::env::var("OTEL_TRACE_DIR").expect("env var OTEL_TRACE_DIR unset");
+        if dir.is_empty() {
+            panic!("env var OTEL_TRACE_DIR empty");
+        }
+        PathBuf::from(dir)
+    });
+
+    fn read_spans() -> Vec<Value> {
         let mut out = vec![];
-        for entry in walkdir::WalkDir::new(dir)
+        for entry in walkdir::WalkDir::new(&*TRACE_DIR)
             .into_iter()
             .filter_map(Result::ok)
         {
@@ -535,20 +534,5 @@ mod server_trace {
         }
 
         out
-    }
-
-    async fn find_spans(dir: &Path, pred: impl Fn(&Value) -> bool, min_count: usize) -> Vec<Value> {
-        const TIMEOUT: Duration = Duration::from_secs(30);
-        let deadline = tokio::time::Instant::now() + TIMEOUT;
-        loop {
-            let found: Vec<_> = read_spans(dir).into_iter().filter(&pred).collect();
-            if found.len() >= min_count {
-                return found;
-            }
-            if tokio::time::Instant::now() >= deadline {
-                panic!("timed out waiting for {min_count} spans in {dir:?}, found {found:#?}");
-            }
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
     }
 }

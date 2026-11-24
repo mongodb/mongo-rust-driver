@@ -66,3 +66,4 @@ tasks:
       - func: run driver test suite
         vars:
           TEST_FILTER: "test::spec::open_telemetry::server_trace"
+          RUN_IGNORED: "all"

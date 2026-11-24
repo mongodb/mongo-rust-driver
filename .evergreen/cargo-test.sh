@@ -14,6 +14,9 @@ if [[ -f nextest-archive.tar.zst ]]; then
   CARGO_OPTIONS+=("--archive-file" "nextest-archive.tar.zst" "--workspace-remap" "${WORKSPACE_ROOT}")
 fi
 
+if [[ "${RUN_IGNORED}" != "" ]]; then
+  CARGO_OPTIONS+=("--run-ignored=${RUN_IGNORED}")
+fi
 
 cargo_test_options() {
   FEATURES="$(features_option)"
