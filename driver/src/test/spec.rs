@@ -44,7 +44,7 @@ pub(crate) use self::{
 };
 use crate::bson::Bson;
 
-use super::log_uncaptured;
+use super::{log_uncaptured, DSC};
 
 pub(crate) fn deserialize_spec_tests_from_exact_path<T: DeserializeOwned>(
     path: &[&str],
@@ -139,5 +139,23 @@ pub(crate) enum Serverless {
 impl Serverless {
     pub(crate) fn can_run(&self) -> bool {
         *self != Self::Require
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase", deny_unknown_fields)]
+pub(crate) enum Dsc {
+    Require,
+    Forbid,
+    Allow,
+}
+
+impl Dsc {
+    pub(crate) fn can_run(&self) -> bool {
+        match self {
+            Self::Require => *DSC,
+            Self::Forbid => !*DSC,
+            Self::Allow => true,
+        }
     }
 }

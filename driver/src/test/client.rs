@@ -9,7 +9,7 @@ use std::{
 use crate::{
     bson::Document,
     error::{RETRYABLE_ERROR, SYSTEM_OVERLOADED_ERROR},
-    test::spec::unified_runner::run_unified_tests,
+    test::{spec::unified_runner::run_unified_tests, DSC},
 };
 use serde::{Deserialize, Serialize};
 
@@ -173,6 +173,10 @@ async fn server_selection_timeout_message() {
 
 #[tokio::test]
 async fn list_databases() {
+    if *DSC {
+        log_uncaptured("skipping list_databases: sizeOnDisk field not reported");
+    }
+
     let expected_dbs = &["list_databases1", "list_databases2", "list_databases3"];
 
     let client = Client::for_test().await;

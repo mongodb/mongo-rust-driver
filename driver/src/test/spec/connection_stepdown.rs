@@ -9,6 +9,7 @@ use crate::{
         topology_is_replica_set,
         util::fail_point::{FailPoint, FailPointMode},
         EventClient,
+        DSC,
     },
     Collection,
     Database,
@@ -51,6 +52,13 @@ async fn run_test<F: Future>(
 
 #[tokio::test]
 async fn get_more() {
+    // The disaggregated storage cluster only has one member that can be a primary, so forcing it to
+    // step down causes failures in other tests.
+    if *DSC {
+        log_uncaptured("skipping get_more: running with a disaggregated storage cluster");
+        return;
+    }
+
     async fn get_more_test(client: EventClient, _db: Database, coll: Collection<Document>) {
         let docs = vec![doc! { "x": 1 }; 5];
         coll.insert_many(docs)

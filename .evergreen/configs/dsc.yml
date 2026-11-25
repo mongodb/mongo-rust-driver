@@ -1,0 +1,55 @@
+tasks:
+  - name: test-dsc
+    depends_on:
+      - name: build-nextest-archive
+    commands:
+      - func: fetch nextest archive
+      - func: start dsc
+        vars:
+          DSC_SLS_TAG: linux-x86-64-f987ae59a6f61e0b4e3edc73663992e15c4e9261
+      - func: run driver test suite
+        vars:
+          DSC: true
+
+functions:
+  start dsc:
+    - command: ec2.assume_role
+      type: setup
+      params:
+        role_arn: arn:aws:iam::664315256653:role/disagg-storage-tf-project-ro
+    - command: subprocess.exec
+      type: setup
+      params:
+        working_dir: src
+        binary: bash
+        include_expansions_in_env:
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - DSC_SLS_TAG
+          - DSC_MONGOD_TAG
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/disagg/setup.sh
+    - command: expansions.update
+      type: setup
+      params:
+        file: src/dsc-expansion.yml
+
+  stop dsc:
+    - command: subprocess.exec
+      params:
+        working_dir: src
+        binary: bash
+        args:
+          - ${DRIVERS_TOOLS}/.evergreen/disagg/teardown.sh
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/sls-logs.txt.gz
+        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${version_id}/${build_id}/logs/${task_id}-${execution}-sls-logs.txt.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: "sls-logs.txt.gz"
+        optional: true

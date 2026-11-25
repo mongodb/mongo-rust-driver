@@ -6,11 +6,16 @@ use crate::{
     error::ErrorKind,
     event::command::CommandEvent,
     runtime::process::Process,
-    test::{util::Event, EventClient},
+    test::{util::Event, EventClient, DSC},
     Client,
 };
 
 async fn spawn_mongocryptd(name: &str) -> Option<(EventClient, Process)> {
+    // mongocryptd is not installed
+    if *DSC {
+        return None;
+    }
+
     let pid_file_path = format!("--pidfilepath={name}.pid");
     let args = vec!["--port=47017", &pid_file_path];
     let process = Process::spawn("mongocryptd", args).expect("failed to spawn mongocryptd");

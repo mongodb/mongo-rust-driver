@@ -38,7 +38,7 @@ pub(crate) mod util;
 #[cfg(feature = "in-use-encryption")]
 pub(crate) use self::csfle_skip_local as csfle;
 pub(crate) use self::{
-    spec::{run_spec_test, Serverless, Topology},
+    spec::{run_spec_test, Dsc, Serverless, Topology},
     util::{
         assert_matches,
         eq_matches,
@@ -290,6 +290,8 @@ pub(crate) static LOAD_BALANCED_MULTIPLE_URI: LazyLock<Option<String>> =
     LazyLock::new(|| std::env::var("MULTI_MONGOS_LB_URI").ok());
 pub(crate) static OIDC_URI: LazyLock<Option<String>> =
     LazyLock::new(|| std::env::var("MONGODB_URI_SINGLE").ok());
+pub(crate) static DSC: LazyLock<bool> =
+    LazyLock::new(|| std::env::var("DSC").is_ok_and(|s| s == "true"));
 
 // conditional definitions do not work within the lazy_static! macro, so this
 // needs to be defined separately.
