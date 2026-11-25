@@ -148,33 +148,35 @@ async fn run_test(mut test_file: TestFile) {
             hosts.sort();
         }
 
-        // This loop allows for some time to allow SDAM to discover the desired topology
-        // TODO: RUST-232 or RUST-585: use SDAM monitoring / channels / timeouts to improve
-        // this.
-        let start = Instant::now();
-        loop {
-            let mut actual_hosts = client.get_hosts();
-            actual_hosts.sort();
+        if test_file.hosts.is_some() || test_file.num_hosts.is_some() {
+            // This loop allows for some time to allow SDAM to discover the desired topology
+            // TODO: RUST-232 or RUST-585: use SDAM monitoring / channels / timeouts to improve
+            // this.
+            let start = Instant::now();
+            loop {
+                let mut actual_hosts = client.get_hosts();
+                actual_hosts.sort();
 
-            if let Some(ref expected_hosts) = test_file.hosts {
-                if actual_hosts == *expected_hosts {
-                    break;
+                if let Some(ref expected_hosts) = test_file.hosts {
+                    if actual_hosts == *expected_hosts {
+                        break;
+                    }
+                } else if let Some(expected_host_count) = test_file.num_hosts {
+                    if actual_hosts.len() == expected_host_count {
+                        break;
+                    }
                 }
-            } else if let Some(expected_host_count) = test_file.num_hosts {
-                if actual_hosts.len() == expected_host_count {
-                    break;
+
+                if start.elapsed() > Duration::from_secs(5) {
+                    panic!(
+                        "expected to eventually discover hosts {:?} (num hosts {:?}), instead \
+                         found {:?}",
+                        test_file.hosts, test_file.num_hosts, actual_hosts
+                    )
                 }
-            }
 
-            if start.elapsed() > Duration::from_secs(5) {
-                panic!(
-                    "expected to eventually discover hosts {:?} (num hosts {:?}), instead found \
-                     {:?}",
-                    test_file.hosts, test_file.num_hosts, actual_hosts
-                )
+                tokio::time::sleep(Duration::from_millis(500)).await;
             }
-
-            tokio::time::sleep(Duration::from_millis(500)).await;
         }
     }
 
