@@ -1,7 +1,5 @@
-use std::convert::TryInto;
-
 use crate::{
-    bson::{Document, RawBsonRef, RawDocumentBuf},
+    bson::{RawBsonRef, RawDocumentBuf},
     bson_compat::{cstr, CStr},
     client::SESSIONS_UNSUPPORTED_COMMANDS,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
@@ -47,7 +45,7 @@ impl<'conn> RunCommand<'conn> {
 }
 
 impl BaseOperation for RunCommand<'_> {
-    type O = Document;
+    type O = RawDocumentBuf;
 
     // Since we can't actually specify a string statically here, we just put a descriptive string
     // that should fail loudly if accidentally passed to the server.
@@ -79,7 +77,7 @@ impl BaseOperation for RunCommand<'_> {
         response: &'a RawCommandResponse,
         _context: ResponseContext<'a>,
     ) -> Result<Self::O> {
-        Ok(response.raw_body().try_into()?)
+        Ok(response.raw_body().to_owned())
     }
 
     fn selection_criteria(&self) -> super::Feature<&SelectionCriteria> {
