@@ -169,13 +169,9 @@ impl<'a> RunCommand<'a> {
         self.session = Some(value.into());
         self
     }
-}
 
-#[action_impl]
-impl<'a> Action for RunCommand<'a> {
-    type Future = RunCommandFuture;
-
-    async fn execute(self) -> Result<Document> {
+    /// Run the command, returning the output as a `RawDocumentBuf`.
+    pub async fn as_raw(self) -> Result<RawDocumentBuf> {
         let mut selection_criteria = self.options.and_then(|o| o.selection_criteria);
         let command = self.command?;
         if let Some(session) = &self.session {
@@ -208,6 +204,15 @@ impl<'a> Action for RunCommand<'a> {
             .client()
             .execute_operation(operation, self.session)
             .await
+    }
+}
+
+#[action_impl]
+impl<'a> Action for RunCommand<'a> {
+    type Future = RunCommandFuture;
+
+    async fn execute(self) -> Result<Document> {
+        Ok(self.as_raw().await?.try_into()?)
     }
 }
 
