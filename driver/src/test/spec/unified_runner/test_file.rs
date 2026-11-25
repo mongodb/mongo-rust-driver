@@ -39,6 +39,7 @@ use crate::{
         get_server_parameters,
         get_topology,
         server_version_matches,
+        Dsc,
         Event,
         Serverless,
         DEFAULT_URI,
@@ -92,7 +93,7 @@ pub(crate) struct RunOnRequirement {
     auth: Option<bool>,
     csfle: Option<Csfle>,
     auth_mechanism: Option<AuthMechanism>,
-    dsc: Option<String>,
+    dsc: Option<Dsc>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -197,11 +198,8 @@ impl RunOnRequirement {
             }
         }
         if let Some(ref dsc) = self.dsc {
-            match dsc.as_str() {
-                "require" => {}
-                "forbid" => {}
-                "allow" => {}
-                other => panic!("unknown value for dsc run on requirement: {other}"),
+            if !dsc.can_run() {
+                return Err(format!("dsc requirement {dsc:?} not met"));
             }
         }
         Ok(())

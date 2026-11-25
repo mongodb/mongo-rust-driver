@@ -292,3 +292,4 @@ functions:
           - TEST_FILTER
           - OTEL_TRACE_DIR
           - RUN_IGNORED
+          - DSC

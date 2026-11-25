@@ -28,6 +28,7 @@ include:
   - filename: .evergreen/configs/happy-eyeballs.yml
   - filename: .evergreen/configs/aws-lambda.yml
   - filename: .evergreen/configs/misc-tests.yml
+  - filename: .evergreen/configs/dsc.yml
 
 # Functions to run before all tasks (except those in task groups).
 pre:
@@ -44,6 +45,7 @@ pre:
 # Functions to run after all tasks (except those in task groups).
 post:
   - func: "stop load balancer"
+  - func: "stop dsc"
   - func: "stop mongo orchestration"
   - func: "tear down aws"
   - func: "upload test results"
@@ -507,3 +509,12 @@ buildvariants:
     run_on: [rhel8-latest-small]
     tasks:
       - name: test-otel
+
+  - name: dsc
+    display_name: "Disaggregated Storage"
+    run_on:
+      - ubuntu2404-large
+    batchtime: 1440
+    tasks:
+      - name: build-nextest-archive
+      - name: test-dsc
