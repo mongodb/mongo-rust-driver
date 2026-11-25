@@ -92,6 +92,7 @@ pub(crate) struct RunOnRequirement {
     auth: Option<bool>,
     csfle: Option<Csfle>,
     auth_mechanism: Option<AuthMechanism>,
+    dsc: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -193,6 +194,14 @@ impl RunOnRequirement {
             if !actual_mechanism.is_some_and(|actual_mechanism| actual_mechanism == auth_mechanism)
             {
                 return Err(format!("requires {auth_mechanism:?} auth mechanism"));
+            }
+        }
+        if let Some(ref dsc) = self.dsc {
+            match dsc.as_str() {
+                "require" => {}
+                "forbid" => {}
+                "allow" => {}
+                other => panic!("unknown value for dsc run on requirement: {other}"),
             }
         }
         Ok(())
