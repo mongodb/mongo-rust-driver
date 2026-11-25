@@ -1,7 +1,9 @@
+pub(crate) mod internal;
+pub(crate) mod test;
+
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{
-    parse_macro_input,
     parse_quote,
     punctuated::Punctuated,
     Attribute,
@@ -10,172 +12,19 @@ use syn::{
     Expr,
     ExprLit,
     Fields,
+    Generics,
     Ident,
+    Lifetime,
     Lit,
     LitStr,
     Meta,
     Token,
 };
 
-pub(crate) fn derive_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    into_output(derive_deserialize_inner(input))
-}
-
-pub(crate) fn derive_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    into_output(derive_serialize_inner(input))
-}
-
 fn into_output(result: syn::Result<TokenStream>) -> proc_macro::TokenStream {
     match result {
         Ok(tokens) => tokens.into(),
         Err(e) => e.into_compile_error().into(),
-    }
-}
-
-fn derive_deserialize_inner(input: DeriveInput) -> syn::Result<TokenStream> {
-    let name = &input.ident;
-    let mirror_name = Ident::new("__DeserializeMirror", Span::call_site());
-    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-
-    let mut mirror = mirror(&input, &mirror_name)?;
-
-    let default_fn = Ident::new("__mirror_default", Span::call_site());
-    let default_fn_str = LitStr::new(&default_fn.to_string(), Span::call_site());
-    let default_impl = match find_container_default(&mut mirror.attrs, &default_fn_str)? {
-        None => quote!(),
-        Some(ContainerDefault::Trait) => {
-            let convert = convert(&input.data, &quote!(#name), &quote!(Self));
-            let mut generics = input.generics.clone();
-            generics
-                .make_where_clause()
-                .predicates
-                .push(parse_quote!(#name #ty_generics: ::std::default::Default));
-            let (_, _, default_where_clause) = generics.split_for_impl();
-            quote! {
-                impl #impl_generics ::std::default::Default for #mirror_name #ty_generics
-                    #default_where_clause
-                {
-                    fn default() -> Self {
-                        let __value: #name #ty_generics = ::std::default::Default::default();
-                        #convert
-                    }
-                }
-            }
-        }
-        Some(ContainerDefault::Path(path)) => {
-            let convert = convert(&input.data, &quote!(#name), &quote!(#mirror_name));
-            quote! {
-                fn #default_fn #impl_generics () -> #mirror_name #ty_generics #where_clause {
-                    let __value: #name #ty_generics = #path();
-                    #convert
-                }
-            }
-        }
-    };
-
-    let convert = convert(&input.data, &quote!(#mirror_name), &quote!(Self));
-
-    let mut de_generics = input.generics.clone();
-    de_generics.params.insert(0, parse_quote!('de));
-    de_generics
-        .make_where_clause()
-        .predicates
-        .push(parse_quote!(#mirror_name #ty_generics: ::serde::Deserialize<'de>));
-    let (de_impl_generics, _, de_where_clause) = de_generics.split_for_impl();
-
-    Ok(quote! {
-        #[cfg(test)]
-        const _: () = {
-            #[derive(::serde::Deserialize)]
-            #mirror
-
-            #default_impl
-
-            #[automatically_derived]
-            impl #de_impl_generics ::serde::Deserialize<'de> for #name #ty_generics #de_where_clause {
-                fn deserialize<__D>(deserializer: __D) -> ::std::result::Result<Self, __D::Error>
-                where
-                    __D: ::serde::Deserializer<'de>,
-                {
-                    let __value = <#mirror_name #ty_generics as ::serde::Deserialize<'de>>::deserialize(
-                        deserializer,
-                    )?;
-                    ::std::result::Result::Ok(#convert)
-                }
-            }
-        };
-    })
-}
-
-fn derive_serialize_inner(input: DeriveInput) -> syn::Result<TokenStream> {
-    let name = &input.ident;
-    let mirror_name = Ident::new("__SerializeMirror", Span::call_site());
-    let (impl_generics, ty_generics, _) = input.generics.split_for_impl();
-
-    let mut mirror = mirror(&input, &mirror_name)?;
-    let remote = LitStr::new(&name.to_string(), Span::call_site());
-    mirror.attrs.push(parse_quote!(#[serde(remote = #remote)]));
-
-    let mut ser_generics = input.generics.clone();
-    let type_params: Vec<_> = ser_generics
-        .type_params()
-        .map(|param| param.ident.clone())
-        .collect();
-    let ser_where_clause = ser_generics.make_where_clause();
-    for param in type_params {
-        ser_where_clause
-            .predicates
-            .push(parse_quote!(#param: ::serde::Serialize));
-    }
-    let (_, _, ser_where_clause) = ser_generics.split_for_impl();
-
-    Ok(quote! {
-        #[cfg(test)]
-        const _: () = {
-            #[derive(::serde::Serialize)]
-            #mirror
-
-            #[automatically_derived]
-            impl #impl_generics ::serde::Serialize for #name #ty_generics #ser_where_clause {
-                fn serialize<__S>(&self, serializer: __S) -> ::std::result::Result<__S::Ok, __S::Error>
-                where
-                    __S: ::serde::Serializer,
-                {
-                    #mirror_name::serialize(self, serializer)
-                }
-            }
-        };
-    })
-}
-
-/// Creates a private copy of the input type with the given name that has only `#[serde(...)]`
-/// attributes, suitable for passing to the serde derives.
-fn mirror(input: &DeriveInput, mirror_name: &Ident) -> syn::Result<DeriveInput> {
-    let mut mirror = input.clone();
-    mirror.ident = mirror_name.clone();
-    mirror.vis = syn::Visibility::Inherited;
-    retain_serde_attrs(&mut mirror.attrs);
-    match &mut mirror.data {
-        Data::Struct(data) => strip_fields(&mut data.fields),
-        Data::Enum(data) => {
-            for variant in &mut data.variants {
-                retain_serde_attrs(&mut variant.attrs);
-                strip_fields(&mut variant.fields);
-            }
-        }
-        Data::Union(_) => {
-            return Err(syn::Error::new_spanned(input, "unions are not supported"));
-        }
-    }
-    Ok(mirror)
-}
-
-fn strip_fields(fields: &mut Fields) {
-    for field in fields.iter_mut() {
-        field.vis = syn::Visibility::Inherited;
-        retain_serde_attrs(&mut field.attrs);
     }
 }
 
@@ -225,6 +74,162 @@ fn bindings(fields: &Fields) -> TokenStream {
             quote!((#(#bindings),*))
         }
         Fields::Unit => quote!(),
+    }
+}
+
+/// The pieces needed to implement a serde trait for a type via a private mirror of it.
+struct MirrorImpl {
+    /// The mirror definition, deriving the corresponding serde trait, plus any supporting items.
+    items: TokenStream,
+    /// The original type's generics, extended with whatever the impl needs.
+    generics: Generics,
+    /// The body of the impl's method.
+    body: TokenStream,
+}
+
+/// Implements serialization via a mirror that borrows each field of the original value.
+fn serialize_mirror(input: &DeriveInput) -> syn::Result<MirrorImpl> {
+    let name = &input.ident;
+    let mirror_name = Ident::new("__SerializeMirror", Span::call_site());
+    let lifetime = Lifetime::new("'__mirror", Span::call_site());
+
+    let has_fields = match &input.data {
+        Data::Struct(data) => !data.fields.is_empty(),
+        Data::Enum(data) => data.variants.iter().any(|v| !v.fields.is_empty()),
+        Data::Union(_) => false,
+    };
+    let mut mirror = mirror(input, &mirror_name, has_fields.then_some(&lifetime))?;
+
+    let mut generics = input.generics.clone();
+    if has_fields {
+        mirror.generics.params.insert(0, parse_quote!(#lifetime));
+    }
+    let (_, mirror_ty_generics, _) = mirror.generics.split_for_impl();
+    let bound = if has_fields {
+        parse_quote!(for<#lifetime> #mirror_name #mirror_ty_generics: ::serde::Serialize)
+    } else {
+        parse_quote!(#mirror_name #mirror_ty_generics: ::serde::Serialize)
+    };
+    generics.make_where_clause().predicates.push(bound);
+
+    let convert = convert(&input.data, &quote!(#name), &quote!(#mirror_name));
+
+    Ok(MirrorImpl {
+        items: quote! {
+            #[derive(::serde::Serialize)]
+            #mirror
+        },
+        generics,
+        body: quote! {
+            let __value = self;
+            let __mirror = #convert;
+            ::serde::Serialize::serialize(&__mirror, serializer)
+        },
+    })
+}
+
+/// Implements deserialization via an owned mirror of the original type.
+fn deserialize_mirror(input: &DeriveInput) -> syn::Result<MirrorImpl> {
+    let name = &input.ident;
+    let mirror_name = Ident::new("__DeserializeMirror", Span::call_site());
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
+    let mut mirror = mirror(input, &mirror_name, None)?;
+    let default_fn = Ident::new("__mirror_default", Span::call_site());
+    let default_fn_str = LitStr::new(&default_fn.to_string(), Span::call_site());
+    let default_impl = match find_container_default(&mut mirror.attrs, &default_fn_str)? {
+        None => quote!(),
+        Some(ContainerDefault::Trait) => {
+            let convert = convert(&input.data, &quote!(#name), &quote!(Self));
+            let mut generics = input.generics.clone();
+            generics
+                .make_where_clause()
+                .predicates
+                .push(parse_quote!(#name #ty_generics: ::std::default::Default));
+            let (_, _, default_where_clause) = generics.split_for_impl();
+            quote! {
+                impl #impl_generics ::std::default::Default for #mirror_name #ty_generics
+                    #default_where_clause
+                {
+                    fn default() -> Self {
+                        let __value: #name #ty_generics = ::std::default::Default::default();
+                        #convert
+                    }
+                }
+            }
+        }
+        Some(ContainerDefault::Path(path)) => {
+            let convert = convert(&input.data, &quote!(#name), &quote!(#mirror_name));
+            quote! {
+                fn #default_fn #impl_generics () -> #mirror_name #ty_generics #where_clause {
+                    let __value: #name #ty_generics = #path();
+                    #convert
+                }
+            }
+        }
+    };
+
+    let convert = convert(&input.data, &quote!(#mirror_name), &quote!(Self));
+
+    let mut generics = input.generics.clone();
+    generics.params.insert(0, parse_quote!('de));
+    generics
+        .make_where_clause()
+        .predicates
+        .push(parse_quote!(#mirror_name #ty_generics: ::serde::Deserialize<'de>));
+
+    Ok(MirrorImpl {
+        items: quote! {
+            #[derive(::serde::Deserialize)]
+            #mirror
+
+            #default_impl
+        },
+        generics,
+        body: quote! {
+            let __value = <#mirror_name #ty_generics as ::serde::Deserialize<'de>>::deserialize(
+                deserializer,
+            )?;
+            ::std::result::Result::Ok(#convert)
+        },
+    })
+}
+
+/// Creates a private copy of the input type with the given name that has only `#[serde(...)]`
+/// attributes, suitable for passing to the serde derives. If a lifetime is given, each field's type
+/// is replaced with a reference to it with that lifetime.
+fn mirror(
+    input: &DeriveInput,
+    mirror_name: &Ident,
+    borrow: Option<&Lifetime>,
+) -> syn::Result<DeriveInput> {
+    let mut mirror = input.clone();
+    mirror.ident = mirror_name.clone();
+    mirror.vis = syn::Visibility::Inherited;
+    retain_serde_attrs(&mut mirror.attrs);
+    match &mut mirror.data {
+        Data::Struct(data) => strip_fields(&mut data.fields, borrow),
+        Data::Enum(data) => {
+            for variant in &mut data.variants {
+                retain_serde_attrs(&mut variant.attrs);
+                strip_fields(&mut variant.fields, borrow);
+            }
+        }
+        Data::Union(_) => {
+            return Err(syn::Error::new_spanned(input, "unions are not supported"));
+        }
+    }
+    Ok(mirror)
+}
+
+fn strip_fields(fields: &mut Fields, borrow: Option<&Lifetime>) {
+    for field in fields.iter_mut() {
+        field.vis = syn::Visibility::Inherited;
+        retain_serde_attrs(&mut field.attrs);
+        if let Some(lifetime) = borrow {
+            let ty = &field.ty;
+            field.ty = parse_quote!(&#lifetime #ty);
+        }
     }
 }
 

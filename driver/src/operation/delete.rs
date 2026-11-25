@@ -54,7 +54,7 @@ impl BaseOperation for Delete {
         if let Some(ref collation) = self.collation {
             delete.insert(
                 "collation",
-                crate::bson_compat::serialize_to_bson(&collation)?,
+                crate::bson_compat::serialize_to_bson(&crate::serde_util::Internal(collation))?,
             );
         }
 

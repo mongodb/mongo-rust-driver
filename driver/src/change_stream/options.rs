@@ -69,7 +69,11 @@ pub struct ChangeStreamOptions {
     pub batch_size: Option<u32>,
 
     /// Specifies a collation.
-    #[serde(skip_serializing)]
+    #[serde(
+        default,
+        skip_serializing,
+        deserialize_with = "crate::serde_util::internal::deserialize"
+    )]
     pub collation: Option<Collation>,
 
     /// The read concern to use for the operation.

@@ -9,6 +9,113 @@ use crate::{
     serde_util,
 };
 
+/// Serialization functionality for driver types whose `Serialize` impls are not part of the public
+/// API. Use `#[derive(InternalSerialize)]` to implement.
+pub(crate) trait InternalSerialize {
+    fn serialize_internal<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>;
+}
+
+impl<T: InternalSerialize + ?Sized> InternalSerialize for &T {
+    fn serialize_internal<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        (**self).serialize_internal(serializer)
+    }
+}
+
+impl<T: InternalSerialize> InternalSerialize for Option<T> {
+    fn serialize_internal<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        match self {
+            Some(value) => serializer.serialize_some(&Internal(value)),
+            None => serializer.serialize_none(),
+        }
+    }
+}
+
+impl<T: InternalSerialize> InternalSerialize for Vec<T> {
+    fn serialize_internal<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        serializer.collect_seq(self.iter().map(Internal))
+    }
+}
+
+/// Deserialization functionality for driver types whose `Deserialize` impls are not part of the
+/// public API. Use `#[derive(InternalDeserialize)]` to implement.
+pub(crate) trait InternalDeserialize<'de>: Sized {
+    fn deserialize_internal<D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error>;
+}
+
+impl<'de, T: InternalDeserialize<'de>> InternalDeserialize<'de> for Option<T> {
+    fn deserialize_internal<D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        Ok(Option::<Internal<T>>::deserialize(deserializer)?.map(|value| value.0))
+    }
+}
+
+impl<'de, T: InternalDeserialize<'de>> InternalDeserialize<'de> for Vec<T> {
+    fn deserialize_internal<D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        Ok(Vec::<Internal<T>>::deserialize(deserializer)?
+            .into_iter()
+            .map(|value| value.0)
+            .collect())
+    }
+}
+
+/// Wrapper type to use a type that implements `InternalSerialize` or `InternalDeserialize` in APIs
+/// that expect `Serialize` or `Deserialize`.
+pub(crate) struct Internal<T>(pub(crate) T);
+
+impl<T: InternalSerialize> Serialize for Internal<T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+        self.0.serialize_internal(serializer)
+    }
+}
+
+impl<'de, T: InternalDeserialize<'de>> Deserialize<'de> for Internal<T> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        T::deserialize_internal(deserializer).map(Internal)
+    }
+}
+
+/// For use with `#[serde(with = "...")]` on fields whose types implement both `InternalSerialize`
+/// and `InternalDeserialize`. Fields that only need one direction can use `serialize` with
+/// `serialize_with` or `deserialize` with `deserialize_with`.
+pub(crate) mod internal {
+    use serde::{Deserializer, Serializer};
+
+    use super::{InternalDeserialize, InternalSerialize};
+
+    pub(crate) fn serialize<T, S>(value: &T, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        T: InternalSerialize + ?Sized,
+        S: Serializer,
+    {
+        value.serialize_internal(serializer)
+    }
+
+    pub(crate) fn deserialize<'de, T, D>(deserializer: D) -> std::result::Result<T, D::Error>
+    where
+        T: InternalDeserialize<'de>,
+        D: Deserializer<'de>,
+    {
+        T::deserialize_internal(deserializer)
+    }
+}
+
 /// Deserializes from a value into a optional `Document` without parsing extended JSON values. This
 /// is useful when representing invalid extended JSON, e.g. `{ "$numberLong": "string" }`.
 pub(crate) fn deserialize_document_bypass_extjson<'de, D>(

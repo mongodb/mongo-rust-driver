@@ -57,6 +57,7 @@ pub(super) struct Find {
     show_record_id: Option<bool>,
     skip: Option<u64>,
     sort: Option<Document>,
+    #[serde(default, deserialize_with = "crate::serde_util::internal::deserialize")]
     collation: Option<Collation>,
     #[serde(rename = "let")]
     let_vars: Option<Document>,
@@ -176,6 +177,7 @@ pub(super) struct CreateFindCursor {
     show_record_id: Option<bool>,
     skip: Option<u64>,
     sort: Option<Document>,
+    #[serde(default, deserialize_with = "crate::serde_util::internal::deserialize")]
     collation: Option<Collation>,
     #[serde(rename = "let")]
     let_vars: Option<Document>,

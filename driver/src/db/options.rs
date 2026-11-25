@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use crate::bson::doc;
 use macro_magic::export_tokens;
+use mongodb_internal_macros::{InternalDeserialize, InternalSerialize};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -70,10 +71,12 @@ pub struct CreateCollectionOptions {
 
     /// Specifies how strictly the database should apply the validation rules to existing documents
     /// during an update.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub validation_level: Option<ValidationLevel>,
 
     /// Specifies whether the database should return an error or simply raise a warning if inserted
     /// documents do not pass the validation.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub validation_action: Option<ValidationAction>,
 
     /// The name of the source collection or view to base this view on. If specified, this will
@@ -85,6 +88,7 @@ pub struct CreateCollectionOptions {
     pub pipeline: Option<Vec<Document>>,
 
     /// The default collation for the collection or view.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub collation: Option<Collation>,
 
     /// The write concern for the operation.
@@ -92,6 +96,7 @@ pub struct CreateCollectionOptions {
     pub write_concern: Option<WriteConcern>,
 
     /// The default configuration for indexes created on this collection, including the _id index.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub index_option_defaults: Option<IndexOptionDefaults>,
 
     /// An object containing options for creating time series collections. See the [`create`
@@ -100,6 +105,7 @@ pub struct CreateCollectionOptions {
     /// https://www.mongodb.com/docs/manual/core/timeseries-collections/) for more information.
     ///
     /// This feature is only available on server versions 5.0 and above.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub timeseries: Option<TimeseriesOptions>,
 
     /// Used to automatically delete documents in time series collections. See the [`create`
@@ -112,7 +118,11 @@ pub struct CreateCollectionOptions {
     pub change_stream_pre_and_post_images: Option<ChangeStreamPreAndPostImages>,
 
     /// Options for clustered collections. This option is only available on server versions 5.3+.
-    #[serde(default, deserialize_with = "ClusteredIndex::deserialize_self_or_true")]
+    #[serde(
+        default,
+        serialize_with = "crate::serde_util::internal::serialize",
+        deserialize_with = "ClusteredIndex::deserialize_self_or_true"
+    )]
     pub clustered_index: Option<ClusteredIndex>,
 
     /// Tags the query with an arbitrary [`Bson`] value to help trace the operation through the
@@ -126,7 +136,7 @@ pub struct CreateCollectionOptions {
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
 /// an update.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, InternalSerialize, InternalDeserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum ValidationLevel {
@@ -141,7 +151,7 @@ pub enum ValidationLevel {
 
 /// Specifies whether the database should return an error or simply raise a warning if inserted
 /// documents do not pass the validation.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, InternalSerialize, InternalDeserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum ValidationAction {
@@ -154,7 +164,7 @@ pub enum ValidationAction {
 /// Specifies options for a clustered collection.  Some fields have required values; the `Default`
 /// impl uses those values.
 #[skip_serializing_none]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, InternalSerialize, InternalDeserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ClusteredIndex {
@@ -195,7 +205,10 @@ impl ClusteredIndex {
         #[serde(untagged)]
         enum ValueUnion {
             Bool(bool),
-            ClusteredIndex(ClusteredIndex),
+            ClusteredIndex(
+                #[serde(deserialize_with = "crate::serde_util::internal::deserialize")]
+                ClusteredIndex,
+            ),
         }
 
         let value_option: Option<ValueUnion> = Deserialize::deserialize(deserializer)?;
@@ -212,7 +225,7 @@ impl ClusteredIndex {
 }
 
 /// Specifies default configuration for indexes created on a collection, including the _id index.
-#[derive(Clone, Debug, TypedBuilder, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, TypedBuilder, PartialEq, InternalSerialize, InternalDeserialize)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -225,7 +238,7 @@ pub struct IndexOptionDefaults {
 
 /// Specifies options for creating a timeseries collection.
 #[skip_serializing_none]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, InternalSerialize, InternalDeserialize, PartialEq, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
@@ -241,6 +254,7 @@ pub struct TimeseriesOptions {
 
     /// The units you'd use to describe the expected interval between subsequent measurements for a
     /// time-series.  Defaults to `TimeseriesGranularity::Seconds` if unset.
+    #[serde(default, with = "crate::serde_util::internal")]
     pub granularity: Option<TimeseriesGranularity>,
 
     /// The maximum time between timestamps in the same bucket. This value must be between 1 and
@@ -271,7 +285,7 @@ pub struct TimeseriesOptions {
 
 /// The units you'd use to describe the expected interval between subsequent measurements for a
 /// time-series.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, InternalSerialize, InternalDeserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum TimeseriesGranularity {
