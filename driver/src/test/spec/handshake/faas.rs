@@ -11,7 +11,7 @@ use crate::{
     Client,
 };
 
-use super::{watch_hello, watch_metadata, TempVars};
+use super::{watch_metadata, TempVars};
 
 type Result<T> = anyhow::Result<T>;
 
@@ -125,6 +125,11 @@ async fn invalid_multiple_providers() -> Result<()> {
     .await
 }
 
+#[cfg(not(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+)))]
 #[tokio::test]
 async fn invalid_long_string() -> Result<()> {
     // The oversized region is only dropped by truncation, so this checks the hello as sent.
@@ -134,7 +139,7 @@ async fn invalid_long_string() -> Result<()> {
     ]);
 
     let mut options = get_client_options().await.clone();
-    let hello = watch_hello(&mut options);
+    let hello = super::watch_hello(&mut options);
     let client = Client::for_test().options(options).await;
     client.list_database_names().await?;
     let sent: Document = hello
