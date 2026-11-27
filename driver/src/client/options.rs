@@ -1450,6 +1450,12 @@ impl ClientOptions {
             write_concern.validate()?;
         }
 
+        if let Some(ref credential) = self.credential {
+            if let Some(ref mechanism) = credential.mechanism {
+                mechanism.validate_credential(credential)?;
+            }
+        }
+
         if self.load_balanced.unwrap_or(false) {
             if self.hosts.len() > 1 {
                 return Err(ErrorKind::InvalidArgument {
