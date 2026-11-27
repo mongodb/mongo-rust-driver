@@ -1,7 +1,6 @@
 use std::sync::LazyLock;
 
 use crate::{
-    bson::doc,
     cmap::StreamDescription,
     options::{AuthMechanism, Credential},
     test::get_client_options,
@@ -115,12 +114,7 @@ async fn plain_auth_username_with_null_byte_rejected() {
         .build();
     let mut options = get_client_options().await.clone();
     options.credential = Some(credential);
-    let client = Client::with_options(options).unwrap();
-    let error = client
-        .database("db")
-        .run_command(doc! { "ping": 1 })
-        .await
-        .unwrap_err();
+    let error = Client::with_options(options).unwrap_err();
     assert!(error.is_invalid_argument());
     assert!(error
         .message()
@@ -137,13 +131,8 @@ async fn plain_auth_password_with_null_byte_rejected() {
         .build();
     let mut options = get_client_options().await.clone();
     options.credential = Some(credential);
-    let client = Client::with_options(options).unwrap();
-    let error = client
-        .database("db")
-        .run_command(doc! { "ping": 1 })
-        .await
-        .unwrap_err();
-    assert!(error.is_invalid_argument());
+    let error = Client::with_options(options).unwrap_err();
+    assert!(error.is_invalid_argument(), "{error:?}");
     assert!(error
         .message()
         .unwrap()
